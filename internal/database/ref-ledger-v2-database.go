@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
+
+	"encoding/json"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,6 +25,13 @@ var URI string
 
 var DatabaseVersion string = "ref-ledger-database-v2.1.0"
 
+var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending"}
+var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
+
+type GameFilter struct {
+	Status []string `json:"status"`
+}
+
 func InitDbase(dbName, uri string) {
 	Database = dbName
 	URI = uri
@@ -29,6 +39,87 @@ func InitDbase(dbName, uri string) {
 
 func SetURI(uri string) {
 	URI = uri
+}
+
+func BuildMongoGameFilter(path string) (bson.M, error) {
+
+	fmt.Println("Loading filter from", path)
+	file, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	var filter GameFilter
+	if err := json.Unmarshal(file, &filter); err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	fmt.Println("Filter loaded!")
+	fmt.Println("Building MongoDb Game Filter")
+	mongoFilter := bson.M{}
+
+	if len(filter.Status) > 0 {
+		mongoFilter["status"] = bson.M{
+			"$in": filter.Status,
+		}
+	}
+
+	fmt.Println("Mongo DB Filter successfully built!")
+	fmt.Println("Mongo Filter:", mongoFilter)
+	return mongoFilter, nil
+}
+
+func QueryCollection(filter bson.M, dbase, collection string) *mongo.Cursor {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	count, err := coll.CountDocuments(ctx, filter)
+
+	fmt.Println("coll.Find() found", count, "documents")
+	return cursor
+
+}
+
+func QueryGames(parentCtx context.Context, dbase, collection, filter string) ([]model.GameDescriptor, error) {
+
+	mongoDbFilter, err := BuildMongoGameFilter(filter)
+
+	fmt.Println(mongoDbFilter)
+
+	if err != nil {
+		fmt.Println("Failed to build Mongo DB Filter for games collection")
+		return []model.GameDescriptor{}, err
+	}
+
+	cursor := QueryCollection(mongoDbFilter, dbase, collection)
+
+	var results []model.GameDoc
+	var gameRecords []model.GameDescriptor
+
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.GameDescriptor{}, err
+	}
+
+	for _, r := range results {
+
+		gameRecords = append(gameRecords, utils.ConvertGameDocToGameDescr(r))
+
+	}
+	return gameRecords, nil
 }
 
 func Connect() error {
@@ -142,24 +233,6 @@ func DeleteOneDoc(parentCtx context.Context, doc model.GameDoc, dbase, collectio
 	fmt.Println("Deleted Record with GameId of", doc.GameId, " Records Deleted:", result.DeletedCount)
 }
 
-func QueryCollection(filter bson.M, dbase, collection string) *mongo.Cursor {
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return cursor
-
-}
-
 func InsertDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -196,8 +269,4 @@ func SetGameFilters(field, value string) {
 
 func GetGameFilters() bson.M {
 	return GameFilters
-}
-
-func QueryGames() *mongo.Cursor {
-	return (QueryCollection(GameFilters, Database, "games"))
 }

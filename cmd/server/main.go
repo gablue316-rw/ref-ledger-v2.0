@@ -1,12 +1,11 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
+	"ref-ledger-v2/internal/reports"
 )
 
 var Version string = "ref-ledger-v2.1.0"
@@ -53,27 +52,21 @@ func main() {
 	*/
 
 	//api.DelGame(ctx, game)
-	api.DelGameTable(ctx)
+	//api.DelGameTable(ctx)
 	//api.AddGame(ctx, game)
-	api.BulkAddGames(ctx, "masterGames.csv")
-	//api.DumpGames()
+	//api.BulkAddGames(ctx, "masterGames.csv")
+	//api.DumpGames(ctx)
 
-	database.SetGameFilters("status", "Completed")
-	database.SetGameFilters("status", "Paid")
-	database.SetGameFilters("u1", "Scott Henry")
+	//database.SetGameFilters("status", "Completed")
+	//database.SetGameFilters("status", "Paid")
+	//database.SetGameFilters("u1", "Scott Henry")
 
-	cursor := database.QueryGames()
+	var gameRecords []model.GameDescriptor
+	gameRecords, err = database.QueryGames(ctx, "refLedger_v2", "games", "gameFilter.json")
 
-	var results []model.GameDoc
-
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return
-	}
-
-	for _, r := range results {
-		fmt.Println(r)
+	if err == nil {
+		rept := reports.GenerateGameReport(gameRecords)
+		reports.PrintReport(rept)
 	}
 
 }
