@@ -1,0 +1,39 @@
+1. Modified games colleciton:
+   a. Change Referee, U1, U2, ECO, and Assignor to an ID.  This will be used 
+      to query the Officials colleciton
+   b. Change Site to be an ID.  This will be used to query the Sites collection
+
+2. Add Officials colleciton
+
+3. Add Sites collection 
+
+4. Add Association collection 
+
+5. Add Payment collection 
+
+6. Game Report:
+   a. Get Site by using the site id to query the Sites collection
+   b. Get Referee, U1, and U2 from Sites collection using their IDs.
+   c. Consolidate Referee, U1 and U2 in game report using the first initital of 
+      the first name and the full last name.  -- DONE 4/28/2026
+
+7. Add a validation layer to the code to validate the data before adding to the 
+   collections
+
+8. Add logging and error logs
+
+9. Add backup functions for the various collections
+
+10. Add ability to dump various collections
+
+11. Add abilty to email reports 
+
+12. Add ability to send reports to a file
+
+13. Calculate game fee by using the following formula  -- DONE 4/28/2026
+
+    numOfGames * gameFee + travelPay - deductions - assignorFees
+
+14. Calculate game report totals by association and status type
+
+15. Add config.json to configure refLedger

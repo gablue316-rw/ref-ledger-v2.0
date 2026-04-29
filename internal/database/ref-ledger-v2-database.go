@@ -29,7 +29,8 @@ var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Pai
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
 type GameFilter struct {
-	Status []string `json:"status"`
+	Status      []string `json:"status"`
+	Association []string `json:"association"`
 }
 
 func InitDbase(dbName, uri string) {
@@ -42,6 +43,10 @@ func SetURI(uri string) {
 }
 
 func BuildMongoGameFilter(path string) (bson.M, error) {
+
+	if path == "" {
+		return bson.M{}, nil
+	}
 
 	fmt.Println("Loading filter from", path)
 	file, err := os.ReadFile(path)
@@ -63,6 +68,12 @@ func BuildMongoGameFilter(path string) (bson.M, error) {
 	if len(filter.Status) > 0 {
 		mongoFilter["status"] = bson.M{
 			"$in": filter.Status,
+		}
+	}
+
+	if len(filter.Association) > 0 {
+		mongoFilter["association"] = bson.M{
+			"$in": filter.Association,
 		}
 	}
 
@@ -95,8 +106,6 @@ func QueryCollection(filter bson.M, dbase, collection string) *mongo.Cursor {
 func QueryGames(parentCtx context.Context, dbase, collection, filter string) ([]model.GameDescriptor, error) {
 
 	mongoDbFilter, err := BuildMongoGameFilter(filter)
-
-	fmt.Println(mongoDbFilter)
 
 	if err != nil {
 		fmt.Println("Failed to build Mongo DB Filter for games collection")
