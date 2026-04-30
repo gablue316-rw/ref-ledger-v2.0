@@ -22,6 +22,7 @@ func main() {
 	var report = flag.String("rpt", "", "Report to generate [games]")
 	var gstatus = flag.String("gs", "", "Status game should be set to or used to filter games report")
 	var assoc = flag.String("assoc", "", "Association used to filter reports")
+	var ugs = flag.String("ugs", "", "Update game status.  This is the status to set the game to")
 
 	flag.Parse()
 
@@ -39,6 +40,7 @@ func main() {
 	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generater [games]")
 	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status game should be set to or used to filter games report")
 	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
+	rootCmd.Flags().StringVar(ugs, "ugs", "", "Update game status.  This is the status to set the game to.")
 
 	rootCmd.Execute()
 
@@ -90,12 +92,12 @@ func main() {
 		return
 	}
 
-	if *gstatus != "" {
+	if *ugs != "" {
 		if len(ids) == 0 {
 			fmt.Println("Game Ids not provided.")
 			return
 		}
-		err = api.UpdateGameStatus(ctx, *gstatus, ids)
+		err = api.UpdateGameStatus(ctx, *ugs, ids)
 	}
 
 	/*
