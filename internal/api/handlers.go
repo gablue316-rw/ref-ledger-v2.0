@@ -8,6 +8,8 @@ import (
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
 	"strings"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 var ApiVersion string = "ref-ledger-api-v2.1.0"
@@ -25,6 +27,32 @@ func DelGame(game model.GameDescriptor) {
 
 }
 */
+
+func UpdateGameStatus(parentCtx context.Context, status string, gameIds []int64) error {
+
+	filter := bson.M{
+		"gameId": bson.M{
+			"$in": gameIds,
+		},
+	}
+
+	fmt.Println("filter:", filter)
+	update := bson.M{
+		"$set": bson.M{
+			"status": status,
+		},
+	}
+
+	fmt.Println("Game Ids", gameIds, "Length of gameIds:", len(gameIds))
+	if len(gameIds) > 1 {
+		database.UpdateManyDoc(parentCtx, filter, update, database.Database, "games")
+	} else {
+		database.UpdateOneDoc(parentCtx, filter, update, database.Database, "games")
+	}
+
+	return nil
+
+}
 
 func AddGames(parentCtx context.Context, game []model.GameDescriptor) {
 

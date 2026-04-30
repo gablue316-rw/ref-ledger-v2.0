@@ -28,11 +28,6 @@ var DatabaseVersion string = "ref-ledger-database-v2.1.0"
 var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
-type GameFilter struct {
-	Status      []string `json:"status"`
-	Association []string `json:"association"`
-}
-
 func InitDbase(dbName, uri string) {
 	Database = dbName
 	URI = uri
@@ -42,26 +37,8 @@ func SetURI(uri string) {
 	URI = uri
 }
 
-func BuildMongoGameFilter(path string) (bson.M, error) {
+func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
-	if path == "" {
-		return bson.M{}, nil
-	}
-
-	fmt.Println("Loading filter from", path)
-	file, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	var filter GameFilter
-	if err := json.Unmarshal(file, &filter); err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	fmt.Println("Filter loaded!")
 	fmt.Println("Building MongoDb Game Filter")
 	mongoFilter := bson.M{}
 
@@ -77,8 +54,39 @@ func BuildMongoGameFilter(path string) (bson.M, error) {
 		}
 	}
 
+	if len(filter.GameId) > 0 {
+		mongoFilter["gameId"] = bson.M{
+			"$in": filter.GameId,
+		}
+	}
+
 	fmt.Println("Mongo DB Filter successfully built!")
 	fmt.Println("Mongo Filter:", mongoFilter)
+	return mongoFilter
+}
+
+func BuildMongoGameFilterFromFile(path string) (bson.M, error) {
+
+	if path == "" {
+		return bson.M{}, nil
+	}
+
+	fmt.Println("Loading filter from", path)
+	file, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	var filter model.GameFilter
+	if err := json.Unmarshal(file, &filter); err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	fmt.Println("Filter loaded!")
+	mongoFilter := BuildMongoGameFilter(filter)
+
 	return mongoFilter, nil
 }
 
@@ -105,7 +113,7 @@ func QueryCollection(filter bson.M, dbase, collection string) *mongo.Cursor {
 
 func QueryGames(parentCtx context.Context, dbase, collection, filter string) ([]model.GameDescriptor, error) {
 
-	mongoDbFilter, err := BuildMongoGameFilter(filter)
+	mongoDbFilter, err := BuildMongoGameFilterFromFile(filter)
 
 	if err != nil {
 		fmt.Println("Failed to build Mongo DB Filter for games collection")
@@ -211,6 +219,18 @@ func DelCollection(parentCtx context.Context, dbase, collection string) {
 
 }
 
+func UpdateManyDoc(parentCtx context.Context, filter, update bson.M, dbase, collection string) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+
+	fmt.Println("Updating Many", coll.Name())
+	coll.UpdateMany(ctx, filter, update)
+}
+
 func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -219,7 +239,7 @@ func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, colle
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 
-	fmt.Println("Updating", coll.Name())
+	fmt.Println("Updating One", coll.Name())
 	coll.UpdateOne(ctx, filter, update)
 }
 

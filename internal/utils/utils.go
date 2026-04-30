@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"ref-ledger-v2/internal/model"
 	"strconv"
 	"strings"
@@ -12,6 +14,61 @@ var UtilsVersion string = "ref-ledger-models-v2.1.0"
 func CovertTextFileToJson(f string) error {
 
 	return nil
+}
+
+func ConvertGameIdRangeToInt(g string) ([]int64, error) {
+
+	var gameIds []int64
+
+	rlist := strings.Split(g, "-")
+	begin, err := strconv.ParseInt(rlist[0], 10, 64)
+	if err != nil {
+		fmt.Println("Failed to convert game id to int", rlist[0])
+		return []int64{}, err
+	}
+
+	end, err := strconv.ParseInt(rlist[1], 10, 64)
+	if err != nil {
+		fmt.Println("Failed to convert game id to int", rlist[1])
+		return []int64{}, err
+	}
+
+	if begin > end {
+		return []int64{}, fmt.Errorf("Beginning game id[%d] must not be greater than ending game id [%d]", begin, end)
+	}
+
+	for i := begin; i <= end; i++ {
+		gameIds = append(gameIds, i)
+	}
+
+	return gameIds, nil
+}
+
+func ConvertGameIdStrToInt(g string) ([]int64, error) {
+
+	var gameIds []int64
+
+	glist := strings.Split(g, ";")
+
+	for _, v := range glist {
+		if strings.Contains(v, "-") {
+			rangeOfIds, err := ConvertGameIdRangeToInt(v)
+			if err != nil {
+				fmt.Println("Failed to convert range of game ids to int[", v, "]")
+				return []int64{}, err
+			}
+			gameIds = append(gameIds, rangeOfIds...)
+		} else {
+			gId, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				fmt.Println("Failed to single game id to int[", v, "]")
+				return []int64{}, err
+			}
+			gameIds = append(gameIds, gId)
+		}
+	}
+
+	return gameIds, nil
 }
 
 func ConvertInt64ToStr(num int64) string {
@@ -63,6 +120,22 @@ func ConvertAmtStrToInt64(s string) (int64, error) {
 
 	return amount, nil
 
+}
+
+func ConvertGameDocToJson(doc []model.GameDoc, file string) error {
+
+	// Convert to JSON
+	jsonData, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Write to file
+	err = os.WriteFile(file, jsonData, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {

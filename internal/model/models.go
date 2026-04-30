@@ -24,6 +24,28 @@ type GameDescriptor struct {
 	Assignor    string
 }
 
+type JsonDoc struct {
+	GameId      int64  `json:"gameId"`
+	Date        string `json:"date"`
+	Time        string `json:"time"`
+	Sport       string `json:"sport"`
+	Site        string `json:"site"`
+	Field       string `json:"field"`
+	NumOfGames  int64  `json:"numOfGames"`
+	Level       string `json:"level"`
+	GameFee     int64  `json:"gameFee"`
+	TravelPay   int64  `json:"travelPay"`
+	AssignorFee int64  `json:"assignorFee"`
+	Deductions  int64  `json:"deductions"`
+	Association string `json:"association"`
+	Status      string `json:"status"`
+	Referee     string `json:"referee"`
+	U1          string `json:"u1"`
+	U2          string `json:"u2"`
+	ECO         string `json:"eco"`
+	Assignor    string `json:"assignor"`
+}
+
 type GameDoc struct {
 	GameId      int64  `bson:"gameId,omitempty"`
 	Date        string `bson:"date,omitempty"`
@@ -49,4 +71,10 @@ type GameDoc struct {
 type Filter struct {
 	Field string
 	Value string
+}
+
+type GameFilter struct {
+	Status      []string `json:"status"`
+	Association []string `json:"association"`
+	GameId      []int64  `json:"gameId"`
 }
