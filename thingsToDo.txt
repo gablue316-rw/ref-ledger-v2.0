@@ -37,3 +37,5 @@
 14. Calculate game report totals by association and status type
 
 15. Add config.json to configure refLedger
+
+16. Change the date field in the games collection.  At the moment it is a string.

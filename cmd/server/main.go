@@ -17,12 +17,19 @@ var Version string = "ref-ledger-v2.1.0"
 
 func main() {
 
+	var gameRecords []model.GameDescriptor
+	var ids []int64
+	//var bDate string
+	//var eDate string
+
 	var gfilter = flag.String("gf", "", "JSON filter file used to filter games report")
 	var gameIds = flag.String("gid", "", "Game Ids to be used with other flags")
 	var report = flag.String("rpt", "", "Report to generate [games]")
 	var gstatus = flag.String("gs", "", "Status game should be set to or used to filter games report")
 	var assoc = flag.String("assoc", "", "Association used to filter reports")
 	var ugs = flag.String("ugs", "", "Update game status.  This is the status to set the game to")
+	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday]")
+	var edate = flag.String("ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
 
 	flag.Parse()
 
@@ -37,10 +44,12 @@ func main() {
 
 	rootCmd.Flags().StringVar(gfilter, "gf", "", "JSON filter file used to filter games report")
 	rootCmd.Flags().StringVar(gameIds, "gid", "", "Game Ids to be used with other flags")
-	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generater [games]")
+	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generate [games]")
 	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status game should be set to or used to filter games report")
 	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(ugs, "ugs", "", "Update game status.  This is the status to set the game to.")
+	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday]")
+	rootCmd.Flags().StringVar(edate, "ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
 
 	rootCmd.Execute()
 
@@ -57,8 +66,10 @@ func main() {
 
 	defer cancel()
 
-	var gameRecords []model.GameDescriptor
-	var ids []int64
+	if *bdate != "" || *edate != "" {
+		bDate, eDate, err2 := utils.FormatDateFilter(*bdate, *edate)
+		fmt.Println("Begin Date:", bDate, "End Date:", eDate, "Error:", err2) // Only here to stop compiler from complaining at the moment
+	}
 
 	if *gameIds != "" {
 		ids, err = utils.ConvertGameIdStrToInt(*gameIds)

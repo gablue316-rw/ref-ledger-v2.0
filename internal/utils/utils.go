@@ -13,13 +13,45 @@ import (
 var UtilsVersion string = "ref-ledger-models-v2.1.0"
 var layout string = "1/2/2006"
 
-/*
-type GameFilter struct {
-	Status      []string `json:"status"`
-	Association []string `json:"association"`
-	GameId      []int64  `json:"gameId"`
+func FormatDateFilter(begin, end string) (string, string, error) {
+
+	var bDate string
+	var eDate string
+
+	if begin == "today" {
+		bDate = time.Now().Format(layout)
+	} else if begin == "tomorrow" {
+		bDate = time.Now().AddDate(0, 0, 1).Format(layout)
+	} else if begin == "yesterday" {
+		bDate = time.Now().AddDate(0, 0, -1).Format(layout)
+	}
+
+	if end == "" {
+		eDate = bDate
+	} else if end == "today" {
+		eDate = time.Now().Format(layout)
+	} else if end == "tomorrow" {
+		eDate = time.Now().AddDate(0, 0, 1).Format(layout)
+	} else if end == "yesterday" {
+		eDate = time.Now().AddDate(0, 0, -1).Format(layout)
+	}
+
+	// Make sure the begin date is not later than the end date
+	beginDate, err := time.Parse(layout, bDate)
+	if err != nil {
+		return "", "", err
+	}
+
+	endDate, err := time.Parse(layout, eDate)
+	if err != nil {
+		return "", "", err
+	}
+
+	if beginDate.After(endDate) {
+		return "", "", fmt.Errorf("Begin date [%s] must not be later than end date [%s]", bDate, eDate)
+	}
+	return bDate, eDate, nil
 }
-*/
 
 func ParseInt64CSV(input string) ([]int64, error) {
 	parts := strings.Split(input, ",")
