@@ -20,7 +20,8 @@ func main() {
 	var gfilter = flag.String("gf", "", "JSON filter file used to filter games report")
 	var gameIds = flag.String("gid", "", "Game Ids to be used with other flags")
 	var report = flag.String("rpt", "", "Report to generate [games]")
-	var gstatus = flag.String("gs", "", "Status game should be set to")
+	var gstatus = flag.String("gs", "", "Status game should be set to or used to filter games report")
+	var assoc = flag.String("assoc", "", "Association used to filter reports")
 
 	flag.Parse()
 
@@ -36,7 +37,8 @@ func main() {
 	rootCmd.Flags().StringVar(gfilter, "gf", "", "JSON filter file used to filter games report")
 	rootCmd.Flags().StringVar(gameIds, "gid", "", "Game Ids to be used with other flags")
 	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generater [games]")
-	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status game should be set to")
+	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status game should be set to or used to filter games report")
+	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
 
 	rootCmd.Execute()
 
@@ -54,8 +56,31 @@ func main() {
 	defer cancel()
 
 	var gameRecords []model.GameDescriptor
+	var ids []int64
+
+	if *gameIds != "" {
+		ids, err = utils.ConvertGameIdStrToInt(*gameIds)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+	}
 
 	if *report == "games" {
+
+		//
+		// If the user didn't enter a json game filter file, check if the user
+		// entered other filter flags
+		//
+		if *gfilter == "" {
+			if *gameIds != "" || *gstatus != "" || *assoc != "" {
+				s, _ := utils.ConvertGameIdIntToStr(ids)
+				err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus)
+				if err == nil {
+					*gfilter = "filters.json"
+				}
+			}
+		}
 		gameRecords, err = database.QueryGames(ctx, "refLedger_v2", "games", *gfilter)
 		if err != nil {
 			return
@@ -63,15 +88,6 @@ func main() {
 		rept := reports.GenerateGameReport(gameRecords)
 		reports.PrintReport(rept)
 		return
-	}
-
-	var ids []int64
-	if *gameIds != "" {
-		ids, err = utils.ConvertGameIdStrToInt(*gameIds)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
 	}
 
 	if *gstatus != "" {

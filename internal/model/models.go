@@ -70,11 +70,11 @@ type GameDoc struct {
 
 type Filter struct {
 	Field string
-	Value string
+	Value []string
 }
 
 type GameFilter struct {
-	Status      []string `json:"status"`
-	Association []string `json:"association"`
-	GameId      []int64  `json:"gameId"`
+	Status      []string `json:"status,omitempty"`
+	Association []string `json:"association,omitempty"`
+	GameId      []int64  `json:"gameId,omitempty"`
 }

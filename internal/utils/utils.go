@@ -11,6 +11,78 @@ import (
 
 var UtilsVersion string = "ref-ledger-models-v2.1.0"
 
+/*
+type GameFilter struct {
+	Status      []string `json:"status"`
+	Association []string `json:"association"`
+	GameId      []int64  `json:"gameId"`
+}
+*/
+
+func ParseInt64CSV(input string) ([]int64, error) {
+	parts := strings.Split(input, ",")
+	var result []int64
+
+	for _, p := range parts {
+		val := strings.TrimSpace(p)
+		if val == "" {
+			continue
+		}
+
+		num, err := strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, num)
+	}
+	return result, nil
+}
+
+func ParseCsv(s string) []string {
+
+	parts := strings.Split(s, ",")
+	var result []string
+
+	for _, p := range parts {
+		val := strings.TrimSpace(p)
+		if val != "" {
+			result = append(result, val)
+		}
+	}
+	return result
+}
+
+func ConvertGameFiltersToJsonFile(a, g, s string) error {
+
+	var filters model.GameFilter
+
+	assocValues := ParseCsv(a)
+	gameIdValues, _ := ParseInt64CSV(g)
+	statusValues := ParseCsv(s)
+
+	filters.Status = statusValues
+	filters.Association = assocValues
+	filters.GameId = gameIdValues
+
+	fmt.Println("Filter ready to be written to file", filters)
+
+	// write JSON file
+	file, err := os.Create("filters.json")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+
+	if err := encoder.Encode(filters); err != nil {
+		panic(err)
+	}
+
+	return nil
+}
+
 func CovertTextFileToJson(f string) error {
 
 	return nil
@@ -42,6 +114,22 @@ func ConvertGameIdRangeToInt(g string) ([]int64, error) {
 	}
 
 	return gameIds, nil
+}
+
+func ConvertGameIdIntToStr(g []int64) (string, error) {
+
+	var gameIdStr string
+
+	if len(g) == 0 {
+		return gameIdStr, nil
+	}
+
+	strSlice := make([]string, len(g))
+	for i, v := range g {
+		strSlice[i] = strconv.FormatInt(v, 10)
+	}
+	return strings.Join(strSlice, ","), nil
+
 }
 
 func ConvertGameIdStrToInt(g string) ([]int64, error) {
