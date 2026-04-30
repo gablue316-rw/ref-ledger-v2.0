@@ -181,8 +181,9 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 
 		gameFeeStr := utils.ConvertInt64ToAmtStr(gameFee)
 
+		dateStr := rec.Date + " (" + utils.DayOfWeekAbbreviation(rec.Date) + ")"
 		officialStr := formatOfficialString(rec.Referee, rec.U1, rec.U2)
-		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.GameId, rec.Date, rec.Time, rec.Sport, rec.Site, rec.Field, rec.NumOfGames, rec.Level, gameFeeStr, rec.Association, rec.Status, officialStr))
+		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.GameId, dateStr, rec.Time, rec.Sport, rec.Site, rec.Field, rec.NumOfGames, rec.Level, gameFeeStr, rec.Association, rec.Status, officialStr))
 	}
 
 	grandTotalLine := "\n\nTotal Number of Games: %d  Total Game Fees: $%s\n"

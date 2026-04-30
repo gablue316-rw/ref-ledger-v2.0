@@ -7,9 +7,11 @@ import (
 	"ref-ledger-v2/internal/model"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var UtilsVersion string = "ref-ledger-models-v2.1.0"
+var layout string = "1/2/2006"
 
 /*
 type GameFilter struct {
@@ -50,6 +52,13 @@ func ParseCsv(s string) []string {
 		}
 	}
 	return result
+}
+
+func DayOfWeekAbbreviation(date string) string {
+
+	d, _ := time.Parse(layout, date)
+	abbreviation := d.Format("Mon")
+	return abbreviation
 }
 
 func ConvertGameFiltersToJsonFile(a, g, s string) error {
