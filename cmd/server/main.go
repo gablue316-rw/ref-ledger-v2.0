@@ -22,14 +22,28 @@ func main() {
 	//var bDate string
 	//var eDate string
 
+	//
+	// Game Flags
+	//
 	var gfilter = flag.String("gf", "", "JSON filter file used to filter games report")
-	var gameIds = flag.String("gid", "", "Game Ids to be used with other flags")
-	var report = flag.String("rpt", "", "Report to generate [games]")
+	var gameIds = flag.String("gi", "", "Game Ids to be used with other flags")
 	var gstatus = flag.String("gs", "", "Status game should be set to or used to filter games report")
-	var assoc = flag.String("assoc", "", "Association used to filter reports")
-	var ugs = flag.String("ugs", "", "Update game status.  This is the status to set the game to")
+	var gupdate = flag.String("gu", "", "Update game.")
 	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday]")
 	var edate = flag.String("ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
+
+	//
+	// Other Flags
+	//
+	var report = flag.String("rpt", "", "Report to generate [games]")
+	var assoc = flag.String("assoc", "", "Association used to filter reports")
+	var dumpTable = flag.String("dt", "", "Dump table")
+
+	//
+	// Flags used to rebuild the various collections
+	//
+	var rebuild = flag.String("rebuild", "", "Rebuild collection [games]")
+	var file = flag.String("file", "", "File used to rebuild collection")
 
 	flag.Parse()
 
@@ -42,14 +56,28 @@ func main() {
 		},
 	}
 
+	//
+	// Game Flags
+	//
 	rootCmd.Flags().StringVar(gfilter, "gf", "", "JSON filter file used to filter games report")
-	rootCmd.Flags().StringVar(gameIds, "gid", "", "Game Ids to be used with other flags")
-	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generate [games]")
+	rootCmd.Flags().StringVar(gameIds, "gi", "", "Game Ids to be used with other flags")
 	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status game should be set to or used to filter games report")
-	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
-	rootCmd.Flags().StringVar(ugs, "ugs", "", "Update game status.  This is the status to set the game to.")
+	rootCmd.Flags().StringVar(gupdate, "gu", "", "Update game")
 	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday]")
 	rootCmd.Flags().StringVar(edate, "ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
+
+	//
+	// Other Flags
+	//
+	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generate [games]")
+	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
+	rootCmd.Flags().StringVar(dumpTable, "dt", "", "Dump table")
+
+	//
+	// Flags used to rebuild the various collections
+	//
+	rootCmd.Flags().StringVar(rebuild, "rebuild", "", "Rebuild collection [games]")
+	rootCmd.Flags().StringVar(file, "file", "", "File used to rebuild collection")
 
 	rootCmd.Execute()
 
@@ -65,6 +93,22 @@ func main() {
 	ctx, cancel := database.GetContext()
 
 	defer cancel()
+
+	//
+	// Based on flags perform functions
+	//
+	if *rebuild != "" {
+
+		if *file == "" {
+			fmt.Println("Unable to rebuild", *rebuild, "collection.  No file provided for rebuild.")
+			return
+		}
+		api.RebuildTable(ctx, *rebuild, *file)
+	}
+
+	if *dumpTable != "" {
+		api.DumpTable(ctx, *dumpTable)
+	}
 
 	if *bdate != "" || *edate != "" {
 		bDate, eDate, err2 := utils.FormatDateFilter(*bdate, *edate)
@@ -88,12 +132,14 @@ func main() {
 		if *gfilter == "" {
 			if *gameIds != "" || *gstatus != "" || *assoc != "" {
 				s, _ := utils.ConvertGameIdIntToStr(ids)
-				err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus)
-				if err == nil {
-					*gfilter = "filters.json"
+				*gfilter, err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus)
+				if err != nil {
+					fmt.Println(err)
+					return
 				}
 			}
 		}
+
 		gameRecords, err = database.QueryGames(ctx, "refLedger_v2", "games", *gfilter)
 		if err != nil {
 			return
@@ -103,12 +149,15 @@ func main() {
 		return
 	}
 
-	if *ugs != "" {
+	if *gupdate != "" {
 		if len(ids) == 0 {
 			fmt.Println("Game Ids not provided.")
 			return
 		}
-		err = api.UpdateGameStatus(ctx, *ugs, ids)
+		err = api.UpdateGame(ctx, *gupdate, ids)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
 	/*

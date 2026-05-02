@@ -171,7 +171,34 @@ func GetContext() (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
-func DumpCollection(parentCtx context.Context, dbase, collection string) {
+func DumpOfficialsCollection(parentCtx context.Context, dbase, collection string) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	collectionName := coll.Name()
+
+	fmt.Println("Printing", collectionName, "collection")
+
+	cursor := QueryCollection(bson.M{}, Database, collection)
+
+	var results []model.OfficialDoc
+
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return
+	}
+
+	for _, r := range results {
+		fmt.Println(r)
+	}
+
+}
+
+func DumpGamesCollection(parentCtx context.Context, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -206,7 +233,7 @@ func DelCollection(parentCtx context.Context, dbase, collection string) {
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 
-	fmt.Println("Deleteing", coll.Name())
+	fmt.Println("Deleting", coll.Name())
 
 	err := coll.Drop(ctx)
 	if err != nil {
@@ -262,7 +289,37 @@ func DeleteOneDoc(parentCtx context.Context, doc model.GameDoc, dbase, collectio
 	fmt.Println("Deleted Record with GameId of", doc.GameId, " Records Deleted:", result.DeletedCount)
 }
 
-func InsertDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection string) {
+func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescriptor, dbase, collection string) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	collectionName := coll.Name()
+	fmt.Println("Inserting records into", collectionName)
+
+	officialId := 1
+
+	recordsInserted := 0
+	for _, v := range game {
+
+		doc := utils.ConvertOfficialDescrToOfficialDoc(v)
+		doc.OfficialId = officialId
+
+		fmt.Println("Official Doc:", doc)
+		_, err := coll.InsertOne(ctx, doc)
+		if err != nil {
+			fmt.Println("Insert failed.  Reason:", err)
+			return
+		}
+		recordsInserted++
+		officialId++
+	}
+	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
+}
+
+func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()

@@ -93,9 +93,10 @@ func DayOfWeekAbbreviation(date string) string {
 	return abbreviation
 }
 
-func ConvertGameFiltersToJsonFile(a, g, s string) error {
+func ConvertGameFiltersToJsonFile(a, g, s string) (string, error) {
 
 	var filters model.GameFilter
+	var fileName string = "filters.json"
 
 	assocValues := ParseCsv(a)
 	gameIdValues, _ := ParseInt64CSV(g)
@@ -108,9 +109,9 @@ func ConvertGameFiltersToJsonFile(a, g, s string) error {
 	fmt.Println("Filter ready to be written to file", filters)
 
 	// write JSON file
-	file, err := os.Create("filters.json")
+	file, err := os.Create(fileName)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("Failed to open %s", fileName)
 	}
 	defer file.Close()
 
@@ -118,10 +119,10 @@ func ConvertGameFiltersToJsonFile(a, g, s string) error {
 	encoder.SetIndent("", "  ")
 
 	if err := encoder.Encode(filters); err != nil {
-		panic(err)
+		return "", fmt.Errorf("Failed to encode filters to file %s", fileName)
 	}
 
-	return nil
+	return fileName, nil
 }
 
 func CovertTextFileToJson(f string) error {
@@ -299,6 +300,17 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 	}
 
 	return gameDescr
+}
+
+func ConvertOfficialDescrToOfficialDoc(officialDescr model.OfficialDescriptor) model.OfficialDoc {
+
+	doc := model.OfficialDoc{
+		FirstName:   officialDescr.FirstName,
+		LastName:    officialDescr.LastName,
+		Phone:       officialDescr.Phone,
+		Association: officialDescr.Association,
+	}
+	return doc
 }
 
 func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
