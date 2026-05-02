@@ -33,6 +33,12 @@ func main() {
 	var edate = flag.String("ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
 
 	//
+	// Official Flags
+	//
+
+	var officialName = flag.String("on", "", "Official Name used to filter officials report")
+
+	//
 	// Other Flags
 	//
 	var report = flag.String("rpt", "", "Report to generate [games]")
@@ -72,6 +78,11 @@ func main() {
 	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generate [games]")
 	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "dt", "", "Dump table")
+
+	//
+	// Official Flags
+	//
+	rootCmd.Flags().StringVar(officialName, "on", "", "Official Name used to filter officials report")
 
 	//
 	// Flags used to rebuild the various collections

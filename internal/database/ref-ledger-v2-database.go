@@ -161,6 +161,19 @@ func Connect() error {
 	IsConnected = true
 	Client = client
 	fmt.Println("Connected to MongoDb")
+
+	var result bson.M
+
+	err = client.Database("admin").RunCommand(
+		context.TODO(),
+		bson.D{{Key: "buildInfo", Value: 1}},
+	).Decode(&result)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("MongoDB Version:", result["version"])
 	return nil
 
 }
@@ -333,6 +346,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 	for _, v := range game {
 
 		doc := utils.ConvertGameDescrToGameDoc(v)
+
 		_, err := coll.InsertOne(ctx, doc)
 		if err != nil {
 			fmt.Println("Insert failed.  Reason:", err)
@@ -355,4 +369,32 @@ func SetGameFilters(field, value string) {
 
 func GetGameFilters() bson.M {
 	return GameFilters
+}
+
+func FindOfficial(parentCtx context.Context, fname, lname string) (bool, error) {
+
+	var filter bson.M
+
+	if fname == "" || lname == "" {
+		return false, fmt.Errorf("Invalid query.  Missing required parameter: first and last name are both required.")
+	}
+
+	filter = bson.M{
+		"lastName":  lname,
+		"firstName": fname,
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("officials")
+
+	result := coll.FindOne(ctx, filter)
+
+	if result.Err() == mongo.ErrNoDocuments {
+		return false, nil
+	}
+
+	return true, nil
 }

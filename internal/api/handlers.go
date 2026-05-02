@@ -151,10 +151,62 @@ func BulkAddGames(parentCtx context.Context, file string) {
 
 	sc := bufio.NewScanner(fd)
 
+	recordsRead := 0
+	recordsAppended := 0
+	validationErrors := 0
+
+	officials := []string{"Referee", "U1", "U2", "ECO", "Assignor"}
+
 	for sc.Scan() {
 
 		line := sc.Text()
+
+		recordsRead++
+
 		fields := strings.Split(line, ",")
+
+		validOfficials := true
+		for _, official := range officials {
+			var names []string
+			switch official {
+			case "Referee":
+				if fields[12] == "Unassigned" {
+					continue
+				}
+				names = strings.Split(fields[12], " ")
+			case "U1":
+				if fields[13] == "Unassigned" {
+					continue
+				}
+				names = strings.Split(fields[13], " ")
+			case "U2":
+				if fields[14] == "Unassigned" {
+					continue
+				}
+				names = strings.Split(fields[14], " ")
+			case "ECO":
+				if fields[15] == "Unassigned" {
+					continue
+				}
+				names = strings.Split(fields[15], " ")
+			case "Assignor":
+				if fields[16] == "Unassigned" {
+					continue
+				}
+				names = strings.Split(fields[16], " ")
+			}
+			results, err := database.FindOfficial(parentCtx, names[0], names[1])
+			if !results || err != nil {
+				validationErrors++
+				validOfficials = false
+				fmt.Println(official, names[0], names[1], "not found!  Record dropped!")
+				break
+			}
+		}
+
+		if !validOfficials {
+			continue
+		}
 
 		game := model.GameDescriptor{
 			GameId:      fields[2],
@@ -177,10 +229,13 @@ func BulkAddGames(parentCtx context.Context, file string) {
 			ECO:         fields[15],
 			Assignor:    fields[16],
 		}
+
 		games = append(games, game)
 
+		recordsAppended++
 	}
 
+	fmt.Println("Records Read", recordsRead, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
 	AddGames(parentCtx, games)
 }
 
