@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
@@ -51,6 +52,13 @@ func main() {
 	var rebuild = flag.String("rebuild", "", "Rebuild collection [games]")
 	var file = flag.String("file", "", "File used to rebuild collection")
 
+	//
+	// Flags for payment
+	//
+	var paymentId = flag.String("pi", "", "Payment ID")
+	var paymentDate = flag.String("pd", "", "Payment Date")
+	var paymentAmt = flag.String("pa", "", "Payment Amount")
+
 	flag.Parse()
 
 	var rootCmd = &cobra.Command{
@@ -89,6 +97,13 @@ func main() {
 	//
 	rootCmd.Flags().StringVar(rebuild, "rebuild", "", "Rebuild collection [games]")
 	rootCmd.Flags().StringVar(file, "file", "", "File used to rebuild collection")
+
+	//
+	// Flags for payment
+	//
+	rootCmd.Flags().StringVar(paymentId, "pi", "", "Payment ID")
+	rootCmd.Flags().StringVar(paymentDate, "pd", "", "Payment Date")
+	rootCmd.Flags().StringVar(paymentAmt, "pa", "", "Payment Amount")
 
 	rootCmd.Execute()
 
@@ -141,9 +156,9 @@ func main() {
 		// entered other filter flags
 		//
 		if *gfilter == "" {
-			if *gameIds != "" || *gstatus != "" || *assoc != "" {
+			if *gameIds != "" || *gstatus != "" || *assoc != "" || *bdate != "" || *edate != "" {
 				s, _ := utils.ConvertGameIdIntToStr(ids)
-				*gfilter, err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus)
+				*gfilter, err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus, *bdate, *edate)
 				if err != nil {
 					fmt.Println(err)
 					return

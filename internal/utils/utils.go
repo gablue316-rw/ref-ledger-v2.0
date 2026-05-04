@@ -13,6 +13,93 @@ import (
 var UtilsVersion string = "ref-ledger-models-v2.1.0"
 var layout string = "1/2/2006"
 
+func getEndOfWeek(startOfWeek string) string {
+
+	date, err := time.Parse(layout, startOfWeek)
+	if err != nil {
+		fmt.Println("Error parsing date")
+		return ""
+	}
+
+	endOfWeek := date.AddDate(0, 0, 6)
+	newDate := endOfWeek.Format(layout)
+	return newDate
+
+}
+
+func getStartOfNextWeek() string {
+
+	startOfThisWeek := getStartOfThisWeek()
+	date, err := time.Parse(layout, startOfThisWeek)
+	if err != nil {
+		fmt.Println("Error parsing date")
+		return ""
+	}
+
+	startOfNextWeek := date.AddDate(0, 0, 7)
+	newDate := startOfNextWeek.Format(layout)
+	return newDate
+
+}
+
+func getStartOfLastWeek() string {
+
+	startOfThisWeek := getStartOfThisWeek()
+	date, err := time.Parse(layout, startOfThisWeek)
+	if err != nil {
+		fmt.Println("Error parsing date")
+		return ""
+	}
+
+	startOfLastWeek := date.AddDate(0, 0, -7)
+	newDate := startOfLastWeek.Format(layout)
+	return newDate
+}
+
+func getStartOfThisWeek() string {
+
+	currentDate := time.Now()
+	weekday := currentDate.Weekday()
+	shift := int(weekday) % 7
+	startOfWeek := currentDate.AddDate(0, 0, -shift)
+	newDate := startOfWeek.Format(layout)
+
+	return newDate
+}
+
+func getLastDayOfMonth(startOfMonth string) string {
+
+	date, err := time.Parse(layout, startOfMonth)
+	if err != nil {
+		fmt.Println("Error parsing date")
+		return ""
+	}
+
+	lastDay := date.AddDate(0, 1, 0).AddDate(0, 0, -1)
+	return lastDay.Format(layout)
+}
+
+func getStartOfThisMonth() string {
+
+	tempDate := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.Now().Location())
+	startOfThisMonth := tempDate.Format(layout)
+	return startOfThisMonth
+}
+
+func getStartOfLastMonth() string {
+
+	tempDate := time.Date(time.Now().Year(), time.Now().Month()-1, 1, 0, 0, 0, 0, time.Now().Location())
+	startOfLastMonth := tempDate.Format(layout)
+	return startOfLastMonth
+}
+
+func getStartOfNextMonth() string {
+
+	tempDate := time.Date(time.Now().Year(), time.Now().Month()+1, 1, 0, 0, 0, 0, time.Now().Location())
+	startOfLastMonth := tempDate.Format(layout)
+	return startOfLastMonth
+}
+
 func FormatDateFilter(begin, end string) (string, string, error) {
 
 	var bDate string
@@ -24,6 +111,18 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 		bDate = time.Now().AddDate(0, 0, 1).Format(layout)
 	} else if begin == "yesterday" {
 		bDate = time.Now().AddDate(0, 0, -1).Format(layout)
+	} else if begin == "this week" {
+		bDate = getStartOfThisWeek()
+	} else if begin == "next week" {
+		bDate = getStartOfNextWeek()
+	} else if begin == "last week" {
+		bDate = getStartOfLastWeek()
+	} else if begin == "this month" {
+		bDate = getStartOfThisMonth()
+	} else if begin == "next month" {
+		bDate = getStartOfNextMonth()
+	} else if begin == "last month" {
+		bDate = getStartOfLastMonth()
 	}
 
 	if end == "" {
@@ -34,6 +133,18 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 		eDate = time.Now().AddDate(0, 0, 1).Format(layout)
 	} else if end == "yesterday" {
 		eDate = time.Now().AddDate(0, 0, -1).Format(layout)
+	} else if end == "this week" {
+		eDate = getStartOfThisWeek()
+	} else if end == "next week" {
+		eDate = getStartOfNextWeek()
+	} else if end == "last week" {
+		eDate = getStartOfLastWeek()
+	} else if end == "this month" {
+		eDate = getStartOfThisMonth()
+	} else if end == "next month" {
+		eDate = getStartOfNextMonth()
+	} else if end == "last month" {
+		eDate = getStartOfLastMonth()
 	}
 
 	// Make sure the begin date is not later than the end date
@@ -93,7 +204,7 @@ func DayOfWeekAbbreviation(date string) string {
 	return abbreviation
 }
 
-func ConvertGameFiltersToJsonFile(a, g, s string) (string, error) {
+func ConvertGameFiltersToJsonFile(a, g, s, b, d string) (string, error) {
 
 	var filters model.GameFilter
 	var fileName string = "filters.json"
@@ -191,7 +302,7 @@ func ConvertGameIdStrToInt(g string) ([]int64, error) {
 		} else {
 			gId, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
-				fmt.Println("Failed to single game id to int[", v, "]")
+				fmt.Println("Failed to convert single game id to int[", v, "]")
 				return []int64{}, err
 			}
 			gameIds = append(gameIds, gId)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"ref-ledger-v2/internal/model"
@@ -25,7 +26,7 @@ var URI string
 
 var DatabaseVersion string = "ref-ledger-database-v2.1.0"
 
-var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending"}
+var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending", "Deleted"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
 func InitDbase(dbName, uri string) {
@@ -283,7 +284,7 @@ func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, colle
 	coll.UpdateOne(ctx, filter, update)
 }
 
-func DeleteOneDoc(parentCtx context.Context, doc model.GameDoc, dbase, collection string) {
+func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -293,13 +294,13 @@ func DeleteOneDoc(parentCtx context.Context, doc model.GameDoc, dbase, collectio
 	collectionName := coll.Name()
 	fmt.Println("Deleting one record from", collectionName)
 
-	result, err := coll.DeleteOne(ctx, doc)
+	result, err := coll.DeleteOne(ctx, filter)
 	if err != nil {
-		fmt.Println("Insert failed.  Reason:", err)
+		fmt.Println("Delete failed.  Reason:", err)
 		return
 	}
 
-	fmt.Println("Deleted Record with GameId of", doc.GameId, " Records Deleted:", result.DeletedCount)
+	fmt.Println("Deleted Record with GameId of", filter["gameId"], " Records Deleted:", result.DeletedCount)
 }
 
 func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescriptor, dbase, collection string) {
@@ -371,17 +372,24 @@ func GetGameFilters() bson.M {
 	return GameFilters
 }
 
-func FindOfficial(parentCtx context.Context, fname, lname string) (bool, error) {
+func FindOfficial(parentCtx context.Context, name string) (bool, error) {
 
 	var filter bson.M
+	var names []string
 
-	if fname == "" || lname == "" {
+	names = strings.Split(name, " ")
+
+	if len(names) < 2 {
+		return false, fmt.Errorf("Invalid name[%s].  Missing required parameter: first and last name are both required.", name)
+	}
+
+	if names[0] == "" || names[1] == "" {
 		return false, fmt.Errorf("Invalid query.  Missing required parameter: first and last name are both required.")
 	}
 
 	filter = bson.M{
-		"lastName":  lname,
-		"firstName": fname,
+		"firstName": names[0],
+		"lastName":  names[1],
 	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)

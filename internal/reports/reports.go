@@ -109,6 +109,67 @@ func calculateGameFee(gameRec model.GameDescriptor) int64 {
 	return gameFee
 }
 
+/*
+func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
+
+	fmt.Println("Generating Payments Report")
+	rept := make([]string, 10, 20)
+
+	title := "Payment Report\n"
+	reptTimeMsg := getReportGeneratedDate()
+
+	totalPayments := 0
+	totalDeposits := int64(0)
+
+	//																									   			  1         1         1         1
+	//                      1         2         3         4         5         6         7         8         9         0         1         2         3                                                                                                          1         1         1         1
+	//           1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+	heading1 := "Payment ID    Payment Date     Amount      Association     Game IDs     \n"
+	separator := "==============================================================================================================================\n"
+	reptFmtStr := "%-14s%-17s$%-11s%-16s%-60s\n"
+	reptFmtStr2 := "%-59s%-60s\n"
+
+	maxLineLength := len(heading1)
+
+	newTitle := utils.centerText(title, maxLineLength)
+	newReptTimeMsg := utils.centerText(reptTimeMsg, maxLineLength)
+
+	rept = append(rept, newTitle)
+	rept = append(rept, newReptTimeMsg)
+	rept = append(rept, heading1)
+	rept = append(rept, separator)
+
+	for _, rec := range records {
+
+		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.PaymentId, rec.PaymentDate, rec.PaymentAmt, rec.Association, rec.GameIds))
+
+		totalPayments++
+		totalDeposits += rec.payment_amount_int64
+
+		rec.payment_date = dateValue.Format("1/2/2006")
+
+		if len(rec.game_ids) > 60 {
+			gameIdLines := formatGameIdStrSplice(rec.game_ids, 60)
+			for i, v := range gameIdLines {
+				if i == 0 {
+					rept = append(rept, fmt.Sprintf(reptFmtStr, rec.payment_id, rec.payment_date, convertInt64ToStr(rec.payment_amount_int64), rec.association, v))
+				} else {
+					rept = append(rept, fmt.Sprintf(reptFmtStr2, "", v))
+				}
+			}
+		} else {
+			rept = append(rept, fmt.Sprintf(reptFmtStr, rec.payment_id, rec.payment_date, convertInt64ToStr(rec.payment_amount_int64), rec.association, rec.game_ids))
+		}
+	}
+	if totalPayments > 0 {
+		rept = append(rept, "\n")
+		rept = append(rept, fmt.Sprintf("Total Payments: %d Total Deposits: $%s\n", totalPayments, convertInt64ToStr(totalDeposits)))
+	}
+
+	return nil, rept
+}
+*/
+
 func GenerateGameReport(records []model.GameDescriptor) []string {
 
 	fmt.Println("Generating Game Report")

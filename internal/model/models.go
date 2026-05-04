@@ -2,6 +2,22 @@ package model
 
 var ModelsVersion string = "ref-ledger-models-v2.1.0"
 
+type PaymentDescriptor struct {
+	PaymentId   string
+	PaymentDate string
+	PaymentAmt  float32
+	Association string
+	GameIds     string
+}
+
+type PaymentDoc struct {
+	PaymentId   string  `bson:"paymentId,omitempty"`
+	PaymentDate string  `bson:"paymentDate,omitempty"`
+	PaymentAmt  float32 `bson:"paymentAmt,omitempty"`
+	Association string  `bson:"association,omitempty"`
+	GameIds     []int64 `bson:"gameIds,omitempty"`
+}
+
 type OfficialDescriptor struct {
 	FirstName   string
 	LastName    string
@@ -42,7 +58,7 @@ type GameDescriptor struct {
 type GameDoc struct {
 	GameId      int64  `bson:"gameId,omitempty"`
 	Date        string `bson:"date,omitempty"`
-	Time        string `bson:"time,omitempty"`
+	Time        string `bson:"time,omitestring"`
 	Sport       string `bson:"sport,omitempty"`
 	Site        string `bson:"site,omitempty"`
 	Field       string `bson:"field,omitempty"`
