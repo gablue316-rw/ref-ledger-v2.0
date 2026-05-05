@@ -38,6 +38,66 @@ func SetURI(uri string) {
 	URI = uri
 }
 
+func QueryAggregatedGames(parentCtx context.Context, dbase, collection, filter string) ([]model.GameDescriptor, error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	mongoDbFilter, err := BuildMongoGameFilterFromFile(filter)
+
+	if err != nil {
+		fmt.Println("Failed to build Mongo DB Filter for games collection")
+		return []model.GameDescriptor{}, err
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	pipeline := mongo.Pipeline{
+		{
+			{Key: "$match", Value: mongoDbFilter},
+		},
+		{
+			{Key: "$addFields", Value: bson.D{
+				{Key: "convertedDate", Value: bson.D{
+					{Key: "$dateFromString", Value: bson.D{
+						{Key: "dateString", Value: "$date"},
+						{Key: "format", Value: "%m/%d/%Y"},
+					}},
+				}},
+			}},
+		},
+		{
+			{Key: "$sort", Value: bson.D{
+				{Key: "convertedDate", Value: 1},
+			}},
+		},
+		{
+			{Key: "$project", Value: bson.D{
+				{Key: "convertedDate", Value: 0},
+			}},
+		},
+	}
+
+	cursor, err := coll.Aggregate(ctx, pipeline)
+
+	var results []model.GameDoc
+	var gameRecords []model.GameDescriptor
+
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.GameDescriptor{}, err
+	}
+
+	for _, r := range results {
+
+		gameRecords = append(gameRecords, utils.ConvertGameDocToGameDescr(r))
+
+	}
+	return gameRecords, nil
+}
+
 func GameExists(doc model.GameDoc) (bool, error) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
@@ -127,6 +187,10 @@ func QueryCollection(filter bson.M, dbase, collection string) *mongo.Cursor {
 
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
+
+	if collection == "games" {
+
+	}
 
 	// Query to find all documents
 	cursor, err := coll.Find(ctx, filter)

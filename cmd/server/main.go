@@ -172,7 +172,7 @@ func main() {
 			}
 		}
 
-		gameRecords, err = database.QueryGames(ctx, "refLedger_v2", "games", *gfilter)
+		gameRecords, err = database.QueryAggregatedGames(ctx, "refLedger_v2", "games", *gfilter)
 		if err != nil {
 			return
 		}
