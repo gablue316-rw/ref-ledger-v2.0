@@ -30,6 +30,7 @@ func main() {
 	var gameIds = flag.String("gi", "", "Game Ids to be used with other flags")
 	var gstatus = flag.String("gs", "", "Status game should be set to or used to filter games report")
 	var gupdate = flag.String("gu", "", "Update game.")
+	var gadd = flag.String("ga", "", "Games Update File.")
 	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday]")
 	var edate = flag.String("ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
 
@@ -77,6 +78,7 @@ func main() {
 	rootCmd.Flags().StringVar(gameIds, "gi", "", "Game Ids to be used with other flags")
 	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status game should be set to or used to filter games report")
 	rootCmd.Flags().StringVar(gupdate, "gu", "", "Update game")
+	rootCmd.Flags().StringVar(gadd, "ga", "", "Games Update File.")
 	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday]")
 	rootCmd.Flags().StringVar(edate, "ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
 
@@ -130,6 +132,10 @@ func main() {
 			return
 		}
 		api.RebuildTable(ctx, *rebuild, *file)
+	}
+
+	if *gadd != "" {
+		api.UpdateGames(ctx, *gadd)
 	}
 
 	if *dumpTable != "" {

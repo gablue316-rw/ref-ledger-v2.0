@@ -38,6 +38,35 @@ func SetURI(uri string) {
 	URI = uri
 }
 
+func GameExists(doc model.GameDoc) (bool, error) {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+	filter := bson.M{}
+
+	var gameExists bool = false
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	filter = bson.M{
+		"gameId": doc.GameId,
+	}
+
+	// Query to find all documents
+	count, err := coll.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, fmt.Errorf("CountDocuments failure.  Reason: %s", err)
+	}
+
+	if count > 0 {
+		fmt.Println("Game exists!")
+		gameExists = true
+	}
+
+	return gameExists, nil
+}
+
 func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
 	fmt.Println("Building MongoDb Game Filter")
@@ -292,7 +321,7 @@ func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection st
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 	collectionName := coll.Name()
-	fmt.Println("Deleting one record from", collectionName)
+	fmt.Println("Deleting one document from", collectionName)
 
 	result, err := coll.DeleteOne(ctx, filter)
 	if err != nil {
@@ -344,11 +373,22 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 	fmt.Println("Inserting records into", collectionName)
 
 	recordsInserted := 0
+	totalErrors := 0
+
 	for _, v := range game {
 
 		doc := utils.ConvertGameDescrToGameDoc(v)
 
-		_, err := coll.InsertOne(ctx, doc)
+		gameExists, err := GameExists(doc)
+
+		if gameExists || err != nil {
+			totalErrors++
+			if err != nil {
+				fmt.Println(err)
+			}
+			continue
+		}
+		_, err = coll.InsertOne(ctx, doc)
 		if err != nil {
 			fmt.Println("Insert failed.  Reason:", err)
 			return
@@ -358,6 +398,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 		//fmt.Println("Inserted ID:", result.InsertedID)
 	}
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
+	fmt.Println("Total Errors:", totalErrors)
 }
 
 func ClearGameFilters() {

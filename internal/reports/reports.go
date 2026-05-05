@@ -237,6 +237,16 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 
 		gameFee := calculateGameFee(rec)
 		grandTot += gameFee
+		if totals[rec.Association] == nil {
+			fmt.Println("totals[", rec.Association, "] is equal to nil")
+			continue
+		}
+
+		if totals[rec.Association][rec.Status] == nil {
+			fmt.Println("totals[", rec.Association, "][", rec.Status, "] is equal to nil")
+			fmt.Println("Game Id: ", rec.GameId)
+			continue
+		}
 		totals[rec.Association][rec.Status].totalGameFees += gameFee
 		totals[rec.Association][rec.Status].totalGames += numOfGames
 

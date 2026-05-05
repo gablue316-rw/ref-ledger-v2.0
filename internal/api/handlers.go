@@ -7,6 +7,7 @@ import (
 	"os"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
+	"ref-ledger-v2/internal/utils"
 	"strconv"
 	"strings"
 
@@ -16,19 +17,86 @@ import (
 
 var ApiVersion string = "ref-ledger-api-v2.1.0"
 
-/*
-func DelGame(game model.GameDescriptor) {
+func DelGame(parentCtx context.Context, game model.GameDescriptor) {
 
-    ctx := database.GetContext()
 	fmt.Println("Deleting game with Game Id:", game.GameId)
-	doc := model.GameDoc{
-		GameId: game.GameId,
-	}
+	gameId, _ := utils.ConvertStrToInt64(game.GameId)
+	filter := bson.M{"gameId": gameId}
 
-	database.DeleteOneDoc(ctx, doc, "refLedger_v2", "games")
+	database.DeleteOneDoc(parentCtx, filter, "refLedger_v2", "games")
 
 }
-*/
+
+func UpdateGames(parentCtx context.Context, file string) error {
+
+	fmt.Println("Adding to Games Collection")
+
+	games := []model.GameDescriptor{}
+	// Read file
+	fd, err := os.Open(file)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("Failed to open file %s.  Reason: %s", file, err)
+	}
+	defer fd.Close()
+
+	sc := bufio.NewScanner(fd)
+
+	recordsRead := 0
+	recordsAppended := 0
+	recordsDeleted := 0
+	validationErrors := 0
+
+	for sc.Scan() {
+
+		line := sc.Text()
+		recordsRead++
+		fields := strings.Split(line, ",")
+
+		game := model.GameDescriptor{
+			GameId:      fields[2],
+			Date:        fields[0],
+			Time:        fields[1],
+			Sport:       fields[3],
+			Site:        fields[5],
+			Field:       fields[6],
+			NumOfGames:  fields[7],
+			Level:       fields[4],
+			GameFee:     fields[8],
+			TravelPay:   fields[18],
+			AssignorFee: fields[17],
+			Deductions:  fields[9],
+			Association: fields[11],
+			Status:      fields[10],
+			Referee:     fields[12],
+			U1:          fields[13],
+			U2:          fields[14],
+			ECO:         fields[15],
+			Assignor:    fields[16],
+		}
+
+		if game.Status == "Delete" {
+			DelGame(parentCtx, game)
+			recordsDeleted++
+		}
+
+		err = ValidateGameDescriptor(parentCtx, game)
+		if err != nil {
+			fmt.Println(err)
+			validationErrors++
+			continue
+		}
+
+		games = append(games, game)
+
+		recordsAppended++
+	}
+
+	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
+	AddGames(parentCtx, games)
+
+	return nil
+}
 
 func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) error {
 
