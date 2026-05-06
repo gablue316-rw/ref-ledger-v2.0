@@ -142,9 +142,11 @@ func main() {
 		api.DumpTable(ctx, *dumpTable)
 	}
 
+	var bDate string = ""
+	var eDate string = ""
+
 	if *bdate != "" || *edate != "" {
-		bDate, eDate, err2 := utils.FormatDateFilter(*bdate, *edate)
-		fmt.Println("Begin Date:", bDate, "End Date:", eDate, "Error:", err2) // Only here to stop compiler from complaining at the moment
+		bDate, eDate, err = utils.FormatDateFilter(*bdate, *edate)
 	}
 
 	if *gameIds != "" {
@@ -164,7 +166,7 @@ func main() {
 		if *gfilter == "" {
 			if *gameIds != "" || *gstatus != "" || *assoc != "" || *bdate != "" || *edate != "" {
 				s, _ := utils.ConvertGameIdIntToStr(ids)
-				*gfilter, err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus, *bdate, *edate)
+				*gfilter, err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus, bDate, eDate)
 				if err != nil {
 					fmt.Println(err)
 					return

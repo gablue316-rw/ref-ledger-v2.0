@@ -150,6 +150,40 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 		}
 	}
 
+	// Date handling (your format: M/D/YYYY)
+	if filter.Date != nil {
+
+		fromTime, _ := time.Parse("1/2/2006", filter.Date.From)
+		toTime, _ := time.Parse("1/2/2006", filter.Date.To)
+
+		mongoFilter["$expr"] = bson.M{
+			"$and": []bson.M{
+				{
+					"$gte": []interface{}{
+						bson.M{
+							"$dateFromString": bson.M{
+								"dateString": "$date",
+								"format":     "%m/%d/%Y",
+							},
+						},
+						fromTime,
+					},
+				},
+				{
+					"$lte": []interface{}{
+						bson.M{
+							"$dateFromString": bson.M{
+								"dateString": "$date",
+								"format":     "%m/%d/%Y",
+							},
+						},
+						toTime,
+					},
+				},
+			},
+		}
+	}
+
 	fmt.Println("Mongo DB Filter successfully built!")
 	fmt.Println("Mongo Filter:", mongoFilter)
 	return mongoFilter

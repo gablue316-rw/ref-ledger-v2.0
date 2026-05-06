@@ -104,8 +104,14 @@ type Filter struct {
 	Value []string
 }
 
+type DateRange struct {
+	From string `json:"from,omitempty"`
+	To   string `json:"to,omitempty"`
+}
+
 type GameFilter struct {
-	Status      []string `json:"status,omitempty"`
-	Association []string `json:"association,omitempty"`
-	GameId      []int64  `json:"gameId,omitempty"`
+	Status      []string   `json:"status,omitempty"`
+	Association []string   `json:"association,omitempty"`
+	GameId      []int64    `json:"gameId,omitempty"`
+	Date        *DateRange `json:"date,omitempty"`
 }
