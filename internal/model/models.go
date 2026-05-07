@@ -5,7 +5,7 @@ var ModelsVersion string = "ref-ledger-models-v2.1.0"
 type PaymentDescriptor struct {
 	PaymentId   string
 	PaymentDate string
-	PaymentAmt  float32
+	PaymentAmt  string
 	Association string
 	GameIds     string
 }
@@ -13,7 +13,7 @@ type PaymentDescriptor struct {
 type PaymentDoc struct {
 	PaymentId   string  `bson:"paymentId,omitempty"`
 	PaymentDate string  `bson:"paymentDate,omitempty"`
-	PaymentAmt  float32 `bson:"paymentAmt,omitempty"`
+	PaymentAmt  int64   `bson:"paymentAmt,omitempty"`
 	Association string  `bson:"association,omitempty"`
 	GameIds     []int64 `bson:"gameIds,omitempty"`
 }
@@ -114,4 +114,18 @@ type GameFilter struct {
 	Association []string   `json:"association,omitempty"`
 	GameId      []int64    `json:"gameId,omitempty"`
 	Date        *DateRange `json:"date,omitempty"`
+}
+
+type Config struct {
+	AppName  string         `json:"appName"`
+	Version  string         `json:"version"`
+	UserName string         `json:"user"`
+	Password string         `json:"pwd"`
+	Features FeaturesConfig `json:"features"`
+}
+
+type FeaturesConfig struct {
+	EnableDeleteOnCancel bool   `json:"enableDeleteOnCancel"`
+	LogFile              string `json:"logFile"`
+	DbUpdateLog          string `json:"dbUpdateLog"`
 }

@@ -38,6 +38,35 @@ func SetURI(uri string) {
 	URI = uri
 }
 
+func QueryPayments(parentCtx context.Context, dbase, collection string) ([]model.PaymentDescriptor, error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{}
+
+	db := Client.Database(Database)
+	coll := db.Collection(collection)
+
+	cursor, err := coll.Find(ctx, filter)
+
+	var results []model.PaymentDoc
+	var paymentRecords []model.PaymentDescriptor
+
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.PaymentDescriptor{}, err
+	}
+
+	for _, r := range results {
+
+		paymentRecords = append(paymentRecords, utils.ConvertPaymentDocToPaymentDescr(r))
+
+	}
+	return paymentRecords, nil
+}
+
 func QueryAggregatedGames(parentCtx context.Context, dbase, collection, filter string) ([]model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -96,6 +125,35 @@ func QueryAggregatedGames(parentCtx context.Context, dbase, collection, filter s
 
 	}
 	return gameRecords, nil
+}
+
+func PaymentExists(doc model.PaymentDoc) (bool, error) {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+	filter := bson.M{}
+
+	var paymentExists bool = false
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+
+	filter = bson.M{
+		"paymentId": doc.PaymentId,
+	}
+
+	// Query to find all documents
+	count, err := coll.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, fmt.Errorf("CountDocuments failure.  Reason: %s", err)
+	}
+
+	if count > 0 {
+		fmt.Println("Game exists!")
+		paymentExists = true
+	}
+
+	return paymentExists, nil
 }
 
 func GameExists(doc model.GameDoc) (bool, error) {
@@ -312,6 +370,32 @@ func GetContext() (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
+func DumpPaymentsCollection(parentCtx context.Context, dbase, collection string) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	collectionName := coll.Name()
+
+	fmt.Println("Printing", collectionName, "collection")
+
+	cursor := QueryCollection(bson.M{}, Database, collection)
+
+	var results []model.PaymentDoc
+
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return
+	}
+
+	for _, r := range results {
+		fmt.Println(r)
+	}
+}
+
 func DumpOfficialsCollection(parentCtx context.Context, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -458,6 +542,45 @@ func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescript
 		officialId++
 	}
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
+}
+
+func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection string) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	collectionName := coll.Name()
+	fmt.Println("Inserting records into", collectionName)
+
+	recordsInserted := 0
+	totalErrors := 0
+
+	for _, v := range payment {
+
+		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
+
+		paymentExists, err := PaymentExists(doc)
+
+		if paymentExists || err != nil {
+			totalErrors++
+			if err != nil {
+				fmt.Println(err)
+			}
+			continue
+		}
+		_, err = coll.InsertOne(ctx, doc)
+		if err != nil {
+			fmt.Println("Insert failed.  Reason:", err)
+			return
+		}
+		recordsInserted++
+
+		//fmt.Println("Inserted ID:", result.InsertedID)
+	}
+	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
+	fmt.Println("Total Errors:", totalErrors)
 }
 
 func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection string) {

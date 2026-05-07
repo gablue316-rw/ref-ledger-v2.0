@@ -181,6 +181,14 @@ func main() {
 		rept := reports.GenerateGameReport(gameRecords)
 		reports.PrintReport(rept)
 		return
+	} else if *report == "payments" {
+		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments")
+		if err != nil {
+			return
+		}
+		rept := reports.GeneratePaymentReport(paymentRecords)
+		reports.PrintReport(rept)
+		return
 	}
 
 	if *gupdate != "" {

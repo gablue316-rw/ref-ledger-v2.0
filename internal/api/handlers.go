@@ -11,11 +11,81 @@ import (
 	"strconv"
 	"strings"
 
+	"encoding/base64"
+	"encoding/json"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/exp/slices"
 )
 
 var ApiVersion string = "ref-ledger-api-v2.1.0"
+
+func UseDefaultConfig() model.Config {
+
+	fmt.Println("Using Default Configuration")
+
+	config := model.Config{
+		AppName:  "RefLedger",
+		Version:  "2.0.0",
+		UserName: "cmVmTGVkZ2VyMzE2QGdtYWlsLmNvbQ==",
+		Password: "dHpsZ3l0am5zZmNzdnhiaA==",
+		Features: model.FeaturesConfig{
+			EnableDeleteOnCancel: true,
+			LogFile:              "refLedger.log",
+			DbUpdateLog:          "dbUpdate.log",
+		},
+	}
+
+	return config
+
+}
+
+func processConfigFile(configFile string) error {
+
+	var config model.Config
+
+	fmt.Println("Processing json config file", configFile)
+
+	fd, err := os.OpenFile(configFile, os.O_CREATE|os.O_RDONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("Error opening %s file: %v", configFile, err)
+	}
+
+	defer fd.Close()
+
+	if err = json.NewDecoder(fd).Decode(&config); err != nil {
+		return fmt.Errorf("failed to decode %s: %w", configFile, err)
+	}
+
+	return nil
+}
+
+// Silently fail.  We don't want anyone to know we are decrypting the email credentials
+func DecryptEmailCredentials(userName, password string) (string, string) {
+
+	var decryptedUserName []byte = []byte{}
+	var decryptedPwd []byte = []byte{}
+
+	//
+	// Decrypt User Name
+	//
+	decryptedUserName, err := base64.StdEncoding.DecodeString(userName)
+	if err != nil {
+		return "", ""
+	}
+
+	//
+	// Decrypt Password
+	//
+	decryptedPwd, err = base64.StdEncoding.DecodeString(password)
+
+	if err != nil {
+		return "", ""
+	}
+
+	return string(decryptedUserName), string(decryptedPwd)
+
+}
 
 func DelGame(parentCtx context.Context, game model.GameDescriptor) {
 
@@ -98,6 +168,11 @@ func UpdateGames(parentCtx context.Context, file string) error {
 	return nil
 }
 
+// Stubbed out for now
+func ValidatePaymentDescriptor(parentCtx context.Context, p model.PaymentDescriptor) error {
+	return nil
+}
+
 func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) error {
 
 	var errorFormat string = "%s %s not found!  Record Dropped!"
@@ -139,13 +214,17 @@ func RebuildTable(parentCtx context.Context, table, file string) error {
 
 	fmt.Println("Rebuilding table", table)
 
-	if table == "games" {
+	switch table {
+	case "games":
 		DelGamesTable(parentCtx)
 		BulkAddGames(parentCtx, file)
-	} else if table == "officials" {
+	case "officials":
 		DelOfficialsTable(parentCtx)
 		BulkAddOfficials(parentCtx, file)
-	} else {
+	case "payments":
+		DelPaymentsTable(parentCtx)
+		BulkAddPayments(parentCtx, file)
+	default:
 		return fmt.Errorf("Invalid table")
 	}
 
@@ -160,68 +239,81 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 	var int64Fields []string = []string{"numOfGames", "gameFee", "travelPay", "assignorFee", "deductions"}
 	var officialFields []string = []string{"referee", "u1", "u2", "eco", "assignor"}
 
-	cmdList = strings.Split(cmd, ":")
-	field = cmdList[0]
-	value = cmdList[1]
-	var update bson.M
+	cmdList = strings.Split(cmd, ";")
 
-	//
-	// Time changes will look like the following:
-	//
-	//    Time:6:15 PM
-	//
-	// The above strings.Split command will split the cmd into 3 elements.
-	// So we will need to reassemble the time
-	//
-	if len(cmdList) == 3 {
-		value = cmdList[1] + ":" + cmdList[2]
-	}
+	for _, command := range cmdList {
 
-	filter := bson.M{
-		"gameId": bson.M{
-			"$in": gameIds,
-		},
-	}
+		parts := strings.Split(command, ":")
 
-	if field == "status" && value == "Delete" {
-		database.DeleteOneDoc(parentCtx, filter, database.Database, "games")
-		return nil
-	}
+		field = parts[0]
+		value = parts[1]
+		var update bson.M
 
-	exists := slices.Contains(officialFields, field)
-	if exists {
-		found, err := database.FindOfficial(parentCtx, value)
-		if !found || err != nil {
-			return fmt.Errorf("Failed to find %s %s.  Reason: %s", field, value, err)
+		//
+		// Time changes will look like the following:
+		//
+		//    Time:6:15 PM
+		//
+		// The above strings.Split command will split the cmd into 3 elements.
+		// So we will need to reassemble the time
+		//
+		if len(command) == 3 {
+			value = cmdList[1] + ":" + cmdList[2]
 		}
-	}
 
-	exists = slices.Contains(int64Fields, field)
-	if exists {
-		valueInt64, err := strconv.ParseInt(value, 10, 64)
-		if err != nil {
-			return fmt.Errorf("Error:", err)
-		}
-		update = bson.M{
-			"$set": bson.M{
-				field: valueInt64,
+		filter := bson.M{
+			"gameId": bson.M{
+				"$in": gameIds,
 			},
 		}
-	} else {
-		update = bson.M{
-			"$set": bson.M{
-				field: value,
-			},
-		}
-	}
 
-	if len(gameIds) > 1 {
-		database.UpdateManyDoc(parentCtx, filter, update, database.Database, "games")
-	} else {
-		database.UpdateOneDoc(parentCtx, filter, update, database.Database, "games")
+		if field == "status" && value == "Delete" {
+			database.DeleteOneDoc(parentCtx, filter, database.Database, "games")
+			return nil
+		}
+
+		exists := slices.Contains(officialFields, field)
+		if exists {
+			found, err := database.FindOfficial(parentCtx, value)
+			if !found || err != nil {
+				return fmt.Errorf("Failed to find %s %s.  Reason: %s", field, value, err)
+			}
+		}
+
+		exists = slices.Contains(int64Fields, field)
+		if exists {
+			valueInt64, err := strconv.ParseFloat(value, 64)
+			if err != nil {
+				return fmt.Errorf("Error: %s", err)
+			}
+			valueInt64 = valueInt64 * 100
+			update = bson.M{
+				"$set": bson.M{
+					field: valueInt64,
+				},
+			}
+		} else {
+			update = bson.M{
+				"$set": bson.M{
+					field: value,
+				},
+			}
+		}
+
+		if len(gameIds) > 1 {
+			database.UpdateManyDoc(parentCtx, filter, update, database.Database, "games")
+		} else {
+			database.UpdateOneDoc(parentCtx, filter, update, database.Database, "games")
+		}
 	}
 
 	return nil
+
+}
+
+func AddPayments(parentCtx context.Context, payment []model.PaymentDescriptor) {
+
+	database.InsertPaymentDocs(parentCtx, payment, database.Database, "payments")
 }
 
 func AddGames(parentCtx context.Context, game []model.GameDescriptor) {
@@ -246,6 +338,12 @@ func DelOfficialsTable(parentCtx context.Context) {
 
 }
 
+func DelPaymentsTable(parentCtx context.Context) {
+
+	database.DelCollection(parentCtx, database.Database, "payments")
+
+}
+
 func DumpGames(parentCtx context.Context) {
 
 	database.DumpGamesCollection(parentCtx, database.Database, "games")
@@ -260,7 +358,7 @@ func DumpOfficials(parentCtx context.Context) {
 
 func DumpPayments(parentCtx context.Context) {
 
-	database.DumpOfficialsCollection(parentCtx, database.Database, "payments")
+	database.DumpPaymentsCollection(parentCtx, database.Database, "payments")
 
 }
 
@@ -277,6 +375,73 @@ func DumpTable(parentCtx context.Context, table string) {
 		fmt.Println("Table", table, "not supported")
 	}
 
+}
+
+/*
+type PaymentDescriptor struct {
+	PaymentId   string
+	PaymentDate string
+	PaymentAmt  float32
+	Association string
+	GameIds     string
+}
+
+type PaymentDoc struct {
+	PaymentId   string  `bson:"paymentId,omitempty"`
+	PaymentDate string  `bson:"paymentDate,omitempty"`
+	PaymentAmt  float32 `bson:"paymentAmt,omitempty"`
+	Association string  `bson:"association,omitempty"`
+	GameIds     []int64 `bson:"gameIds,omitempty"`
+}
+*/
+
+func BulkAddPayments(parentCtx context.Context, file string) {
+
+	fmt.Println("Peforming Bulk Update for Payments Collection")
+
+	payments := []model.PaymentDescriptor{}
+	// Read file
+	fd, err := os.Open(file)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer fd.Close()
+
+	sc := bufio.NewScanner(fd)
+
+	recordsRead := 0
+	recordsAppended := 0
+	validationErrors := 0
+
+	for sc.Scan() {
+
+		line := sc.Text()
+		recordsRead++
+		fields := strings.Split(line, ",")
+
+		payment := model.PaymentDescriptor{
+			PaymentId:   fields[0],
+			PaymentDate: fields[1],
+			PaymentAmt:  fields[2],
+			Association: fields[3],
+			GameIds:     fields[4],
+		}
+
+		err = ValidatePaymentDescriptor(parentCtx, payment)
+		if err != nil {
+			fmt.Println(err)
+			validationErrors++
+			continue
+		}
+
+		payments = append(payments, payment)
+
+		recordsAppended++
+	}
+
+	fmt.Println("Records Read", recordsRead, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
+	AddPayments(parentCtx, payments)
 }
 
 func BulkAddGames(parentCtx context.Context, file string) {

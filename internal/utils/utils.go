@@ -279,6 +279,83 @@ func ConvertGameIdRangeToInt(g string) ([]int64, error) {
 	return gameIds, nil
 }
 
+func FormatGameIdStrSplice(gameIdStr string, maxLength int) []string {
+
+	var gameIdSplice []string = []string{}
+	var line string = ""
+
+	gameIdList := strings.Split(gameIdStr, ";")
+	for _, v := range gameIdList {
+
+		if len(v)+len(line) >= maxLength {
+			if line[len(line)-1] == ';' {
+				line = line[:len(line)-1] + " "
+			}
+			gameIdSplice = append(gameIdSplice, line)
+			line = ""
+		}
+		line += v + ";"
+	}
+
+	if len(line) > 0 {
+		if line[len(line)-1] == ';' {
+			line = line[:len(line)-1]
+		}
+		gameIdSplice = append(gameIdSplice, line)
+	}
+
+	return gameIdSplice
+}
+
+func ConvertGameIdsToRange(gameIds []int64) (string, int) {
+
+	gameIdStr := ""
+
+	if len(gameIds) == 1 {
+		gameIdStr := fmt.Sprintf("%d", gameIds[0])
+		return gameIdStr, 1
+	}
+
+	var beginGameId, endGameId int64
+	beginGameId = 0
+	endGameId = 0
+	numOfGameIds := len(gameIds)
+
+	for _, gameId := range gameIds {
+		if beginGameId == 0 {
+			beginGameId = gameId
+		} else {
+			if gameId == beginGameId+1 {
+				endGameId = gameId
+			} else {
+				if beginGameId != 0 && endGameId != 0 {
+					if gameId == endGameId+1 {
+						endGameId = gameId
+						continue
+					}
+					gameIdStr += fmt.Sprintf("%d-%d;", beginGameId, endGameId)
+					beginGameId = gameId
+					endGameId = 0
+				} else {
+					gameIdStr += fmt.Sprintf("%d;", beginGameId)
+					beginGameId = gameId
+					endGameId = 0
+				}
+			}
+		}
+
+	}
+
+	if beginGameId != 0 && endGameId != 0 {
+		gameIdStr += fmt.Sprintf("%d-%d", beginGameId, endGameId)
+	} else if beginGameId != 0 {
+		gameIdStr += fmt.Sprintf("%d", beginGameId)
+	}
+
+	return gameIdStr, numOfGameIds
+
+}
+
 func ConvertGameIdIntToStr(g []int64) (string, error) {
 
 	var gameIdStr string
@@ -431,6 +508,47 @@ func ConvertOfficialDescrToOfficialDoc(officialDescr model.OfficialDescriptor) m
 		Phone:       officialDescr.Phone,
 		Association: officialDescr.Association,
 	}
+	return doc
+}
+
+func ConvertPaymentDocToPaymentDescr(doc model.PaymentDoc) model.PaymentDescriptor {
+
+	var gameIds string
+	paymentAmt := ConvertInt64ToAmtStr(doc.PaymentAmt)
+	gameIds, _ = ConvertGameIdsToRange(doc.GameIds)
+
+	paymentDescr := model.PaymentDescriptor{
+		PaymentId:   doc.PaymentId,
+		PaymentDate: doc.PaymentDate,
+		PaymentAmt:  paymentAmt,
+		Association: doc.Association,
+		GameIds:     gameIds,
+	}
+
+	return paymentDescr
+
+}
+
+func ConvertPaymentDescrToPaymentDoc(paymentDescr model.PaymentDescriptor) model.PaymentDoc {
+
+	var gameIds []int64 = []int64{}
+	gameIds, err := ConvertGameIdStrToInt(paymentDescr.GameIds)
+
+	if err != nil {
+		fmt.Println(err)
+		return model.PaymentDoc{}
+	}
+
+	paymentAmt, _ := ConvertAmtStrToInt64(paymentDescr.PaymentAmt)
+
+	doc := model.PaymentDoc{
+		PaymentId:   paymentDescr.PaymentId,
+		PaymentDate: paymentDescr.PaymentDate,
+		PaymentAmt:  paymentAmt,
+		Association: paymentDescr.Association,
+		GameIds:     gameIds,
+	}
+
 	return doc
 }
 

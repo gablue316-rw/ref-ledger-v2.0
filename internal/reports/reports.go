@@ -170,6 +170,49 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 }
 */
 
+func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
+
+	fmt.Println("Generating Payment Report")
+	rept := make([]string, 10, 20)
+	var totalPayments int
+
+	reptFmtStr := "%-14s%-17s$%-11s%-16s%-60s\n"
+	reptFmtStr2 := "%-59s%-60s\n"
+
+	title := "Game Report\n"
+	heading1 := "Payment ID    Payment Date     Amount      Association     Game IDs\n"
+	separator := "==============================================================================================================================\n"
+	reptTimeMsg := getReportGeneratedDate()
+
+	maxLineLength := len(heading1)
+	newTitle := utils.CenterText(title, maxLineLength)
+	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
+
+	rept = append(rept, newTitle)
+	rept = append(rept, newReptTimeMsg)
+	rept = append(rept, heading1)
+	rept = append(rept, separator)
+
+	for _, record := range records {
+
+		if len(record.GameIds) > 60 {
+			gameIdLines := utils.FormatGameIdStrSplice(record.GameIds, 60)
+			fmt.Println("Game Id Lines:", gameIdLines)
+			for i, v := range gameIdLines {
+				if i == 0 {
+					rept = append(rept, fmt.Sprintf(reptFmtStr, record.PaymentId, record.PaymentDate, record.PaymentAmt, record.Association, v))
+				} else {
+					rept = append(rept, fmt.Sprintf(reptFmtStr2, "", v))
+				}
+			}
+		} else {
+			rept = append(rept, fmt.Sprintf(reptFmtStr, record.PaymentId, record.PaymentDate, record.PaymentAmt, record.Association, record.GameIds))
+		}
+	}
+	fmt.Println("Total Payments", totalPayments)
+	return rept
+}
+
 func GenerateGameReport(records []model.GameDescriptor) []string {
 
 	fmt.Println("Generating Game Report")
