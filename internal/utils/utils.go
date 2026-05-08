@@ -148,21 +148,37 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 	case "last month":
 		bDate = getStartOfLastMonth()
 		eDate = getEndOfMonth(bDate)
+	default:
+		bDate = begin
 	}
 
-	// Make sure the begin date is not later than the end date
-	beginDate, err := time.Parse(layout, bDate)
-	if err != nil {
-		return "", "", err
+	var beginDate time.Time
+	var endDate time.Time
+	var err error
+
+	if bDate != "" {
+		// Make sure the begin date is not later than the end date
+		beginDate, err = time.Parse(layout, bDate)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
-	endDate, err := time.Parse(layout, eDate)
-	if err != nil {
-		return "", "", err
+	if eDate == "" {
+		eDate = end
 	}
 
-	if beginDate.After(endDate) {
-		return "", "", fmt.Errorf("Begin date [%s] must not be later than end date [%s]", bDate, eDate)
+	if eDate != "" {
+		endDate, err = time.Parse(layout, eDate)
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	if beginDate.IsZero() == false && endDate.IsZero() == false {
+		if beginDate.After(endDate) {
+			return "", "", fmt.Errorf("Begin date [%s] must not be later than end date [%s]", bDate, eDate)
+		}
 	}
 
 	return bDate, eDate, nil
@@ -211,7 +227,7 @@ func DayOfWeekAbbreviation(date string) string {
 func ConvertGameFiltersToJsonFile(a, g, s, b, e string) (string, error) {
 
 	var filters model.GameFilter
-	var fileName string = "filters.json"
+	var fileName string = "gamesReportFilters.json"
 
 	assocValues := ParseCsv(a)
 	gameIdValues, _ := ParseInt64CSV(g)
@@ -222,7 +238,7 @@ func ConvertGameFiltersToJsonFile(a, g, s, b, e string) (string, error) {
 	filters.GameId = gameIdValues
 
 	if b != "" || e != "" {
-		filters.Date = &model.DateRange{}
+		filters.Date = &model.Date{}
 	}
 
 	if b != "" {

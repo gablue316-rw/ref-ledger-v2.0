@@ -161,6 +161,9 @@ func main() {
 
 	if *bdate != "" || *edate != "" {
 		bDate, eDate, err = utils.FormatDateFilter(*bdate, *edate)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 
 	if *gameIds != "" {
