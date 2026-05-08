@@ -59,7 +59,7 @@ func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescript
 
 	cursor, err := coll.Find(ctx, filter)
 
-	var results model.GameDoc
+	var results []model.GameDoc
 	var gameRecord model.GameDescriptor
 
 	err = cursor.All(context.TODO(), &results)
@@ -68,7 +68,11 @@ func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescript
 		return model.GameDescriptor{}, err
 	}
 
-	gameRecord = utils.ConvertGameDocToGameDescr(results)
+	if len(results) > 1 {
+		return model.GameDescriptor{}, fmt.Errorf("Error!  Multiple game documents found!")
+	}
+
+	gameRecord = utils.ConvertGameDocToGameDescr(results[0])
 
 	return gameRecord, nil
 }
@@ -243,6 +247,25 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 		}
 	}
 
+	// Official filters
+	var officials []bson.M
+
+	if filter.Referee != "" {
+		officials = append(officials, bson.M{"referee": filter.Referee})
+	}
+
+	if filter.U1 != "" {
+		officials = append(officials, bson.M{"u1": filter.U1})
+	}
+
+	if filter.U2 != "" {
+		officials = append(officials, bson.M{"u2": filter.U2})
+	}
+
+	if len(officials) > 0 {
+		mongoFilter["$or"] = officials
+	}
+
 	// Date handling (your format: M/D/YYYY)
 	if filter.Date != nil {
 
@@ -309,6 +332,15 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 				},
 			}
 		}
+	}
+
+	// Convert bson.M to raw BSON bytes
+	text := fmt.Sprintf("%v", mongoFilter)
+
+	// Write BSON bytes to file
+	err := os.WriteFile("gamesReportFilters.bson", []byte(text), 0644)
+	if err != nil {
+		fmt.Println(err)
 	}
 
 	fmt.Println("Mongo DB Filter successfully built!")
@@ -560,7 +592,7 @@ func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, colle
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 
-	fmt.Println("Updating One", coll.Name())
+	//fmt.Println("Updating One", coll.Name())
 	results, err := coll.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return fmt.Errorf("Attempt to update %s failed.  Reason: %s", coll.Name(), err)
@@ -630,10 +662,12 @@ func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
 	db := Client.Database(Database)
 	coll := db.Collection("games")
 	collectionName := coll.Name()
-	fmt.Println("Updating Games Status to Paid")
+	fmt.Println("Updating Games Status to Paid for game ids:", gameIds)
 
 	recordsUpdated := 0
 	totalErrors := 0
+
+	var game model.GameDescriptor = model.GameDescriptor{}
 
 	for _, id := range gameIds {
 
@@ -644,14 +678,14 @@ func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
 			continue
 		}
 
-		gameDescr, err := GetSingleGame(parentCtx, gameIdStr)
+		game, err = GetSingleGame(parentCtx, gameIdStr)
 
 		if err != nil {
 			fmt.Println("Failed to get game record.  Reason:", err)
 			continue
 		}
 
-		if gameDescr.Status == "Pending" || gameDescr.Status == "Completed" {
+		if game.Status == "Pending" || game.Status == "Completed" {
 
 			filter := bson.M{
 				"gameId": id,
@@ -670,11 +704,10 @@ func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
 			} else {
 				recordsUpdated++
 			}
-
 		}
 	}
-	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated)
-	fmt.Println("Total Errors:", totalErrors)
+
+	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
 }
 
 func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection string) {
@@ -722,8 +755,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			UpdateGameStatusToPaid(ctx, gameIds)
 		}
 	}
-	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
-	fmt.Println("Total Errors:", totalErrors)
+	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors)
 }
 
 func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection string) {

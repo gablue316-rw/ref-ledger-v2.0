@@ -224,7 +224,7 @@ func DayOfWeekAbbreviation(date string) string {
 	return abbreviation
 }
 
-func ConvertGameFiltersToJsonFile(a, g, s, b, e string) (string, error) {
+func ConvertGameFiltersToJsonFile(a, g, s, b, e, o string) (string, error) {
 
 	var filters model.GameFilter
 	var fileName string = "gamesReportFilters.json"
@@ -248,6 +248,10 @@ func ConvertGameFiltersToJsonFile(a, g, s, b, e string) (string, error) {
 	if e != "" {
 		filters.Date.To = e
 	}
+
+	filters.Referee = o
+	filters.U1 = o
+	filters.U2 = o
 
 	// write JSON file
 	file, err := os.Create(fileName)

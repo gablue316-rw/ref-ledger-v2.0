@@ -44,7 +44,7 @@ func main() {
 	// Official Flags
 	//
 
-	var officialName = flag.String("on", "", "Official Name used to filter officials report")
+	var officialName = flag.String("on", "", "Official Name used to filter officials and games report")
 
 	//
 	// Other Flags
@@ -99,7 +99,7 @@ func main() {
 	//
 	// Official Flags
 	//
-	rootCmd.Flags().StringVar(officialName, "on", "", "Official Name used to filter officials report")
+	rootCmd.Flags().StringVar(officialName, "on", "", "Official Name used to filter officials and games report")
 
 	//
 	// Flags used to rebuild the various collections
@@ -181,9 +181,9 @@ func main() {
 		// entered other filter flags
 		//
 		if *gfilter == "" {
-			if *gameIds != "" || *gstatus != "" || *assoc != "" || *bdate != "" || *edate != "" {
+			if *gameIds != "" || *gstatus != "" || *assoc != "" || *bdate != "" || *edate != "" || *officialName != "" {
 				s, _ := utils.ConvertGameIdIntToStr(ids)
-				*gfilter, err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus, bDate, eDate)
+				*gfilter, err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus, bDate, eDate, *officialName)
 				if err != nil {
 					fmt.Println(err)
 					return
