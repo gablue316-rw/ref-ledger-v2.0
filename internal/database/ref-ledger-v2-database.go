@@ -278,7 +278,7 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 	}
 
 	fmt.Println("Mongo DB Filter successfully built!")
-	fmt.Println("Mongo Filter:", mongoFilter)
+
 	return mongoFilter
 }
 

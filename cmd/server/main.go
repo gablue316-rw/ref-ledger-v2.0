@@ -37,8 +37,8 @@ func main() {
 	var gstatus = flag.String("gs", "", "Status game should be set to or used to filter games report")
 	var gupdate = flag.String("gu", "", "Update game.")
 	var gadd = flag.String("ga", "", "Games Update File.")
-	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday]")
-	var edate = flag.String("ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
+	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
+	var edate = flag.String("ed", "", "Ending date usedd to flter game report")
 
 	//
 	// Official Flags
@@ -86,8 +86,8 @@ func main() {
 	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status game should be set to or used to filter games report")
 	rootCmd.Flags().StringVar(gupdate, "gu", "", "Update game")
 	rootCmd.Flags().StringVar(gadd, "ga", "", "Games Update File.")
-	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday]")
-	rootCmd.Flags().StringVar(edate, "ed", "", "Ending date usedd to flter game report [today | tomorrow | yesterday]")
+	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
+	rootCmd.Flags().StringVar(edate, "ed", "", "Ending date usedd to flter game report")
 
 	//
 	// Other Flags

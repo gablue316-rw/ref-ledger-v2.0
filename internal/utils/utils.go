@@ -23,6 +23,21 @@ func getEndOfWeek(startOfWeek string) string {
 
 	endOfWeek := date.AddDate(0, 0, 6)
 	newDate := endOfWeek.Format(layout)
+
+	return newDate
+
+}
+
+func getEndOfMonth(startOfMonth string) string {
+
+	date, err := time.Parse(layout, startOfMonth)
+	if err != nil {
+		fmt.Println("Error parsing date")
+		return ""
+	}
+
+	endOfMonth := date.AddDate(0, 1, -1)
+	newDate := endOfMonth.Format(layout)
 	return newDate
 
 }
@@ -102,49 +117,37 @@ func getStartOfNextMonth() string {
 
 func FormatDateFilter(begin, end string) (string, string, error) {
 
-	var bDate string
-	var eDate string
+	var bDate string = ""
+	var eDate string = ""
 
-	if begin == "today" {
+	switch begin {
+	case "today":
 		bDate = time.Now().Format(layout)
-	} else if begin == "tomorrow" {
-		bDate = time.Now().AddDate(0, 0, 1).Format(layout)
-	} else if begin == "yesterday" {
-		bDate = time.Now().AddDate(0, 0, -1).Format(layout)
-	} else if begin == "this week" {
-		bDate = getStartOfThisWeek()
-	} else if begin == "next week" {
-		bDate = getStartOfNextWeek()
-	} else if begin == "last week" {
-		bDate = getStartOfLastWeek()
-	} else if begin == "this month" {
-		bDate = getStartOfThisMonth()
-	} else if begin == "next month" {
-		bDate = getStartOfNextMonth()
-	} else if begin == "last month" {
-		bDate = getStartOfLastMonth()
-	}
-
-	if end == "" {
 		eDate = bDate
-	} else if end == "today" {
-		eDate = time.Now().Format(layout)
-	} else if end == "tomorrow" {
-		eDate = time.Now().AddDate(0, 0, 1).Format(layout)
-	} else if end == "yesterday" {
-		eDate = time.Now().AddDate(0, 0, -1).Format(layout)
-	} else if end == "this week" {
-		eDate = getStartOfThisWeek()
-	} else if end == "next week" {
-		eDate = getStartOfNextWeek()
-	} else if end == "last week" {
-		eDate = getStartOfLastWeek()
-	} else if end == "this month" {
-		eDate = getStartOfThisMonth()
-	} else if end == "next month" {
-		eDate = getStartOfNextMonth()
-	} else if end == "last month" {
-		eDate = getStartOfLastMonth()
+	case "tomorrow":
+		bDate = time.Now().AddDate(0, 0, 1).Format(layout)
+		eDate = bDate
+	case "yesterday":
+		bDate = time.Now().AddDate(0, 0, -1).Format(layout)
+		eDate = bDate
+	case "this week":
+		bDate = getStartOfThisWeek()
+		eDate = getEndOfWeek(bDate)
+	case "next week":
+		bDate = getStartOfNextWeek()
+		eDate = getEndOfWeek(bDate)
+	case "last week":
+		bDate = getStartOfLastWeek()
+		eDate = getEndOfWeek(bDate)
+	case "this month":
+		bDate = getStartOfThisMonth()
+		eDate = getEndOfMonth(bDate)
+	case "next month":
+		bDate = getStartOfNextMonth()
+		eDate = getEndOfMonth(bDate)
+	case "last month":
+		bDate = getStartOfLastMonth()
+		eDate = getEndOfMonth(bDate)
 	}
 
 	// Make sure the begin date is not later than the end date
@@ -161,6 +164,7 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 	if beginDate.After(endDate) {
 		return "", "", fmt.Errorf("Begin date [%s] must not be later than end date [%s]", bDate, eDate)
 	}
+
 	return bDate, eDate, nil
 }
 
