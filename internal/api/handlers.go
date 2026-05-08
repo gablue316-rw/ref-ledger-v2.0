@@ -97,6 +97,66 @@ func DelGame(parentCtx context.Context, game model.GameDescriptor) {
 
 }
 
+func UpdatePayments(parentCtx context.Context, file string) error {
+
+	fmt.Println("Adding to Payments Collection")
+
+	payments := []model.PaymentDescriptor{}
+
+	// Read file
+	fd, err := os.Open(file)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("Failed to open file %s.  Reason: %s", file, err)
+	}
+	defer fd.Close()
+
+	sc := bufio.NewScanner(fd)
+
+	recordsRead := 0
+	recordsAppended := 0
+	recordsDeleted := 0
+	validationErrors := 0
+
+	type PaymentDescriptor struct {
+		PaymentId   string
+		PaymentDate string
+		PaymentAmt  string
+		Association string
+		GameIds     string
+	}
+	for sc.Scan() {
+
+		line := sc.Text()
+		recordsRead++
+		fields := strings.Split(line, ",")
+
+		payment := model.PaymentDescriptor{
+			PaymentId:   fields[0],
+			PaymentDate: fields[1],
+			PaymentAmt:  fields[2],
+			Association: fields[3],
+			GameIds:     fields[4],
+		}
+
+		err = ValidatePaymentDescriptor(parentCtx, payment)
+		if err != nil {
+			fmt.Println(err)
+			validationErrors++
+			continue
+		}
+
+		payments = append(payments, payment)
+
+		recordsAppended++
+	}
+
+	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
+	AddPayments(parentCtx, payments)
+
+	return nil
+}
+
 func UpdateGames(parentCtx context.Context, file string) error {
 
 	fmt.Println("Adding to Games Collection")
@@ -231,6 +291,10 @@ func RebuildTable(parentCtx context.Context, table, file string) error {
 	return nil
 }
 
+func UpdatePayment(parentCtx context.Context) {
+
+}
+
 func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 
 	var field string
@@ -303,7 +367,10 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 		if len(gameIds) > 1 {
 			database.UpdateManyDoc(parentCtx, filter, update, database.Database, "games")
 		} else {
-			database.UpdateOneDoc(parentCtx, filter, update, database.Database, "games")
+			err := database.UpdateOneDoc(parentCtx, filter, update, database.Database, "games")
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
 	}
 
@@ -376,24 +443,6 @@ func DumpTable(parentCtx context.Context, table string) {
 	}
 
 }
-
-/*
-type PaymentDescriptor struct {
-	PaymentId   string
-	PaymentDate string
-	PaymentAmt  float32
-	Association string
-	GameIds     string
-}
-
-type PaymentDoc struct {
-	PaymentId   string  `bson:"paymentId,omitempty"`
-	PaymentDate string  `bson:"paymentDate,omitempty"`
-	PaymentAmt  float32 `bson:"paymentAmt,omitempty"`
-	Association string  `bson:"association,omitempty"`
-	GameIds     []int64 `bson:"gameIds,omitempty"`
-}
-*/
 
 func BulkAddPayments(parentCtx context.Context, file string) {
 

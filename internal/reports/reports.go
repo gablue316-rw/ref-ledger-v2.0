@@ -174,7 +174,10 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 
 	fmt.Println("Generating Payment Report")
 	rept := make([]string, 10, 20)
-	var totalPayments int
+	var totalPayments int64 = 0
+	var paymentAmtInt64 int64 = 0
+	var totalNumOfPayments int = 0
+	var err error
 
 	reptFmtStr := "%-14s%-17s$%-11s%-16s%-60s\n"
 	reptFmtStr2 := "%-59s%-60s\n"
@@ -195,9 +198,17 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 
 	for _, record := range records {
 
+		totalNumOfPayments++
+		paymentAmtInt64, err = utils.ConvertAmtStrToInt64(record.PaymentAmt)
+		if err == nil {
+			totalPayments += paymentAmtInt64
+		} else {
+			fmt.Println(err)
+		}
+
 		if len(record.GameIds) > 60 {
 			gameIdLines := utils.FormatGameIdStrSplice(record.GameIds, 60)
-			fmt.Println("Game Id Lines:", gameIdLines)
+
 			for i, v := range gameIdLines {
 				if i == 0 {
 					rept = append(rept, fmt.Sprintf(reptFmtStr, record.PaymentId, record.PaymentDate, record.PaymentAmt, record.Association, v))
@@ -209,7 +220,9 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 			rept = append(rept, fmt.Sprintf(reptFmtStr, record.PaymentId, record.PaymentDate, record.PaymentAmt, record.Association, record.GameIds))
 		}
 	}
-	fmt.Println("Total Payments", totalPayments)
+	rept = append(rept, "\n")
+	rept = append(rept, fmt.Sprintf("Total Payments: %d Total Deposits: $%s\n", totalNumOfPayments, utils.ConvertInt64ToAmtStr(totalPayments)))
+
 	return rept
 }
 

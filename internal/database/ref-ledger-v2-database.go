@@ -38,6 +38,41 @@ func SetURI(uri string) {
 	URI = uri
 }
 
+func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescriptor, error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	id, err := utils.ConvertStrToInt64(gameId)
+
+	if err != nil {
+		fmt.Println(err)
+		return model.GameDescriptor{}, err
+	}
+
+	filter := bson.M{
+		"gameId": id,
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	cursor, err := coll.Find(ctx, filter)
+
+	var results model.GameDoc
+	var gameRecord model.GameDescriptor
+
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return model.GameDescriptor{}, err
+	}
+
+	gameRecord = utils.ConvertGameDocToGameDescr(results)
+
+	return gameRecord, nil
+}
+
 func QueryPayments(parentCtx context.Context, dbase, collection string) ([]model.PaymentDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -483,7 +518,7 @@ func UpdateManyDoc(parentCtx context.Context, filter, update bson.M, dbase, coll
 	coll.UpdateMany(ctx, filter, update)
 }
 
-func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, collection string) {
+func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, collection string) error {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -492,7 +527,16 @@ func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, colle
 	coll := db.Collection(collection)
 
 	fmt.Println("Updating One", coll.Name())
-	coll.UpdateOne(ctx, filter, update)
+	results, err := coll.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("Attempt to update %s failed.  Reason: %s", coll.Name(), err)
+	}
+
+	if results.ModifiedCount != 1 {
+		return fmt.Errorf("Attempt to update %s failed", coll.Name())
+	}
+
+	return nil
 }
 
 func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection string) {
@@ -544,6 +588,61 @@ func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescript
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
 }
 
+func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+	collectionName := coll.Name()
+	fmt.Println("Updating Games Status to Paid")
+
+	recordsUpdated := 0
+	totalErrors := 0
+
+	for _, id := range gameIds {
+
+		gameIdStr, err := utils.ConvertSingleGameIdToStr(id)
+
+		if err != nil {
+			fmt.Println("Failed to convert Game Id to string.  Reason:", err)
+			continue
+		}
+
+		gameDescr, err := GetSingleGame(parentCtx, gameIdStr)
+
+		if err != nil {
+			fmt.Println("Failed to get game record.  Reason:", err)
+			continue
+		}
+
+		if gameDescr.Status == "Pending" || gameDescr.Status == "Completed" {
+
+			filter := bson.M{
+				"gameId": id,
+			}
+
+			update := bson.M{
+				"$set": bson.M{
+					"status": "Paid",
+				},
+			}
+
+			err = UpdateOneDoc(ctx, filter, update, Database, "games")
+			if err != nil {
+				totalErrors++
+				fmt.Println(err)
+			} else {
+				recordsUpdated++
+			}
+
+		}
+	}
+	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated)
+	fmt.Println("Total Errors:", totalErrors)
+}
+
 func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -556,6 +655,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 
 	recordsInserted := 0
 	totalErrors := 0
+	var gameIds []int64
 
 	for _, v := range payment {
 
@@ -564,20 +664,29 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 		paymentExists, err := PaymentExists(doc)
 
 		if paymentExists || err != nil {
-			totalErrors++
 			if err != nil {
+				totalErrors++
 				fmt.Println(err)
 			}
 			continue
 		}
+
 		_, err = coll.InsertOne(ctx, doc)
 		if err != nil {
 			fmt.Println("Insert failed.  Reason:", err)
-			return
+			totalErrors++
+			continue
 		}
+
 		recordsInserted++
 
-		//fmt.Println("Inserted ID:", result.InsertedID)
+		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
+
+		if err != nil {
+			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
+		} else {
+			UpdateGameStatusToPaid(ctx, gameIds)
+		}
 	}
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
 	fmt.Println("Total Errors:", totalErrors)

@@ -356,6 +356,11 @@ func ConvertGameIdsToRange(gameIds []int64) (string, int) {
 
 }
 
+func ConvertSingleGameIdToStr(g int64) (string, error) {
+
+	return strconv.FormatInt(g, 10), nil
+}
+
 func ConvertGameIdIntToStr(g []int64) (string, error) {
 
 	var gameIdStr string

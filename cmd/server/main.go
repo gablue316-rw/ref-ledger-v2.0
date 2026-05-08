@@ -11,12 +11,18 @@ import (
 	"ref-ledger-v2/internal/reports"
 	"ref-ledger-v2/internal/utils"
 
+	"ref-ledger-v2/internal/logs"
+
 	"github.com/spf13/cobra"
 )
 
 var Version string = "ref-ledger-v2.1.0"
 
 func main() {
+
+	appLog := logs.LogDescriptor{}
+	appLog.Open("logs", "ref-ledger-v2.0.log", "append")
+	defer appLog.Close()
 
 	var gameRecords []model.GameDescriptor
 	var ids []int64
@@ -59,6 +65,7 @@ func main() {
 	var paymentId = flag.String("pi", "", "Payment ID")
 	var paymentDate = flag.String("pd", "", "Payment Date")
 	var paymentAmt = flag.String("pa", "", "Payment Amount")
+	var padd = flag.String("padd", "", "Payments Update File")
 
 	flag.Parse()
 
@@ -106,9 +113,11 @@ func main() {
 	rootCmd.Flags().StringVar(paymentId, "pi", "", "Payment ID")
 	rootCmd.Flags().StringVar(paymentDate, "pd", "", "Payment Date")
 	rootCmd.Flags().StringVar(paymentAmt, "pa", "", "Payment Amount")
+	rootCmd.Flags().StringVar(padd, "padd", "", "Payments Update File")
 
 	rootCmd.Execute()
 
+	appLog.Write("Establing database connection...")
 	fmt.Println("Establing database connection...")
 	database.InitDbase("refLedger_v2", "mongodb://localhost:27017")
 
@@ -117,6 +126,7 @@ func main() {
 		log.Fatal("db connect: %w", err)
 	}
 
+	appLog.Write("Getting context")
 	fmt.Println("Getting context")
 	ctx, cancel := database.GetContext()
 
@@ -136,6 +146,10 @@ func main() {
 
 	if *gadd != "" {
 		api.UpdateGames(ctx, *gadd)
+	}
+
+	if *padd != "" {
+		api.UpdatePayments(ctx, *padd)
 	}
 
 	if *dumpTable != "" {
@@ -199,6 +213,13 @@ func main() {
 		err = api.UpdateGame(ctx, *gupdate, ids)
 		if err != nil {
 			fmt.Println(err)
+		}
+	}
+
+	if *paymentId != "" && *paymentAmt != "" && *paymentDate != "" {
+		if len(ids) == 0 {
+			fmt.Println("Game Ids not provided.")
+			return
 		}
 	}
 
