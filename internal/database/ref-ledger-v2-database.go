@@ -247,6 +247,24 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 		}
 	}
 
+	if len(filter.Site) > 0 {
+		mongoFilter["site"] = bson.M{
+			"$in": filter.Site,
+		}
+	}
+
+	if len(filter.Sport) > 0 {
+		mongoFilter["sport"] = bson.M{
+			"$in": filter.Sport,
+		}
+	}
+
+	if len(filter.Level) > 0 {
+		mongoFilter["level"] = bson.M{
+			"$in": filter.Level,
+		}
+	}
+
 	// Official filters
 	var officials []bson.M
 

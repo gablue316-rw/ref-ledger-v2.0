@@ -224,34 +224,40 @@ func DayOfWeekAbbreviation(date string) string {
 	return abbreviation
 }
 
-func ConvertGameFiltersToJsonFile(a, g, s, b, e, o string) (string, error) {
+func ConvertGameFiltersToJsonFile(filters model.GFilters) (string, error) {
 
-	var filters model.GameFilter
-	var fileName string = "gamesReportFilters.json"
+	var jsonFilters model.GameFilter
+	var fileName string = "gamesReportFiltersV2.json"
 
-	assocValues := ParseCsv(a)
-	gameIdValues, _ := ParseInt64CSV(g)
-	statusValues := ParseCsv(s)
+	assocValues := ParseCsv(filters.Association)
+	gameIdValues, _ := ParseInt64CSV(filters.GameId)
+	statusValues := ParseCsv(filters.Status)
+	siteValues := ParseCsv(filters.Site)
+	sportValues := ParseCsv(filters.Sport)
+	levelValues := ParseCsv(filters.Level)
 
-	filters.Status = statusValues
-	filters.Association = assocValues
-	filters.GameId = gameIdValues
+	jsonFilters.Association = assocValues
+	jsonFilters.GameId = gameIdValues
+	jsonFilters.Status = statusValues
+	jsonFilters.Site = siteValues
+	jsonFilters.Sport = sportValues
+	jsonFilters.Level = levelValues
 
-	if b != "" || e != "" {
-		filters.Date = &model.Date{}
+	if filters.FromDate != "" || filters.ToDate != "" {
+		jsonFilters.Date = &model.Date{}
 	}
 
-	if b != "" {
-		filters.Date.From = b
+	if filters.FromDate != "" {
+		jsonFilters.Date.From = filters.FromDate
 	}
 
-	if e != "" {
-		filters.Date.To = e
+	if filters.ToDate != "" {
+		jsonFilters.Date.To = filters.ToDate
 	}
 
-	filters.Referee = o
-	filters.U1 = o
-	filters.U2 = o
+	jsonFilters.Referee = filters.Official
+	jsonFilters.U1 = filters.Official
+	jsonFilters.U2 = filters.Official
 
 	// write JSON file
 	file, err := os.Create(fileName)
@@ -263,7 +269,7 @@ func ConvertGameFiltersToJsonFile(a, g, s, b, e, o string) (string, error) {
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
 
-	if err := encoder.Encode(filters); err != nil {
+	if err := encoder.Encode(jsonFilters); err != nil {
 		return "", fmt.Errorf("Failed to encode filters to file %s", fileName)
 	}
 

@@ -110,13 +110,16 @@ type Date struct {
 }
 
 type GFilters struct {
-	Status      []string
-	Association []string
-	GameId      []int64
-	Date        *Date
-	Referee     string
-	U1          string
-	U2          string
+	Status      string
+	Association string
+	GameId      string
+	FromDate    string
+	ToDate      string
+	Official    string
+	Site        string
+	Sport       string
+	Level       string
+	GameFee     string
 }
 
 type GameFilter struct {
@@ -127,6 +130,9 @@ type GameFilter struct {
 	Referee     string   `json:"referee,omitempty"`
 	U1          string   `json:"u1,omitempty"`
 	U2          string   `json:"u2,omitempty"`
+	Site        []string `json:"site,omitempty"`
+	Sport       []string `json:"sport,omitempty"`
+	Level       []string `json:"level,omitempty"`
 }
 
 type Config struct {

@@ -26,6 +26,8 @@ func main() {
 
 	var gameRecords []model.GameDescriptor
 	var ids []int64
+	var gameFilters model.GFilters = model.GFilters{}
+
 	//var bDate string
 	//var eDate string
 
@@ -39,6 +41,8 @@ func main() {
 	var gadd = flag.String("ga", "", "Games Update File.")
 	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
 	var edate = flag.String("ed", "", "Ending date usedd to flter game report")
+	var gsport = flag.String("gsport", "", "Sport [Softball | Basketball]")
+	var glevel = flag.String("gl", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
 
 	//
 	// Official Flags
@@ -52,6 +56,7 @@ func main() {
 	var report = flag.String("rpt", "", "Report to generate [games]")
 	var assoc = flag.String("assoc", "", "Association used to filter reports")
 	var dumpTable = flag.String("dt", "", "Dump table")
+	var sites = flag.String("s", "", "Sites")
 
 	//
 	// Flags used to rebuild the various collections
@@ -88,6 +93,8 @@ func main() {
 	rootCmd.Flags().StringVar(gadd, "ga", "", "Games Update File.")
 	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
 	rootCmd.Flags().StringVar(edate, "ed", "", "Ending date usedd to flter game report")
+	rootCmd.Flags().StringVar(gsport, "gsport", "", "Sport [Softball | Basketball]")
+	rootCmd.Flags().StringVar(glevel, "gl", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
 
 	//
 	// Other Flags
@@ -95,6 +102,7 @@ func main() {
 	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generate [games]")
 	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "dt", "", "Dump table")
+	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
 
 	//
 	// Official Flags
@@ -156,6 +164,9 @@ func main() {
 		api.DumpTable(ctx, *dumpTable)
 	}
 
+	//
+	// Create Game Filter
+	//
 	var bDate string = ""
 	var eDate string = ""
 
@@ -163,7 +174,30 @@ func main() {
 		bDate, eDate, err = utils.FormatDateFilter(*bdate, *edate)
 		if err != nil {
 			fmt.Println(err)
+		} else {
+			gameFilters.FromDate = bDate
+			gameFilters.ToDate = eDate
 		}
+	}
+
+	if *gstatus != "" {
+		gameFilters.Status = *gstatus
+	}
+
+	if *assoc != "" {
+		gameFilters.Association = *assoc
+	}
+
+	if *officialName != "" {
+		gameFilters.Official = *officialName
+	}
+
+	if *gsport != "" {
+		gameFilters.Sport = *gsport
+	}
+
+	if *glevel != "" {
+		gameFilters.Level = *glevel
 	}
 
 	if *gameIds != "" {
@@ -172,40 +206,21 @@ func main() {
 			fmt.Println("Error:", err)
 			return
 		}
+		s, _ := utils.ConvertGameIdIntToStr(ids)
+		gameFilters.GameId = s
 	}
 
-	if *report == "games" {
+	if *sites != "" {
+		gameFilters.Site = *sites
+	}
 
-		//
-		// If the user didn't enter a json game filter file, check if the user
-		// entered other filter flags
-		//
-		if *gfilter == "" {
-			if *gameIds != "" || *gstatus != "" || *assoc != "" || *bdate != "" || *edate != "" || *officialName != "" {
-				s, _ := utils.ConvertGameIdIntToStr(ids)
-				*gfilter, err = utils.ConvertGameFiltersToJsonFile(*assoc, s, *gstatus, bDate, eDate, *officialName)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-			}
-		}
+	if *gfilter == "" {
 
-		gameRecords, err = database.QueryAggregatedGames(ctx, "refLedger_v2", "games", *gfilter)
+		*gfilter, err = utils.ConvertGameFiltersToJsonFile(gameFilters)
 		if err != nil {
+			fmt.Println(err)
 			return
 		}
-		rept := reports.GenerateGameReport(gameRecords)
-		reports.PrintReport(rept)
-		return
-	} else if *report == "payments" {
-		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments")
-		if err != nil {
-			return
-		}
-		rept := reports.GeneratePaymentReport(paymentRecords)
-		reports.PrintReport(rept)
-		return
 	}
 
 	if *gupdate != "" {
@@ -226,6 +241,24 @@ func main() {
 		}
 	}
 
+	switch *report {
+	case "games":
+		gameRecords, err = database.QueryAggregatedGames(ctx, "refLedger_v2", "games", *gfilter)
+		if err != nil {
+			return
+		}
+		rept := reports.GenerateGameReport(gameRecords)
+		reports.PrintReport(rept)
+		return
+	case "payments":
+		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments")
+		if err != nil {
+			return
+		}
+		rept := reports.GeneratePaymentReport(paymentRecords)
+		reports.PrintReport(rept)
+		return
+	}
 	/*
 		var gameDocs []model.GameDoc
 		for _, v := range gameRecords {
