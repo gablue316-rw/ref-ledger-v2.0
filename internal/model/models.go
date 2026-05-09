@@ -58,7 +58,7 @@ type GameDescriptor struct {
 type GameDoc struct {
 	GameId      int64  `bson:"gameId,omitempty"`
 	Date        string `bson:"date,omitempty"`
-	Time        string `bson:"time,omitestring"`
+	Time        string `bson:"time,omitempty"`
 	Sport       string `bson:"sport,omitempty"`
 	Site        string `bson:"site,omitempty"`
 	Field       string `bson:"field,omitempty"`
@@ -147,4 +147,26 @@ type FeaturesConfig struct {
 	EnableDeleteOnCancel bool   `json:"enableDeleteOnCancel"`
 	LogFile              string `json:"logFile"`
 	DbUpdateLog          string `json:"dbUpdateLog"`
+}
+
+type HtmlResponse struct {
+	GameId      int64  `json:"gameId" bson:"gameId,omitempty"`
+	Date        string `json:"date" bson:"date,omitempty"`
+	Time        string `json:"time" bson:"time,omitempty"`
+	Sport       string `json:"sport" bson:"sport,omitempty"`
+	Site        string `json:"site" bson:"site,omitempty"`
+	Field       string `json:"field" bson:"field,omitempty"`
+	NumOfGames  int64  `json:"numOfGames" bson:"numOfGames,omitempty"`
+	Level       string `json:"level" bson:"level,omitempty"`
+	GameFee     int64  `json:"gameFee" bson:"gameFee,omitempty"`
+	TravelPay   int64  `json:"travelPay" bson:"travelPay,omitempty"`
+	AssignorFee int64  `json:"assignorFee" bson:"assignorFee,omitempty"`
+	Deductions  int64  `json:"deductions" bson:"deductions,omitempty"`
+	Association string `json:"association" bson:"association,omitempty"`
+	Status      string `json:"status" bson:"status,omitempty"`
+	Referee     string `json:"referee" bson:"referee,omitempty"`
+	U1          string `json:"u1" bson:"u1,omitempty"`
+	U2          string `json:"u2" bson:"u2,omitempty"`
+	ECO         string `json:"eco" bson:"eco,omitempty"`
+	Assignor    string `json:"assignor" bson:"assignor,omitempty"`
 }

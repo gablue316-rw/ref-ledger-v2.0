@@ -259,6 +259,7 @@ func main() {
 		reports.PrintReport(rept)
 		return
 	}
+
 	/*
 		var gameDocs []model.GameDoc
 		for _, v := range gameRecords {

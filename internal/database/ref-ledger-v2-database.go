@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -861,3 +862,90 @@ func FindOfficial(parentCtx context.Context, name string) (bool, error) {
 
 	return true, nil
 }
+
+func GetGames2(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("GetGames called")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	w.Write([]byte(`[
+        {
+            "gameId": 1001,
+            "date": "05/08/2026",
+            "location": "Atlanta",
+            "status": "Completed"
+        }
+    ]`))
+}
+
+/*
+func GetGames(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("GetGames has been called")
+
+	var games []model.HtmlResponse
+	var gameFilters model.GFilters = model.GFilters{}
+
+	_, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	// 1. Read query parameters
+	status := r.URL.Query().Get("status")
+	association := r.URL.Query().Get("association")
+
+	if len(status) > 0 {
+		runes := []rune(status)
+		runes[0] = unicode.ToUpper(runes[0])
+		status = string(runes)
+	}
+
+	fmt.Println("status:", status, "association", association)
+	gameFilters.Status = status
+	gameFilters.Association = association
+
+	fmt.Println("gameFilters.Status", gameFilters.Status)
+
+	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	mongoDbFilter, err := BuildMongoGameFilterFromFile(gfilter)
+
+	fmt.Println("gfilter", gfilter, "mongoDbFilter", mongoDbFilter)
+
+	// 2. Query MongoDB
+	cursor, err := coll.Find(context.TODO(), mongoDbFilter)
+
+	if err != nil {
+		fmt.Println("find failed")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer cursor.Close(context.TODO())
+
+	// 3. Decode results
+
+	err = cursor.All(context.TODO(), &games)
+
+	//fmt.Println(games)
+
+	if err != nil {
+		fmt.Println("Decoding failed")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Return JSON
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(games)
+
+}
+*/

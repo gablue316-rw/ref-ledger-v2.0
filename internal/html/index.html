@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ref Ledger V2.0 Game Dashboard</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .header {
+            background-color: #1e293b;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+        }
+
+        .filters {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: end;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            min-width: 180px;
+        }
+
+        .btn {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 11px 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background-color: #1d4ed8;
+        }
+
+        .games-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .games-table th {
+            background-color: #0f172a;
+            color: white;
+            text-align: left;
+            padding: 14px;
+        }
+
+        .games-table td {
+            padding: 14px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .games-table tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .pending {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .completed {
+            background-color: #dcfce7;
+            color: #15803d;
+        }
+
+        .paid {
+            background-color: #fee2e2;
+            color: #b91c1c;
+        }
+
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-group input,
+            .filter-group select {
+                width: 100%;
+            }
+
+            .games-table {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1>Ref Ledger V2.0 Game Dashboard</h1>
+        <p>View and manage your game schedule</p>
+    </div>
+
+    <div class="filters">
+        <div class="filter-group">
+            <label for="gameId">Game ID</label>
+            <input type="text" id="gameId" placeholder="Enter Game ID">
+        </div>
+
+        <div class="filter-group">
+            <label for="status">Status</label>
+            <select id="status">
+                <option value="">All</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="paid">Paid</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="date">Begin Date</label>
+            <select id="date">
+                <option value="today">Today</option>
+                <option value="tomorrow">Tomorrow</option>
+                <option value="yesterday">Yesterday</option>                
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="association">Association</label>
+            <select id="association">
+                <option value="">All</option>
+                <option value="GOLLC">GOLLC</option>
+                <option value="MCBOA">MCBOA</option>
+                <option value="MSO">MSO</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="sport">Sport</label>
+            <select id="sport">
+                <option value="">All</option>
+                <option value="Basketball">Basketball</option>
+                <option value="Softball">Softball</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="officials">Officials</label>
+            <input type="text" id="officials" placeholder="Enter Officials Name">                
+        </div>
+
+        <div class="filter-group">
+            <label for="site">Site</label>
+            <select id="site">
+                <option value="">All</option>
+                <option value="BETH">Bethesda Park</option>
+                <option value="BFDAR">Buford Arena</option>
+                <option value="BFDHS">Buford High School</option>
+                <option value="BFORD">Buford Park</option>
+                <option value="BOGNP">Bogan Park</option>
+                <option value="GP">George Pierce</option>
+                <option value="PCHTR">Peachtree Ridge Park</option>
+                <option value="VICLD">Victor Lord Park</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="level">Level</label>
+            <select id="level">
+                <option value="">All</option>
+                <option value="SP">Slow Pitch</option>
+                <option value="PW">Pee Wee</option>
+                <option value="Minor">Minor</option>
+                <option value="Major">Major</option>
+                <option value="Junior">Junior</option>
+                <option value="Senior">Senior</option>
+                <option value="9th Grade">9th Grade</option>
+                <option value="JV">Junior Varsity</option>
+                <option value="Varsity">Varsity</option>
+            </select>    
+        </div>
+       
+        <button class="btn" onclick="loadGames()">
+            Search
+        </button>
+    </div>
+
+    <table class="games-table">
+        <thead>
+            <tr>
+                <th>Game ID</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Sport</th>
+                <th>Site</th>
+                <th>Field</th>
+                <th>Num of Games</th>
+                <th>Level</th>
+                <th>Game Fee</th>
+                <th>Assoc</th>
+                <th>Status</th>
+                <th>Officials</th>
+            </tr>
+        </thead>
+
+        <tbody id="gamesBody">
+            <!-- Games loaded here -->
+        </tbody>
+    </table>
+
+</div>
+
+<script>
+
+    async function loadGames() {
+
+        const gameId = document.getElementById("gameId").value;
+        const status = document.getElementById("status").value;
+        const date = document.getElementById("date").value;
+        const site = document.getElementById("site").value;
+        const association = document.getElementById("association").value;
+
+        // Build query string
+        const params = new URLSearchParams();
+
+        if (gameId) params.append("gameId", gameId);
+        if (status) params.append("status", status);
+        if (date) params.append("date", date);
+        if (site) params.append("site",site);
+        if (association) params.append("association",association)
+
+        try {
+
+            // Replace with your Go API endpoint
+            const response = await fetch(`/api/games?${params.toString()}`);
+
+            const games = await response.json();
+
+            const tbody = document.getElementById("gamesBody");
+
+            tbody.innerHTML = "";
+
+            games.forEach(game => {
+
+                let statusClass = "";
+
+                if (game.status === "Completed") {
+                    statusClass = "completed";
+                }
+                else if (game.status === "Pending") {
+                    statusClass = "pending";
+                }
+                else {
+                    statusClass = "paid";
+                }
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${game.gameId}</td>
+                        <td>${game.date}</td>
+                        <td>${game.time}</td>
+                        <td>${game.sport}</td>
+                        <td>${game.site}</td>
+                        <td>${game.field}</td>
+                        <td>${game.numOfGames}</td>                                                                                                
+                        <td>${game.level}</td>
+                        <td>${game.gameFee}</td>       
+                        <td>${game.association}</td>                 
+                        <td>
+                            <span class="status ${statusClass}">
+                                ${game.status}
+                            </span>
+                        </td>
+                        <td>${game.officials}</td>                           
+                    </tr>
+                `;
+            });
+
+        }
+        catch (err) {
+            console.error(err);
+            alert("Failed to load games.");
+        }
+    }
+
+    // Initial page load
+    loadGames();
+
+</script>
+
+</body>
+</html>
