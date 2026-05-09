@@ -370,6 +370,8 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 			err := database.UpdateOneDoc(parentCtx, filter, update, database.Database, "games")
 			if err != nil {
 				fmt.Println(err)
+			} else {
+				fmt.Println("Successfully updated game with game id[s]:", gameIds)
 			}
 		}
 	}

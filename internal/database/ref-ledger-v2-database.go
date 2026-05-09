@@ -618,7 +618,7 @@ func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, colle
 	}
 
 	if results.ModifiedCount != 1 {
-		return fmt.Errorf("Attempt to update %s failed", coll.Name())
+		return fmt.Errorf("No records modified in collection %s", coll.Name())
 	}
 
 	return nil
