@@ -1,7 +1,9 @@
 package reports
 
 import (
+	"context"
 	"fmt"
+	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
@@ -226,13 +228,10 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 	return rept
 }
 
-func GenerateAcctsRecvReport(records []model.GameDescriptor) []string {
+func GenerateAcctsRecvReport(parentCtx context.Context, associations string) []string {
 
 	fmt.Println("Generating Accounts Receivable Report")
 	rept := make([]string, 10, 20)
-
-	var grandTot int64 = 0
-	var totalGameId int = 0
 
 	title := "Accounts Receivable Report\n"
 	reptTimeMsg := getReportGeneratedDate()
@@ -240,8 +239,9 @@ func GenerateAcctsRecvReport(records []model.GameDescriptor) []string {
 	separator := "=======================================================================================================================\n"
 	totalSeparator := "\n----------------------------------------------------------------------------------------------------------------------\n"
 
-	totAcctRptFormat := "Total Accounts Receivable: $%s Total Game IDs: %d"
-	reptFmt := "%-15s%-22s%-60s\n"
+	totAcctRptFormat := "\nTotal Accounts Receivable: $%s Total Game IDs: %d"
+	reptFmt := "%-15s$%-22s%-60s\n"
+
 	maxLineLength := len(heading1)
 
 	rept = append(rept, utils.CenterText(title, maxLineLength))
@@ -249,52 +249,57 @@ func GenerateAcctsRecvReport(records []model.GameDescriptor) []string {
 	rept = append(rept, heading1)
 	rept = append(rept, separator)
 
-	var gameIds []int64 = []int64{}
-	var prevAssoc string = ""
-	var acctsRecv int64 = 0
-	var fee int64 = 0
-
-	for _, r := range records {
-
-		if prevAssoc == "" {
-			prevAssoc = r.Association
-		}
-
-		if prevAssoc != r.Association {
-			// format and append record
-			gameIdRange, _ := utils.ConvertGameIdsToRange(gameIds)
-
-			rept = append(rept, fmt.Sprintf(reptFmt, prevAssoc, utils.ConvertInt64ToAmtStr(acctsRecv), gameIdRange))
-
-			// Add to total variables
-			grandTot += acctsRecv
-			totalGameId += len(gameIds)
-
-			// clearout variables for the next association
-			gameIds = []int64{}
-			acctsRecv = 0
-		}
-
-		g, err := utils.ConvertStrToInt64(r.GameId)
-
+	if associations == "" {
+		assocs, err := api.GetAssociations(parentCtx)
 		if err != nil {
-			fmt.Println(err)
-			continue
+			fmt.Println("Error:", err)
+			return nil
 		}
-
-		gameIds = append(gameIds, g)
-
-		fee, err = utils.ConvertAmtStrToInt64(r.GameFee)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		acctsRecv += fee
+		associations = assocs
 	}
+	associationList := strings.Split(associations, ",")
 
-	if acctsRecv != 0 {
+	grandTot := int64(0)
+	totalGameId := 0
+
+	for _, assoc := range associationList {
+
+		gFilter := model.GFilters{
+			Status:      "Completed",
+			Association: assoc,
+		}
+		gFilters, err := utils.ConvertGameFiltersToJsonFile(gFilter)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return nil
+		}
+		gameRecords, err := database.QueryAggregatedGames(parentCtx, "refLedger_v2", "games", gFilters)
+
+		if err != nil {
+			fmt.Println("Error:", err)
+			return nil
+		}
+
+		gameIds := []int64{}
+		acctsRecv := int64(0)
+
+		for _, r := range gameRecords {
+
+			g, err := utils.ConvertStrToInt64(r.GameId)
+			totalGameId++
+
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			gameIds = append(gameIds, g)
+			gFee, _ := utils.ConvertAmtStrToInt64(r.GameFee)
+			acctsRecv += gFee
+		}
+
 		gameIdRange, _ := utils.ConvertGameIdsToRange(gameIds)
-		rept = append(rept, fmt.Sprintf(reptFmt, prevAssoc, utils.ConvertInt64ToAmtStr(acctsRecv), gameIdRange))
+		rept = append(rept, fmt.Sprintf(reptFmt, assoc, utils.ConvertInt64ToAmtStr(acctsRecv), gameIdRange))
 		grandTot += acctsRecv
 		totalGameId += len(gameIds)
 	}
@@ -303,6 +308,7 @@ func GenerateAcctsRecvReport(records []model.GameDescriptor) []string {
 		rept = append(rept, totalSeparator)
 		rept = append(rept, fmt.Sprintf(totAcctRptFormat, utils.ConvertInt64ToAmtStr(grandTot), totalGameId))
 	}
+
 	return rept
 }
 

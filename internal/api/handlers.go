@@ -20,6 +20,15 @@ import (
 
 var ApiVersion string = "ref-ledger-api-v2.1.0"
 
+func GetAssociations(parentCtx context.Context) (string, error) {
+	fmt.Println("Getting Associations")
+
+	associations := []string{"GOLLC", "MCBOA", "MSO"}
+
+	return strings.Join(associations, ","), nil
+
+}
+
 func UseDefaultConfig() model.Config {
 
 	fmt.Println("Using Default Configuration")

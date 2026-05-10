@@ -259,17 +259,7 @@ func main() {
 		reports.PrintReport(rept)
 		return
 	case "acctsRecv":
-		gFilters := model.GFilters{
-			Status: "Completed",
-		}
-
-		if *assoc != "" {
-			gFilters.Association = *assoc
-		}
-
-		*gfilter, err = utils.ConvertGameFiltersToJsonFile(gFilters)
-		gameRecords, err = database.QueryAggregatedGames(ctx, "refLedger_v2", "games", *gfilter)
-		rept := reports.GenerateAcctsRecvReport(gameRecords)
+		rept := reports.GenerateAcctsRecvReport(ctx, *assoc)
 		reports.PrintReport(rept)
 		return
 	}
