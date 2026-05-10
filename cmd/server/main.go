@@ -258,20 +258,20 @@ func main() {
 		rept := reports.GeneratePaymentReport(paymentRecords)
 		reports.PrintReport(rept)
 		return
+	case "acctsRecv":
+		gFilters := model.GFilters{
+			Status: "Completed",
+		}
+
+		if *assoc != "" {
+			gFilters.Association = *assoc
+		}
+
+		*gfilter, err = utils.ConvertGameFiltersToJsonFile(gFilters)
+		gameRecords, err = database.QueryAggregatedGames(ctx, "refLedger_v2", "games", *gfilter)
+		rept := reports.GenerateAcctsRecvReport(gameRecords)
+		reports.PrintReport(rept)
+		return
 	}
-
-	/*
-		var gameDocs []model.GameDoc
-		for _, v := range gameRecords {
-
-			doc := utils.ConvertGameDescrToGameDoc(v)
-			gameDocs = append(gameDocs, doc)
-		}
-
-		err = utils.ConvertGameDocToJson(gameDocs, "test.json")
-		if err != nil {
-			fmt.Println(err)
-		}
-	*/
 
 }

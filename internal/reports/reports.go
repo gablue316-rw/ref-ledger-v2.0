@@ -226,6 +226,86 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 	return rept
 }
 
+func GenerateAcctsRecvReport(records []model.GameDescriptor) []string {
+
+	fmt.Println("Generating Accounts Receivable Report")
+	rept := make([]string, 10, 20)
+
+	var grandTot int64 = 0
+	var totalGameId int = 0
+
+	title := "Accounts Receivable Report\n"
+	reptTimeMsg := getReportGeneratedDate()
+	heading1 := "Association    Accounts Receivable   Game IDs\n"
+	separator := "=======================================================================================================================\n"
+	totalSeparator := "\n----------------------------------------------------------------------------------------------------------------------\n"
+
+	totAcctRptFormat := "Total Accounts Receivable: $%s Total Game IDs: %d"
+	reptFmt := "%-15s%-22s%-60s\n"
+	maxLineLength := len(heading1)
+
+	rept = append(rept, utils.CenterText(title, maxLineLength))
+	rept = append(rept, utils.CenterText(reptTimeMsg, maxLineLength))
+	rept = append(rept, heading1)
+	rept = append(rept, separator)
+
+	var gameIds []int64 = []int64{}
+	var prevAssoc string = ""
+	var acctsRecv int64 = 0
+	var fee int64 = 0
+
+	for _, r := range records {
+
+		if prevAssoc == "" {
+			prevAssoc = r.Association
+		}
+
+		if prevAssoc != r.Association {
+			// format and append record
+			gameIdRange, _ := utils.ConvertGameIdsToRange(gameIds)
+
+			rept = append(rept, fmt.Sprintf(reptFmt, prevAssoc, utils.ConvertInt64ToAmtStr(acctsRecv), gameIdRange))
+
+			// Add to total variables
+			grandTot += acctsRecv
+			totalGameId += len(gameIds)
+
+			// clearout variables for the next association
+			gameIds = []int64{}
+			acctsRecv = 0
+		}
+
+		g, err := utils.ConvertStrToInt64(r.GameId)
+
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		gameIds = append(gameIds, g)
+
+		fee, err = utils.ConvertAmtStrToInt64(r.GameFee)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		acctsRecv += fee
+	}
+
+	if acctsRecv != 0 {
+		gameIdRange, _ := utils.ConvertGameIdsToRange(gameIds)
+		rept = append(rept, fmt.Sprintf(reptFmt, prevAssoc, utils.ConvertInt64ToAmtStr(acctsRecv), gameIdRange))
+		grandTot += acctsRecv
+		totalGameId += len(gameIds)
+	}
+
+	if totalGameId > 0 {
+		rept = append(rept, totalSeparator)
+		rept = append(rept, fmt.Sprintf(totAcctRptFormat, utils.ConvertInt64ToAmtStr(grandTot), totalGameId))
+	}
+	return rept
+}
+
 func GenerateGameReport(records []model.GameDescriptor) []string {
 
 	fmt.Println("Generating Game Report")
@@ -247,7 +327,6 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 	reptFmtStr := "%-9s%-17s%-11s%-11s%-20s%-10s%-12s%-11s$%-10s%-10s%-11s%-37s\n"
 	dateSeparator := "--------------------------------------------------------------------------------------------------------------------------------------------------------------------\n"
 
-	//dateSeparator := "--------------------------------------------------------------------------------------------------------------------------------------------------------------------\n"
 	maxLineLength := len(heading1)
 
 	//grandTotalLine := "\n\nTotal Number of Games: %d  Total Game Fees: $%s\n"
