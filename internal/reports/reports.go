@@ -3,6 +3,7 @@ package reports
 import (
 	"context"
 	"fmt"
+	"os"
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
@@ -81,6 +82,22 @@ func formatAddress(address, city, state, zip string) string {
 	}
 
 	return addr
+}
+
+func WriteReportToFile(report []string, filePath string) {
+
+	flag := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+
+	fd, err := os.OpenFile(filePath, flag, 0644)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	defer fd.Close()
+
+	for _, s := range report {
+		_, err = fd.WriteString(s)
+	}
 }
 
 func PrintReport(report []string) {

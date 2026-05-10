@@ -57,6 +57,7 @@ func main() {
 	var assoc = flag.String("assoc", "", "Association used to filter reports")
 	var dumpTable = flag.String("dt", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
+	var reptFile = flag.String("rf", "", "Report output file")
 
 	//
 	// Flags used to rebuild the various collections
@@ -103,6 +104,7 @@ func main() {
 	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "dt", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
+	rootCmd.Flags().StringVar(reptFile, "rf", "", "Report output file")
 
 	//
 	// Official Flags
@@ -241,27 +243,27 @@ func main() {
 		}
 	}
 
+	var rept []string = []string{}
 	switch *report {
 	case "games":
 		gameRecords, err = database.QueryAggregatedGames(ctx, "refLedger_v2", "games", *gfilter)
 		if err != nil {
 			return
 		}
-		rept := reports.GenerateGameReport(gameRecords)
-		reports.PrintReport(rept)
-		return
+		rept = reports.GenerateGameReport(gameRecords)
 	case "payments":
 		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments")
 		if err != nil {
 			return
 		}
-		rept := reports.GeneratePaymentReport(paymentRecords)
-		reports.PrintReport(rept)
-		return
+		rept = reports.GeneratePaymentReport(paymentRecords)
 	case "acctsRecv":
-		rept := reports.GenerateAcctsRecvReport(ctx, *assoc)
-		reports.PrintReport(rept)
-		return
+		rept = reports.GenerateAcctsRecvReport(ctx, *assoc)
 	}
 
+	if *reptFile != "" {
+		reports.WriteReportToFile(rept, *reptFile)
+	} else {
+		reports.PrintReport(rept)
+	}
 }
