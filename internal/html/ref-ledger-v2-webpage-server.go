@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"net/http"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
+	"ref-ledger-v2/internal/reports"
 	"ref-ledger-v2/internal/utils"
 
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,12 +22,14 @@ import (
 
 var Client *mongo.Client
 var URI string = "mongodb://localhost:27017"
+var tmpl = template.Must(template.ParseFiles("./internal/html/index.html"))
 
 func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GetGames has been called")
 
 	var games []model.HtmlResponse
+	var gameView []model.GameView
 	var gameFilters model.GFilters = model.GFilters{}
 
 	_, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
@@ -37,6 +41,12 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	// 1. Read query parameters
 	status := r.URL.Query().Get("status")
 	association := r.URL.Query().Get("association")
+	begindate := r.URL.Query().Get("begindate")
+	enddate := r.URL.Query().Get("enddate")
+	level := r.URL.Query().Get("level")
+	gameId := r.URL.Query().Get("gameId")
+	site := r.URL.Query().Get("site")
+	official := r.URL.Query().Get("official")
 
 	if len(status) > 0 {
 		runes := []rune(status)
@@ -44,9 +54,32 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		status = string(runes)
 	}
 
-	fmt.Println("status:", status, "association", association)
+	var bDate string = ""
+	var eDate string = ""
+	var err error
+
+	if len(begindate) > 0 {
+		bDate, _, err = utils.FormatDateFilter(begindate, "")
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	if len(enddate) > 0 {
+		_, eDate, err = utils.FormatDateFilter("", enddate)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+	fmt.Println("status:", status, "association", association, "bDate", bDate, "eDate", eDate)
 	gameFilters.Status = status
 	gameFilters.Association = association
+	gameFilters.Level = level
+	gameFilters.FromDate = bDate
+	gameFilters.GameId = gameId
+	gameFilters.ToDate = eDate
+	gameFilters.Site = site
+	gameFilters.Official = official
 
 	fmt.Println("gameFilters.Status", gameFilters.Status)
 
@@ -75,18 +108,37 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	err = cursor.All(context.TODO(), &games)
 
-	//fmt.Println(games)
-
 	if err != nil {
 		fmt.Println("Decoding failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	for _, game := range games {
+
+		view := model.GameView{
+			GameId:      game.GameId,
+			Date:        game.Date,
+			Time:        game.Time,
+			Sport:       game.Sport,
+			Site:        game.Site,
+			Field:       game.Field,
+			NumOfGames:  game.NumOfGames,
+			Level:       game.Level,
+			Status:      game.Status,
+			Association: game.Association,
+		}
+
+		view.GameFee = fmt.Sprintf("$%.2f", float64(game.GameFee)/100)
+
+		view.Officials = reports.FormatOfficialString(game.Referee, game.U1, game.U2)
+		gameView = append(gameView, view)
+	}
+
 	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 
-	json.NewEncoder(w).Encode(games)
+	json.NewEncoder(w).Encode(gameView)
 
 }
 

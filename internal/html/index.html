@@ -165,19 +165,20 @@
             <label for="status">Status</label>
             <select id="status">
                 <option value="">All</option>
-                <option value="completed">Completed</option>
-                <option value="pending">Pending</option>
-                <option value="paid">Paid</option>
+                <option value="Completed">Completed</option>
+                <option value="Pending">Pending</option>
+                <option value="Paid">Paid</option>
             </select>
         </div>
 
         <div class="filter-group">
-            <label for="date">Begin Date</label>
-            <select id="date">
-                <option value="today">Today</option>
-                <option value="tomorrow">Tomorrow</option>
-                <option value="yesterday">Yesterday</option>                
-            </select>
+            <label for="begindate">Begin Date</label>
+            <input type="text" id="begindate" placeholder="Enter Date (e.g. m/d/yyyy, today, tomorrow, yesterday)">
+        </div>
+
+        <div class="filter-group">
+            <label for="enddate">End Date</label>
+            <input type="text" id="enddate" placeholder="Enter Date (e.g. m/d/yyyy)">
         </div>
 
         <div class="filter-group">
@@ -200,8 +201,8 @@
         </div>
 
         <div class="filter-group">
-            <label for="officials">Officials</label>
-            <input type="text" id="officials" placeholder="Enter Officials Name">                
+            <label for="official">Official</label>
+            <input type="text" id="official" placeholder="Enter Official's Name">                
         </div>
 
         <div class="filter-group">
@@ -238,6 +239,11 @@
         <button class="btn" onclick="loadGames()">
             Search
         </button>
+    
+        <button class="btn" onclick="clearFilters()">
+            Clear
+        </button>        
+   
     </div>
 
     <table class="games-table">
@@ -271,18 +277,26 @@
 
         const gameId = document.getElementById("gameId").value;
         const status = document.getElementById("status").value;
-        const date = document.getElementById("date").value;
+        const begindate = document.getElementById("begindate").value;
+        const enddate = document.getElementById("enddate").value;
         const site = document.getElementById("site").value;
         const association = document.getElementById("association").value;
+        const level = document.getElementById("level").value;
+        const sport = document.getElementById("sport").value;
+        const official = document.getElementById("official").value;
 
         // Build query string
         const params = new URLSearchParams();
 
         if (gameId) params.append("gameId", gameId);
         if (status) params.append("status", status);
-        if (date) params.append("date", date);
+        if (begindate) params.append("begindate", begindate);
+        if (enddate) params.append("enddate", enddate);
         if (site) params.append("site",site);
         if (association) params.append("association",association)
+        if (level) params.append("level",level)
+        if (sport) params.append("sport",sport)
+        if (official) params.append("official", official);
 
         try {
 
@@ -311,22 +325,18 @@
 
                 tbody.innerHTML += `
                     <tr>
-                        <td>${game.gameId}</td>
-                        <td>${game.date}</td>
-                        <td>${game.time}</td>
-                        <td>${game.sport}</td>
-                        <td>${game.site}</td>
-                        <td>${game.field}</td>
-                        <td>${game.numOfGames}</td>                                                                                                
-                        <td>${game.level}</td>
-                        <td>${game.gameFee}</td>       
-                        <td>${game.association}</td>                 
-                        <td>
-                            <span class="status ${statusClass}">
-                                ${game.status}
-                            </span>
-                        </td>
-                        <td>${game.officials}</td>                           
+                        <td>${game.GameId}</td>
+                        <td>${game.Date}</td>
+                        <td>${game.Time}</td>
+                        <td>${game.Sport}</td>
+                        <td>${game.Site}</td>
+                        <td>${game.Field}</td>
+                        <td>${game.NumOfGames}</td>                                                                                                
+                        <td>${game.Level}</td>
+                        <td>${game.GameFee}</td>       
+                        <td>${game.Association}</td>              
+                        <td>${game.Status}</td>
+                        <td>${game.Officials}</td>                           
                     </tr>
                 `;
             });
@@ -336,6 +346,21 @@
             console.error(err);
             alert("Failed to load games.");
         }
+    }
+
+    function clearFilters() {
+
+       document.getElementById("gameId").value = "";
+       document.getElementById("status").value = "";
+       document.getElementById("begindate").value = "";
+       document.getElementById("enddate").value = "";
+       document.getElementById("site").value = "";
+       document.getElementById("association").value = "";
+       document.getElementById("level").value = "";
+       document.getElementById("sport").value = "";
+       document.getElementById("official").value = "";
+
+       loadGames();
     }
 
     // Initial page load

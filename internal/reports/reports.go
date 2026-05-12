@@ -27,7 +27,7 @@ func getReportGeneratedDate() string {
 	return reptTimeMsg
 }
 
-func formatOfficialString(ref, u1, u2 string) string {
+func FormatOfficialString(ref, u1, u2 string) string {
 
 	officialStr := ""
 	refStr := ""
@@ -285,11 +285,14 @@ func GenerateAcctsRecvReport(parentCtx context.Context, associations string) []s
 			Status:      "Completed",
 			Association: assoc,
 		}
+
 		gFilters, err := utils.ConvertGameFiltersToJsonFile(gFilter)
 		if err != nil {
 			fmt.Println("Error:", err)
 			return nil
 		}
+		fmt.Println("gFilters", gFilters)
+
 		gameRecords, err := database.QueryAggregatedGames(parentCtx, "refLedger_v2", "games", gFilters)
 
 		if err != nil {
@@ -411,7 +414,7 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 		gameFeeStr := utils.ConvertInt64ToAmtStr(gameFee)
 
 		dateStr := rec.Date + " (" + utils.DayOfWeekAbbreviation(rec.Date) + ")"
-		officialStr := formatOfficialString(rec.Referee, rec.U1, rec.U2)
+		officialStr := FormatOfficialString(rec.Referee, rec.U1, rec.U2)
 		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.GameId, dateStr, rec.Time, rec.Sport, rec.Site, rec.Field, rec.NumOfGames, rec.Level, gameFeeStr, rec.Association, rec.Status, officialStr))
 	}
 

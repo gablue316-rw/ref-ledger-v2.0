@@ -170,3 +170,18 @@ type HtmlResponse struct {
 	ECO         string `json:"eco" bson:"eco,omitempty"`
 	Assignor    string `json:"assignor" bson:"assignor,omitempty"`
 }
+
+type GameView struct {
+	GameId      int64  `json:"GameId"`
+	Date        string `json:"Date"`
+	Time        string `json:"Time"`
+	Sport       string `json:"Sport"`
+	Site        string `json:"Site"`
+	Field       string `json:"Field"`
+	NumOfGames  int64  `json:"NumOfGames"`
+	Level       string `json:"Level"`
+	GameFee     string `json:"GameFee"`
+	Association string `json:"Association"`
+	Status      string `json:"Status"`
+	Officials   string `json:"Officials"`
+}
