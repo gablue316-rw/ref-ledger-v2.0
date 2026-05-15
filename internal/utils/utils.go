@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -217,11 +219,56 @@ func ParseCsv(s string) []string {
 	return result
 }
 
+func GenerateRandomString(length int) string {
+
+	b := make([]byte, length)
+	rand.Read(b)
+	return base64.StdEncoding.EncodeToString(b)
+
+}
+
 func DayOfWeekAbbreviation(date string) string {
 
 	d, _ := time.Parse(layout, date)
 	abbreviation := d.Format("Mon")
 	return abbreviation
+}
+
+func ConvertExpenseFilterToJsonFile(filters model.EFilters) (string, error) {
+
+	var jsonFilters model.ExpenseFilter
+	var fileName string = "expenseReportFiltersV2.json"
+	assocValues := ParseCsv(filters.Association)
+	gameIdValues, _ := ParseInt64CSV(filters.GameId)
+
+	jsonFilters.Association = assocValues
+	jsonFilters.GameId = gameIdValues
+
+	if filters.FromDate != "" || filters.ToDate != "" {
+		jsonFilters.Date = &model.Date{}
+	}
+
+	if filters.FromDate != "" {
+		jsonFilters.Date.From = filters.FromDate
+	}
+
+	if filters.ToDate != "" {
+		jsonFilters.Date.To = filters.ToDate
+	}
+
+	// write JSON file
+	file, err := os.Create(fileName)
+	if err != nil {
+		return "", fmt.Errorf("Failed to open %s", fileName)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(jsonFilters); err != nil {
+		return "", fmt.Errorf("Failed to encode filters to file %s", fileName)
+	}
+	return fileName, nil
 }
 
 func ConvertGameFiltersToJsonFile(filters model.GFilters) (string, error) {
@@ -456,6 +503,9 @@ func ConvertStrToInt64(s string) (int64, error) {
 
 	var num int64
 
+	if s == "" {
+		return int64(0), nil
+	}
 	_, err := fmt.Sscanf(s, "%d", &num)
 
 	if err != nil {
@@ -470,6 +520,14 @@ func ConvertStrToInt64(s string) (int64, error) {
 func ConvertAmtStrToInt64(s string) (int64, error) {
 
 	var dollars, cents, amount int64
+
+	if s == "" {
+		return int64(0), nil
+	}
+
+	if !strings.Contains(s, ".") {
+		s = s + ".00"
+	}
 
 	_, err := fmt.Sscanf(s, "%d.%d", &dollars, &cents)
 
@@ -585,6 +643,41 @@ func ConvertPaymentDescrToPaymentDoc(paymentDescr model.PaymentDescriptor) model
 	}
 
 	return doc
+}
+
+func ConvertExpenseDescrToExpenseDoc(expenseDescr model.ExpenseDescriptor) model.ExpenseDoc {
+
+	expenseAmt, _ := ConvertAmtStrToInt64(expenseDescr.Amount)
+	gameId, err := ConvertStrToInt64(expenseDescr.GameId)
+	if err != nil {
+		fmt.Println("Error converting GameId to int64.  Reason:", err)
+		return model.ExpenseDoc{}
+	}
+	doc := model.ExpenseDoc{
+		ExpenseId:   expenseDescr.ExpenseId,
+		Date:        expenseDescr.Date,
+		Type:        expenseDescr.Type,
+		Amount:      expenseAmt,
+		Association: expenseDescr.Association,
+		GameId:      gameId,
+		Description: expenseDescr.Description,
+	}
+	return doc
+}
+
+func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescriptor {
+	expenseAmt := ConvertInt64ToAmtStr(doc.Amount)
+	gameId := ConvertInt64ToStr(doc.GameId)
+	descr := model.ExpenseDescriptor{
+		ExpenseId:   doc.ExpenseId,
+		Date:        doc.Date,
+		Type:        doc.Type,
+		Amount:      expenseAmt,
+		Association: doc.Association,
+		GameId:      gameId,
+		Description: doc.Description,
+	}
+	return descr
 }
 
 func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {

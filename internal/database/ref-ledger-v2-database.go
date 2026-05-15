@@ -231,6 +231,79 @@ func GameExists(doc model.GameDoc) (bool, error) {
 	return gameExists, nil
 }
 
+func BuildMongoExpenseFilter(filter model.ExpenseFilter) bson.M {
+	fmt.Println("Building MongoDb Expense Filter")
+	mongoFilter := bson.M{}
+
+	if len(filter.Association) > 0 {
+		mongoFilter["association"] = filter.Association
+	}
+
+	if len(filter.GameId) > 0 {
+		mongoFilter["gameId"] = filter.GameId
+	}
+
+	if filter.Date != nil {
+		fromTime, fromErr := time.Parse("1/2/2006", filter.Date.From)
+		toTime, toErr := time.Parse("1/2/2006", filter.Date.To)
+
+		if fromErr == nil && toErr == nil {
+			mongoFilter["$expr"] = bson.M{
+				"$and": []bson.M{
+					{
+						"$gte": []interface{}{
+							bson.M{
+								"$dateFromString": bson.M{
+									"dateString": "$date",
+									"format":     "%m/%d/%Y",
+								},
+							},
+							fromTime,
+						},
+					},
+					{
+						"$lte": []interface{}{
+							bson.M{
+								"$dateFromString": bson.M{
+									"dateString": "$date",
+									"format":     "%m/%d/%Y",
+								},
+							},
+							toTime,
+						},
+					},
+				},
+			}
+		}
+	}
+	return mongoFilter
+}
+
+func BuildMongoExpenseFilterFromFile(path string) (bson.M, error) {
+
+	if path == "" {
+		return bson.M{}, nil
+	}
+
+	fmt.Println("Loading filter from", path)
+	file, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	var filter model.ExpenseFilter
+	if err := json.Unmarshal(file, &filter); err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	fmt.Println("Filter loaded!")
+	mongoFilter := BuildMongoExpenseFilter(filter)
+
+	return mongoFilter, nil
+}
+
 func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
 	fmt.Println("Building MongoDb Game Filter")
@@ -276,22 +349,18 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 	var officials []bson.M
 
 	if filter.Referee != "" {
-		fmt.Println("BuildMongoGameFilter - Referee filter:", filter.Referee)
 		officials = append(officials, bson.M{"referee": filter.Referee})
 	}
 
 	if filter.U1 != "" {
-		fmt.Println("BuildMongoGameFilter - U1 filter:", filter.U1)
 		officials = append(officials, bson.M{"u1": filter.U1})
 	}
 
 	if filter.U2 != "" {
-		fmt.Println("BuildMongoGameFilter - U2 filter:", filter.U2)
 		officials = append(officials, bson.M{"u2": filter.U2})
 	}
 
 	if len(officials) > 0 {
-		fmt.Println("BuildMongoGameFilter - Officials filter:", officials)
 		mongoFilter["$or"] = officials
 	}
 
@@ -427,6 +496,40 @@ func QueryCollection(filter bson.M, dbase, collection string) *mongo.Cursor {
 
 }
 
+func QueryExpenses(parentCtx context.Context, dbase, collection, filter string) ([]model.ExpenseDescriptor, error) {
+
+	mongoDbFilter, err := BuildMongoExpenseFilterFromFile(filter)
+
+	if err != nil {
+		fmt.Println("Failed to build Mongo DB Filter for expenses collection")
+		return []model.ExpenseDescriptor{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	cursor, err := coll.Find(ctx, mongoDbFilter)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.ExpenseDescriptor{}, err
+	}
+
+	var results []model.ExpenseDoc
+	var expenseRecords []model.ExpenseDescriptor
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.ExpenseDescriptor{}, err
+	}
+
+	for _, r := range results {
+		expenseRecords = append(expenseRecords, utils.ConvertExpenseDocToExpenseDescr(r))
+	}
+	return expenseRecords, nil
+}
+
 func QueryGames(parentCtx context.Context, dbase, collection, filter string) ([]model.GameDescriptor, error) {
 
 	mongoDbFilter, err := BuildMongoGameFilterFromFile(filter)
@@ -551,6 +654,52 @@ func DumpOfficialsCollection(parentCtx context.Context, dbase, collection string
 		fmt.Println(r)
 	}
 
+}
+
+func DumpExpensesCollection(parentCtx context.Context, dbase, collection string) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	collectionName := coll.Name()
+	fmt.Println("Printing", collectionName, "collection")
+
+	cursor := QueryCollection(bson.M{}, Database, collection)
+	var results []model.ExpenseDoc
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return
+	}
+	for _, r := range results {
+		fmt.Println(r)
+	}
+}
+
+func GetGamesCollection(parentCtx context.Context) ([]model.GameDoc, error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+	collectionName := coll.Name()
+
+	fmt.Println("Printing", collectionName, "collection")
+
+	cursor := QueryCollection(bson.M{}, Database, "games")
+
+	var results []model.GameDoc
+
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.GameDoc{}, err
+	}
+
+	return results, nil
 }
 
 func DumpGamesCollection(parentCtx context.Context, dbase, collection string) {
@@ -785,6 +934,33 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 		}
 	}
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors)
+}
+
+func InsertExpenseDocs(parentCtx context.Context, expense []model.ExpenseDescriptor, dbase, collection string) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	collectionName := coll.Name()
+	fmt.Println("Inserting records into", collectionName)
+	recordsInserted := 0
+	totalErrors := 0
+	for _, v := range expense {
+
+		doc := utils.ConvertExpenseDescrToExpenseDoc(v)
+		_, err := coll.InsertOne(ctx, doc)
+		if err != nil {
+			fmt.Println("Insert failed.  Reason:", err)
+			totalErrors++
+			continue
+		}
+		fmt.Println("Inserted Expense with Id:", doc.ExpenseId, "Date:", doc.Date, "Type:", doc.Type, "Amount:", doc.Amount, "Association:", doc.Association, "GameId:", doc.GameId, "Description:", doc.Description)
+		recordsInserted++
+	}
+	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors)
+
 }
 
 func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection string) {

@@ -2,6 +2,39 @@ package model
 
 var ModelsVersion string = "ref-ledger-models-v2.1.0"
 
+type ExpenseDescriptor struct {
+	ExpenseId   string
+	Date        string
+	Type        string
+	Amount      string
+	Association string
+	GameId      string
+	Description string
+}
+
+type ExpenseDoc struct {
+	ExpenseId   string `bson:"expenseId,omitempty"`
+	Date        string `bson:"date,omitempty"`
+	Type        string `bson:"type,omitempty"`
+	Amount      int64  `bson:"amount,omitempty"`
+	Association string `bson:"association,omitempty"`
+	GameId      int64  `bson:"gameId,omitempty"`
+	Description string `bson:"description,omitempty"`
+}
+
+type EFilters struct {
+	Association string
+	GameId      string
+	FromDate    string
+	ToDate      string
+}
+
+type ExpenseFilter struct {
+	Association []string `json:"association,omitempty"`
+	GameId      []int64  `json:"gameId,omitempty"`
+	Date        *Date    `json:"date,omitempty"`
+}
+
 type PaymentDescriptor struct {
 	PaymentId   string
 	PaymentDate string

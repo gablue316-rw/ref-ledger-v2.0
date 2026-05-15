@@ -293,6 +293,9 @@ func RebuildTable(parentCtx context.Context, table, file string) error {
 	case "payments":
 		DelPaymentsTable(parentCtx)
 		BulkAddPayments(parentCtx, file)
+	case "expenses":
+		DelExpensesTable(parentCtx)
+		BulkAddExpenses(parentCtx, file)
 	default:
 		return fmt.Errorf("Invalid table")
 	}
@@ -394,6 +397,11 @@ func AddPayments(parentCtx context.Context, payment []model.PaymentDescriptor) {
 	database.InsertPaymentDocs(parentCtx, payment, database.Database, "payments")
 }
 
+func AddExpenses(parentCtx context.Context, expense []model.ExpenseDescriptor) {
+
+	database.InsertExpenseDocs(parentCtx, expense, database.Database, "expenses")
+}
+
 func AddGames(parentCtx context.Context, game []model.GameDescriptor) {
 
 	database.InsertGameDocs(parentCtx, game, database.Database, "games")
@@ -410,6 +418,12 @@ func DelGamesTable(parentCtx context.Context) {
 
 }
 
+func DelExpensesTable(parentCtx context.Context) {
+
+	database.DelCollection(parentCtx, database.Database, "expenses")
+
+}
+
 func DelOfficialsTable(parentCtx context.Context) {
 
 	database.DelCollection(parentCtx, database.Database, "officials")
@@ -422,9 +436,46 @@ func DelPaymentsTable(parentCtx context.Context) {
 
 }
 
-func DumpGames(parentCtx context.Context) {
+func writeToFile(records []string, file string) error {
 
-	database.DumpGamesCollection(parentCtx, database.Database, "games")
+	content := strings.Join(records, "\n")
+
+	err := os.WriteFile(file, []byte(content), 0644)
+	if err != nil {
+		return fmt.Errorf("Failed to write to file %s.  Reason: %v", file, err)
+	}
+	return nil
+}
+
+func DumpGames(parentCtx context.Context, file string) {
+
+	var games []model.GameDoc = []model.GameDoc{}
+	var records []string = []string{}
+
+	var recdFmt string = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"
+
+	games, err := database.GetGamesCollection(parentCtx)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("Dumping games.  Number of games:", len(games))
+	for _, game := range games {
+
+		if file == "" {
+			fmt.Println(game)
+			continue
+		} else {
+			g := utils.ConvertGameDocToGameDescr(game)
+			r := fmt.Sprintf(recdFmt, g.Date, g.Time, g.GameId, g.Sport, g.Level, g.Site, g.Field, g.NumOfGames, g.GameFee, g.Deductions, g.Status, g.Association, g.Referee, g.U1, g.U2, g.ECO, g.Assignor, g.AssignorFee, g.TravelPay)
+			records = append(records, r)
+		}
+	}
+	if len(records) != 0 {
+		err = writeToFile(records, file)
+	}
 
 }
 
@@ -440,19 +491,98 @@ func DumpPayments(parentCtx context.Context) {
 
 }
 
-func DumpTable(parentCtx context.Context, table string) {
+func DumpExpenses(parentCtx context.Context) {
+
+	database.DumpExpensesCollection(parentCtx, database.Database, "expenses")
+}
+
+func DumpTable(parentCtx context.Context, table, file string) {
 
 	switch table {
 	case "games":
-		DumpGames(parentCtx)
+		DumpGames(parentCtx, file)
 	case "officials":
 		DumpOfficials(parentCtx)
 	case "payments":
 		DumpPayments(parentCtx)
+	case "expenses":
+		DumpExpenses(parentCtx)
 	default:
 		fmt.Println("Table", table, "not supported")
 	}
 
+}
+
+func generateExpenseId(expense model.ExpenseDescriptor) string {
+
+	var month int
+	var day int
+	var year int
+	var expTypeId string
+	var dollar string
+	var cents string
+	var expenseId string = ""
+
+	expTypeParts := strings.Split(expense.Type, " ")
+	if len(expTypeParts) > 1 {
+		expTypeId = expTypeParts[0][0:1] + expTypeParts[1][0:1]
+	} else if len(expTypeParts) == 1 {
+		expTypeId = expTypeParts[0][0:2]
+	}
+
+	dollarCents := strings.Split(expense.Amount, ".")
+
+	if len(dollarCents) == 2 {
+		dollar = dollarCents[0]
+		cents = dollarCents[1]
+	} else {
+		dollar = expense.Amount
+		cents = "00"
+	}
+
+	n, err := fmt.Sscanf(expense.Date, "%d/%d/%d", &month, &day, &year)
+	if err != nil || n != 3 {
+		fmt.Println("Error parsing date for expense", expense.ExpenseId, "Reason:", err)
+		return fmt.Sprintf("EXP%s", utils.GenerateRandomString(10))
+	}
+	if len(expense.Association) != 0 {
+		expTypeId = expTypeId + "-" + expense.Association
+	}
+	expenseId = fmt.Sprintf("%s-%d%d%d-%s%s", expTypeId, month, day, year, dollar, cents)
+	return expenseId
+
+}
+
+func BulkAddExpenses(parentCtx context.Context, file string) {
+
+	fmt.Println("Peforming Bulk Update for Expenses Collection")
+	expenses := []model.ExpenseDescriptor{}
+	// Read file
+	fd, err := os.Open(file)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer fd.Close()
+
+	sc := bufio.NewScanner(fd)
+	for sc.Scan() {
+
+		line := sc.Text()
+		fields := strings.Split(line, ",")
+		expense := model.ExpenseDescriptor{
+			Date:        fields[0],
+			Type:        fields[1],
+			Amount:      fields[2],
+			Association: fields[3],
+			GameId:      fields[4],
+			Description: fields[5],
+		}
+		expense.ExpenseId = generateExpenseId(expense)
+		expenses = append(expenses, expense)
+	}
+
+	AddExpenses(parentCtx, expenses)
 }
 
 func BulkAddPayments(parentCtx context.Context, file string) {

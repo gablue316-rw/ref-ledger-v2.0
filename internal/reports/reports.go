@@ -332,6 +332,33 @@ func GenerateAcctsRecvReport(parentCtx context.Context, associations string) []s
 	return rept
 }
 
+func GenerateExpenseReport(records []model.ExpenseDescriptor) []string {
+
+	fmt.Println("Generating Expense Report")
+	rept := make([]string, 10, 20)
+	title := "Expense Report\n"
+	reptTimeMsg := getReportGeneratedDate()
+	heading1 := "Expense ID              Date        Type              Amount      Association     Game ID     Description\n"
+	separator := "=================================================================================================================================\n"
+	reptFmtStr := "%-24s%-12s%-18s$%-11s%-16s%-12s%-60s\n"
+	maxLineLength := len(heading1)
+
+	newTitle := utils.CenterText(title, maxLineLength)
+	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
+	rept = append(rept, newTitle)
+	rept = append(rept, newReptTimeMsg)
+	rept = append(rept, heading1)
+	rept = append(rept, separator)
+
+	for _, rec := range records {
+
+		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.ExpenseId, rec.Date, rec.Type, rec.Amount, rec.Association, rec.GameId, rec.Description))
+	}
+
+	return rept
+
+}
+
 func GenerateGameReport(records []model.GameDescriptor) []string {
 
 	fmt.Println("Generating Game Report")

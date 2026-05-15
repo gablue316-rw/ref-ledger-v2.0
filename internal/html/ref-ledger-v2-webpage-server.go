@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"html/template"
 	"net/http"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	"ref-ledger-v2/internal/reports"
 	"ref-ledger-v2/internal/utils"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
@@ -22,7 +22,8 @@ import (
 
 var Client *mongo.Client
 var URI string = "mongodb://localhost:27017"
-var tmpl = template.Must(template.ParseFiles("./internal/html/index.html"))
+
+//var tmpl = template.Must(template.ParseFiles("./internal/html/index.html"))
 
 func GetGames(w http.ResponseWriter, r *http.Request) {
 
@@ -91,13 +92,47 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	mongoDbFilter, err := database.BuildMongoGameFilterFromFile(gfilter)
 
-	fmt.Println("gfilter", gfilter, "mongoDbFilter", mongoDbFilter)
+	if err != nil {
+		fmt.Println("FILTER BUILD ERROR", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	pipeline := mongo.Pipeline{
+		{
+			{Key: "$match", Value: mongoDbFilter},
+		},
+		{
+			{Key: "$addFields", Value: bson.D{
+				{Key: "convertedDate", Value: bson.D{
+					{Key: "$dateFromString", Value: bson.D{
+						{Key: "dateString", Value: "$date"},
+						{Key: "format", Value: "%m/%d/%Y"},
+					}},
+				}},
+			}},
+		},
+		{
+			{Key: "$sort", Value: bson.D{
+				{Key: "convertedDate", Value: 1},
+			}},
+		},
+		{
+			{Key: "$project", Value: bson.D{
+				{Key: "convertedDate", Value: 0},
+			}},
+		},
+	}
+
+	cursor, err := coll.Aggregate(context.TODO(), pipeline)
+
+	//fmt.Println("gfilter", gfilter, "mongoDbFilter", mongoDbFilter)
 
 	// 2. Query MongoDB
-	cursor, err := coll.Find(context.TODO(), mongoDbFilter)
+	//cursor, err := coll.Find(context.TODO(), mongoDbFilter)
 
 	if err != nil {
-		fmt.Println("find failed")
+		fmt.Println("MONGO FIND ERROR:", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -118,7 +153,6 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 		view := model.GameView{
 			GameId:      game.GameId,
-			Date:        game.Date,
 			Time:        game.Time,
 			Sport:       game.Sport,
 			Site:        game.Site,
@@ -130,6 +164,9 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 
 		view.GameFee = fmt.Sprintf("$%.2f", float64(game.GameFee)/100)
+
+		abbrev := utils.DayOfWeekAbbreviation(game.Date)
+		view.Date = fmt.Sprintf("%s (%s)", game.Date, abbrev)
 
 		view.Officials = reports.FormatOfficialString(game.Referee, game.U1, game.U2)
 		gameView = append(gameView, view)
@@ -144,7 +181,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	fmt.Println("Ref Ledger V2.0 Web Page Server Establing database connection...")
+	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	database.InitDbase("refLedger_v2", "mongodb://localhost:27017")
 
 	err := database.Connect()
@@ -160,20 +197,35 @@ func main() {
 		return
 	}
 
-	err = client.Ping(context.TODO(), nil)
+	Client = client
+
+	fmt.Println("Registering routes...")
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/games", GetGames)
+	fs := http.FileServer(http.Dir("./internal/html"))
+	mux.Handle("/", fs)
+
+	fmt.Println("Routes successfully registered")
+	fmt.Println("Server running on port 8080")
+	err = http.ListenAndServe(":8080", mux)
+
 	if err != nil {
-		fmt.Println("Failed to verity connection to database.  Terminating web page server.")
+		fmt.Println("HTTP Error", err)
 		return
 	}
 
-	Client = client
-	fmt.Println("Connected to MongoDb")
+	/*
+		http.HandleFunc("/api/games", GetGames)
+		fs := http.FileServer(http.Dir("./internal/html"))
+		http.Handle("/", fs)
 
-	http.HandleFunc("/api/games", GetGames)
-	fs := http.FileServer(http.Dir("./internal/html"))
-	http.Handle("/", fs)
 
-	fmt.Println("Server running on port 8080")
 
-	http.ListenAndServe(":8080", nil)
+		err = http.ListenAndServe(":8080", nil)
+		if err != nil {
+			fmt.Println("HTTP Error:", err)
+		}
+	*/
+
 }

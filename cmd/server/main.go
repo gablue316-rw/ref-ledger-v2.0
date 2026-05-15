@@ -27,6 +27,7 @@ func main() {
 	var gameRecords []model.GameDescriptor
 	var ids []int64
 	var gameFilters model.GFilters = model.GFilters{}
+	var expenseFilters model.EFilters = model.EFilters{}
 
 	//var bDate string
 	//var eDate string
@@ -36,7 +37,7 @@ func main() {
 	//
 	var gfilter = flag.String("gf", "", "JSON filter file used to filter games report")
 	var gameIds = flag.String("gi", "", "Game Ids to be used with other flags")
-	var gstatus = flag.String("gs", "", "Status game should be set to or used to filter games report")
+	var gstatus = flag.String("gs", "", "Status used to filter games report")
 	var gupdate = flag.String("gu", "", "Update game.")
 	var gadd = flag.String("ga", "", "Games Update File.")
 	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
@@ -53,17 +54,16 @@ func main() {
 	//
 	// Other Flags
 	//
-	var report = flag.String("rpt", "", "Report to generate [games]")
+	var report = flag.String("rpt", "", "Report to generate [games | payments | acctsRecv | expenses]")
 	var assoc = flag.String("assoc", "", "Association used to filter reports")
 	var dumpTable = flag.String("dt", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
-	var reptFile = flag.String("rf", "", "Report output file")
 
 	//
 	// Flags used to rebuild the various collections
 	//
-	var rebuild = flag.String("rebuild", "", "Rebuild collection [games]")
-	var file = flag.String("file", "", "File used to rebuild collection")
+	var rebuild = flag.String("rebuild", "", "Rebuild collection [games | expenses | payments | officials]")
+	var file = flag.String("file", "", "File used to rebuild collection, dump collection to a file, or write a report to a file")
 
 	//
 	// Flags for payment
@@ -89,7 +89,7 @@ func main() {
 	//
 	rootCmd.Flags().StringVar(gfilter, "gf", "", "JSON filter file used to filter games report")
 	rootCmd.Flags().StringVar(gameIds, "gi", "", "Game Ids to be used with other flags")
-	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status game should be set to or used to filter games report")
+	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status used to filter games report")
 	rootCmd.Flags().StringVar(gupdate, "gu", "", "Update game")
 	rootCmd.Flags().StringVar(gadd, "ga", "", "Games Update File.")
 	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
@@ -100,11 +100,10 @@ func main() {
 	//
 	// Other Flags
 	//
-	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generate [games]")
+	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generate [games | payments | acctsRecv | expenses]")
 	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "dt", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
-	rootCmd.Flags().StringVar(reptFile, "rf", "", "Report output file")
 
 	//
 	// Official Flags
@@ -114,8 +113,8 @@ func main() {
 	//
 	// Flags used to rebuild the various collections
 	//
-	rootCmd.Flags().StringVar(rebuild, "rebuild", "", "Rebuild collection [games]")
-	rootCmd.Flags().StringVar(file, "file", "", "File used to rebuild collection")
+	rootCmd.Flags().StringVar(rebuild, "rebuild", "", "Rebuild collection [games | expenses | payments | officials]")
+	rootCmd.Flags().StringVar(file, "file", "", "File used to rebuild collection, dump collection to a file, or write a report to a file")
 
 	//
 	// Flags for payment
@@ -163,7 +162,7 @@ func main() {
 	}
 
 	if *dumpTable != "" {
-		api.DumpTable(ctx, *dumpTable)
+		api.DumpTable(ctx, *dumpTable, *file)
 	}
 
 	//
@@ -179,6 +178,8 @@ func main() {
 		} else {
 			gameFilters.FromDate = bDate
 			gameFilters.ToDate = eDate
+			expenseFilters.FromDate = bDate
+			expenseFilters.ToDate = eDate
 		}
 	}
 
@@ -188,6 +189,7 @@ func main() {
 
 	if *assoc != "" {
 		gameFilters.Association = *assoc
+		expenseFilters.Association = *assoc
 	}
 
 	if *officialName != "" {
@@ -210,6 +212,7 @@ func main() {
 		}
 		s, _ := utils.ConvertGameIdIntToStr(ids)
 		gameFilters.GameId = s
+		expenseFilters.GameId = s
 	}
 
 	if *sites != "" {
@@ -259,10 +262,22 @@ func main() {
 		rept = reports.GeneratePaymentReport(paymentRecords)
 	case "acctsRecv":
 		rept = reports.GenerateAcctsRecvReport(ctx, *assoc)
+	case "expenses":
+		efilter, err := utils.ConvertExpenseFilterToJsonFile(expenseFilters)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		expenseRecords, err := database.QueryExpenses(ctx, "refLedger_v2", "expenses", efilter)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		rept = reports.GenerateExpenseReport(expenseRecords)
 	}
 
-	if *reptFile != "" {
-		reports.WriteReportToFile(rept, *reptFile)
+	if *file != "" {
+		reports.WriteReportToFile(rept, *file)
 	} else {
 		reports.PrintReport(rept)
 	}
