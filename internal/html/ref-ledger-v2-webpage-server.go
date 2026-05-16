@@ -3,6 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+	"log"
+	"os"
+	"io"
 	"net/http"
 	"time"
 
@@ -22,12 +26,95 @@ import (
 
 var Client *mongo.Client
 var URI string = "mongodb://localhost:27017"
+var logFile = "refLedgerV2_0-webserver.log"
 
 //var tmpl = template.Must(template.ParseFiles("./internal/html/index.html"))
+
+func GetIpAddress(r *http.Request) string {
+
+	//
+	// Get Cloudfare Connecting IP Address
+	//
+	ip := r.Header.Get("CF-Connecting-IP")
+	if ip != "" {
+		return "CF-Connecting-IP " + ip
+	}
+
+	//
+	// Get the real IP Address that was proxied 
+	//
+	realIpAddr := r.Header.Get("X-Forwarded-For")
+
+	if realIpAddr != "" {
+		return "X-Forwarded-For " + realIpAddr
+	}
+
+	//
+	// Get the original IP Address
+	//
+	originalIpAddr := r.Header.Get("X-Real-IP")
+
+	if originalIpAddr != "" {
+		return "X-Real-IP " + originalIpAddr
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err == nil {
+		return "Host " + host
+	}
+
+	return "RemoteAddr " + r.RemoteAddr
+
+}
+
+func OpenLog(f string) *os.File {
+	
+	// Open or create log file
+	file, err := os.OpenFile(
+		f,
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0666,
+	)
+
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+	
+	// Send logs to file (and optionally terminal)
+	log.SetOutput(file)
+	log.SetFlags(log.Ldate | log.Ltime)
+	log.SetOutput(io.MultiWriter(os.Stdout, file))
+
+   
+	return file
+}
+
+func LogVisitor(w http.ResponseWriter, r *http.Request) {
+
+	remoteIpAddr := GetIpAddress(r)
+	method := r.Method
+	path := r.URL.Path
+	url  := r.URL.String()
+	userAgent := r.UserAgent()
+	referer := r.Referer()
+	host := r.Host
+	protocol := "HTTP"
+	if r.TLS != nil {
+       protocol = "HTTPS"
+	} else {
+		protocol = r.Header.Get("X-Forwared-Proto")
+	}
+
+	log.Printf("IP=%s Method=%s Path=%s URL=%s Agent=%s Referer=%s Host=%s Protocol=%s",remoteIpAddr, method, path, url, userAgent, referer, host, protocol)
+
+}
 
 func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GetGames has been called")
+
+	LogVisitor(w, r)
 
 	var games []model.HtmlResponse
 	var gameView []model.GameView
@@ -124,13 +211,9 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	cursor, err := coll.Aggregate(context.TODO(), pipeline)
-
-	//fmt.Println("gfilter", gfilter, "mongoDbFilter", mongoDbFilter)
-
 	// 2. Query MongoDB
-	//cursor, err := coll.Find(context.TODO(), mongoDbFilter)
 
+	cursor, err := coll.Aggregate(context.TODO(), pipeline)
 	if err != nil {
 		fmt.Println("MONGO FIND ERROR:", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -149,6 +232,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	
 	for _, game := range games {
 
 		view := model.GameView{
@@ -197,6 +281,12 @@ func main() {
 		return
 	}
 
+	f := OpenLog (logFile)
+
+	if f != nil {
+		fmt.Println("Failed to open",logFile)
+	}
+
 	Client = client
 
 	fmt.Println("Registering routes...")
@@ -214,18 +304,5 @@ func main() {
 		fmt.Println("HTTP Error", err)
 		return
 	}
-
-	/*
-		http.HandleFunc("/api/games", GetGames)
-		fs := http.FileServer(http.Dir("./internal/html"))
-		http.Handle("/", fs)
-
-
-
-		err = http.ListenAndServe(":8080", nil)
-		if err != nil {
-			fmt.Println("HTTP Error:", err)
-		}
-	*/
 
 }

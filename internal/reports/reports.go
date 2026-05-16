@@ -108,7 +108,7 @@ func PrintReport(report []string) {
 
 }
 
-func calculateGameFee(gameRec model.GameDescriptor) int64 {
+func CalculateGameFee(gameRec model.GameDescriptor) int64 {
 
 	var gameFee int64
 	var gFee int64
@@ -423,7 +423,7 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 		numOfGames, _ := utils.ConvertStrToInt64(rec.NumOfGames)
 		totalGames += numOfGames
 
-		gameFee := calculateGameFee(rec)
+		gameFee := CalculateGameFee(rec)
 		grandTot += gameFee
 		if totals[rec.Association] == nil {
 			fmt.Println("totals[", rec.Association, "] is equal to nil")
