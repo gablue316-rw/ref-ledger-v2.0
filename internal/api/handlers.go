@@ -439,11 +439,11 @@ func DelPaymentsTable(parentCtx context.Context) {
 func writeToFile(records []string, file string) error {
 
 	content := strings.Join(records, "\n")
-
 	err := os.WriteFile(file, []byte(content), 0644)
 	if err != nil {
 		return fmt.Errorf("Failed to write to file %s.  Reason: %v", file, err)
 	}
+
 	return nil
 }
 
@@ -479,21 +479,112 @@ func DumpGames(parentCtx context.Context, file string) {
 
 }
 
-func DumpOfficials(parentCtx context.Context) {
+func DumpOfficials(parentCtx context.Context, file string) {
 
-	database.DumpOfficialsCollection(parentCtx, database.Database, "officials")
+	var officials []model.OfficialDoc = []model.OfficialDoc{}
+	var records []string = []string{}
+
+	var recdFmt string = "%s,%s,%s,%s"
+
+	officials, err := database.GetOfficialsCollection(parentCtx)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("Dumping officials.  Number of officials:", len(officials))
+	for _, official := range officials {
+
+		if file == "" {
+			fmt.Println(official)
+			continue
+		} else {
+			o := utils.ConvertOfficialDocToOfficialDescr(official)
+			r := fmt.Sprintf(recdFmt, o.FirstName, o.LastName, o.Phone, o.Association)
+			records = append(records, r)
+		}
+	}
+
+	if len(records) != 0 {
+		err = writeToFile(records, file)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
 
 }
 
-func DumpPayments(parentCtx context.Context) {
+func DumpPayments(parentCtx context.Context, file string) {
 
-	database.DumpPaymentsCollection(parentCtx, database.Database, "payments")
+	var payments []model.PaymentDoc = []model.PaymentDoc{}
+	var records []string = []string{}
+
+	var recdFmt string = "%s,%s,%s,%s,%s"
+
+	payments, err := database.GetPaymentsCollection(parentCtx)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("Dumping payments.  Number of payments:", len(payments))
+	for _, payment := range payments {
+
+		if file == "" {
+			fmt.Println(payment)
+			continue
+		} else {
+			p := utils.ConvertPaymentDocToPaymentDescr(payment)
+			r := fmt.Sprintf(recdFmt, p.PaymentId, p.PaymentDate, p.PaymentAmt, p.Association, p.GameIds)
+			records = append(records, r)
+		}
+	}
+
+	if len(records) != 0 {
+		err = writeToFile(records, file)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
 
 }
 
-func DumpExpenses(parentCtx context.Context) {
+func DumpExpenses(parentCtx context.Context, file string) {
 
-	database.DumpExpensesCollection(parentCtx, database.Database, "expenses")
+	var expenses []model.ExpenseDoc = []model.ExpenseDoc{}
+	var records []string = []string{}
+
+	var recdFmt string = "%s,%s,%s,%s,%s,%s"
+
+	expenses, err := database.GetExpensesCollection(parentCtx)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("Dumping expenses.  Number of expenses:", len(expenses))
+	for _, expense := range expenses {
+
+		if file == "" {
+			fmt.Println(expense)
+			continue
+		} else {
+			e := utils.ConvertExpenseDocToExpenseDescr(expense)
+			r := fmt.Sprintf(recdFmt, e.Date, e.Type, e.Amount, e.Association, e.GameId, e.Description)
+			records = append(records, r)
+		}
+	}
+
+	if len(records) != 0 {
+		err = writeToFile(records, file)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
 }
 
 func DumpTable(parentCtx context.Context, table, file string) {
@@ -502,11 +593,11 @@ func DumpTable(parentCtx context.Context, table, file string) {
 	case "games":
 		DumpGames(parentCtx, file)
 	case "officials":
-		DumpOfficials(parentCtx)
+		DumpOfficials(parentCtx, file)
 	case "payments":
-		DumpPayments(parentCtx)
+		DumpPayments(parentCtx, file)
 	case "expenses":
-		DumpExpenses(parentCtx)
+		DumpExpenses(parentCtx, file)
 	default:
 		fmt.Println("Table", table, "not supported")
 	}

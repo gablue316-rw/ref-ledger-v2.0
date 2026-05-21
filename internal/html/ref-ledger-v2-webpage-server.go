@@ -120,6 +120,9 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	var gameView []model.GameView
 	var gameFilters model.GFilters = model.GFilters{}
 
+	var HtmlAssocGameTotals reports.AssocGameTotalsMap
+    HtmlAssocGameTotals.Init()
+
 	_, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
@@ -226,14 +229,25 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	err = cursor.All(context.TODO(), &games)
 
+
 	if err != nil {
 		fmt.Println("Decoding failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	
 	for _, game := range games {
+	
+		gameRec := model.GameDescriptor {
+			GameFee:     utils.ConvertInt64ToAmtStr(game.GameFee),
+			NumOfGames:  utils.ConvertInt64ToStr(game.NumOfGames),
+			TravelPay:   utils.ConvertInt64ToAmtStr(game.TravelPay),
+			Deductions:  utils.ConvertInt64ToAmtStr(game.Deductions),
+			AssignorFee: utils.ConvertInt64ToAmtStr(game.AssignorFee),
+		}
+
+		gameFee := reports.CalculateGameFee(gameRec)
+		HtmlAssocGameTotals.Update(game.Association, game.Status, game.NumOfGames, gameFee)	
 
 		view := model.GameView{
 			GameId:      game.GameId,
@@ -255,6 +269,14 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		view.Officials = reports.FormatOfficialString(game.Referee, game.U1, game.U2)
 		gameView = append(gameView, view)
 	}
+
+/*
+	reptLines := HtmlAssocGameTotals.FormatTotalLine()
+
+	if len(reptLines) > 0 {
+		fmt.Println(reptLines)
+	}
+*/
 
 	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")

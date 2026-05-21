@@ -3,18 +3,204 @@ package reports
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
+	"strconv"
 	"strings"
 	"time"
 )
 
-type ReportTotals struct {
-	totalGames    int64
-	totalGameFees int64
+func TrimMileageStr(miles string) string {
+
+	//
+	// Truncate the .00 if it exists
+	//
+	m := strings.Split(miles, ".")
+	return m[0]
+
+}
+
+func ConvertTrueMilesToInt64Rate(miles int64) int64 {
+
+	trueMiles := miles / 100
+	temp := float64(trueMiles) * 725 / 10
+	rounded := math.Ceil(temp)
+	return int64(rounded)
+}
+
+func ConvertInt64MilesToExpense(miles int64) string {
+
+	trueMiles := miles / 100
+	milesExp := trueMiles * 725
+	expense := float32(milesExp) / 10
+	expenseStr := utils.ConvertInt64ToAmtStr(int64(expense))
+	return expenseStr
+}
+
+func ConvertMilesToExpense(miles string) (string, int64) {
+
+	//
+	// Truncate the .00 if it exists
+	//
+	m := strings.Split(miles, ".")
+
+	//
+	// Convert string to int64 so we can calculate mileage expense
+	//
+	amt, err := utils.ConvertStrToInt64(m[0])
+	if err != nil {
+		fmt.Println(err)
+		return "", 0
+	}
+
+	//
+	// Convert miles to expense
+	//
+
+	temp := float64(amt) * 725 / 10
+	rounded := math.Ceil(temp)
+	expense := int64(rounded)
+	expenseStr := utils.ConvertInt64ToAmtStr(expense)
+	return expenseStr, expense
+}
+
+var mileageRate float32 = 0.725
+
+type AssociationExpenses struct {
+	TotalExpenses map[string]map[string]int64
+}
+
+type GameTotals struct {
+	NumOfGames int64
+	GameFees   int64
+}
+
+type AssocGameTotalsMap struct {
+	AssocGameTotals map[string]map[string]*GameTotals
+}
+
+func (a *AssociationExpenses) Init() {
+
+	a.TotalExpenses = make(map[string]map[string]int64)
+
+	firstKeys := database.Associations
+	secondKeys := database.ExpenseTypes
+
+	for _, fk := range firstKeys {
+		a.TotalExpenses[fk] = make(map[string]int64)
+		for _, sk := range secondKeys {
+			a.TotalExpenses[fk][sk] = 0
+		}
+	}
+}
+
+func (a *AssociationExpenses) UpdateExpense(assoc, expense string, amount int64) {
+
+	if a.TotalExpenses[assoc] == nil {
+		return
+	}
+
+	a.TotalExpenses[assoc][expense] += amount
+}
+
+func (a *AssociationExpenses) GetTotalExpenseByType(expenseType string) int64 {
+
+	firstKeys := database.Associations
+	secondKey := expenseType
+	var totalExpenses int64 = 0
+
+	for _, fk := range firstKeys {
+		totalExpenses += a.TotalExpenses[fk][secondKey]
+	}
+
+	return totalExpenses
+}
+
+func (a *AssociationExpenses) GetExpenseByType(assoc, expenseType string) int64 {
+
+	if a.TotalExpenses[assoc] == nil {
+		return 0
+	}
+
+	return a.TotalExpenses[assoc][expenseType]
+}
+
+func (a *AssociationExpenses) GetTotalExpensesByAssociation(assoc string) int64 {
+
+	var totalExpenses int64 = 0
+	if a.TotalExpenses[assoc] == nil {
+		return totalExpenses
+	}
+
+	firstKey := assoc
+	secondKeys := database.ExpenseTypes
+
+	for _, sk := range secondKeys {
+		if sk == "Mileage" {
+			// Skip for now
+			continue
+			//totalExpenses += ConvertTrueMilesToInt64Rate(a.TotalExpenses[firstKey][sk])
+		} else {
+			totalExpenses += a.TotalExpenses[firstKey][sk]
+		}
+	}
+
+	return totalExpenses
+}
+
+func (g *AssocGameTotalsMap) Init() {
+
+	g.AssocGameTotals = make(map[string]map[string]*GameTotals)
+
+	firstKeys := database.Associations
+	secondKeys := database.PermittedGameStatusValues
+
+	for _, fk := range firstKeys {
+		g.AssocGameTotals[fk] = make(map[string]*GameTotals)
+		for _, sk := range secondKeys {
+			g.AssocGameTotals[fk][sk] = &GameTotals{}
+		}
+	}
+
+}
+
+func (g *AssocGameTotalsMap) Update(assoc, status string, numOfGames, gameFee int64) error {
+
+	if g.AssocGameTotals[assoc] == nil {
+		return fmt.Errorf("Association %s not found in table", assoc)
+	}
+
+	if g.AssocGameTotals[assoc][status] == nil {
+		return fmt.Errorf("Status %s not found in table", status)
+	}
+
+	g.AssocGameTotals[assoc][status].NumOfGames += numOfGames
+	g.AssocGameTotals[assoc][status].GameFees += gameFee
+
+	return nil
+}
+
+func (g *AssocGameTotalsMap) FormatTotalLine() []string {
+
+	var reptLines []string = []string{}
+	assocTotalLine := "    Association: %-12s Game Status: %-11s Total Number of Games: %-4d  Total Game Fees: $%s\n"
+
+	firstKeys := database.Associations
+	secondKeys := database.PermittedGameStatusValues
+
+	for _, fk := range firstKeys {
+		for _, sk := range secondKeys {
+			if g.AssocGameTotals[fk][sk].NumOfGames == 0 {
+				continue
+			}
+			reptLines = append(reptLines, fmt.Sprintf(assocTotalLine, fk, sk, g.AssocGameTotals[fk][sk].NumOfGames, utils.ConvertInt64ToAmtStr(g.AssocGameTotals[fk][sk].GameFees)))
+		}
+	}
+	return reptLines
 }
 
 func getReportGeneratedDate() string {
@@ -127,67 +313,6 @@ func CalculateGameFee(gameRec model.GameDescriptor) int64 {
 
 	return gameFee
 }
-
-/*
-func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
-
-	fmt.Println("Generating Payments Report")
-	rept := make([]string, 10, 20)
-
-	title := "Payment Report\n"
-	reptTimeMsg := getReportGeneratedDate()
-
-	totalPayments := 0
-	totalDeposits := int64(0)
-
-	//																									   			  1         1         1         1
-	//                      1         2         3         4         5         6         7         8         9         0         1         2         3                                                                                                          1         1         1         1
-	//           1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
-	heading1 := "Payment ID    Payment Date     Amount      Association     Game IDs     \n"
-	separator := "==============================================================================================================================\n"
-	reptFmtStr := "%-14s%-17s$%-11s%-16s%-60s\n"
-	reptFmtStr2 := "%-59s%-60s\n"
-
-	maxLineLength := len(heading1)
-
-	newTitle := utils.centerText(title, maxLineLength)
-	newReptTimeMsg := utils.centerText(reptTimeMsg, maxLineLength)
-
-	rept = append(rept, newTitle)
-	rept = append(rept, newReptTimeMsg)
-	rept = append(rept, heading1)
-	rept = append(rept, separator)
-
-	for _, rec := range records {
-
-		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.PaymentId, rec.PaymentDate, rec.PaymentAmt, rec.Association, rec.GameIds))
-
-		totalPayments++
-		totalDeposits += rec.payment_amount_int64
-
-		rec.payment_date = dateValue.Format("1/2/2006")
-
-		if len(rec.game_ids) > 60 {
-			gameIdLines := formatGameIdStrSplice(rec.game_ids, 60)
-			for i, v := range gameIdLines {
-				if i == 0 {
-					rept = append(rept, fmt.Sprintf(reptFmtStr, rec.payment_id, rec.payment_date, convertInt64ToStr(rec.payment_amount_int64), rec.association, v))
-				} else {
-					rept = append(rept, fmt.Sprintf(reptFmtStr2, "", v))
-				}
-			}
-		} else {
-			rept = append(rept, fmt.Sprintf(reptFmtStr, rec.payment_id, rec.payment_date, convertInt64ToStr(rec.payment_amount_int64), rec.association, rec.game_ids))
-		}
-	}
-	if totalPayments > 0 {
-		rept = append(rept, "\n")
-		rept = append(rept, fmt.Sprintf("Total Payments: %d Total Deposits: $%s\n", totalPayments, convertInt64ToStr(totalDeposits)))
-	}
-
-	return nil, rept
-}
-*/
 
 func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 
@@ -338,10 +463,15 @@ func GenerateExpenseReport(records []model.ExpenseDescriptor) []string {
 	rept := make([]string, 10, 20)
 	title := "Expense Report\n"
 	reptTimeMsg := getReportGeneratedDate()
-	heading1 := "Expense ID              Date        Type              Amount      Association     Game ID     Description\n"
-	separator := "=================================================================================================================================\n"
-	reptFmtStr := "%-24s%-12s%-18s$%-11s%-16s%-12s%-60s\n"
+	heading1 := "Expense ID              Date        Type              Mileage     Amount      Association     Game ID     Description\n"
+	separator := "============================================================================================================================================\n"
+	separator2 := "____________________________________________________________________________________________________________________________________________\n"
+	reptFmtStr := "%-24s%-12s%-18s%-12s%-12s%-16s%-12s%-60s\n"
+
 	maxLineLength := len(heading1)
+
+	var expenses AssociationExpenses
+	expenses.Init()
 
 	newTitle := utils.CenterText(title, maxLineLength)
 	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
@@ -350,11 +480,84 @@ func GenerateExpenseReport(records []model.ExpenseDescriptor) []string {
 	rept = append(rept, heading1)
 	rept = append(rept, separator)
 
+	var totalNumOfExpenses int = 0
+	var totalMiles int64 = 0
+	var totalExpenses int64 = 0
+	var amtStr string = ""
+	var amt int64 = 0
+	var err error
+	var miles string = ""
+
 	for _, rec := range records {
 
-		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.ExpenseId, rec.Date, rec.Type, rec.Amount, rec.Association, rec.GameId, rec.Description))
+		amt, err = utils.ConvertAmtStrToInt64(rec.Amount)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		if rec.Type == "Mileage" {
+			miles = TrimMileageStr(rec.Amount)
+			milesInt64, err := utils.ConvertStrToInt64(miles)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			totalMiles += milesInt64
+			amtStr = ""
+		} else {
+			amtStr = "$" + rec.Amount
+			totalExpenses += amt
+			miles = ""
+		}
+
+		expenses.UpdateExpense(rec.Association, rec.Type, amt)
+
+		totalNumOfExpenses++
+		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.ExpenseId, rec.Date, rec.Type, miles, amtStr, rec.Association, rec.GameId, rec.Description))
 	}
 
+	totalLineReptFmt := "Total Expenses %-39d%-12d$%-11s\n\n"
+	rept = append(rept, separator2)
+	rept = append(rept, fmt.Sprintf(totalLineReptFmt, totalNumOfExpenses, totalMiles, utils.ConvertInt64ToAmtStr(totalExpenses)))
+
+	rept = append(rept, "Break out Expenses by Association and Type\n\n")
+
+	firstKeys := database.Associations
+	secondKeys := database.ExpenseTypes
+
+	reptLine := ""
+	fmtStr := "      %-12s%-10s\n"
+	for _, fk := range firstKeys {
+
+		totExp := expenses.GetTotalExpensesByAssociation(fk)
+		if totExp == 0 {
+			continue
+		}
+
+		temp := expenses.GetExpenseByType(fk, "Mileage") / 100
+		totMileage := strconv.FormatInt(temp, 10)
+
+		reptLine = reptLine + "   Association: " + fk + " Total Expenses: $" + utils.ConvertInt64ToAmtStr(totExp) + " Total Mileage:" + totMileage + "\n"
+		rept = append(rept, reptLine)
+		reptLine = ""
+
+		for _, sk := range secondKeys {
+			expenseAmt := expenses.GetExpenseByType(fk, sk)
+			line := ""
+			if expenseAmt != 0 {
+				if sk == "Mileage" {
+					continue
+				} else {
+					expStr := "$" + utils.ConvertInt64ToAmtStr(expenseAmt)
+					line = fmt.Sprintf(fmtStr, sk, expStr)
+				}
+				rept = append(rept, line)
+				reptLine = ""
+			}
+		}
+		rept = append(rept, "\n")
+	}
 	return rept
 
 }
@@ -364,9 +567,11 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 	fmt.Println("Generating Game Report")
 	rept := make([]string, 10, 20)
 
-	totals := make(map[string]map[string]*ReportTotals)
 	var grandTot int64
 	var totalGames int64
+
+	var ReportAssocGameTotals AssocGameTotalsMap
+	ReportAssocGameTotals.Init()
 
 	title := "Game Report\n"
 	reptTimeMsg := getReportGeneratedDate()
@@ -382,9 +587,6 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 
 	maxLineLength := len(heading1)
 
-	//grandTotalLine := "\n\nTotal Number of Games: %d  Total Game Fees: $%s\n"
-	//assocTotalLine := "    Association: %-12s Game Status: %-11s Total Number of Games: %-4d  Total Game Fees: $%s\n"
-
 	newTitle := utils.CenterText(title, maxLineLength)
 	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
 
@@ -393,20 +595,6 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 	rept = append(rept, heading0)
 	rept = append(rept, heading1)
 	rept = append(rept, separator)
-
-	//
-	// Initialize totals map
-	//
-	firstKeys := database.Associations
-	secondKeys := database.PermittedGameStatusValues
-
-	for _, fk := range firstKeys {
-		totals[fk] = make(map[string]*ReportTotals)
-		for _, sk := range secondKeys {
-			totals[fk][sk] = &ReportTotals{}
-
-		}
-	}
 
 	prevDate := ""
 
@@ -424,20 +612,9 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 		totalGames += numOfGames
 
 		gameFee := CalculateGameFee(rec)
+		ReportAssocGameTotals.Update(rec.Association, rec.Status, numOfGames, gameFee)
+
 		grandTot += gameFee
-		if totals[rec.Association] == nil {
-			fmt.Println("totals[", rec.Association, "] is equal to nil")
-			continue
-		}
-
-		if totals[rec.Association][rec.Status] == nil {
-			fmt.Println("totals[", rec.Association, "][", rec.Status, "] is equal to nil")
-			fmt.Println("Game Id: ", rec.GameId)
-			continue
-		}
-		totals[rec.Association][rec.Status].totalGameFees += gameFee
-		totals[rec.Association][rec.Status].totalGames += numOfGames
-
 		gameFeeStr := utils.ConvertInt64ToAmtStr(gameFee)
 
 		dateStr := rec.Date + " (" + utils.DayOfWeekAbbreviation(rec.Date) + ")"
@@ -448,23 +625,11 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 	grandTotalLine := "\n\nTotal Number of Games: %d  Total Game Fees: $%s\n"
 	rept = append(rept, fmt.Sprintf(grandTotalLine, totalGames, utils.ConvertInt64ToAmtStr(grandTot)))
 
-	supplementalRept := []string{}
-	lines := 0
-	supplementalRept = append(supplementalRept, ("\nBreakdown by Association and Status:\n"))
-	assocTotalLine := "    Association: %-12s Game Status: %-11s Total Number of Games: %-4d  Total Game Fees: $%s\n"
+	rLines := ReportAssocGameTotals.FormatTotalLine()
 
-	for fk, inner := range totals {
-		for sk, counters := range inner {
-			if counters.totalGames == 0 {
-				continue
-			}
-			lines++
-			supplementalRept = append(supplementalRept, fmt.Sprintf(assocTotalLine, fk, sk, counters.totalGames, utils.ConvertInt64ToAmtStr(counters.totalGameFees)))
-		}
-	}
-
-	if lines > 1 {
-		rept = append(rept, supplementalRept...)
+	if len(rLines) > 1 {
+		rept = append(rept, "\nBreakdown by Association and Status:\n")
+		rept = append(rept, rLines...)
 	}
 
 	return rept

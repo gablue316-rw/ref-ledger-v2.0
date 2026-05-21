@@ -25,6 +25,7 @@ type ExpenseDoc struct {
 type EFilters struct {
 	Association string
 	GameId      string
+	ExpenseType string
 	FromDate    string
 	ToDate      string
 }
@@ -32,6 +33,7 @@ type EFilters struct {
 type ExpenseFilter struct {
 	Association []string `json:"association,omitempty"`
 	GameId      []int64  `json:"gameId,omitempty"`
+	ExpenseType []string `json:"type,omitempty"`
 	Date        *Date    `json:"date,omitempty"`
 }
 

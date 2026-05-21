@@ -46,6 +46,11 @@ func main() {
 	var glevel = flag.String("gl", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
 
 	//
+	// Expense Flags
+	//
+
+	var expType = flag.String("etype", "", "Expense type to filter on [Camp Fee | Dues | Equipment | Food | Mileage]")
+	//
 	// Official Flags
 	//
 
@@ -106,6 +111,12 @@ func main() {
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
 
 	//
+	// Expense Flags
+	//
+
+	rootCmd.Flags().StringVar(expType, "etype", "", "Expense type to filter on [Camp Fee | Dues | Equipment | Food | Mileage]")
+
+	//
 	// Official Flags
 	//
 	rootCmd.Flags().StringVar(officialName, "on", "", "Official Name used to filter officials and games report")
@@ -151,6 +162,7 @@ func main() {
 			return
 		}
 		api.RebuildTable(ctx, *rebuild, *file)
+		return
 	}
 
 	if *gadd != "" {
@@ -163,6 +175,7 @@ func main() {
 
 	if *dumpTable != "" {
 		api.DumpTable(ctx, *dumpTable, *file)
+		return
 	}
 
 	//
@@ -181,6 +194,10 @@ func main() {
 			expenseFilters.FromDate = bDate
 			expenseFilters.ToDate = eDate
 		}
+	}
+
+	if *expType != "" {
+		expenseFilters.ExpenseType = *expType
 	}
 
 	if *gstatus != "" {

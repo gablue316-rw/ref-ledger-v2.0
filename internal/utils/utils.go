@@ -239,10 +239,12 @@ func ConvertExpenseFilterToJsonFile(filters model.EFilters) (string, error) {
 	var jsonFilters model.ExpenseFilter
 	var fileName string = "expenseReportFiltersV2.json"
 	assocValues := ParseCsv(filters.Association)
+	expenseValues := ParseCsv(filters.ExpenseType)
 	gameIdValues, _ := ParseInt64CSV(filters.GameId)
 
 	jsonFilters.Association = assocValues
 	jsonFilters.GameId = gameIdValues
+	jsonFilters.ExpenseType = expenseValues
 
 	if filters.FromDate != "" || filters.ToDate != "" {
 		jsonFilters.Date = &model.Date{}
@@ -604,6 +606,18 @@ func ConvertOfficialDescrToOfficialDoc(officialDescr model.OfficialDescriptor) m
 	return doc
 }
 
+func ConvertOfficialDocToOfficialDescr(doc model.OfficialDoc) model.OfficialDescriptor {
+
+	officialDescr := model.OfficialDescriptor{
+		FirstName:   doc.FirstName,
+		LastName:    doc.LastName,
+		Phone:       doc.Phone,
+		Association: doc.Association,
+	}
+
+	return officialDescr
+}
+
 func ConvertPaymentDocToPaymentDescr(doc model.PaymentDoc) model.PaymentDescriptor {
 
 	var gameIds string
@@ -666,6 +680,7 @@ func ConvertExpenseDescrToExpenseDoc(expenseDescr model.ExpenseDescriptor) model
 }
 
 func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescriptor {
+
 	expenseAmt := ConvertInt64ToAmtStr(doc.Amount)
 	gameId := ConvertInt64ToStr(doc.GameId)
 	descr := model.ExpenseDescriptor{

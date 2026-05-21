@@ -26,6 +26,8 @@ var URI string
 
 var DatabaseVersion string = "ref-ledger-database-v2.1.0"
 
+var ExpenseTypes []string = []string{"Camp Fee", "Dues", "Equipment", "Food", "Mileage"}
+
 var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending", "Deleted"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
@@ -236,11 +238,15 @@ func BuildMongoExpenseFilter(filter model.ExpenseFilter) bson.M {
 	mongoFilter := bson.M{}
 
 	if len(filter.Association) > 0 {
-		mongoFilter["association"] = filter.Association
+		mongoFilter["association"] = bson.M{
+			"$in": filter.Association,
+		}
 	}
 
-	if len(filter.GameId) > 0 {
-		mongoFilter["gameId"] = filter.GameId
+	if len(filter.ExpenseType) > 0 {
+		mongoFilter["type"] = bson.M{
+			"$in": filter.ExpenseType,
+		}
 	}
 
 	if filter.Date != nil {
@@ -505,6 +511,7 @@ func QueryExpenses(parentCtx context.Context, dbase, collection, filter string) 
 		return []model.ExpenseDescriptor{}, err
 	}
 
+	fmt.Println("mongoDbFilter:", mongoDbFilter)
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
@@ -678,6 +685,78 @@ func DumpExpensesCollection(parentCtx context.Context, dbase, collection string)
 	}
 }
 
+func GetExpensesCollection(parentCtx context.Context) ([]model.ExpenseDoc, error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("expenses")
+	collectionName := coll.Name()
+
+	fmt.Println("Retrieving", collectionName, "collection")
+
+	cursor := QueryCollection(bson.M{}, Database, "expenses")
+
+	var results []model.ExpenseDoc
+
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.ExpenseDoc{}, err
+	}
+
+	return results, nil
+}
+
+func GetOfficialsCollection(parentCtx context.Context) ([]model.OfficialDoc, error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("officials")
+	collectionName := coll.Name()
+
+	fmt.Println("Retrieving", collectionName, "collection")
+
+	cursor := QueryCollection(bson.M{}, Database, "officials")
+
+	var results []model.OfficialDoc
+
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.OfficialDoc{}, err
+	}
+
+	return results, nil
+}
+
+func GetPaymentsCollection(parentCtx context.Context) ([]model.PaymentDoc, error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+	collectionName := coll.Name()
+
+	fmt.Println("Retrieving", collectionName, "collection")
+
+	cursor := QueryCollection(bson.M{}, Database, "payments")
+
+	var results []model.PaymentDoc
+
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.PaymentDoc{}, err
+	}
+
+	return results, nil
+}
+
 func GetGamesCollection(parentCtx context.Context) ([]model.GameDoc, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -687,7 +766,7 @@ func GetGamesCollection(parentCtx context.Context) ([]model.GameDoc, error) {
 	coll := db.Collection("games")
 	collectionName := coll.Name()
 
-	fmt.Println("Printing", collectionName, "collection")
+	fmt.Println("Retrieving", collectionName, "collection")
 
 	cursor := QueryCollection(bson.M{}, Database, "games")
 
