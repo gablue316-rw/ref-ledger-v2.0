@@ -333,8 +333,8 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 		// The above strings.Split command will split the cmd into 3 elements.
 		// So we will need to reassemble the time
 		//
-		if len(command) == 3 {
-			value = cmdList[1] + ":" + cmdList[2]
+		if len(parts) == 3 {
+			value = parts[1] + ":" + parts[2]
 		}
 
 		filter := bson.M{
@@ -386,6 +386,7 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 				fmt.Println("Successfully updated game with game id[s]:", gameIds)
 			}
 		}
+
 	}
 
 	return nil

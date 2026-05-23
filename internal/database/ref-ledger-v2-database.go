@@ -610,81 +610,6 @@ func GetContext() (context.Context, context.CancelFunc) {
 	return ctx, cancel
 }
 
-func DumpPaymentsCollection(parentCtx context.Context, dbase, collection string) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-
-	fmt.Println("Printing", collectionName, "collection")
-
-	cursor := QueryCollection(bson.M{}, Database, collection)
-
-	var results []model.PaymentDoc
-
-	err := cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return
-	}
-
-	for _, r := range results {
-		fmt.Println(r)
-	}
-}
-
-func DumpOfficialsCollection(parentCtx context.Context, dbase, collection string) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-
-	fmt.Println("Printing", collectionName, "collection")
-
-	cursor := QueryCollection(bson.M{}, Database, collection)
-
-	var results []model.OfficialDoc
-
-	err := cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return
-	}
-
-	for _, r := range results {
-		fmt.Println(r)
-	}
-
-}
-
-func DumpExpensesCollection(parentCtx context.Context, dbase, collection string) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-	fmt.Println("Printing", collectionName, "collection")
-
-	cursor := QueryCollection(bson.M{}, Database, collection)
-	var results []model.ExpenseDoc
-	err := cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return
-	}
-	for _, r := range results {
-		fmt.Println(r)
-	}
-}
-
 func GetExpensesCollection(parentCtx context.Context) ([]model.ExpenseDoc, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -779,33 +704,6 @@ func GetGamesCollection(parentCtx context.Context) ([]model.GameDoc, error) {
 	}
 
 	return results, nil
-}
-
-func DumpGamesCollection(parentCtx context.Context, dbase, collection string) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-
-	fmt.Println("Printing", collectionName, "collection")
-
-	cursor := QueryCollection(bson.M{}, Database, collection)
-
-	var results []model.GameDoc
-
-	err := cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return
-	}
-
-	for _, r := range results {
-		fmt.Println(r)
-	}
-
 }
 
 func DelCollection(parentCtx context.Context, dbase, collection string) {

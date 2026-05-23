@@ -59,7 +59,7 @@ func main() {
 	//
 	// Other Flags
 	//
-	var report = flag.String("rpt", "", "Report to generate [games | payments | acctsRecv | expenses]")
+	var report = flag.String("r", "", "Report to generate [games | payments | acctsRecv | expenses]")
 	var assoc = flag.String("assoc", "", "Association used to filter reports")
 	var dumpTable = flag.String("dt", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
@@ -105,7 +105,7 @@ func main() {
 	//
 	// Other Flags
 	//
-	rootCmd.Flags().StringVar(report, "rpt", "", "Report to generate [games | payments | acctsRecv | expenses]")
+	rootCmd.Flags().StringVar(report, "r", "", "Report to generate [games | payments | acctsRecv | expenses]")
 	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "dt", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
