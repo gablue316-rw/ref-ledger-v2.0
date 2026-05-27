@@ -122,16 +122,26 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 	var bDate string = ""
 	var eDate string = ""
 
+	if end != "" {
+		switch end {
+		case "today":
+			eDate = time.Now().Format(layout)
+		case "tomorrow":
+			eDate = time.Now().AddDate(0, 0, 1).Format(layout)
+		case "yesterday":
+			eDate = time.Now().AddDate(0, 0, -1).Format(layout)
+		default:
+			eDate = end
+		}
+	}
+
 	switch begin {
 	case "today":
 		bDate = time.Now().Format(layout)
-		eDate = bDate
 	case "tomorrow":
 		bDate = time.Now().AddDate(0, 0, 1).Format(layout)
-		eDate = bDate
 	case "yesterday":
 		bDate = time.Now().AddDate(0, 0, -1).Format(layout)
-		eDate = bDate
 	case "this week":
 		bDate = getStartOfThisWeek()
 		eDate = getEndOfWeek(bDate)
@@ -164,10 +174,6 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 		if err != nil {
 			return "", "", err
 		}
-	}
-
-	if eDate == "" {
-		eDate = end
 	}
 
 	if eDate != "" {
