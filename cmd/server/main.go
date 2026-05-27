@@ -35,15 +35,15 @@ func main() {
 	//
 	// Game Flags
 	//
-	var gfilter = flag.String("gf", "", "JSON filter file used to filter games report")
+	var gfilter = flag.String("j", "", "JSON filter file used to filter games report")
 	var gameIds = flag.String("i", "", "Game Ids to be used with other flags")
 	var gstatus = flag.String("S", "", "Status used to filter games report")
 	var update = flag.String("u", "", "Update single document in collection [games]")
 	var value = flag.String("v", "", "Update string [field:value] used to update single document in collection --u")
 	var massUpdate = flag.String("m", "", "Mass update of collection using file specifed by --f flag [expense | games | officials | payments]")
-	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
-	var edate = flag.String("ed", "", "Ending date usedd to flter game report")
-	var gsport = flag.String("gsport", "", "Sport [Softball | Basketball]")
+	var bdate = flag.String("F", "", "From date used to filter game report [mm/dd/yyyy | today | tomorrow | yesterday | this week | next week | last week]")
+	var edate = flag.String("T", "", "To date used to filter game report [mm/dd/yyyy | today | tomorrow | yesterday]")
+	var gsport = flag.String("t", "", "Type of Sport [Softball | Basketball]")
 	var glevel = flag.String("l", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
 
 	//
@@ -92,15 +92,15 @@ func main() {
 	//
 	// Game Flags
 	//
-	rootCmd.Flags().StringVar(gfilter, "gf", "", "JSON filter file used to filter games report")
+	rootCmd.Flags().StringVar(gfilter, "j", "", "JSON filter file used to filter games report")
 	rootCmd.Flags().StringVar(gameIds, "i", "", "Game Ids to be used with other flags")
 	rootCmd.Flags().StringVar(gstatus, "S", "", "Status used to filter games report")
 	rootCmd.Flags().StringVar(update, "u", "", "Update single document in collection [games]")
 	rootCmd.Flags().StringVar(value, "v", "", "Update string [field:value] used to update single document in collection --u")
 	rootCmd.Flags().StringVar(massUpdate, "m", "", "Mass update of collection using file specifed by --f flag [expense | games | officials | payments]")
-	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
-	rootCmd.Flags().StringVar(edate, "ed", "", "Ending date usedd to flter game report")
-	rootCmd.Flags().StringVar(gsport, "gsport", "", "Sport [Softball | Basketball]")
+	rootCmd.Flags().StringVar(bdate, "F", "", "From date used to filter game report [mm/dd/yyyy | today | tomorrow | yesterday | this week | next week | last week]")
+	rootCmd.Flags().StringVar(edate, "T", "", "To date used to filter game report [mm/dd/yyyy | today | tomorrow | yesterday]")
+	rootCmd.Flags().StringVar(gsport, "t", "", "Type of sport [Softball | Basketball]")
 	rootCmd.Flags().StringVar(glevel, "l", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
 
 	//
@@ -192,6 +192,7 @@ func main() {
 		bDate, eDate, err = utils.FormatDateFilter(*bdate, *edate)
 		if err != nil {
 			fmt.Println(err)
+			return
 		} else {
 			gameFilters.FromDate = bDate
 			gameFilters.ToDate = eDate
