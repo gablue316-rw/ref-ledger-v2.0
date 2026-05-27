@@ -36,39 +36,40 @@ func main() {
 	// Game Flags
 	//
 	var gfilter = flag.String("gf", "", "JSON filter file used to filter games report")
-	var gameIds = flag.String("gi", "", "Game Ids to be used with other flags")
-	var gstatus = flag.String("gs", "", "Status used to filter games report")
-	var gupdate = flag.String("gu", "", "Update game.")
-	var gadd = flag.String("ga", "", "Games Update File.")
+	var gameIds = flag.String("i", "", "Game Ids to be used with other flags")
+	var gstatus = flag.String("S", "", "Status used to filter games report")
+	var update = flag.String("u", "", "Update single document in collection [games]")
+	var value = flag.String("v", "", "Update string [field:value] used to update single document in collection --u")
+	var massUpdate = flag.String("m", "", "Mass update of collection using file specifed by --f flag [expense | games | officials | payments]")
 	var bdate = flag.String("bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
 	var edate = flag.String("ed", "", "Ending date usedd to flter game report")
 	var gsport = flag.String("gsport", "", "Sport [Softball | Basketball]")
-	var glevel = flag.String("gl", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
+	var glevel = flag.String("l", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
 
 	//
 	// Expense Flags
 	//
 
-	var expType = flag.String("etype", "", "Expense type to filter on [Camp Fee | Dues | Equipment | Food | Mileage]")
+	var expType = flag.String("e", "", "Expense type to filter on [Camp Fee | Dues | Equipment | Food | Mileage]")
 	//
 	// Official Flags
 	//
 
-	var officialName = flag.String("on", "", "Official Name used to filter officials and games report")
+	var officialName = flag.String("o", "", "Official Name used to filter officials and games report")
 
 	//
 	// Other Flags
 	//
 	var report = flag.String("r", "", "Report to generate [games | payments | acctsRecv | expenses]")
-	var assoc = flag.String("assoc", "", "Association used to filter reports")
-	var dumpTable = flag.String("dt", "", "Dump table")
+	var assoc = flag.String("a", "", "Association used to filter reports")
+	var dumpTable = flag.String("d", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
 
 	//
 	// Flags used to rebuild the various collections
 	//
-	var rebuild = flag.String("rebuild", "", "Rebuild collection [games | expenses | payments | officials]")
-	var file = flag.String("file", "", "File used to rebuild collection, dump collection to a file, or write a report to a file")
+	var rebuild = flag.String("R", "", "Rebuild collection [games | expenses | payments | officials]")
+	var file = flag.String("f", "", "File used to rebuild collection, dump collection to a file, or write a report to a file")
 
 	//
 	// Flags for payment
@@ -76,7 +77,6 @@ func main() {
 	var paymentId = flag.String("pi", "", "Payment ID")
 	var paymentDate = flag.String("pd", "", "Payment Date")
 	var paymentAmt = flag.String("pa", "", "Payment Amount")
-	var padd = flag.String("padd", "", "Payments Update File")
 
 	flag.Parse()
 
@@ -93,39 +93,40 @@ func main() {
 	// Game Flags
 	//
 	rootCmd.Flags().StringVar(gfilter, "gf", "", "JSON filter file used to filter games report")
-	rootCmd.Flags().StringVar(gameIds, "gi", "", "Game Ids to be used with other flags")
-	rootCmd.Flags().StringVar(gstatus, "gs", "", "Status used to filter games report")
-	rootCmd.Flags().StringVar(gupdate, "gu", "", "Update game")
-	rootCmd.Flags().StringVar(gadd, "ga", "", "Games Update File.")
+	rootCmd.Flags().StringVar(gameIds, "i", "", "Game Ids to be used with other flags")
+	rootCmd.Flags().StringVar(gstatus, "S", "", "Status used to filter games report")
+	rootCmd.Flags().StringVar(update, "u", "", "Update single document in collection [games]")
+	rootCmd.Flags().StringVar(value, "v", "", "Update string [field:value] used to update single document in collection --u")
+	rootCmd.Flags().StringVar(massUpdate, "m", "", "Mass update of collection using file specifed by --f flag [expense | games | officials | payments]")
 	rootCmd.Flags().StringVar(bdate, "bd", "", "Beginning date used to filter game report [today | tomorrow | yesterday | this week | next week | last week]")
 	rootCmd.Flags().StringVar(edate, "ed", "", "Ending date usedd to flter game report")
 	rootCmd.Flags().StringVar(gsport, "gsport", "", "Sport [Softball | Basketball]")
-	rootCmd.Flags().StringVar(glevel, "gl", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
+	rootCmd.Flags().StringVar(glevel, "l", "", "Game Level [SP | JV | Varsity | 9th Grade | PW | Minor | Major | Senior]")
 
 	//
 	// Other Flags
 	//
 	rootCmd.Flags().StringVar(report, "r", "", "Report to generate [games | payments | acctsRecv | expenses]")
-	rootCmd.Flags().StringVar(assoc, "assoc", "", "Association used to filter reports")
-	rootCmd.Flags().StringVar(dumpTable, "dt", "", "Dump table")
+	rootCmd.Flags().StringVar(assoc, "a", "", "Association used to filter reports")
+	rootCmd.Flags().StringVar(dumpTable, "d", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
 
 	//
 	// Expense Flags
 	//
 
-	rootCmd.Flags().StringVar(expType, "etype", "", "Expense type to filter on [Camp Fee | Dues | Equipment | Food | Mileage]")
+	rootCmd.Flags().StringVar(expType, "e", "", "Expense type to filter on [Camp Fee | Dues | Equipment | Food | Mileage]")
 
 	//
 	// Official Flags
 	//
-	rootCmd.Flags().StringVar(officialName, "on", "", "Official Name used to filter officials and games report")
+	rootCmd.Flags().StringVar(officialName, "o", "", "Official Name used to filter officials and games report")
 
 	//
 	// Flags used to rebuild the various collections
 	//
-	rootCmd.Flags().StringVar(rebuild, "rebuild", "", "Rebuild collection [games | expenses | payments | officials]")
-	rootCmd.Flags().StringVar(file, "file", "", "File used to rebuild collection, dump collection to a file, or write a report to a file")
+	rootCmd.Flags().StringVar(rebuild, "R", "", "Rebuild collection [games | expenses | payments | officials]")
+	rootCmd.Flags().StringVar(file, "f", "", "File used to rebuild collection, dump collection to a file, or write a report to a file")
 
 	//
 	// Flags for payment
@@ -133,12 +134,10 @@ func main() {
 	rootCmd.Flags().StringVar(paymentId, "pi", "", "Payment ID")
 	rootCmd.Flags().StringVar(paymentDate, "pd", "", "Payment Date")
 	rootCmd.Flags().StringVar(paymentAmt, "pa", "", "Payment Amount")
-	rootCmd.Flags().StringVar(padd, "padd", "", "Payments Update File")
 
 	rootCmd.Execute()
 
-	appLog.Write("Establing database connection...")
-	fmt.Println("Establing database connection...")
+	appLog.Write("Establing database connection...", true)
 	database.InitDbase("refLedger_v2", "mongodb://localhost:27017")
 
 	err := database.Connect()
@@ -146,8 +145,7 @@ func main() {
 		log.Fatal("db connect: %w", err)
 	}
 
-	appLog.Write("Getting context")
-	fmt.Println("Getting context")
+	appLog.Write("Getting context", true)
 	ctx, cancel := database.GetContext()
 
 	defer cancel()
@@ -165,12 +163,18 @@ func main() {
 		return
 	}
 
-	if *gadd != "" {
-		api.UpdateGames(ctx, *gadd)
-	}
-
-	if *padd != "" {
-		api.UpdatePayments(ctx, *padd)
+	if *massUpdate != "" {
+		switch *massUpdate {
+		case "games":
+			api.UpdateGames(ctx, *file)
+		case "payments":
+			api.UpdatePayments(ctx, *file)
+		case "officials":
+			api.UpdateOfficials(ctx, *file)
+		default:
+			fmt.Println("Invalid collection.  Permitted values [games | officials | payments]")
+		}
+		return
 	}
 
 	if *dumpTable != "" {
@@ -245,14 +249,20 @@ func main() {
 		}
 	}
 
-	if *gupdate != "" {
-		if len(ids) == 0 {
-			fmt.Println("Game Ids not provided.")
+	if *update != "" {
+		switch *update {
+		case "games":
+			if len(ids) == 0 {
+				fmt.Println("Game Ids not provided.")
+				return
+			}
+			err = api.UpdateGame(ctx, *value, ids)
+			if err != nil {
+				fmt.Println(err)
+			}
 			return
-		}
-		err = api.UpdateGame(ctx, *gupdate, ids)
-		if err != nil {
-			fmt.Println(err)
+		default:
+			fmt.Println("Invalid collection.  Permitted values [games]")
 		}
 	}
 
@@ -264,6 +274,7 @@ func main() {
 	}
 
 	var rept []string = []string{}
+
 	switch *report {
 	case "games":
 		gameRecords, err = database.QueryAggregatedGames(ctx, "refLedger_v2", "games", *gfilter)

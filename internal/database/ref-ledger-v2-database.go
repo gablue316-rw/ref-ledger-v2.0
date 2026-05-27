@@ -40,6 +40,36 @@ func SetURI(uri string) {
 	URI = uri
 }
 
+func ClearGames(parentCtx context.Context, gameIds []int64) {
+
+	filter := bson.M{
+		"gameId": bson.M{
+			"$in": gameIds,
+		},
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"gameFee":     0,
+			"travelPay":   0,
+			"assignorFee": 0,
+			"deductions":  0,
+			"status":      "Cancelled",
+		},
+	}
+
+	if len(gameIds) > 1 {
+		UpdateManyDoc(parentCtx, filter, update, Database, "games")
+	} else {
+		err := UpdateOneDoc(parentCtx, filter, update, Database, "games")
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Println("Successfully updated game with game id[s]:", gameIds)
+		}
+	}
+}
+
 func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)

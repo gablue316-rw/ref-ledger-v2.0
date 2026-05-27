@@ -53,7 +53,11 @@ func (l *LogDescriptor) Close() {
 	l.Error = l.Fd.Close()
 }
 
-func (l *LogDescriptor) Write(text string) {
+func (l *LogDescriptor) Write(text string, verbose bool) {
+
+	if verbose {
+		fmt.Println(text)
+	}
 
 	l.Error = nil
 
