@@ -60,7 +60,7 @@ func main() {
 	//
 	// Other Flags
 	//
-	var report = flag.String("r", "", "Report to generate [games | payments | acctsRecv | expenses]")
+	var report = flag.String("r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation]")
 	var assoc = flag.String("a", "", "Association used to filter reports")
 	var dumpTable = flag.String("d", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
@@ -106,7 +106,7 @@ func main() {
 	//
 	// Other Flags
 	//
-	rootCmd.Flags().StringVar(report, "r", "", "Report to generate [games | payments | acctsRecv | expenses]")
+	rootCmd.Flags().StringVar(report, "r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation]")
 	rootCmd.Flags().StringVar(assoc, "a", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "d", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
@@ -291,6 +291,12 @@ func main() {
 		rept = reports.GeneratePaymentReport(paymentRecords)
 	case "acctsRecv":
 		rept = reports.GenerateAcctsRecvReport(ctx, *assoc)
+	case "reconciliation":
+		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments")
+		if err != nil {
+			return
+		}
+		rept = reports.GenerateReconciliationReport(paymentRecords)
 	case "expenses":
 		efilter, err := utils.ConvertExpenseFilterToJsonFile(expenseFilters)
 		if err != nil {

@@ -70,6 +70,45 @@ func ClearGames(parentCtx context.Context, gameIds []int64) {
 	}
 }
 
+func GetGameFee(gameIds []int64) (int64, error) {
+
+	totGameFee := int64(0)
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{}
+
+	if len(gameIds) > 0 {
+		filter["gameId"] = bson.M{
+			"$in": gameIds,
+		}
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totGameFee, fmt.Errorf("GetGameFee failure.  Reason: %s", err)
+	}
+
+	var results []model.GameDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totGameFee, fmt.Errorf("GetGameFee failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+
+		totGameFee += r.GameFee*r.NumOfGames + r.TravelPay - r.Deductions - r.AssignorFee
+	}
+
+	return totGameFee, nil
+}
+
 func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
