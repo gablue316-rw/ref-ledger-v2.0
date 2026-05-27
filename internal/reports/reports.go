@@ -314,6 +314,76 @@ func CalculateGameFee(gameRec model.GameDescriptor) int64 {
 	return gameFee
 }
 
+func GenerateReconciliationReport(records []model.PaymentDescriptor) []string {
+
+	var totalPayments int64 = 0
+	var paymentAmtInt64 int64 = 0
+	var calcPayment int64 = 0
+	var calcPaymentStr string = ""
+	var totalNumOfPayments int = 0
+	var err error
+	var status string = "Reconciled"
+
+	reptFmtStr := "%-16s%-14s%-17s$%-19s$%-19s%-16s\n"
+	gameIds := []int64{}
+	rept := []string{}
+
+	title := "Reconciliation Report\n"
+	heading1 := "Association     Payment ID    Payment Date     Payment Amount      Calculated Amount   Status\n"
+	separator := "==================================================================================================\n"
+	reptTimeMsg := getReportGeneratedDate()
+
+	maxLineLength := len(heading1)
+	newTitle := utils.CenterText(title, maxLineLength)
+	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
+
+	rept = append(rept, newTitle)
+	rept = append(rept, newReptTimeMsg)
+	rept = append(rept, heading1)
+	rept = append(rept, separator)
+
+	for _, record := range records {
+
+		totalNumOfPayments++
+		paymentAmtInt64, err = utils.ConvertAmtStrToInt64(record.PaymentAmt)
+		if err == nil {
+			totalPayments += paymentAmtInt64
+		} else {
+			fmt.Println(err)
+			return []string{}
+		}
+
+		gameIds, err = utils.ConvertGameIdStrToInt(record.GameIds)
+		if err != nil {
+			fmt.Println(err)
+			return []string{}
+		}
+
+		calcPayment, err = database.GetGameFee(gameIds)
+		if err != nil {
+			fmt.Println(err)
+			return []string{}
+		}
+
+		if paymentAmtInt64 > calcPayment {
+			status = "Overpaid"
+		} else if paymentAmtInt64 < calcPayment {
+			status = "Underpaid"
+		} else {
+			status = "Reconciled"
+		}
+
+		calcPaymentStr = utils.ConvertInt64ToAmtStr(calcPayment)
+		rept = append(rept, fmt.Sprintf(reptFmtStr, record.Association, record.PaymentId, record.PaymentDate, record.PaymentAmt, calcPaymentStr, status))
+
+	}
+
+	rept = append(rept, "\n")
+	rept = append(rept, fmt.Sprintf("Total Payments: %d Total Deposits: $%s\n", totalNumOfPayments, utils.ConvertInt64ToAmtStr(totalPayments)))
+
+	return rept
+}
+
 func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 
 	fmt.Println("Generating Payment Report")
