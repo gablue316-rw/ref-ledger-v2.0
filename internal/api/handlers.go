@@ -106,6 +106,59 @@ func DelGame(parentCtx context.Context, game model.GameDescriptor) {
 
 }
 
+func UpdateOfficials(parentCtx context.Context, file string) error {
+
+	fmt.Println("Adding to Officials Collection")
+
+	officials := []model.OfficialDescriptor{}
+
+	// Read file
+	fd, err := os.Open(file)
+	if err != nil {
+		fmt.Println(err)
+		return fmt.Errorf("Failed to open file %s.  Reason: %s", file, err)
+	}
+	defer fd.Close()
+
+	sc := bufio.NewScanner(fd)
+
+	recordsRead := 0
+	recordsAppended := 0
+	recordsDeleted := 0
+	validationErrors := 0
+
+	for sc.Scan() {
+
+		line := sc.Text()
+		recordsRead++
+		fields := strings.Split(line, ",")
+
+		official := model.OfficialDescriptor{
+			FirstName:   fields[0],
+			LastName:    fields[1],
+			Phone:       fields[2],
+			Association: fields[3],
+		}
+
+		err = ValidateOfficialDescriptor(parentCtx, official)
+		if err != nil {
+			fmt.Println(err)
+			validationErrors++
+			continue
+		}
+
+		officials = append(officials, official)
+
+		recordsAppended++
+	}
+
+	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
+	AddOfficials(parentCtx, officials)
+
+	return nil
+
+}
+
 func UpdatePayments(parentCtx context.Context, file string) error {
 
 	fmt.Println("Adding to Payments Collection")
@@ -242,6 +295,11 @@ func ValidatePaymentDescriptor(parentCtx context.Context, p model.PaymentDescrip
 	return nil
 }
 
+// Stubbed out for now
+func ValidateOfficialDescriptor(parentCtx context.Context, p model.OfficialDescriptor) error {
+	return nil
+}
+
 func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) error {
 
 	var errorFormat string = "%s %s not found!  Record Dropped!"
@@ -345,6 +403,11 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 
 		if field == "status" && value == "Delete" {
 			database.DeleteOneDoc(parentCtx, filter, database.Database, "games")
+			return nil
+		}
+
+		if field == "status" && value == "Cancelled" {
+			database.ClearGames(parentCtx, gameIds)
 			return nil
 		}
 

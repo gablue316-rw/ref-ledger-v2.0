@@ -431,7 +431,6 @@ func GenerateAcctsRecvReport(parentCtx context.Context, associations string) []s
 		for _, r := range gameRecords {
 
 			g, err := utils.ConvertStrToInt64(r.GameId)
-			totalGameId++
 
 			if err != nil {
 				fmt.Println(err)
