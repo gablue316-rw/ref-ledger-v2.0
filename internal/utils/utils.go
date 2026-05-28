@@ -489,6 +489,12 @@ func ConvertGameIdStrToInt(g string) ([]int64, error) {
 	return gameIds, nil
 }
 
+func ConvertMilesToStr(miles int64) string {
+
+	str := strconv.FormatInt((miles / 100), 10) // Convert to string with base 10
+	return str
+}
+
 func ConvertInt64ToStr(num int64) string {
 
 	str := strconv.FormatInt(num, 10) // Convert to string with base 10

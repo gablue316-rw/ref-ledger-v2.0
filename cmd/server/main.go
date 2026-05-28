@@ -60,7 +60,7 @@ func main() {
 	//
 	// Other Flags
 	//
-	var report = flag.String("r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation]")
+	var report = flag.String("r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation | income]")
 	var assoc = flag.String("a", "", "Association used to filter reports")
 	var dumpTable = flag.String("d", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
@@ -97,7 +97,7 @@ func main() {
 	rootCmd.Flags().StringVar(gstatus, "S", "", "Status used to filter games report")
 	rootCmd.Flags().StringVar(update, "u", "", "Update single document in collection [games]")
 	rootCmd.Flags().StringVar(value, "v", "", "Update string [field:value] used to update single document in collection --u")
-	rootCmd.Flags().StringVar(massUpdate, "m", "", "Mass update of collection using file specifed by --f flag [expense | games | officials | payments]")
+	rootCmd.Flags().StringVar(massUpdate, "m", "", "Mass update of collection using file specifed by --f flag [expense | games | officials | payments ]")
 	rootCmd.Flags().StringVar(bdate, "F", "", "From date used to filter game report [mm/dd/yyyy | today | tomorrow | yesterday | this week | next week | last week]")
 	rootCmd.Flags().StringVar(edate, "T", "", "To date used to filter game report [mm/dd/yyyy | today | tomorrow | yesterday]")
 	rootCmd.Flags().StringVar(gsport, "t", "", "Type of sport [Softball | Basketball]")
@@ -106,7 +106,7 @@ func main() {
 	//
 	// Other Flags
 	//
-	rootCmd.Flags().StringVar(report, "r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation]")
+	rootCmd.Flags().StringVar(report, "r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation | income]")
 	rootCmd.Flags().StringVar(assoc, "a", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "d", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
@@ -291,6 +291,8 @@ func main() {
 		rept = reports.GeneratePaymentReport(paymentRecords)
 	case "acctsRecv":
 		rept = reports.GenerateAcctsRecvReport(ctx, *assoc)
+	case "income":
+		rept = reports.GenerateIncomeReport(*assoc)
 	case "reconciliation":
 		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments")
 		if err != nil {
