@@ -31,6 +31,18 @@ var ExpenseTypes []string = []string{"Camp Fee", "Dues", "Equipment", "Food", "M
 var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending", "Deleted"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
+func foundAssociation(assoc string) bool {
+
+	associations := []string{"GOLLC", "MCBOA", "MSO"}
+
+	for _, a := range associations {
+		if assoc == a {
+			return true
+		}
+	}
+	return false
+}
+
 func InitDbase(dbName, uri string) {
 	Database = dbName
 	URI = uri
@@ -68,6 +80,481 @@ func ClearGames(parentCtx context.Context, gameIds []int64) {
 			fmt.Println("Successfully updated game with game id[s]:", gameIds)
 		}
 	}
+}
+
+func GetGamesPaidForPerAssoc(assoc string) ([]int64, error) {
+
+	var gameIdList []int64 = []int64{}
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return gameIdList, fmt.Errorf("GetGamesPaidForPerAssoc failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return gameIdList, fmt.Errorf("GetGamesPaidForPerAssoc failure.  Reason: %s", err)
+	}
+
+	var results []model.PaymentDoc
+	err = cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return gameIdList, fmt.Errorf("GetGamesPaidForPerAssoc failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		gameIdList = append(gameIdList, r.GameIds...)
+	}
+
+	return gameIdList, nil
+}
+
+func GetGamesInPaidStatusPerAssoc(assoc string) ([]int64, error) {
+
+	var gameIdList []int64 = []int64{}
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return gameIdList, fmt.Errorf("GetGamesInPaidStatusPerAssoc failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"status":      "Paid",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return gameIdList, fmt.Errorf("GetGamesInPaidStatusPerAssoc failure.  Reason: %s", err)
+	}
+
+	var results []model.GameDoc
+	err = cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return gameIdList, fmt.Errorf("GetGamesInPaidStatusPerAssoc failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		gameIdList = append(gameIdList, r.GameId)
+	}
+
+	return gameIdList, nil
+}
+
+func GetTotalMileage(assoc string) (int64, error) {
+
+	totalMileage := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalMileage, fmt.Errorf("GetTotalMileage failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"type":        "Mileage",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("expenses")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalMileage, fmt.Errorf("GetTotalMileage failure.  Reason: %s", err)
+	}
+
+	var results []model.ExpenseDoc
+	err = cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalMileage, fmt.Errorf("GetTotalMileage failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalMileage += r.Amount
+	}
+
+	return totalMileage, nil
+
+}
+
+func GetTotalFoodExpense(assoc string) (int64, error) {
+
+	totalFood := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalFood, fmt.Errorf("GetTotalFoodExpense failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"type":        "Food",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("expenses")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalFood, fmt.Errorf("GetTotalFoodExpense failure.  Reason: %s", err)
+	}
+
+	var results []model.ExpenseDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalFood, fmt.Errorf("GetTotalFoodExpense failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalFood += r.Amount
+	}
+
+	return totalFood, nil
+
+}
+
+func GetTotalGames(assoc string) (int64, error) {
+
+	totalGames := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalGames, fmt.Errorf("GetTotalGames failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"status":      "Paid",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalGames, fmt.Errorf("GetTotalGames failure.  Reason: %s", err)
+	}
+
+	var results []model.GameDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalGames, fmt.Errorf("GetTotalGames failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalGames += r.NumOfGames
+	}
+	return totalGames, nil
+}
+
+func GetTotalEquipmentExpense(assoc string) (int64, error) {
+
+	totalEquipment := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalEquipment, fmt.Errorf("GetTotalEquipmentExpense failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"type":        "Equipment",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("expenses")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalEquipment, fmt.Errorf("GetTotalEquipmentExpense failure.  Reason: %s", err)
+	}
+
+	var results []model.ExpenseDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalEquipment, fmt.Errorf("GetTotalEquipmentExpense failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalEquipment += r.Amount
+	}
+
+	return totalEquipment, nil
+
+}
+
+func GetTotalDues(assoc string) (int64, error) {
+
+	totalDues := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalDues, fmt.Errorf("GetTotalDues failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"type":        "Dues",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("expenses")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalDues, fmt.Errorf("GetTotalDues failure.  Reason: %s", err)
+	}
+
+	var results []model.ExpenseDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalDues, fmt.Errorf("GetTotalDues failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalDues += r.Amount
+	}
+
+	return totalDues, nil
+
+}
+
+func GetTotalTravelPay(assoc string) (int64, error) {
+
+	totalTravelPay := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalTravelPay, fmt.Errorf("GetTotalTravelPay failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"status":      "Paid",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalTravelPay, fmt.Errorf("GetTotalTravelPay failure.  Reason: %s", err)
+	}
+
+	var results []model.GameDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalTravelPay, fmt.Errorf("GetTotalTravelPay failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalTravelPay += r.TravelPay
+	}
+
+	return totalTravelPay, nil
+
+}
+
+func GetTotalAssignorFee(assoc string) (int64, error) {
+
+	totalAssignorFee := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalAssignorFee, fmt.Errorf("GetTotalAssignorFee failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"status":      "Paid",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalAssignorFee, fmt.Errorf("GetTotalAssignorFee failure.  Reason: %s", err)
+	}
+
+	var results []model.GameDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalAssignorFee, fmt.Errorf("GetTotalAssignorFee failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalAssignorFee += r.AssignorFee
+	}
+
+	return totalAssignorFee, nil
+
+}
+
+func GetTotalDeductions(assoc string) (int64, error) {
+
+	totalDeductions := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalDeductions, fmt.Errorf("GetTotalDeductions failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"status":      "Paid",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalDeductions, fmt.Errorf("GetTotalDeductions failure.  Reason: %s", err)
+	}
+
+	var results []model.GameDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalDeductions, fmt.Errorf("GetTotalDeductions failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalDeductions += r.Deductions
+	}
+
+	return totalDeductions, nil
+
+}
+
+func GetTotalGrossGameFee(assoc string) (int64, error) {
+
+	totalGrossGameFee := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalGrossGameFee, fmt.Errorf("GetTotalGrossGameFee failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"status":      "Paid",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalGrossGameFee, fmt.Errorf("GetTotalGrossGameFee failure.  Reason: %s", err)
+	}
+
+	var results []model.GameDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalGrossGameFee, fmt.Errorf("GetTotalGrossGameFee failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalGrossGameFee += r.GameFee * r.NumOfGames
+	}
+
+	return totalGrossGameFee, nil
+
+}
+
+func GetTotalCampFees(assoc string) (int64, error) {
+
+	totalCampFees := int64(0)
+
+	if assoc == "" || !foundAssociation(assoc) {
+		return totalCampFees, fmt.Errorf("GetTotalCampFees failure.  Reason: Invalid Association: %s", assoc)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{
+		"association": assoc,
+		"type":        "Camp Fees",
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("expenses")
+
+	// Query to find all documents
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return totalCampFees, fmt.Errorf("GetTotalCampFees failure.  Reason: %s", err)
+	}
+
+	var results []model.ExpenseDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return totalCampFees, fmt.Errorf("GetTotalCampFees failure.  Reason: %s", err)
+	}
+
+	for _, r := range results {
+		totalCampFees += r.Amount
+	}
+
+	return totalCampFees, nil
+
 }
 
 func GetGameFee(gameIds []int64) (int64, error) {
