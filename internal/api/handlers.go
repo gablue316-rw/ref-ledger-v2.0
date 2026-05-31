@@ -402,7 +402,11 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 		}
 
 		if field == "status" && value == "Delete" {
-			database.DeleteOneDoc(parentCtx, filter, database.Database, "games")
+			if len(gameIds) == 1 {
+				database.DeleteOneDoc(parentCtx, filter, database.Database, "games")
+			} else if len(gameIds) > 1 {
+				database.DeleteManyDoc(parentCtx, filter, database.Database, "games")
+			}
 			return nil
 		}
 
