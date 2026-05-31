@@ -1316,6 +1316,25 @@ func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, colle
 	return nil
 }
 
+func DeleteManyDoc(parentCtx context.Context, filter bson.M, dbase, collection string) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	collectionName := coll.Name()
+	fmt.Println("Deleting multiple documents from", collectionName)
+
+	result, err := coll.DeleteMany(ctx, filter)
+	if err != nil {
+		fmt.Println("Delete failed.  Reason:", err)
+		return
+	}
+
+	fmt.Println("Deleted Records with GameIds of", filter["gameId"], " Records Deleted:", result.DeletedCount)
+}
+
 func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
