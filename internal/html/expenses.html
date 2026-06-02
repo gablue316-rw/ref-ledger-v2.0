@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Entry</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        .row {
+            display: flex;
+            gap: 20px;
+        }
+
+        .col {
+            flex: 1;
+        }
+
+        #message {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Expense Entry</h1>
+
+<form id="expenseForm">
+
+    <div class="row">
+        <div class="col">
+            <label for="date">Date</label>
+            <input type="date" id="date" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="association">Association</label>
+            <select id="association">
+                <option value="">Select Association</option>
+                <option value="GOLLC">GOLLC</option>
+                <option value="MCBOA">MCBOA</option>
+                <option value="MSO">MSO</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="expenseType">Expense Type</label>
+        <select id="expenseType" required>
+            <option value="">Select Expense Type</option>
+            <option value="Mileage">Mileage</option>
+            <option value="Food">Food</option>
+            <option value="Equipment">Equipment</option>
+            <option value="Camp Fees">Camp Fees</option>
+            <option value="Association Dues">Association Dues</option>
+        </select>
+    </div>
+
+    <div class="row">
+        <div class="col">
+            <label for="amount">Amount / Miles</label>
+            <input type="number" id="amount" step="0.01" required>
+        </div>
+
+        <div class="col">
+            <label for="gameId">Game ID</label>
+            <input type="number" id="gameId">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" rows="4"></textarea>
+    </div>
+
+    <button type="submit">Save Expense</button>
+
+</form>
+
+<div id="message"></div>
+
+<script>
+document.getElementById("expenseForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const expense = {
+        date: document.getElementById("date").value,
+        expenseType: document.getElementById("expenseType").value,
+        amount: parseFloat(document.getElementById("amount").value),
+        description: document.getElementById("description").value,
+        association: document.getElementById("association").value,
+        gameId: parseInt(document.getElementById("gameId").value) || 0
+    };
+
+    try {
+        const response = await fetch("/api/expenses", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(expense)
+        });
+
+        if (response.ok) {
+            document.getElementById("message").innerText =
+                "Expense saved successfully.";
+
+            document.getElementById("expenseForm").reset();
+        } else {
+            document.getElementById("message").innerText =
+                "Error saving expense.";
+        }
+    } catch (err) {
+        document.getElementById("message").innerText =
+            "Server unavailable.";
+    }
+});
+</script>
+
+</body>
+</html>

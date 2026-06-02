@@ -672,7 +672,7 @@ func DumpTable(parentCtx context.Context, table, file string) {
 
 }
 
-func generateExpenseId(expense model.ExpenseDescriptor) string {
+func GenerateExpenseId(expense model.ExpenseDescriptor) string {
 
 	var month int
 	var day int
@@ -737,7 +737,7 @@ func BulkAddExpenses(parentCtx context.Context, file string) {
 			GameId:      fields[4],
 			Description: fields[5],
 		}
-		expense.ExpenseId = generateExpenseId(expense)
+		expense.ExpenseId = GenerateExpenseId(expense)
 		expenses = append(expenses, expense)
 	}
 

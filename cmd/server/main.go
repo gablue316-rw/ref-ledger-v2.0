@@ -60,7 +60,7 @@ func main() {
 	//
 	// Other Flags
 	//
-	var report = flag.String("r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation | income]")
+	var report = flag.String("r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation | income | officials]")
 	var assoc = flag.String("a", "", "Association used to filter reports")
 	var dumpTable = flag.String("d", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
@@ -106,7 +106,7 @@ func main() {
 	//
 	// Other Flags
 	//
-	rootCmd.Flags().StringVar(report, "r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation | income]")
+	rootCmd.Flags().StringVar(report, "r", "", "Report to generate [games | payments | acctsRecv | expenses | reconciliation | income | officials]")
 	rootCmd.Flags().StringVar(assoc, "a", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "d", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
@@ -283,22 +283,34 @@ func main() {
 			return
 		}
 		rept = reports.GenerateGameReport(gameRecords)
+
+	case "officials":
+		officialsRecords, err := database.QueryOfficials(ctx, "refLedger_v2", "officials", *assoc, *officialName)
+		if err != nil {
+			return
+		}
+		rept = reports.GenerateOfficialsReport(officialsRecords)
+
 	case "payments":
-		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments")
+		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments", *assoc)
 		if err != nil {
 			return
 		}
 		rept = reports.GeneratePaymentReport(paymentRecords)
+
 	case "acctsRecv":
 		rept = reports.GenerateAcctsRecvReport(ctx, *assoc)
+
 	case "income":
 		rept = reports.GenerateIncomeReport(*assoc)
+
 	case "reconciliation":
-		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments")
+		paymentRecords, err := database.QueryPayments(ctx, "refLedger_v2", "payments", *assoc)
 		if err != nil {
 			return
 		}
 		rept = reports.GenerateReconciliationReport(paymentRecords)
+
 	case "expenses":
 		efilter, err := utils.ConvertExpenseFilterToJsonFile(expenseFilters)
 		if err != nil {

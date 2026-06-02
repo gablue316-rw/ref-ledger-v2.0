@@ -454,6 +454,37 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 	return rept
 }
 
+func GenerateOfficialsReport(records []model.OfficialDescriptor) []string {
+
+	fmt.Println("Generating Officials Report")
+	var title string = "Officials Report\n"
+	var rept []string = []string{}
+
+	reptTimeMsg := getReportGeneratedDate()
+	heading1 := "Official Id     Officials Name             Phone Number    Association\n"
+	separator := "======================================================================\n"
+
+	reptFmt := "%-16d%-28s%-15s%-15s\n"
+
+	maxLineLength := len(heading1)
+
+	rept = append(rept, utils.CenterText(title, maxLineLength))
+	rept = append(rept, utils.CenterText(reptTimeMsg, maxLineLength))
+	rept = append(rept, heading1)
+	rept = append(rept, separator)
+
+	totalOfficials := 0
+	for _, r := range records {
+		name := fmt.Sprintf("%s %s", r.FirstName, r.LastName)
+		rept = append(rept, fmt.Sprintf(reptFmt, r.OfficialId, name, r.Phone, r.Association))
+		totalOfficials++
+	}
+
+	rept = append(rept, fmt.Sprintf("\nTotal Officials:%d", totalOfficials))
+
+	return rept
+}
+
 func GenerateAcctsRecvReport(parentCtx context.Context, associations string) []string {
 
 	fmt.Println("Generating Accounts Receivable Report")

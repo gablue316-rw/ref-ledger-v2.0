@@ -54,6 +54,7 @@ type PaymentDoc struct {
 }
 
 type OfficialDescriptor struct {
+	OfficialId  int
 	FirstName   string
 	LastName    string
 	Phone       string
