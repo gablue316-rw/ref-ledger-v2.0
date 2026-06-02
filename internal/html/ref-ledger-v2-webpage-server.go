@@ -3,15 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
-	"net"
-	"log"
-	"os"
 	"io"
+	"log"
+	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"unicode"
 
+	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/reports"
@@ -28,7 +30,32 @@ var Client *mongo.Client
 var URI string = "mongodb://localhost:27017"
 var logFile = "refLedgerV2_0-webserver.log"
 
+type Expense struct {
+	Date        string  `json:"date"`
+	ExpenseType string  `json:"expenseType"`
+	Amount      float64 `json:"amount"`
+	Description string  `json:"description"`
+	Association string  `json:"association"`
+	GameID      int     `json:"gameId"`
+}
+
 //var tmpl = template.Must(template.ParseFiles("./internal/html/index.html"))
+
+func ExpenseDocToExpenseDesr(e Expense) model.ExpenseDescriptor {
+
+	t, _ := time.Parse("2006-01-02", e.Date)
+	formattedDate := t.Format("1/2/2006")
+
+	return model.ExpenseDescriptor{
+		Date:        formattedDate,
+		Type:        e.ExpenseType,
+		Amount:      strconv.FormatFloat(e.Amount, 'f', 2, 64),
+		Association: e.Association,
+		GameId:      strconv.Itoa(e.GameID),
+		Description: e.Description,
+	}
+
+}
 
 func GetIpAddress(r *http.Request) string {
 
@@ -41,7 +68,7 @@ func GetIpAddress(r *http.Request) string {
 	}
 
 	//
-	// Get the real IP Address that was proxied 
+	// Get the real IP Address that was proxied
 	//
 	realIpAddr := r.Header.Get("X-Forwarded-For")
 
@@ -68,7 +95,7 @@ func GetIpAddress(r *http.Request) string {
 }
 
 func OpenLog(f string) *os.File {
-	
+
 	// Open or create log file
 	file, err := os.OpenFile(
 		f,
@@ -80,13 +107,12 @@ func OpenLog(f string) *os.File {
 		log.Fatal(err)
 		return nil
 	}
-	
+
 	// Send logs to file (and optionally terminal)
 	log.SetOutput(file)
 	log.SetFlags(log.Ldate | log.Ltime)
 	log.SetOutput(io.MultiWriter(os.Stdout, file))
 
-   
 	return file
 }
 
@@ -95,18 +121,45 @@ func LogVisitor(w http.ResponseWriter, r *http.Request) {
 	remoteIpAddr := GetIpAddress(r)
 	method := r.Method
 	path := r.URL.Path
-	url  := r.URL.String()
+	url := r.URL.String()
 	userAgent := r.UserAgent()
 	referer := r.Referer()
 	host := r.Host
 	protocol := "HTTP"
 	if r.TLS != nil {
-       protocol = "HTTPS"
+		protocol = "HTTPS"
 	} else {
 		protocol = r.Header.Get("X-Forwared-Proto")
 	}
 
-	log.Printf("IP=%s Method=%s Path=%s URL=%s Agent=%s Referer=%s Host=%s Protocol=%s",remoteIpAddr, method, path, url, userAgent, referer, host, protocol)
+	log.Printf("IP=%s Method=%s Path=%s URL=%s Agent=%s Referer=%s Host=%s Protocol=%s", remoteIpAddr, method, path, url, userAgent, referer, host, protocol)
+
+}
+
+func CreateExpense(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Println("I'm here at CreateExpense")
+
+	var expense Expense
+	var singleExpense model.ExpenseDescriptor
+
+	var expDesc []model.ExpenseDescriptor
+
+	err := json.NewDecoder(r.Body).Decode(&expense)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Expense in json: ", expense)
+	singleExpense = ExpenseDocToExpenseDesr(expense)
+	singleExpense.ExpenseId = api.GenerateExpenseId(singleExpense)
+	fmt.Println("Expense Descr: ", singleExpense)
+	expDesc = append(expDesc, singleExpense)
+
+	fmt.Println("Expenses:", expDesc)
+
+	database.InsertExpenseDocs(context.TODO(), expDesc, database.Database, "expenses")
 
 }
 
@@ -121,7 +174,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	var gameFilters model.GFilters = model.GFilters{}
 
 	var HtmlAssocGameTotals reports.AssocGameTotalsMap
-    HtmlAssocGameTotals.Init()
+	HtmlAssocGameTotals.Init()
 
 	_, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
@@ -149,19 +202,11 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	var eDate string = ""
 	var err error
 
-	if len(begindate) > 0 {
-		bDate, _, err = utils.FormatDateFilter(begindate, "")
-		if err != nil {
-			fmt.Println(err)
-		}
+	bDate, eDate, err = utils.FormatDateFilter(begindate, enddate)
+	if err != nil {
+		fmt.Println(err)
 	}
 
-	if len(enddate) > 0 {
-		_, eDate, err = utils.FormatDateFilter("", enddate)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
 	fmt.Println("status:", status, "association", association, "bDate", bDate, "eDate", eDate)
 	gameFilters.Status = status
 	gameFilters.Association = association
@@ -229,7 +274,6 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	err = cursor.All(context.TODO(), &games)
 
-
 	if err != nil {
 		fmt.Println("Decoding failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -237,8 +281,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, game := range games {
-	
-		gameRec := model.GameDescriptor {
+
+		gameRec := model.GameDescriptor{
 			GameFee:     utils.ConvertInt64ToAmtStr(game.GameFee),
 			NumOfGames:  utils.ConvertInt64ToStr(game.NumOfGames),
 			TravelPay:   utils.ConvertInt64ToAmtStr(game.TravelPay),
@@ -247,7 +291,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 
 		gameFee := reports.CalculateGameFee(gameRec)
-		HtmlAssocGameTotals.Update(game.Association, game.Status, game.NumOfGames, gameFee)	
+		HtmlAssocGameTotals.Update(game.Association, game.Status, game.NumOfGames, gameFee)
 
 		view := model.GameView{
 			GameId:      game.GameId,
@@ -270,13 +314,13 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		gameView = append(gameView, view)
 	}
 
-/*
-	reptLines := HtmlAssocGameTotals.FormatTotalLine()
+	/*
+		reptLines := HtmlAssocGameTotals.FormatTotalLine()
 
-	if len(reptLines) > 0 {
-		fmt.Println(reptLines)
-	}
-*/
+		if len(reptLines) > 0 {
+			fmt.Println(reptLines)
+		}
+	*/
 
 	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
@@ -303,10 +347,10 @@ func main() {
 		return
 	}
 
-	f := OpenLog (logFile)
+	f := OpenLog(logFile)
 
 	if f != nil {
-		fmt.Println("Failed to open",logFile)
+		fmt.Println("Failed to open", logFile)
 	}
 
 	Client = client
@@ -315,6 +359,11 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/games", GetGames)
+	mux.HandleFunc("/expenses", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/expenses.html")
+	})
+
+	mux.HandleFunc("/api/expenses", CreateExpense)
 	fs := http.FileServer(http.Dir("./internal/html"))
 	mux.Handle("/", fs)
 

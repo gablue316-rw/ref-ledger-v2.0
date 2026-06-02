@@ -635,12 +635,68 @@ func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescript
 	return gameRecord, nil
 }
 
-func QueryPayments(parentCtx context.Context, dbase, collection string) ([]model.PaymentDescriptor, error) {
+func QueryOfficials(parentCtx context.Context, dbase, collection, assoc, official string) ([]model.OfficialDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	filter := bson.M{}
+
+	if len(assoc) > 0 {
+		assocValues := utils.ParseCsv(assoc)
+		filter["association"] = bson.M{
+			"$in": assocValues,
+		}
+	}
+
+	if len(official) > 0 {
+		parts := strings.Split(official, " ")
+		if len(parts) == 1 {
+			filter["$or"] = []bson.M{
+				{"firstName": parts[0]},
+				{"lastName": parts[0]},
+			}
+		} else {
+			filter["firstName"] = parts[0]
+			filter["lastName"] = parts[1]
+		}
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection(collection)
+
+	cursor, err := coll.Find(ctx, filter)
+
+	var results []model.OfficialDoc
+	var officialRecords []model.OfficialDescriptor
+
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.OfficialDescriptor{}, err
+	}
+
+	for _, r := range results {
+
+		officialRecords = append(officialRecords, utils.ConvertOfficialDocToOfficialDescr(r))
+
+	}
+	return officialRecords, nil
+}
+
+func QueryPayments(parentCtx context.Context, dbase, collection, assoc string) ([]model.PaymentDescriptor, error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{}
+
+	if len(assoc) > 0 {
+		assocValues := utils.ParseCsv(assoc)
+		filter["association"] = bson.M{
+			"$in": assocValues,
+		}
+	}
 
 	db := Client.Database(Database)
 	coll := db.Collection(collection)

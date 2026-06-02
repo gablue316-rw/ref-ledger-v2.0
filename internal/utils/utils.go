@@ -610,6 +610,7 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 func ConvertOfficialDescrToOfficialDoc(officialDescr model.OfficialDescriptor) model.OfficialDoc {
 
 	doc := model.OfficialDoc{
+		OfficialId:  0,
 		FirstName:   officialDescr.FirstName,
 		LastName:    officialDescr.LastName,
 		Phone:       officialDescr.Phone,
@@ -621,6 +622,7 @@ func ConvertOfficialDescrToOfficialDoc(officialDescr model.OfficialDescriptor) m
 func ConvertOfficialDocToOfficialDescr(doc model.OfficialDoc) model.OfficialDescriptor {
 
 	officialDescr := model.OfficialDescriptor{
+		OfficialId:  doc.OfficialId,
 		FirstName:   doc.FirstName,
 		LastName:    doc.LastName,
 		Phone:       doc.Phone,
