@@ -324,13 +324,13 @@ func GenerateReconciliationReport(records []model.PaymentDescriptor) []string {
 	var err error
 	var status string = "Reconciled"
 
-	reptFmtStr := "%-16s%-14s%-17s$%-19s$%-19s%-16s\n"
+	reptFmtStr := "%-21s%-19s%-17s$%-19s$%-19s%-16s\n"
 	gameIds := []int64{}
 	rept := []string{}
 
 	title := "Reconciliation Report\n"
-	heading1 := "Association     Payment ID    Payment Date     Payment Amount      Calculated Amount   Status\n"
-	separator := "==================================================================================================\n"
+	heading1 := "Association          Payment ID         Payment Date     Payment Amount      Calculated Amount   Status\n"
+	separator := "============================================================================================================\n"
 	reptTimeMsg := getReportGeneratedDate()
 
 	maxLineLength := len(heading1)
@@ -407,12 +407,12 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 	var totalNumOfPayments int = 0
 	var err error
 
-	reptFmtStr := "%-14s%-17s$%-11s%-16s%-60s\n"
-	reptFmtStr2 := "%-59s%-60s\n"
+	reptFmtStr := "%-19s%-17s$%-11s%-16s%-60s\n"
+	reptFmtStr2 := "%-64s%-60s\n"
 
 	title := "Game Report\n"
-	heading1 := "Payment ID    Payment Date     Amount      Association     Game IDs\n"
-	separator := "==============================================================================================================================\n"
+	heading1 := "Payment ID         Payment Date     Amount      Association     Game IDs\n"
+	separator := "===================================================================================================================================\n"
 	reptTimeMsg := getReportGeneratedDate()
 
 	maxLineLength := len(heading1)
