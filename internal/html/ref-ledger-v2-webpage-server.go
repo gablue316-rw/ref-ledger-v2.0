@@ -28,6 +28,7 @@ import (
 
 var Client *mongo.Client
 var URI string = "mongodb://localhost:27017"
+var URI_CONTAINER string = "mongodb://host.docker.internal:27017"
 var logFile = "refLedgerV2_0-webserver.log"
 
 type Expense struct {
@@ -332,7 +333,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 func main() {
 
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
-	database.InitDbase("refLedger_v2", "mongodb://localhost:27017")
+	//database.InitDbase("refLedger_v2", "mongodb://localhost:27017")
+	database.InitDbase("refLedger_v2", "mongodb://host.docker.internal:27017")
 
 	err := database.Connect()
 	if err != nil {
@@ -340,7 +342,7 @@ func main() {
 		return
 	}
 
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(URI))
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(URI_CONTAINER))
 
 	if err != nil {
 		fmt.Println("Failed to connect to database.  Terminating web page server.")
