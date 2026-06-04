@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ref-Ledger V2.0 Update Game Status</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px 0 0 20px;
+        }
+
+        h2 {
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        #gameIds {
+            width: 220px;
+        }
+
+        #status {
+            width: 220px;
+        }
+
+        input,
+        select,
+        button {
+            padding: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 220px;
+            cursor: pointer;
+        }
+
+        #result {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+       <div class="header">
+           <h1>Ref Ledger V2.0 Update Game Status</h1>
+           <p>Enter Game Id[s] and Game Status</p>
+       </div>
+    </div>
+    
+    <form id="statusForm">
+
+        <div class="form-group">
+            <label for="gameIds">Game IDs</label>
+            <input
+                type="text"
+                id="gameIds"
+                placeholder="1980-1982;2698-2700;2900"
+                required>
+        </div>
+
+        <div class="form-group">
+            <label for="status">New Status</label>
+            <select id="status">
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Paid">Paid</option>
+                <option value="Pending">Pending</option>
+                <option value="Delete">Delete</option>
+            </select>
+        </div>
+
+        <button type="submit">
+            Update Games
+        </button>
+
+    </form>
+
+    <div id="result"></div>
+
+    <script>
+        document
+            .getElementById("statusForm")
+            .addEventListener("submit", async function (e) {
+
+                e.preventDefault();
+
+                const gameIds = document
+                    .getElementById("gameIds")
+                    .value
+                    .trim();
+
+                const status = document
+                    .getElementById("status")
+                    .value;
+
+                try {
+                    const response = await fetch(
+                        "/api/games/status",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                gameIds: gameIds,
+                                status: status
+                            })
+                        }
+                    );
+
+                    const result =
+                        document.getElementById("result");
+
+                    if (response.ok) {
+                        result.innerText =
+                            "Game status update completed.";
+                    } else {
+                        const text = await response.text();
+                        result.innerText =
+                            "Error: " + text;
+                    }
+
+                } catch (err) {
+                    document.getElementById("result").innerText =
+                        "Request failed: " + err.message;
+                }
+            });
+    </script>
+
+</body>
+</html>

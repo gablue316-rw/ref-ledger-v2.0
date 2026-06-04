@@ -40,6 +40,11 @@ type Expense struct {
 	GameID      int     `json:"gameId"`
 }
 
+type GameStatusUpdate struct {
+	GameIds string `json:"gameIds"`
+	Status  string `json:"status"`
+}
+
 //var tmpl = template.Must(template.ParseFiles("./internal/html/index.html"))
 
 func ExpenseDocToExpenseDesr(e Expense) model.ExpenseDescriptor {
@@ -137,9 +142,29 @@ func LogVisitor(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func CreateExpense(w http.ResponseWriter, r *http.Request) {
+func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("I'm here at CreateExpense")
+	fmt.Println("I'm here at UpdateGameStatus")
+	var gameUpdate GameStatusUpdate
+	var gameIds []int64 = []int64{}
+
+	err := json.NewDecoder(r.Body).Decode(&gameUpdate)
+	if err != nil {
+		fmt.Println("err:", err)
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	gameIds, err = utils.ConvertGameIdStrToInt(gameUpdate.GameIds)
+	if err != nil {
+		fmt.Println("err:", err)
+		return
+	}
+	database.UpdateGameStatus(gameIds, gameUpdate.Status)
+
+}
+
+func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 	var expense Expense
 	var singleExpense model.ExpenseDescriptor
@@ -365,7 +390,11 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
 	})
 
+	mux.HandleFunc("/game-status", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/gameStatus.html")
+	})
 	mux.HandleFunc("/api/expenses", CreateExpense)
+	mux.HandleFunc("/api/games/status", UpdateGameStatus)
 	fs := http.FileServer(http.Dir("./internal/html"))
 	mux.Handle("/", fs)
 

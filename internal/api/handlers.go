@@ -515,14 +515,14 @@ func writeToFile(records []string, file string) error {
 	return nil
 }
 
-func DumpGames(parentCtx context.Context, file string) {
+func DumpGames(parentCtx context.Context, file, assoc string) {
 
 	var games []model.GameDoc = []model.GameDoc{}
 	var records []string = []string{}
 
 	var recdFmt string = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"
 
-	games, err := database.GetGamesCollection(parentCtx)
+	games, err := database.GetGamesCollection(parentCtx, assoc)
 
 	if err != nil {
 		fmt.Println(err)
@@ -655,11 +655,11 @@ func DumpExpenses(parentCtx context.Context, file string) {
 
 }
 
-func DumpTable(parentCtx context.Context, table, file string) {
+func DumpTable(parentCtx context.Context, table, file, assoc string) {
 
 	switch table {
 	case "games":
-		DumpGames(parentCtx, file)
+		DumpGames(parentCtx, file, assoc)
 	case "officials":
 		DumpOfficials(parentCtx, file)
 	case "payments":

@@ -1294,10 +1294,34 @@ func GetPaymentsCollection(parentCtx context.Context) ([]model.PaymentDoc, error
 	return results, nil
 }
 
-func GetGamesCollection(parentCtx context.Context) ([]model.GameDoc, error) {
+func ClearGamesCollection(parentCtx context.Context, assoc string) {
+
+	filter := bson.M{}
+
+	if len(assoc) > 0 {
+		assocValues := utils.ParseCsv(assoc)
+		fmt.Println("Attempting to delete all games for association(s):", assocValues)
+		filter["association"] = bson.M{
+			"$in": assocValues,
+		}
+	}
+	DeleteManyDoc(parentCtx, filter, Database, "games")
+
+}
+
+func GetGamesCollection(parentCtx context.Context, assoc string) ([]model.GameDoc, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
+
+	filter := bson.M{}
+
+	if len(assoc) > 0 {
+		assocValues := utils.ParseCsv(assoc)
+		filter["association"] = bson.M{
+			"$in": assocValues,
+		}
+	}
 
 	db := Client.Database(Database)
 	coll := db.Collection("games")
@@ -1305,7 +1329,7 @@ func GetGamesCollection(parentCtx context.Context) ([]model.GameDoc, error) {
 
 	fmt.Println("Retrieving", collectionName, "collection")
 
-	cursor := QueryCollection(bson.M{}, Database, "games")
+	cursor := QueryCollection(filter, Database, "games")
 
 	var results []model.GameDoc
 
@@ -1438,6 +1462,65 @@ func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescript
 		officialId++
 	}
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
+}
+
+func UpdateGameStatus(gameIds []int64, status string) {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+	collectionName := coll.Name()
+	fmt.Println("Updating Games Status to", status, "for game ids:", gameIds)
+
+	recordsUpdated := 0
+	totalErrors := 0
+
+	var game model.GameDescriptor = model.GameDescriptor{}
+
+	for _, id := range gameIds {
+
+		gameIdStr, err := utils.ConvertSingleGameIdToStr(id)
+
+		if err != nil {
+			fmt.Println("Failed to convert Game Id to string.  Reason:", err)
+			continue
+		}
+
+		game, err = GetSingleGame(ctx, gameIdStr)
+
+		if err != nil {
+			fmt.Println("Failed to get game record.  Reason:", err)
+			continue
+		}
+
+		if game.Status == status {
+			fmt.Println("Game Id", id, "already set to status", status)
+			continue
+		}
+
+		filter := bson.M{
+			"gameId": id,
+		}
+
+		update := bson.M{
+			"$set": bson.M{
+				"status": status,
+			},
+		}
+
+		err = UpdateOneDoc(ctx, filter, update, Database, "games")
+		if err != nil {
+			totalErrors++
+			fmt.Println(err)
+		} else {
+			recordsUpdated++
+		}
+
+	}
+
+	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
 }
 
 func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
