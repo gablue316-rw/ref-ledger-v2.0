@@ -219,6 +219,49 @@ func UpdatePayments(parentCtx context.Context, file string) error {
 	return nil
 }
 
+func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
+
+	fmt.Println("Adding to Games Collection using Json File")
+
+	games, err := utils.ConvertJsonToGameDescriptor(file)
+	newGames := []model.GameDescriptor{}
+
+	if err != nil {
+		return fmt.Errorf("Failed to convert json file %s to GameDescriptor.  Reason: %s", file, err)
+	}
+
+	recordsDeleted := 0
+	validationErrors := 0
+	recordsAppended := 0
+	recordsRead := 0
+
+	for _, g := range games {
+
+		recordsRead++
+
+		if g.Status == "Delete" {
+			DelGame(parentCtx, g)
+			recordsDeleted++
+		}
+
+		err = ValidateGameDescriptor(parentCtx, g)
+		if err != nil {
+			fmt.Println(err)
+			validationErrors++
+			continue
+		}
+
+		newGames = append(newGames, g)
+
+		recordsAppended++
+	}
+
+	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
+	AddGames(parentCtx, games)
+
+	return nil
+
+}
 func UpdateGames(parentCtx context.Context, file string) error {
 
 	fmt.Println("Adding to Games Collection")
@@ -515,7 +558,7 @@ func writeToFile(records []string, file string) error {
 	return nil
 }
 
-func DumpGames(parentCtx context.Context, file, assoc string) {
+func DumpGames(parentCtx context.Context, file, assoc, format string) {
 
 	var games []model.GameDoc = []model.GameDoc{}
 	var records []string = []string{}
@@ -655,11 +698,11 @@ func DumpExpenses(parentCtx context.Context, file string) {
 
 }
 
-func DumpTable(parentCtx context.Context, table, file, assoc string) {
+func DumpTable(parentCtx context.Context, table, file, assoc, format string) {
 
 	switch table {
 	case "games":
-		DumpGames(parentCtx, file, assoc)
+		DumpGames(parentCtx, file, assoc, format)
 	case "officials":
 		DumpOfficials(parentCtx, file)
 	case "payments":

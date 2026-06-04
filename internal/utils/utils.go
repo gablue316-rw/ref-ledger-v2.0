@@ -192,6 +192,53 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 	return bDate, eDate, nil
 }
 
+func ConvertJsonToGameDescriptor(file string) ([]model.GameDescriptor, error) {
+
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return []model.GameDescriptor{}, fmt.Errorf("Failed to read json file")
+	}
+
+	games := []model.JsonDoc{}
+	gameDescr := []model.GameDescriptor{}
+
+	err = json.Unmarshal(data, &games)
+	if err != nil {
+		return []model.GameDescriptor{}, fmt.Errorf("Failed to unmarshal json file.  Reason: %w", err)
+	}
+
+	// Convert Game to GameDescriptor
+
+	for _, g := range games {
+		gameDescr = append(gameDescr, model.GameDescriptor{
+			GameId:      strconv.FormatInt(g.GameId, 10),
+			Date:        g.Date,
+			Time:        g.Time,
+			Sport:       g.Sport,
+			Site:        g.Site,
+			Field:       g.Field,
+			NumOfGames:  strconv.FormatInt(g.NumOfGames, 10),
+			Level:       g.Level,
+			GameFee:     g.GameFee,
+			TravelPay:   g.TravelPay,
+			AssignorFee: g.AssignorFee,
+			Deductions:  g.Deductions,
+			Association: g.Association,
+			Status:      g.Status,
+			Referee:     g.Referee,
+			U1:          g.U1,
+			U2:          g.U2,
+			ECO:         g.ECO,
+			Assignor:    g.Assignor,
+		})
+
+	}
+
+	//fmt.Println("Game Descriptors:", gameDescr)
+
+	return gameDescr, nil
+}
+
 func ParseInt64CSV(input string) ([]int64, error) {
 	parts := strings.Split(input, ",")
 	var result []int64

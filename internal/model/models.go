@@ -122,10 +122,10 @@ type JsonDoc struct {
 	Field       string `json:"field"`
 	NumOfGames  int64  `json:"numOfGames"`
 	Level       string `json:"level"`
-	GameFee     int64  `json:"gameFee"`
-	TravelPay   int64  `json:"travelPay"`
-	AssignorFee int64  `json:"assignorFee"`
-	Deductions  int64  `json:"deductions"`
+	GameFee     string `json:"gameFee"`
+	TravelPay   string `json:"travelPay"`
+	AssignorFee string `json:"assignorFee"`
+	Deductions  string `json:"deductions"`
 	Association string `json:"association"`
 	Status      string `json:"status"`
 	Referee     string `json:"referee"`
