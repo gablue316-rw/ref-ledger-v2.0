@@ -64,6 +64,7 @@ func main() {
 	var assoc = flag.String("a", "", "Association used to filter reports")
 	var dumpTable = flag.String("d", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
+	var clrCollection = flag.String("c", "", "Clear Collection [games]")
 
 	//
 	// Flags used to rebuild the various collections
@@ -110,6 +111,7 @@ func main() {
 	rootCmd.Flags().StringVar(assoc, "a", "", "Association used to filter reports")
 	rootCmd.Flags().StringVar(dumpTable, "d", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
+	rootCmd.Flags().StringVar(clrCollection, "c", "", "Clear Collection [games]")
 
 	//
 	// Expense Flags
@@ -150,6 +152,15 @@ func main() {
 
 	defer cancel()
 
+	if *clrCollection != "" {
+		switch *clrCollection {
+		case "games":
+			database.ClearGamesCollection(ctx, *assoc)
+		default:
+			fmt.Println("Invalid collection entered:", *clrCollection)
+		}
+	}
+
 	//
 	// Based on flags perform functions
 	//
@@ -178,7 +189,7 @@ func main() {
 	}
 
 	if *dumpTable != "" {
-		api.DumpTable(ctx, *dumpTable, *file)
+		api.DumpTable(ctx, *dumpTable, *file, *assoc)
 		return
 	}
 
