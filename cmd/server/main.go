@@ -36,6 +36,7 @@ func main() {
 	// Game Flags
 	//
 	var gfilter = flag.String("j", "", "JSON filter file used to filter games report")
+	var gJsonFile = flag.String("J", "", "New games in json format used to update games collection")
 	var gameIds = flag.String("i", "", "Game Ids to be used with other flags")
 	var gstatus = flag.String("S", "", "Status used to filter games report")
 	var update = flag.String("u", "", "Update single document in collection [games]")
@@ -65,6 +66,7 @@ func main() {
 	var dumpTable = flag.String("d", "", "Dump table")
 	var sites = flag.String("s", "", "Sites")
 	var clrCollection = flag.String("c", "", "Clear Collection [games]")
+	var outputFormat = flag.String("O", "text", "Format for output files [text | json]")
 
 	//
 	// Flags used to rebuild the various collections
@@ -94,6 +96,7 @@ func main() {
 	// Game Flags
 	//
 	rootCmd.Flags().StringVar(gfilter, "j", "", "JSON filter file used to filter games report")
+	rootCmd.Flags().StringVar(gJsonFile, "J", "", "New games in json format used to update games collection")
 	rootCmd.Flags().StringVar(gameIds, "i", "", "Game Ids to be used with other flags")
 	rootCmd.Flags().StringVar(gstatus, "S", "", "Status used to filter games report")
 	rootCmd.Flags().StringVar(update, "u", "", "Update single document in collection [games]")
@@ -112,6 +115,7 @@ func main() {
 	rootCmd.Flags().StringVar(dumpTable, "d", "", "Dump table")
 	rootCmd.Flags().StringVar(sites, "s", "", "Sites")
 	rootCmd.Flags().StringVar(clrCollection, "c", "", "Clear Collection [games]")
+	rootCmd.Flags().StringVar(outputFormat, "O", "text", "Format for output files [text | json]")
 
 	//
 	// Expense Flags
@@ -177,7 +181,15 @@ func main() {
 	if *massUpdate != "" {
 		switch *massUpdate {
 		case "games":
-			api.UpdateGames(ctx, *file)
+			if *gJsonFile != "" {
+				err := api.UpdateGamesFromJsonFile(ctx, *gJsonFile)
+				if err != nil {
+					fmt.Println("Error updating games from JSON file:", err)
+					return
+				}
+			} else {
+				api.UpdateGames(ctx, *file)
+			}
 		case "payments":
 			api.UpdatePayments(ctx, *file)
 		case "officials":
@@ -189,7 +201,7 @@ func main() {
 	}
 
 	if *dumpTable != "" {
-		api.DumpTable(ctx, *dumpTable, *file, *assoc)
+		api.DumpTable(ctx, *dumpTable, *file, *assoc, *outputFormat)
 		return
 	}
 

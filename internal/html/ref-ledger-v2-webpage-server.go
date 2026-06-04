@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"unicode"
@@ -139,6 +140,51 @@ func LogVisitor(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("IP=%s Method=%s Path=%s URL=%s Agent=%s Referer=%s Host=%s Protocol=%s", remoteIpAddr, method, path, url, userAgent, referer, host, protocol)
+
+}
+
+func generateGamesReport(w http.ResponseWriter, gameFilters model.GFilters) {
+	// Implementation for generating games report
+
+	gFilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	gameRecords, err := database.QueryAggregatedGames(context.TODO(), "refLedger_v2", "games", gFilter)
+	if err != nil {
+		fmt.Println("Failed to query aggregated games")
+		return
+	}
+	rept := reports.GenerateGameReport(gameRecords)
+
+	w.Header().Set("Content-Type", "text/plain")
+	output := strings.Join(rept, "\n")
+
+	_, err = w.Write([]byte(output))
+	if err != nil {
+		fmt.Println(err)
+		fmt.Fprint(w, "Error generating report")
+	}
+
+}
+
+func GenerateReport(w http.ResponseWriter, r *http.Request) {
+
+	gameFilters := model.GFilters{}
+	rType := r.URL.Query().Get("type")
+	association := r.URL.Query().Get("association")
+
+	gameFilters.Association = association
+
+	if rType == "Games" {
+		generateGamesReport(w, gameFilters)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	fmt.Fprint(w, "Not Implemented Yet")
 
 }
 
@@ -393,8 +439,13 @@ func main() {
 	mux.HandleFunc("/game-status", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/gameStatus.html")
 	})
+
+	mux.HandleFunc("/reports", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/reports.html")
+	})
 	mux.HandleFunc("/api/expenses", CreateExpense)
 	mux.HandleFunc("/api/games/status", UpdateGameStatus)
+	mux.HandleFunc("/api/reports", GenerateReport)
 	fs := http.FileServer(http.Dir("./internal/html"))
 	mux.Handle("/", fs)
 

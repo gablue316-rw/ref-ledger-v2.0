@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ref Ledger V2.0 Reports Generator</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .header {
+            background-color: #1e293b;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin-bottom: 10px;
+        }
+
+        .filters {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: end;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            min-width: 180px;
+        }
+
+        .btn {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 11px 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background-color: #1d4ed8;
+        }
+
+        .report-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .report-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+
+        #reportContainer {
+            min-height: 300px;
+            white-space: pre-wrap;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            padding: 10px;
+            background-color: #fafafa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-group input,
+            .filter-group select {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1>Ref Ledger V2.0 Reports Generator</h1>
+        <p>Select and Generate Your Report. Not all filters apply to all reports.</p>
+    </div>
+
+    <div class="filters">
+
+        <div class="filter-group">
+            <label for="type">Report Type</label>
+            <select id="type">
+                <option value=""></option>
+                <option value="Accounts Receivable">Accounts Receivable</option>
+                <option value="Expenses">Expenses</option>
+                <option value="Games">Games</option>
+                <option value="Income">Income</option>
+                <option value="Payments">Payments</option>
+                <option value="Reconciliation">Reconciliation</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label for="association">Association</label>
+            <select id="association">
+                <option value="">All</option>
+                <option value="GOLLC">GOLLC</option>
+                <option value="MCBOA">MCBOA</option>
+                <option value="MSO">MSO</option>
+            </select>
+        </div>
+
+        <button class="btn" onclick="generateReport()">
+            Create Report
+        </button>
+
+        <button class="btn" onclick="clearFilters()">
+            Clear
+        </button>
+
+    </div>
+
+    <div class="report-container">
+        <div class="report-title">Report Output</div>
+
+        <div id="reportContainer">
+Select report options and click "Create Report".
+        </div>
+    </div>
+
+</div>
+
+<script>
+
+async function generateReport() {
+
+    const type = document.getElementById("type").value;
+    const association = document.getElementById("association").value;
+
+    const params = new URLSearchParams();
+
+    if (type) params.append("type", type);
+    if (association) params.append("association", association);
+
+    try {
+
+        document.getElementById("reportContainer").textContent =
+            "Generating report...";
+
+        const response =
+            await fetch(`/api/reports?${params.toString()}`);
+
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+            );
+        }
+
+        const report = await response.text();
+
+        document.getElementById("reportContainer").textContent =
+            report;
+   
+    }
+    catch (err) {
+
+        console.error(err);
+
+        document.getElementById("reportContainer").textContent =
+            "Failed to generate report.\n\n" + err.message;
+    }
+}
+
+function clearFilters() {
+
+    document.getElementById("type").value = "";
+    document.getElementById("association").value = "";
+
+    document.getElementById("reportContainer").textContent =
+        'Select report options and click "Create Report".';
+}
+
+</script>
+
+</body>
+</html>
