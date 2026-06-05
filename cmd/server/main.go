@@ -4,9 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
+	"ref-ledger-v2/internal/email"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/reports"
 	"ref-ledger-v2/internal/utils"
@@ -28,6 +30,9 @@ func main() {
 	var ids []int64
 	var gameFilters model.GFilters = model.GFilters{}
 	var expenseFilters model.EFilters = model.EFilters{}
+
+	var email email.Email
+	email.Initialize()
 
 	//var bDate string
 	//var eDate string
@@ -80,6 +85,14 @@ func main() {
 	var paymentId = flag.String("pi", "", "Payment ID")
 	var paymentDate = flag.String("pd", "", "Payment Date")
 	var paymentAmt = flag.String("pa", "", "Payment Amount")
+
+	//
+	// Flags for email
+	//
+	var emailTo = flag.String("et", "", "Email address to send report to separated by commas")
+	var emailSubject = flag.String("es", "", "Email subject")
+	var emailBody = flag.String("eb", "", "Email body")
+	var emailAttachments = flag.String("ea", "", "Attach files? Y | N")
 
 	flag.Parse()
 
@@ -140,6 +153,14 @@ func main() {
 	rootCmd.Flags().StringVar(paymentId, "pi", "", "Payment ID")
 	rootCmd.Flags().StringVar(paymentDate, "pd", "", "Payment Date")
 	rootCmd.Flags().StringVar(paymentAmt, "pa", "", "Payment Amount")
+
+	//
+	// Flags for email
+	//
+	rootCmd.Flags().StringVar(emailTo, "et", "", "Email address to send report to separated by commas")
+	rootCmd.Flags().StringVar(emailSubject, "es", "", "Email subject")
+	rootCmd.Flags().StringVar(emailBody, "eb", "", "Email body")
+	rootCmd.Flags().StringVar(emailAttachments, "ea", "", "Attach files? Y | N")
 
 	rootCmd.Execute()
 
@@ -352,5 +373,19 @@ func main() {
 		reports.WriteReportToFile(rept, *file)
 	} else {
 		reports.PrintReport(rept)
+	}
+
+	if *emailTo != "" && *emailAttachments == "Y" && *file != "" {
+		if *emailSubject == "" {
+			*emailSubject = "Ref Ledger V2.0 Report"
+		}
+		if *emailBody == "" {
+			*emailBody = "Please see the attached report.\n\nThanks!\n\nGenerated and Sent by Ref Ledger V2.0"
+		}
+		email.SetSubject(*emailSubject)
+		email.SetBody(*emailBody)
+		email.AddAttachment(*file)
+		email.SetTo(strings.Split(*emailTo, ","))
+		email.Send()
 	}
 }
