@@ -16,6 +16,7 @@ import (
 
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
+	"ref-ledger-v2/internal/email"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/reports"
 	"ref-ledger-v2/internal/utils"
@@ -200,30 +201,23 @@ func LogVisitor(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func generateGamesReport(w http.ResponseWriter, gameFilters model.GFilters) {
+func generateGamesReport(w http.ResponseWriter, gameFilters model.GFilters) []string {
 	// Implementation for generating games report
 
 	gFilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return []string{}
 	}
 
 	gameRecords, err := database.QueryAggregatedGames(context.TODO(), "refLedger_v2", "games", gFilter)
 	if err != nil {
 		fmt.Println("Failed to query aggregated games")
-		return
+		return []string{}
 	}
 	rept := reports.GenerateGameReport(gameRecords)
 
-	w.Header().Set("Content-Type", "text/plain")
-	output := strings.Join(rept, "\n")
-
-	_, err = w.Write([]byte(output))
-	if err != nil {
-		fmt.Println(err)
-		fmt.Fprint(w, "Error generating report")
-	}
+	return rept
 
 }
 
@@ -231,17 +225,47 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	gameFilters := model.GFilters{}
 	rType := r.URL.Query().Get("type")
+	rEmail := r.URL.Query().Get("email")
+	rFile := r.URL.Query().Get("file")
+	rept := []string{}
+
 	association := r.URL.Query().Get("association")
 
 	gameFilters.Association = association
 
 	if rType == "Games" {
-		generateGamesReport(w, gameFilters)
+		rept = generateGamesReport(w, gameFilters)
+	} else {
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprint(w, "Not Implemented Yet")
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprint(w, "Not Implemented Yet")
+	if rEmail != "" {
+		var email email.Email
+		email.Initialize()
+		if rFile == "" {
+			rFile = rType + "_report.txt"
+		}
+		reports.WriteReportToFile(rept, rFile)
+		// Send report via email
+		email.SetSubject("Ref Ledger V2 Report")
+		email.SetBody("Please see the attached report.\n\nThanks!\n\nGenerated and Sent by Ref Ledger V2.0")
+		email.AddAttachment(rFile)
+		email.SetTo(strings.Split(rEmail, ","))
+		email.Send()
+		w.Header().Set("Content-Type", "text/plain")
+		fmt.Fprint(w, "Email sent")
+	} else {
+		w.Header().Set("Content-Type", "text/plain")
+		output := strings.Join(rept, "\n")
+
+		_, err := w.Write([]byte(output))
+		if err != nil {
+			fmt.Println(err)
+			fmt.Fprint(w, "Error generating report")
+		}
+	}
 
 }
 

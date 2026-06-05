@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ref Ledger V2.0 Reports Generator</title>
+    <title>Ref Ledger V2.0 Report Generator</title>
 
     <style>
         * {
@@ -40,11 +40,10 @@
             background-color: white;
             padding: 20px;
             border-radius: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
-            align-items: end;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
@@ -63,21 +62,43 @@
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 5px;
-            min-width: 180px;
+            min-width: 220px;
+        }
+
+        .button-row {
+            background-color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
         .btn {
-            background-color: #2563eb;
             color: white;
             border: none;
-            padding: 11px 18px;
+            padding: 11px 20px;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
+            font-size: 14px;
         }
 
-        .btn:hover {
-            background-color: #1d4ed8;
+        .btn-create {
+            background-color: #16a34a;
+        }
+
+        .btn-create:hover {
+            background-color: #15803d;
+        }
+
+        .btn-clear {
+            background-color: #dc2626;
+        }
+
+        .btn-clear:hover {
+            background-color: #b91c1c;
         }
 
         .report-container {
@@ -105,16 +126,22 @@
             background-color: #fafafa;
             border: 1px solid #ddd;
             border-radius: 5px;
+            overflow-x: auto;
         }
 
         @media (max-width: 768px) {
+
             .filters {
                 flex-direction: column;
-                align-items: stretch;
+            }
+
+            .button-row {
+                flex-direction: column;
             }
 
             .filter-group input,
-            .filter-group select {
+            .filter-group select,
+            .btn {
                 width: 100%;
             }
         }
@@ -126,10 +153,11 @@
 <div class="container">
 
     <div class="header">
-        <h1>Ref Ledger V2.0 Reports Generator</h1>
+        <h1>Ref Ledger V2.0 Report Generator</h1>
         <p>Select and Generate Your Report. Not all filters apply to all reports.</p>
     </div>
 
+    <!-- FILTERS ROW -->
     <div class="filters">
 
         <div class="filter-group">
@@ -155,22 +183,66 @@
             </select>
         </div>
 
-        <button class="btn" onclick="generateReport()">
+        <div class="filter-group">
+            <label for="email">
+                Email Report To (Optional)
+            </label>
+            <input
+                type="email"
+                id="email"
+                placeholder="someone@example.com">
+        </div>
+
+        <div class="filter-group">
+            <label for="file">
+                File Name (Optional)
+            </label>
+            <input
+                type="text"
+                id="file"
+                placeholder="report.txt">
+        </div>
+
+    </div>
+
+    <!-- BUTTON ROW -->
+    <div class="button-row">
+
+        <button
+                id="email"
+                placeholder="someone@example.com">
+        </div>
+
+    </div>
+
+    <!-- BUTTON ROW -->
+    <div class="button-row">
+
+        <button
+            class="btn btn-create"
+            onclick="generateReport()">
             Create Report
         </button>
 
-        <button class="btn" onclick="clearFilters()">
+        <button
+            class="btn btn-clear"
+            onclick="clearFilters()">
             Clear
         </button>
 
     </div>
 
+    <!-- REPORT OUTPUT -->
     <div class="report-container">
-        <div class="report-title">Report Output</div>
+
+        <div class="report-title">
+            Report Output
+        </div>
 
         <div id="reportContainer">
 Select report options and click "Create Report".
         </div>
+
     </div>
 
 </div>
@@ -179,13 +251,31 @@ Select report options and click "Create Report".
 
 async function generateReport() {
 
-    const type = document.getElementById("type").value;
-    const association = document.getElementById("association").value;
+    const type =
+        document.getElementById("type").value;
+
+    const association =
+        document.getElementById("association").value;
+
+    const email =
+        document.getElementById("email").value.trim();
+
+    const file =
+        document.getElementById("file").value.trim();
 
     const params = new URLSearchParams();
 
-    if (type) params.append("type", type);
-    if (association) params.append("association", association);
+    if (type)
+        params.append("type", type);
+
+    if (association)
+        params.append("association", association);
+
+    if (email)
+        params.append("email", email);
+
+    if (file)
+        params.append("file", file);
 
     try {
 
@@ -196,16 +286,17 @@ async function generateReport() {
             await fetch(`/api/reports?${params.toString()}`);
 
         if (!response.ok) {
+
             throw new Error(
                 `HTTP ${response.status}: ${response.statusText}`
             );
         }
 
-        const report = await response.text();
+        const report =
+            await response.text();
 
         document.getElementById("reportContainer").textContent =
             report;
-   
     }
     catch (err) {
 
@@ -220,6 +311,8 @@ function clearFilters() {
 
     document.getElementById("type").value = "";
     document.getElementById("association").value = "";
+    document.getElementById("email").value = "";
+    document.getElementById("file").value = "";
 
     document.getElementById("reportContainer").textContent =
         'Select report options and click "Create Report".';
