@@ -32,6 +32,28 @@ var URI string = "mongodb://localhost:27017"
 var URI_CONTAINER string = "mongodb://host.docker.internal:27017"
 var logFile = "refLedgerV2_0-webserver.log"
 
+type Game struct {
+	Association string  `json:"association"`
+	GameId      int     `json:"gameId"`
+	Date        string  `json:"date"`
+	Time        string  `json:"time"`
+	Site        string  `json:"site"`
+	Field       string  `json:"field"`
+	Sport       string  `json:"sport"`
+	Level       string  `json:"level"`
+	NumOfGames  int     `json:"numOfGames"`
+	GameFee     float64 `json:"gameFee"`
+	TravelPay   float64 `json:"travelPay"`
+	AssignorFee float64 `json:"assignorFee"`
+	Deductions  float64 `json:"deductions"`
+	Status      string  `json:"status"`
+	Referee     string  `json:"referee"`
+	U1          string  `json:"u1"`
+	U2          string  `json:"u2"`
+	ECO         string  `json:"eco"`
+	Assignor    string  `json:"assignor"`
+}
+
 type Expense struct {
 	Date        string  `json:"date"`
 	ExpenseType string  `json:"expenseType"`
@@ -46,7 +68,42 @@ type GameStatusUpdate struct {
 	Status  string `json:"status"`
 }
 
-//var tmpl = template.Must(template.ParseFiles("./internal/html/index.html"))
+func GameDocToGameDescr(g Game) model.GameDescriptor {
+
+	t, err := time.Parse("2006-01-02", g.Date)
+	if err != nil {
+		log.Println("Error parsing date:", err)
+	}
+	formattedDate := t.Format("1/2/2006")
+
+	t, err = time.Parse("15:04", g.Time)
+	if err != nil {
+		log.Println("Error parsing time:", err)
+	}
+	formattedTime := t.Format("3:04 PM")
+
+	return model.GameDescriptor{
+		Association: g.Association,
+		GameId:      strconv.Itoa(g.GameId),
+		Date:        formattedDate,
+		Time:        formattedTime,
+		Site:        g.Site,
+		Field:       g.Field,
+		Sport:       g.Sport,
+		Level:       g.Level,
+		NumOfGames:  strconv.Itoa(g.NumOfGames),
+		GameFee:     strconv.FormatFloat(g.GameFee, 'f', 2, 64),
+		TravelPay:   strconv.FormatFloat(g.TravelPay, 'f', 2, 64),
+		AssignorFee: strconv.FormatFloat(g.AssignorFee, 'f', 2, 64),
+		Deductions:  strconv.FormatFloat(g.Deductions, 'f', 2, 64),
+		Status:      g.Status,
+		Referee:     g.Referee,
+		U1:          g.U1,
+		U2:          g.U2,
+		ECO:         g.ECO,
+		Assignor:    g.Assignor,
+	}
+}
 
 func ExpenseDocToExpenseDesr(e Expense) model.ExpenseDescriptor {
 
@@ -188,9 +245,38 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func UpdateGame(w http.ResponseWriter, r *http.Request) {
+
+	var game Game
+	var gameDesc []model.GameDescriptor
+	var singGameDesc model.GameDescriptor = model.GameDescriptor{}
+
+	err := json.NewDecoder(r.Body).Decode(&game)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	singGameDesc = GameDocToGameDescr(game)
+
+	if singGameDesc.Status == "Delete" {
+		api.DelGame(context.TODO(), singGameDesc)
+		return
+	}
+
+	err = api.ValidateGameDescriptor(context.TODO(), singGameDesc)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	gameDesc = append(gameDesc, singGameDesc)
+	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games")
+
+}
+
 func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("I'm here at UpdateGameStatus")
 	var gameUpdate GameStatusUpdate
 	var gameIds []int64 = []int64{}
 
@@ -443,9 +529,15 @@ func main() {
 	mux.HandleFunc("/reports", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/reports.html")
 	})
+
+	mux.HandleFunc("/game-update", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/update_game.html")
+	})
+
 	mux.HandleFunc("/api/expenses", CreateExpense)
 	mux.HandleFunc("/api/games/status", UpdateGameStatus)
 	mux.HandleFunc("/api/reports", GenerateReport)
+	mux.HandleFunc("/api/game-update", UpdateGame)
 	fs := http.FileServer(http.Dir("./internal/html"))
 	mux.Handle("/", fs)
 

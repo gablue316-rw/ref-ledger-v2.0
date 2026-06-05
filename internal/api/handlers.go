@@ -242,6 +242,7 @@ func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
 		if g.Status == "Delete" {
 			DelGame(parentCtx, g)
 			recordsDeleted++
+			continue
 		}
 
 		err = ValidateGameDescriptor(parentCtx, g)
@@ -257,7 +258,9 @@ func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
 	}
 
 	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
-	AddGames(parentCtx, games)
+	if len(newGames) > 0 {
+		AddGames(parentCtx, newGames)
+	}
 
 	return nil
 
@@ -313,6 +316,7 @@ func UpdateGames(parentCtx context.Context, file string) error {
 		if game.Status == "Delete" {
 			DelGame(parentCtx, game)
 			recordsDeleted++
+			continue
 		}
 
 		err = ValidateGameDescriptor(parentCtx, game)
@@ -328,7 +332,9 @@ func UpdateGames(parentCtx context.Context, file string) error {
 	}
 
 	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
-	AddGames(parentCtx, games)
+	if len(games) > 0 {
+		AddGames(parentCtx, games)
+	}
 
 	return nil
 }
