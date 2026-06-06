@@ -83,6 +83,22 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 	}
 	formattedTime := t.Format("3:04 PM")
 
+	if g.Referee == "" {
+		g.Referee = "Unassigned"
+	}
+
+	if g.U1 == "" {
+		g.U1 = "Unassigned"
+	}
+
+	if g.U2 == "" {
+		g.U2 = "Unassigned"
+	}
+
+	if g.ECO == "" {
+		g.ECO = "Unassigned"
+	}
+
 	return model.GameDescriptor{
 		Association: g.Association,
 		GameId:      strconv.Itoa(g.GameId),
@@ -201,7 +217,7 @@ func LogVisitor(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func generateGamesReport(w http.ResponseWriter, gameFilters model.GFilters) []string {
+func generateGamesReport(gameFilters model.GFilters) []string {
 	// Implementation for generating games report
 
 	gFilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
@@ -227,14 +243,18 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	rType := r.URL.Query().Get("type")
 	rEmail := r.URL.Query().Get("email")
 	rFile := r.URL.Query().Get("file")
+	rStatus := r.URL.Query().Get("status")
+	rAssoc := r.URL.Query().Get("association")
+	rGameIds := r.URL.Query().Get("gameids")
+
 	rept := []string{}
 
-	association := r.URL.Query().Get("association")
-
-	gameFilters.Association = association
+	gameFilters.Association = rAssoc
+	gameFilters.Status = rStatus
+	gameFilters.GameId = rGameIds
 
 	if rType == "Games" {
-		rept = generateGamesReport(w, gameFilters)
+		rept = generateGamesReport(gameFilters)
 	} else {
 		w.Header().Set("Content-Type", "text/plain")
 		fmt.Fprint(w, "Not Implemented Yet")
@@ -294,6 +314,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("game", game, "singleGameDesc", singGameDesc)
 	gameDesc = append(gameDesc, singGameDesc)
 	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games")
 
