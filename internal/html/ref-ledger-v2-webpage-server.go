@@ -241,8 +241,8 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	gameFilters := model.GFilters{}
 	rType := r.URL.Query().Get("type")
-	rEmail := r.URL.Query().Get("email")
-	rFile := r.URL.Query().Get("file")
+	rEmail := r.URL.Query().Get("emailaddr")
+	rFile := r.URL.Query().Get("filename")
 	rStatus := r.URL.Query().Get("status")
 	rAssoc := r.URL.Query().Get("association")
 	rGameIds := r.URL.Query().Get("gameids")
