@@ -250,16 +250,23 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	rept := []string{}
 
-	ids, err := utils.ConvertGameIdStrToInt(rGameIds)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
+	if len(rGameIds) > 0 {
+		ids, err := utils.ConvertGameIdStrToInt(rGameIds)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		gameFilters.GameId, err = utils.ConvertGameIdIntToStr(ids)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+	} else {
+		gameFilters.GameId = rGameIds
 	}
-	s, _ := utils.ConvertGameIdIntToStr(ids)
-	gameFilters.GameId = s
+
 	gameFilters.Association = rAssoc
 	gameFilters.Status = rStatus
-	gameFilters.GameId = s
 
 	if rType == "Games" {
 		rept = generateGamesReport(gameFilters)
@@ -418,17 +425,28 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 
-	fmt.Println("status:", status, "association", association, "bDate", bDate, "eDate", eDate)
+	if len(gameId) > 0 {
+		ids, err := utils.ConvertGameIdStrToInt(gameId)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+		gameFilters.GameId, err = utils.ConvertGameIdIntToStr(ids)
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+	} else {
+		gameFilters.GameId = gameId
+	}
+
 	gameFilters.Status = status
 	gameFilters.Association = association
 	gameFilters.Level = level
 	gameFilters.FromDate = bDate
-	gameFilters.GameId = gameId
 	gameFilters.ToDate = eDate
 	gameFilters.Site = site
 	gameFilters.Official = official
-
-	fmt.Println("gameFilters.Status", gameFilters.Status)
 
 	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
 	if err != nil {
