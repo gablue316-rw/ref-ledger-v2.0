@@ -727,8 +727,6 @@ func QueryAggregatedGames(parentCtx context.Context, dbase, collection, filter s
 
 	mongoDbFilter, err := BuildMongoGameFilterFromFile(filter)
 
-	fmt.Println(mongoDbFilter)
-
 	if err != nil {
 		fmt.Println("Failed to build Mongo DB Filter for games collection")
 		return []model.GameDescriptor{}, err
@@ -899,11 +897,11 @@ func BuildMongoExpenseFilter(filter model.ExpenseFilter) bson.M {
 
 func BuildMongoExpenseFilterFromFile(path string) (bson.M, error) {
 
+	fmt.Println("Building MongoDb Expense Filter from File")
 	if path == "" {
 		return bson.M{}, nil
 	}
 
-	fmt.Println("Loading filter from", path)
 	file, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Println(err)
@@ -916,9 +914,10 @@ func BuildMongoExpenseFilterFromFile(path string) (bson.M, error) {
 		return nil, err
 	}
 
-	fmt.Println("Filter loaded!")
+	fmt.Println("Filter is loaded!")
 	mongoFilter := BuildMongoExpenseFilter(filter)
 
+	fmt.Println("mongoFilter:", mongoFilter)
 	return mongoFilter, nil
 }
 
@@ -1066,11 +1065,11 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
 func BuildMongoGameFilterFromFile(path string) (bson.M, error) {
 
+	fmt.Println("Building MongoDb Game Filter from File")
 	if path == "" {
 		return bson.M{}, nil
 	}
 
-	fmt.Println("Loading filter from", path)
 	file, err := os.ReadFile(path)
 	if err != nil {
 		fmt.Println(err)
@@ -1083,9 +1082,10 @@ func BuildMongoGameFilterFromFile(path string) (bson.M, error) {
 		return nil, err
 	}
 
-	fmt.Println("Filter loaded!")
+	fmt.Println("Filter is loaded!")
 	mongoFilter := BuildMongoGameFilter(filter)
 
+	fmt.Println("mongoFilter:", mongoFilter)
 	return mongoFilter, nil
 }
 

@@ -239,6 +239,7 @@ func generateGamesReport(gameFilters model.GFilters) []string {
 
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
+	fmt.Println("GenerateReport is called")
 	gameFilters := model.GFilters{}
 	rType := r.URL.Query().Get("type")
 	rEmail := r.URL.Query().Get("emailaddr")
@@ -249,9 +250,16 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	rept := []string{}
 
+	ids, err := utils.ConvertGameIdStrToInt(rGameIds)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	s, _ := utils.ConvertGameIdIntToStr(ids)
+	gameFilters.GameId = s
 	gameFilters.Association = rAssoc
 	gameFilters.Status = rStatus
-	gameFilters.GameId = rGameIds
+	gameFilters.GameId = s
 
 	if rType == "Games" {
 		rept = generateGamesReport(gameFilters)
