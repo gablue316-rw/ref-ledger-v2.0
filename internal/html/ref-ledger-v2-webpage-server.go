@@ -588,7 +588,7 @@ func main() {
 	fmt.Println("Registering routes...")
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/api/games", GetGames)
+	//mux.HandleFunc("/api/games", GetGames)
 	mux.HandleFunc("/expenses", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
 	})
@@ -601,14 +601,19 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/reports.html")
 	})
 
-	mux.HandleFunc("/game-update", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./internal/html/update_game.html")
+	mux.HandleFunc("/games", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/games.html")
+	})
+
+	mux.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/dashboard.html")
 	})
 
 	mux.HandleFunc("/api/expenses", CreateExpense)
 	mux.HandleFunc("/api/games/status", UpdateGameStatus)
 	mux.HandleFunc("/api/reports", GenerateReport)
 	mux.HandleFunc("/api/game-update", UpdateGame)
+	mux.HandleFunc("/api/dashboard", GetGames)
 	fs := http.FileServer(http.Dir("./internal/html"))
 	mux.Handle("/", fs)
 
