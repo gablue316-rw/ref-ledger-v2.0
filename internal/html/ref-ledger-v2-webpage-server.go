@@ -64,6 +64,14 @@ type Expense struct {
 	GameID      int     `json:"gameId"`
 }
 
+type Payment struct {
+	PaymentDate string  `json:"date"`
+	PaymentId   string  `json:"paymentid"`
+	PaymentAmt  float64 `json:"amount"`
+	Association string  `json:"association"`
+	GameID      []int64 `json:"gameids"`
+}
+
 type GameStatusUpdate struct {
 	GameIds string `json:"gameIds"`
 	Status  string `json:"status"`
@@ -122,7 +130,27 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 	}
 }
 
-func ExpenseDocToExpenseDesr(e Expense) model.ExpenseDescriptor {
+func PaymentDocToPaymentDescr(p Payment) model.PaymentDescriptor {
+
+	t, _ := time.Parse("2006-01-02", p.PaymentDate)
+	formattedDate := t.Format("1/2/2006")
+
+	return model.PaymentDescriptor{
+		PaymentDate: formattedDate,
+		PaymentId:   p.PaymentId,
+		PaymentAmt:  strconv.FormatFloat(p.PaymentAmt, 'f', 2, 64),
+		Association: p.Association,
+		GameIds: strings.Trim(strings.Join(func() []string {
+			var gameIds []string
+			for _, id := range p.GameID {
+				gameIds = append(gameIds, strconv.Itoa(int(id)))
+			}
+			return gameIds
+		}(), ";"), ","),
+	}
+}
+
+func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 
 	t, _ := time.Parse("2006-01-02", e.Date)
 	formattedDate := t.Format("1/2/2006")
@@ -356,6 +384,29 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func CreatePayment(w http.ResponseWriter, r *http.Request) {
+
+	var payment Payment
+	var singlePayment model.PaymentDescriptor
+	var paymentDescr []model.PaymentDescriptor
+
+	err := json.NewDecoder(r.Body).Decode(&payment)
+	if err != nil {
+		fmt.Println("Invalid JSON.  Error:", err)
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	singlePayment = PaymentDocToPaymentDescr(payment)
+	paymentDescr = append(paymentDescr, singlePayment)
+
+	//fmt.Println("Payment in json: ", payment)
+	fmt.Println("Payment Descr: ", singlePayment)
+	//fmt.Println("Payments:", paymentDescr)
+
+	database.InsertPaymentDocs(context.TODO(), paymentDescr, database.Database, "payments")
+}
+
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 	var expense Expense
@@ -370,7 +421,7 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("Expense in json: ", expense)
-	singleExpense = ExpenseDocToExpenseDesr(expense)
+	singleExpense = ExpenseDocToExpenseDescr(expense)
 	singleExpense.ExpenseId = api.GenerateExpenseId(singleExpense)
 	fmt.Println("Expense Descr: ", singleExpense)
 	expDesc = append(expDesc, singleExpense)
@@ -609,11 +660,15 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/dashboard.html")
 	})
 
+	mux.HandleFunc("/payments", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/payments.html")
+	})
 	mux.HandleFunc("/api/expenses", CreateExpense)
 	mux.HandleFunc("/api/games/status", UpdateGameStatus)
 	mux.HandleFunc("/api/reports", GenerateReport)
 	mux.HandleFunc("/api/game-update", UpdateGame)
 	mux.HandleFunc("/api/dashboard", GetGames)
+	mux.HandleFunc("/api/payments", CreatePayment)
 	fs := http.FileServer(http.Dir("./internal/html"))
 	mux.Handle("/", fs)
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ref Ledger V2.0 Expense Entry</title>
+    <title>Ref Ledger V2.0 Payments</title>
 
     <style>
 
@@ -171,8 +171,8 @@
 <div class="container">
 
     <div class="header">
-        <h1>Ref Ledger V2.0 Expense Entry</h1>
-        <p>Record and track your officiating expenses.</p>
+        <h1>Ref Ledger V2.0 Payments</h1>
+        <p>Record and track your received payments.</p>
     </div>
 
     <nav class="navbar">
@@ -181,17 +181,26 @@
         <a href="/reports">Report Generator</a>
         <a href="/games">Games</a>
         <a href="/officials">Officials</a>
-        <a href="/payments">Payments</a>
-        <a href="/expenses" class="active">Expenses</a>
+        <a href="/payments" class="active">Payments</a>
+        <a href="/expenses">Expenses</a>
         <a href="/associations">Associations</a>
         <a href="/sites">Sites</a>
     </nav>
 
     <div class="form-card">
 
-        <form id="expenseForm">
+        <form id="paymentForm">
 
             <div class="row">
+
+                <div class="col">
+                    <label for="paymentid">Payment ID</label>
+                    <input
+                        type="text" 
+                        id="paymentid" 
+                        placeholder="Enter Payment ID" 
+                    >
+                </div>
 
                 <div class="col">
                     <label for="date">Date</label>
@@ -210,22 +219,10 @@
 
             </div>
 
-            <div class="form-group">
-                <label for="expenseType">Expense Type</label>
-                <select id="expenseType" required>
-                    <option value="">Select Expense Type</option>
-                    <option value="Mileage">Mileage</option>
-                    <option value="Food">Food</option>
-                    <option value="Equipment">Equipment</option>
-                    <option value="Camp Fees">Camp Fees</option>
-                    <option value="Association Dues">Association Dues</option>
-                </select>
-            </div>
-
             <div class="row">
 
                 <div class="col">
-                    <label for="amount">Amount / Miles</label>
+                    <label for="amount">Payment Amount</label>
                     <input
                         type="number"
                         id="amount"
@@ -235,21 +232,14 @@
                 </div>
 
                 <div class="col">
-                    <label for="gameId">Game ID</label>
+                    <label for="gameids">Game IDs</label>
                     <input
-                        type="number"
-                        id="gameId"
+                        type="text" 
+                        id="gameids" 
+                        placeholder="Enter Game IDs (1980-1983,1995)" 
                     >
                 </div>
 
-            </div>
-
-            <div class="form-group">
-                <label for="description">Description</label>
-                <textarea
-                    id="description"
-                    rows="4">
-                </textarea>
             </div>
 
             <div class="button-row">
@@ -257,7 +247,7 @@
                 <button
                     type="submit"
                     class="btn btn-save">
-                    Save Expense
+                    Save Payment
                 </button>
 
                 <button
@@ -273,48 +263,70 @@
     </div>
 
     <div class="message-box" id="message">
-        Ready to enter expenses.
+        Ready to enter payments.
     </div>
 
 </div>
 
 <script>
 
-document.getElementById("expenseForm")
+    function parseGameIds(input) {
+       const ids = [];
+
+        input.split(",").forEach(part => {
+           part = part.trim();
+
+        if (part.includes("-")) {
+             const [start, end] = part.split("-").map(Number);
+
+             for (let i = start; i <= end; i++) {
+                 ids.push(i);
+             }
+        } else if (part) {
+            ids.push(Number(part));
+        }
+    });
+
+    return ids;
+}
+
+
+document.getElementById("paymentForm")
 .addEventListener("submit", async function(e) {
 
     e.preventDefault();
 
-    const expense = {
+    const payment = {
         date: document.getElementById("date").value,
-        expenseType: document.getElementById("expenseType").value,
+        paymentid: document.getElementById("paymentid").value,
         amount: parseFloat(document.getElementById("amount").value),
-        description: document.getElementById("description").value,
         association: document.getElementById("association").value,
-        gameId: parseInt(document.getElementById("gameId").value) || 0
+        gameids: parseGameIds(
+            document.getElementById("gameids").value
+        )
     };
 
     try {
 
-        const response = await fetch("/api/expenses", {
+        const response = await fetch("/api/payments", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(expense)
+            body: JSON.stringify(payment)
         });
 
         if (response.ok) {
 
             document.getElementById("message").innerText =
-                "Expense saved successfully.";
+                "Payment saved successfully.";
 
-            document.getElementById("expenseForm").reset();
+            document.getElementById("paymentForm").reset();
 
         } else {
 
             document.getElementById("message").innerText =
-                "Error saving expense.";
+                "Error saving payment.";
         }
 
     } catch (err) {
