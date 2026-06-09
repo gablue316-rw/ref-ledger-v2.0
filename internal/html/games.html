@@ -136,10 +136,34 @@ body{padding:10px;}
 <div class="card-title">Officials</div>
 <div class="form-grid">
 <div class="form-group"><label for="status">Status</label><select id="status"><option></option><option>Cancelled</option><option>Completed</option><option>Delete</option><option>Paid</option><option>Pending</option></select></div>
-<div class="form-group"><label for="referee">Referee</label><input type="text" id="referee"></div>
-<div class="form-group"><label for="u1">U1</label><input type="text" id="u1"></div>
-<div class="form-group"><label for="u2">U2</label><input type="text" id="u2"></div>
-<div class="form-group"><label for="eco">ECO</label><input type="text" id="eco"></div>
+<div class="form-group">
+    <label for="referee">Referee</label>
+    <select id="referee">
+        <option value="">Select Official</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="u1">U1</label>
+    <select id="u1">
+        <option value="">Select Official</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="u2">U2</label>
+    <select id="u2">
+        <option value="">Select Official</option>
+    </select>
+</div>
+
+<div class="form-group">
+    <label for="eco">ECO</label>
+    <select id="eco">
+        <option value="">Select Official</option>
+    </select>
+</div>
+
 <div class="form-group"><label for="assignor">Assignor</label><select id="assignor"><option></option><option>Euvonda Harrison</option><option>Scott Henry</option><option>Brian Hinson</option><option>Kevin Self</option><option>Barry Sullivan</option></select></div>
 </div>
 </div>
@@ -155,10 +179,53 @@ body{padding:10px;}
 </div>
 
 <script>
+
+async function loadOfficials() {
+    try {
+        const response = await fetch("/api/officials");
+
+        if (!response.ok) {
+            throw new Error("Failed to load officials");
+        }
+
+        const officials = await response.json();
+        console.log(officials);
+    
+        const dropdowns = [
+            "referee",
+            "u1",
+            "u2",
+            "eco"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Official</option>';
+
+            officials.forEach(official => {
+               const option = document.createElement("option");
+               option.value = official.name;
+               option.textContent = official.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading officials:", err);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    loadOfficials();
+});
 document.getElementById("clearBtn").addEventListener("click", function () {
     document.getElementById("gameForm").reset();
     document.getElementById("message").innerText = "";
 });
+
 
 function toInputDate(dateStr) {
     const d = new Date(dateStr);

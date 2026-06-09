@@ -31,6 +31,10 @@ var ExpenseTypes []string = []string{"Camp Fee", "Dues", "Equipment", "Food", "M
 var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending", "Deleted"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
+type OfficialName struct {
+	Name string `json:"name"`
+}
+
 func foundAssociation(assoc string) bool {
 
 	associations := []string{"GOLLC", "MCBOA", "MSO"}
@@ -1299,6 +1303,46 @@ func GetExpensesCollection(parentCtx context.Context) ([]model.ExpenseDoc, error
 	}
 
 	return results, nil
+}
+
+func GetOfficialNames() ([]OfficialName, error) {
+
+	db := Client.Database(Database)
+	coll := db.Collection("officials")
+	result := []OfficialName{}
+
+	opts := options.Find().
+		SetSort(bson.D{
+			{Key: "lastName", Value: 1},
+			{Key: "firstName", Value: 1},
+		})
+
+	cursor, err := coll.Find(context.Background(), bson.M{}, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	var officials []model.OfficialDoc = []model.OfficialDoc{}
+
+	if err := cursor.All(context.Background(), &officials); err != nil {
+		return nil, err
+	}
+
+	//
+	// Add Unassigned to Officials collection and then remove this
+	//
+	result = append(result, OfficialName{
+		Name: "Unassigned",
+	})
+
+	for _, o := range officials {
+		result = append(result, OfficialName{
+			Name: strings.TrimSpace(o.FirstName + " " + o.LastName),
+		})
+	}
+
+	return result, nil
 }
 
 func GetOfficialsCollection(parentCtx context.Context) ([]model.OfficialDoc, error) {

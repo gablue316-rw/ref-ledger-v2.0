@@ -166,6 +166,17 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 
 }
 
+func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
+	officials, err := database.GetOfficialNames()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(officials)
+}
+
 func GetIpAddress(r *http.Request) string {
 
 	//
@@ -338,7 +349,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
-	fmt.Println("Updating game...")
 	err := json.NewDecoder(r.Body).Decode(&game)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -370,9 +380,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("game", game, "singleGameDesc", singleGameDesc)
 	if gameExists {
-		fmt.Println("Game exists, updating...")
 		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games")
 		if err != nil {
 			fmt.Println(err)
@@ -709,7 +717,7 @@ func main() {
 	mux.HandleFunc("/payments", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/payments.html")
 	})
-
+	mux.HandleFunc("/api/officials", GetOfficialsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 
 	mux.HandleFunc("/api/expenses", CreateExpense)
