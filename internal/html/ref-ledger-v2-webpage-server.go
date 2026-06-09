@@ -336,29 +336,52 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	var game Game
 	var gameDesc []model.GameDescriptor
-	var singGameDesc model.GameDescriptor = model.GameDescriptor{}
+	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
+	fmt.Println("Updating game...")
 	err := json.NewDecoder(r.Body).Decode(&game)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	singGameDesc = GameDocToGameDescr(game)
+	singleGameDesc = GameDocToGameDescr(game)
 
-	if singGameDesc.Status == "Delete" {
-		api.DelGame(context.TODO(), singGameDesc)
+	if singleGameDesc.Status == "Delete" {
+		api.DelGame(context.TODO(), singleGameDesc)
 		return
 	}
 
-	err = api.ValidateGameDescriptor(context.TODO(), singGameDesc)
+	var gDoc model.GameDoc = model.GameDoc{}
+
+	gDoc.GameId = int64(game.GameId)
+	gDoc.Association = game.Association
+
+	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	fmt.Println("game", game, "singleGameDesc", singGameDesc)
-	gameDesc = append(gameDesc, singGameDesc)
+	gameExists, err := database.GameExists(gDoc)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("game", game, "singleGameDesc", singleGameDesc)
+	if gameExists {
+		fmt.Println("Game exists, updating...")
+		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		return
+	}
+
+	gameDesc = append(gameDesc, singleGameDesc)
 	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games")
 
 }
@@ -443,7 +466,7 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 	gameID := r.PathValue("gameid")
 
 	fmt.Println("Getting single game:", gameID, association)
-	game, err := database.GetGameByAssocAndId(association, gameID)
+	game, err := database.GetGameByGameIdAndOrAssoc(association, gameID)
 	if err != nil {
 		http.Error(w, "Game not found", http.StatusNotFound)
 		return

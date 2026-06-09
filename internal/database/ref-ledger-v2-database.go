@@ -597,7 +597,7 @@ func GetGameFee(gameIds []int64) (int64, error) {
 }
 
 // Used by HTML Web Pages
-func GetGameByAssocAndId(assoc string, gameId string) (model.GameDescriptor, error) {
+func GetGameByGameIdAndOrAssoc(assoc string, gameId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
@@ -608,9 +608,22 @@ func GetGameByAssocAndId(assoc string, gameId string) (model.GameDescriptor, err
 		return model.GameDescriptor{}, err
 	}
 
+	if assoc == "" && gameId == "" {
+		return model.GameDescriptor{}, fmt.Errorf("GetGameByAssocAndOrId failure.  Reason: Invalid parameters")
+	}
+
+	if gameId == "" {
+		return model.GameDescriptor{}, fmt.Errorf("GetGameByAssocAndOrId failure.  Reason: Invalid parameters")
+	}
+
 	filter := bson.M{
-		"association": assoc,
-		"gameId":      id,
+		"gameId": id,
+	}
+
+	if assoc == "" {
+		filter = bson.M{
+			"association": assoc,
+		}
 	}
 
 	db := Client.Database(Database)
@@ -867,7 +880,8 @@ func GameExists(doc model.GameDoc) (bool, error) {
 	coll := db.Collection("games")
 
 	filter = bson.M{
-		"gameId": doc.GameId,
+		"gameId":      doc.GameId,
+		"association": doc.Association,
 	}
 
 	// Query to find all documents
@@ -1693,6 +1707,35 @@ func InsertExpenseDocs(parentCtx context.Context, expense []model.ExpenseDescrip
 	}
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors)
 
+}
+
+func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbase, collection string) error {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	fmt.Println("Updating one game")
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+
+	doc := utils.ConvertGameDescrToGameDoc(game)
+	filter := bson.M{
+		"gameId": doc.GameId,
+	}
+
+	update := bson.M{
+		"$set": doc,
+	}
+
+	fmt.Println("Update filter:", filter, "update:", update)
+	result, err := coll.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Updated document:", result.ModifiedCount)
+	return nil
 }
 
 func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection string) {
