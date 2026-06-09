@@ -27,6 +27,13 @@ body{background:#f4f6f9;padding:20px;color:#333;}
 .btn-save:hover{background:#15803d;}
 .btn-clear{background:#dc2626;}
 .btn-clear:hover{background:#b91c1c;}
+.btn-get{
+    background:#2563eb;
+}
+
+.btn-get:hover{
+    background:#1d4ed8;
+}
 #message{margin-top:15px;font-weight:bold;}
 @media(max-width:768px){
 body{padding:10px;}
@@ -138,9 +145,11 @@ body{padding:10px;}
 </div>
 
 <div class="button-row">
-<button type="submit" class="btn btn-save">Save Game</button>
-<button type="button" id="clearBtn" class="btn btn-clear">Clear Form</button>
+    <button type="button" id="getGameBtn" class="btn btn-get">Get Game</button>
+    <button type="submit" class="btn btn-save">Update Game</button>
+    <button type="button" id="clearBtn" class="btn btn-clear">Clear Form</button>
 </div>
+
 <div id="message"></div>
 </form>
 </div>
@@ -149,6 +158,92 @@ body{padding:10px;}
 document.getElementById("clearBtn").addEventListener("click", function () {
     document.getElementById("gameForm").reset();
     document.getElementById("message").innerText = "";
+});
+
+function toInputDate(dateStr) {
+    const d = new Date(dateStr);
+    return d.toISOString().split("T")[0];
+}
+
+function toInputTime(timeStr) {
+
+    if (!timeStr) return "";
+
+    const [time, modifier] = timeStr.split(" ");
+    let [hours, minutes] = time.split(":");
+
+    hours = parseInt(hours, 10);
+
+    if (modifier === "PM" && hours !== 12) {
+        hours += 12;
+    }
+    if (modifier === "AM" && hours === 12) {
+        hours = 0;
+    }
+
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+}
+
+
+document.getElementById("getGameBtn").addEventListener("click", async function () {
+
+    const gameId = document.getElementById("gameId").value;
+    const association = document.getElementById("association").value;
+
+    if (!gameId) {
+        document.getElementById("message").innerText =
+            "Enter a Game ID first.";
+        return;
+    }
+
+    if (!association) {
+        document.getElementById("message").innerText =
+            "Enter an Association first.";
+        return;
+    }
+    try {
+
+        const response = await fetch(`/api/game/${association}/${gameId}`);
+
+        if (!response.ok) {
+            document.getElementById("message").innerText =
+                "Game not found.";
+            return;
+        }
+
+        const game = await response.json();
+
+        console.log("Returned game:", game);
+
+        document.getElementById("association").value = game.Association;
+        document.getElementById("gameId").value = game.GameId;
+        document.getElementById("date").value = toInputDate(game.Date);
+        document.getElementById("time").value = toInputTime(game.Time);
+        document.getElementById("site").value = game.Site;
+        document.getElementById("field").value = game.Field;
+        document.getElementById("sport").value = game.Sport;
+        document.getElementById("level").value = game.Level;
+
+        document.getElementById("numOfGames").value = game.NumOfGames;
+        document.getElementById("gameFee").value = game.GameFee;
+        document.getElementById("travelPay").value = game.TravelPay;
+        document.getElementById("assignorFee").value = game.AssignorFee;
+        document.getElementById("deductions").value = game.Deductions;
+
+        document.getElementById("status").value = game.Status;
+        document.getElementById("referee").value = game.Referee;
+        document.getElementById("u1").value = game.U1;
+        document.getElementById("u2").value = game.U2;
+        document.getElementById("eco").value = game.ECO; 
+        document.getElementById("assignor").value = game.Assignor;
+
+        document.getElementById("message").innerText =
+            "Game loaded successfully.";
+
+    } catch (err) {
+        document.getElementById("message").innerText =
+            "Server unavailable.";
+    }
 });
 
 document.getElementById("gameForm").addEventListener("submit", async function(e) {

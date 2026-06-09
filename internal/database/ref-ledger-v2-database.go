@@ -596,6 +596,47 @@ func GetGameFee(gameIds []int64) (int64, error) {
 	return totGameFee, nil
 }
 
+// Used by HTML Web Pages
+func GetGameByAssocAndId(assoc string, gameId string) (model.GameDescriptor, error) {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	id, err := utils.ConvertStrToInt64(gameId)
+	if err != nil {
+		fmt.Println(err)
+		return model.GameDescriptor{}, err
+	}
+
+	filter := bson.M{
+		"association": assoc,
+		"gameId":      id,
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	cursor, err := coll.Find(ctx, filter)
+	if err != nil {
+		return model.GameDescriptor{}, fmt.Errorf("GetGameByAssocAndId failure.  Reason: %s", err)
+	}
+
+	var results []model.GameDoc
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return model.GameDescriptor{}, fmt.Errorf("GetGameByAssocAndId failure.  Reason: %s", err)
+	}
+
+	if len(results) == 0 {
+		return model.GameDescriptor{}, fmt.Errorf("Game not found for association: %s and game ID: %s", assoc, gameId)
+	}
+
+	gameRecord := utils.ConvertGameDocToGameDescr(results[0])
+
+	return gameRecord, nil
+}
+
 func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)

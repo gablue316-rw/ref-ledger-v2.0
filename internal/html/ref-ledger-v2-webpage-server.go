@@ -432,6 +432,29 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func GetSingleGame(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	association := r.PathValue("association")
+	gameID := r.PathValue("gameid")
+
+	fmt.Println("Getting single game:", gameID, association)
+	game, err := database.GetGameByAssocAndId(association, gameID)
+	if err != nil {
+		http.Error(w, "Game not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(game)
+
+}
+
 func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GetGames has been called")
@@ -663,6 +686,9 @@ func main() {
 	mux.HandleFunc("/payments", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/payments.html")
 	})
+
+	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
+
 	mux.HandleFunc("/api/expenses", CreateExpense)
 	mux.HandleFunc("/api/games/status", UpdateGameStatus)
 	mux.HandleFunc("/api/reports", GenerateReport)
