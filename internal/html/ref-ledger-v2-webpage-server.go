@@ -23,7 +23,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"encoding/json"
 )
@@ -76,6 +75,8 @@ type GameStatusUpdate struct {
 	GameIds string `json:"gameIds"`
 	Status  string `json:"status"`
 }
+
+var ac database.AssociationCollection
 
 func GameDocToGameDescr(g Game) model.GameDescriptor {
 
@@ -164,6 +165,17 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 		Description: e.Description,
 	}
 
+}
+
+func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
+	assignors, err := ac.GetAssignorNames()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(assignors)
 }
 
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
@@ -438,6 +450,27 @@ func CreatePayment(w http.ResponseWriter, r *http.Request) {
 	database.InsertPaymentDocs(context.TODO(), paymentDescr, database.Database, "payments")
 }
 
+func CreateAssociation(w http.ResponseWriter, r *http.Request) {
+
+	var assocJson database.AssociationJson
+
+	err := json.NewDecoder(r.Body).Decode(&assocJson)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson))
+	if err != nil {
+		fmt.Println("Failed to create association")
+		http.Error(w, "Failed to create association", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("Association updated successfully"))
+}
+
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 	var expense Expense
@@ -463,6 +496,46 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("DeleteAssociation called")
+
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	assocId := r.PathValue("assocId")
+
+	err := ac.Delete(assocId)
+
+	if err != nil {
+		http.Error(w,
+			fmt.Sprintf("Delete failed: %v", err),
+			http.StatusNotFound,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	assoc, err := ac.Get(r.PathValue("assocId"))
+	if err != nil {
+		http.Error(w, "Association not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(assoc)
+}
+
 func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -473,7 +546,6 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 	association := r.PathValue("association")
 	gameID := r.PathValue("gameid")
 
-	fmt.Println("Getting single game:", gameID, association)
 	game, err := database.GetGameByGameIdAndOrAssoc(association, gameID)
 	if err != nil {
 		http.Error(w, "Game not found", http.StatusNotFound)
@@ -502,7 +574,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	_, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
-	db := Client.Database(database.Database)
+	db := database.Client.Database(database.Database)
 	coll := db.Collection("games")
 
 	// 1. Read query parameters
@@ -675,10 +747,9 @@ func main() {
 		return
 	}
 
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(URI_CONTAINER))
-
+	err = ac.Init(database.Client)
 	if err != nil {
-		fmt.Println("Failed to connect to database.  Terminating web page server.")
+		fmt.Println("Failed to initialize associations collection.")
 		return
 	}
 
@@ -687,8 +758,6 @@ func main() {
 	if f != nil {
 		fmt.Println("Failed to open", logFile)
 	}
-
-	Client = client
 
 	fmt.Println("Registering routes...")
 	mux := http.NewServeMux()
@@ -717,10 +786,19 @@ func main() {
 	mux.HandleFunc("/payments", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/payments.html")
 	})
+
+	mux.HandleFunc("/associations", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/associations.html")
+	})
+
 	mux.HandleFunc("/api/officials", GetOfficialsHandler)
+	mux.HandleFunc("/api/assignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
+	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
+	mux.HandleFunc("/api/deleteAssociation/{assocId}", DeleteAssociation)
 
 	mux.HandleFunc("/api/expenses", CreateExpense)
+	mux.HandleFunc("/api/associations", CreateAssociation)
 	mux.HandleFunc("/api/games/status", UpdateGameStatus)
 	mux.HandleFunc("/api/reports", GenerateReport)
 	mux.HandleFunc("/api/game-update", UpdateGame)
@@ -731,6 +809,36 @@ func main() {
 
 	fmt.Println("Routes successfully registered")
 	fmt.Println("Server running on port 8080")
+
+	/*
+		var Association database.Association = database.Association{
+			Id:        "MSO",
+			Name:      "Multi Spors Officials",
+			Contact:   "Scott Henry",
+			Phone:     "(678) 778-4546",
+			Email:     "test@example.com",
+			Assignors: []string{"Scott Henry", "Euvonda Harrison", "Barry Sullivan"},
+		}
+
+		err = associations.Add(Association)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		Association.Email = "scott.henry@example.com"
+		err = associations.Update("MSO", Association)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		associations.Dump("MSO")
+
+		err = associations.Delete("MSO")
+		if err != nil {
+			fmt.Println(err)
+		}
+	*/
+
 	err = http.ListenAndServe(":8080", mux)
 
 	if err != nil {

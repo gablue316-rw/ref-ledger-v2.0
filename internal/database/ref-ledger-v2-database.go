@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -32,6 +33,10 @@ var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Pai
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
 type OfficialName struct {
+	Name string `json:"name"`
+}
+
+type AssignorName struct {
 	Name string `json:"name"`
 }
 
@@ -1866,4 +1871,223 @@ func FindOfficial(parentCtx context.Context, name string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+type AssociationJson struct {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	Contact   string `json:"contact"`
+	Phone     string `json:"phone"`
+	Email     string `json:"email"`
+	Assignors string `json:"assignors"`
+}
+
+type AssociationDoc struct {
+	Id        string `bson:"id,omitempty"`
+	Name      string `bson:"name,omitempty"`
+	Contact   string `bson:"contact,omitempty"`
+	Phone     string `bson:"phone,omitempty"`
+	Email     string `bson:"email,omitempty"`
+	Assignors string `bson:"assignors,omitempty"`
+}
+
+type Association struct {
+	Id        string
+	Name      string
+	Contact   string
+	Phone     string
+	Email     string
+	Assignors string
+}
+
+type AssociationCollection struct {
+	DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+func (ac *AssociationCollection) Init(client *mongo.Client) error {
+
+	ac.DB = client.Database(Database)
+	ac.Coll = ac.DB.Collection("associations")
+
+	fmt.Println("Successfully initialized Associations Collection")
+	return nil
+}
+
+func (ac *AssociationCollection) ConvAssocJsonToAssoc(aj AssociationJson) Association {
+	return Association{
+		Id:        aj.Id,
+		Name:      aj.Name,
+		Contact:   aj.Contact,
+		Phone:     aj.Phone,
+		Email:     aj.Email,
+		Assignors: aj.Assignors,
+	}
+}
+
+func (ac *AssociationCollection) convAssocToDoc(association Association) AssociationDoc {
+	return AssociationDoc{
+		Id:        association.Id,
+		Name:      association.Name,
+		Contact:   association.Contact,
+		Phone:     association.Phone,
+		Email:     association.Email,
+		Assignors: association.Assignors,
+	}
+}
+
+func (ac *AssociationCollection) convDocToAssociation(doc AssociationDoc) Association {
+	return Association{
+		Id:        doc.Id,
+		Name:      doc.Name,
+		Contact:   doc.Contact,
+		Phone:     doc.Phone,
+		Email:     doc.Email,
+		Assignors: doc.Assignors,
+	}
+}
+
+func (ac *AssociationCollection) Add(association Association) error {
+
+	var result *mongo.InsertOneResult
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	doc := ac.convAssocToDoc(association)
+
+	result, ac.LastError = ac.Coll.InsertOne(ctx, doc)
+	if ac.LastError != nil {
+		return fmt.Errorf("Insert failed.  Reason: %v", ac.LastError)
+	}
+	fmt.Println("Inserted ID:", result.InsertedID)
+
+	return nil
+}
+
+func (ac *AssociationCollection) Get(id string) (*Association, error) {
+
+	var filter bson.M
+	var doc AssociationDoc
+
+	filter = bson.M{
+		"id": id,
+	}
+
+	err := ac.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("association not found")
+		}
+		return nil, err
+	}
+	association := ac.convDocToAssociation(doc)
+	return &association, nil
+}
+
+func (ac *AssociationCollection) GetAssignorNames() ([]AssignorName, error) {
+	var assignors []AssignorName = []AssignorName{}
+
+	cursor, err := ac.Coll.Find(context.TODO(), bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("Failed to query assignors.  Reason: %v", err)
+	}
+	defer cursor.Close(context.TODO())
+
+	for cursor.Next(context.TODO()) {
+		var doc AssociationDoc
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, fmt.Errorf("Failed to decode assignor document.  Reason: %v", err)
+		}
+
+		for part := range strings.SplitSeq(doc.Assignors, ",") {
+			assignors = append(assignors, AssignorName{Name: strings.TrimSpace(part)})
+		}
+	}
+
+	return assignors, nil
+}
+
+func (ac *AssociationCollection) Update(id string, association Association) error {
+
+	var filter bson.M
+	var doc AssociationDoc
+	var result *mongo.UpdateResult
+
+	filter = bson.M{
+		"id": id,
+	}
+
+	doc = ac.convAssocToDoc(association)
+
+	result, ac.LastError = ac.Coll.ReplaceOne(context.TODO(), filter, doc)
+	if ac.LastError != nil {
+		return fmt.Errorf("Failed to update association.  Reason: %v", ac.LastError)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("association not found")
+	}
+
+	fmt.Println("Record updated in", ac.Coll.Name())
+	return nil
+}
+
+func (ac *AssociationCollection) DeleteAll() error {
+
+	var result *mongo.DeleteResult
+
+	result, ac.LastError = ac.Coll.DeleteMany(context.TODO(), bson.M{})
+	if ac.LastError != nil {
+		return fmt.Errorf("Failed to delete all associations.  Reason: %v", ac.LastError)
+	}
+
+	fmt.Println("Deleted ", result.DeletedCount, " records from ", ac.Coll.Name())
+	return nil
+}
+
+func (ac *AssociationCollection) Delete(id string) error {
+
+	var filter bson.M
+	var result *mongo.DeleteResult
+
+	filter = bson.M{
+		"id": id,
+	}
+
+	result, ac.LastError = ac.Coll.DeleteOne(context.TODO(), filter)
+	if ac.LastError != nil {
+		return fmt.Errorf("Failed to delete association.  Reason: %v", ac.LastError)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("association not found")
+	}
+
+	fmt.Println("Deleted Record with Association Id of", filter["id"], " in", ac.Coll.Name(), "Records Deleted:", result.DeletedCount)
+
+	return nil
+}
+
+func (ac *AssociationCollection) Dump(id string) error {
+
+	fmt.Println("Retrieving association with ID:", id)
+
+	var assoc *Association
+	assoc, err := ac.Get(id)
+	if err != nil {
+		return fmt.Errorf("Failed to get association.  Reason: %v", err)
+	}
+
+	fmt.Println("Dumping Record with Association Id of", assoc.Id)
+
+	fmt.Println("Name:", assoc.Name)
+	fmt.Println("Contact:", assoc.Contact)
+	fmt.Println("Phone:", assoc.Phone)
+	fmt.Println("Email:", assoc.Email)
+	fmt.Println("Assignors:", assoc.Assignors)
+
+	return nil
 }
