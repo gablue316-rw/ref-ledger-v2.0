@@ -40,6 +40,10 @@ type AssignorName struct {
 	Name string `json:"name"`
 }
 
+type SiteName struct {
+	Name string `json:"name"`
+}
+
 func foundAssociation(assoc string) bool {
 
 	associations := []string{"GOLLC", "MCBOA", "MSO"}
@@ -1873,6 +1877,7 @@ func FindOfficial(parentCtx context.Context, name string) (bool, error) {
 	return true, nil
 }
 
+// Association Colleciton, Documents and API Code
 type AssociationJson struct {
 	Id        string `json:"id"`
 	Name      string `json:"name"`
@@ -2088,6 +2093,219 @@ func (ac *AssociationCollection) Dump(id string) error {
 	fmt.Println("Phone:", assoc.Phone)
 	fmt.Println("Email:", assoc.Email)
 	fmt.Println("Assignors:", assoc.Assignors)
+
+	return nil
+}
+
+// Site Colleciton, Documents and API Code
+type SiteJson struct {
+	Id      string `json:"id"`
+	Name    string `json:"name"`
+	Contact string `json:"contact"`
+	Phone   string `json:"phone"`
+	Email   string `json:"email"`
+}
+
+type SiteDoc struct {
+	Id      string `bson:"id,omitempty"`
+	Name    string `bson:"name,omitempty"`
+	Contact string `bson:"contact,omitempty"`
+	Phone   string `bson:"phone,omitempty"`
+	Email   string `bson:"email,omitempty"`
+}
+
+type Site struct {
+	Id      string
+	Name    string
+	Contact string
+	Phone   string
+	Email   string
+}
+
+type SiteCollection struct {
+	DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+func (sc *SiteCollection) ConvJsonToSite(aj SiteJson) Site {
+	return Site{
+		Id:      aj.Id,
+		Name:    aj.Name,
+		Contact: aj.Contact,
+		Phone:   aj.Phone,
+		Email:   aj.Email,
+	}
+}
+
+func (sc *SiteCollection) convSiteToDoc(site Site) SiteDoc {
+	return SiteDoc{
+		Id:      site.Id,
+		Name:    site.Name,
+		Contact: site.Contact,
+		Phone:   site.Phone,
+		Email:   site.Email,
+	}
+}
+
+func (sc *SiteCollection) convDocToSite(doc SiteDoc) Site {
+	return Site{
+		Id:      doc.Id,
+		Name:    doc.Name,
+		Contact: doc.Contact,
+		Phone:   doc.Phone,
+		Email:   doc.Email,
+	}
+}
+
+func (sc *SiteCollection) Init(client *mongo.Client) error {
+
+	sc.DB = client.Database(Database)
+	sc.Coll = sc.DB.Collection("sites")
+
+	fmt.Println("Successfully initialized Site Collection")
+	return nil
+}
+
+func (sc *SiteCollection) Add(site Site) error {
+
+	var result *mongo.InsertOneResult
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	doc := sc.convSiteToDoc(site)
+
+	result, sc.LastError = sc.Coll.InsertOne(ctx, doc)
+	if sc.LastError != nil {
+		return fmt.Errorf("Insert failed.  Reason: %v", sc.LastError)
+	}
+	fmt.Println("Inserted ID:", result.InsertedID)
+
+	return nil
+}
+
+func (sc *SiteCollection) Get(id string) (*Site, error) {
+
+	var filter bson.M
+	var doc SiteDoc
+
+	filter = bson.M{
+		"id": id,
+	}
+
+	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("site not found")
+		}
+		return nil, err
+	}
+	site := sc.convDocToSite(doc)
+	return &site, nil
+}
+
+func (sc *SiteCollection) GetSiteName() ([]SiteName, error) {
+	var sites []SiteName = []SiteName{}
+
+	cursor, err := sc.Coll.Find(context.TODO(), bson.M{})
+	if err != nil {
+		return nil, fmt.Errorf("Failed to query sites.  Reason: %v", err)
+	}
+	defer cursor.Close(context.TODO())
+
+	for cursor.Next(context.TODO()) {
+		var doc SiteDoc
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, fmt.Errorf("Failed to decode site document.  Reason: %v", err)
+		}
+
+		for part := range strings.SplitSeq(doc.Name, ",") {
+			sites = append(sites, SiteName{Name: strings.TrimSpace(part)})
+		}
+	}
+
+	return sites, nil
+}
+
+func (sc *SiteCollection) Update(id string, site Site) error {
+
+	var filter bson.M
+	var doc SiteDoc
+	var result *mongo.UpdateResult
+
+	filter = bson.M{
+		"id": id,
+	}
+
+	doc = sc.convSiteToDoc(site)
+
+	result, sc.LastError = sc.Coll.ReplaceOne(context.TODO(), filter, doc)
+	if sc.LastError != nil {
+		return fmt.Errorf("Failed to update site.  Reason: %v", sc.LastError)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("site not found")
+	}
+
+	fmt.Println("Record updated in", sc.Coll.Name())
+	return nil
+}
+
+func (sc *SiteCollection) DeleteAll() error {
+
+	var result *mongo.DeleteResult
+
+	result, sc.LastError = sc.Coll.DeleteMany(context.TODO(), bson.M{})
+	if sc.LastError != nil {
+		return fmt.Errorf("Failed to delete all sites.  Reason: %v", sc.LastError)
+	}
+
+	fmt.Println("Deleted ", result.DeletedCount, " records from ", sc.Coll.Name())
+	return nil
+}
+
+func (sc *SiteCollection) Delete(id string) error {
+
+	var filter bson.M
+	var result *mongo.DeleteResult
+
+	filter = bson.M{
+		"id": id,
+	}
+
+	result, sc.LastError = sc.Coll.DeleteOne(context.TODO(), filter)
+	if sc.LastError != nil {
+		return fmt.Errorf("Failed to delete site.  Reason: %v", sc.LastError)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("site not found")
+	}
+
+	fmt.Println("Deleted Record with Site Id of", filter["id"], " in", sc.Coll.Name(), "Records Deleted:", result.DeletedCount)
+
+	return nil
+}
+
+func (sc *SiteCollection) Dump(id string) error {
+
+	fmt.Println("Retrieving site with ID:", id)
+
+	var site *Site
+	site, err := sc.Get(id)
+	if err != nil {
+		return fmt.Errorf("Failed to get site.  Reason: %v", err)
+	}
+
+	fmt.Println("Dumping Record with Site Id of", site.Id)
+
+	fmt.Println("Name:", site.Name)
+	fmt.Println("Contact:", site.Contact)
+	fmt.Println("Phone:", site.Phone)
+	fmt.Println("Email:", site.Email)
 
 	return nil
 }

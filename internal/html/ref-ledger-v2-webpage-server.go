@@ -77,6 +77,7 @@ type GameStatusUpdate struct {
 }
 
 var ac database.AssociationCollection
+var sc database.SiteCollection
 
 func GameDocToGameDescr(g Game) model.GameDescriptor {
 
@@ -471,6 +472,27 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Association updated successfully"))
 }
 
+func CreateSite(w http.ResponseWriter, r *http.Request) {
+
+	var siteJson database.SiteJson
+
+	err := json.NewDecoder(r.Body).Decode(&siteJson)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	err = sc.Add(sc.ConvJsonToSite(siteJson))
+	if err != nil {
+		fmt.Println("Failed to create site")
+		http.Error(w, "Failed to create site", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("Site updated successfully"))
+}
+
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 	var expense Expense
@@ -519,6 +541,29 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func DeleteSite(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("DeleteSite called")
+
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	siteId := r.PathValue("siteId")
+
+	err := sc.Delete(siteId)
+
+	if err != nil {
+		http.Error(w,
+			fmt.Sprintf("Delete failed: %v", err),
+			http.StatusNotFound,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -534,6 +579,23 @@ func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(assoc)
+}
+
+func GetSingleSite(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	site, err := sc.Get(r.PathValue("siteId"))
+	if err != nil {
+		http.Error(w, "Site not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(site)
 }
 
 func GetSingleGame(w http.ResponseWriter, r *http.Request) {
@@ -753,6 +815,12 @@ func main() {
 		return
 	}
 
+	err = sc.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize site collection.")
+		return
+	}
+
 	f := OpenLog(logFile)
 
 	if f != nil {
@@ -791,14 +859,22 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/associations.html")
 	})
 
+	mux.HandleFunc("/sites", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/sites.html")
+	})
+
 	mux.HandleFunc("/api/officials", GetOfficialsHandler)
 	mux.HandleFunc("/api/assignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
 	mux.HandleFunc("/api/deleteAssociation/{assocId}", DeleteAssociation)
 
+	mux.HandleFunc("/api/site/{siteId}", GetSingleSite)
+	mux.HandleFunc("/api/deleteSite/{siteId}", DeleteSite)
+
 	mux.HandleFunc("/api/expenses", CreateExpense)
 	mux.HandleFunc("/api/associations", CreateAssociation)
+	mux.HandleFunc("/api/sites", CreateSite)
 	mux.HandleFunc("/api/games/status", UpdateGameStatus)
 	mux.HandleFunc("/api/reports", GenerateReport)
 	mux.HandleFunc("/api/game-update", UpdateGame)
