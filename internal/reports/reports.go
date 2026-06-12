@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"os"
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
@@ -12,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jung-kurt/gofpdf"
 )
 
 func TrimMileageStr(miles string) string {
@@ -270,20 +271,38 @@ func formatAddress(address, city, state, zip string) string {
 	return addr
 }
 
-func WriteReportToFile(report []string, filePath string) {
+func WriteReportToFile(report []string, filePath string) error {
 
-	flag := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+	pdf := gofpdf.New("L", "mm", "Letter", "") // Landscape
+	pdf.AddPage()
 
-	fd, err := os.OpenFile(filePath, flag, 0644)
+	pdf.SetFont("Courier", "", 8)
+
+	for _, line := range report {
+		pdf.CellFormat(0, 4, line, "", 1, "", false, 0, "")
+	}
+
+	err := pdf.OutputFileAndClose(filePath)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Errorf("Failed to write report to PDF file.  Reason: %v", err)
 	}
 
-	defer fd.Close()
+	return nil
 
-	for _, s := range report {
-		_, err = fd.WriteString(s)
-	}
+	/*
+		   flag := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
+
+			fd, err := os.OpenFile(filePath, flag, 0644)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			defer fd.Close()
+
+			for _, s := range report {
+				_, err = fd.WriteString(s)
+			}
+	*/
 }
 
 func PrintReport(report []string) {

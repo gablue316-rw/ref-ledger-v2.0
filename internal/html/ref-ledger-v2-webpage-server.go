@@ -405,7 +405,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 		var email email.Email
 		email.Initialize()
 		if rFile == "" {
-			rFile = rType + "_report.txt"
+			rFile = rType + "_report.pdf"
 		}
 		reports.WriteReportToFile(rept, rFile)
 		// Send report via email

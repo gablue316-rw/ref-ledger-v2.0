@@ -3,8 +3,10 @@ module ref-ledger-v2
 go 1.25.0
 
 require (
+	github.com/go-pdf/fpdf v0.9.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/jung-kurt/gofpdf v1.16.2 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
