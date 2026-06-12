@@ -27,6 +27,8 @@ body{background:#f4f6f9;padding:20px;color:#333;}
 .btn-save:hover{background:#15803d;}
 .btn-clear{background:#dc2626;}
 .btn-clear:hover{background:#b91c1c;}
+.btn-delete{background:#ffff00;color:black;}
+.btn-delete:hover{background:#ffc000;color: black;}
 .btn-get{
     background:#2563eb;
 }
@@ -170,8 +172,9 @@ body{padding:10px;}
 
 <div class="button-row">
     <button type="button" id="getGameBtn" class="btn btn-get">Get Game</button>
-    <button type="submit" class="btn btn-save">Update Game</button>
+    <button type="submit" class="btn btn-save">Save Game</button>
     <button type="button" id="clearBtn" class="btn btn-clear">Clear Form</button>
+    <button type="button" id="deleteBtn" class="btn btn-delete">Delete Game</button>
 </div>
 
 <div id="message"></div>
@@ -251,6 +254,40 @@ function toInputTime(timeStr) {
     return `${String(hours).padStart(2, "0")}:${minutes}`;
 }
 
+
+document.getElementById("deleteBtn").addEventListener("click", async function () {
+
+    const gameId = document.getElementById("gameId").value;
+    const association = document.getElementById("association").value;
+
+    if (!gameId) {
+        document.getElementById("message").innerText =
+            "Enter a Game ID first.";
+        return;
+    }
+
+    if (!association) {
+        document.getElementById("message").innerText =
+            "Enter an Association first.";
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/deleteGame/${association}/${gameId}`, {
+            method: "DELETE"
+        });
+
+        const message = await response.text();
+
+        document.getElementById("message").innerText =
+            response.ok
+                ? message || "Game deleted successfully."
+                : message || "Error deleting game.";
+    
+    } catch(err) {
+        document.getElementById("message").innerText = "Server unavailable.";
+    }
+});
 
 document.getElementById("getGameBtn").addEventListener("click", async function () {
 

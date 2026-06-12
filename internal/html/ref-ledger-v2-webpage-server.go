@@ -78,6 +78,7 @@ type GameStatusUpdate struct {
 
 var ac database.AssociationCollection
 var sc database.SiteCollection
+var gc database.GameCollection
 
 func GameDocToGameDescr(g Game) model.GameDescriptor {
 
@@ -269,6 +270,66 @@ func LogVisitor(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func generatePaymentsReport(assoc string) []string {
+
+	var rept []string = []string{}
+	paymentRecords, err := database.QueryPayments(context.TODO(), "refLedger_v2", "payments", assoc)
+	if err != nil {
+		rept = append(rept, "Error generating payment report.  Failed to retrieve payment records.")
+		return rept
+	}
+	rept = reports.GeneratePaymentReport(paymentRecords)
+	return rept
+}
+
+func generateReconciliationReport(assoc string) []string {
+
+	var rept []string = []string{}
+
+	paymentRecords, err := database.QueryPayments(context.TODO(), "refLedger_v2", "payments", assoc)
+	if err != nil {
+		rept = append(rept, "Error generating reconciliation report.  Failed to retrieve payment records.")
+		return rept
+	}
+	rept = reports.GenerateReconciliationReport(paymentRecords)
+
+	return rept
+}
+
+func generateAccountsReceivableReport(assoc string) []string {
+
+	var rept []string = []string{}
+	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc)
+	return rept
+}
+
+func generateIncomeReport(assoc string) []string {
+
+	var rept []string = []string{}
+	rept = reports.GenerateIncomeReport(assoc)
+	return rept
+}
+
+func generateExpenseReport(expenseFilters model.EFilters) []string {
+
+	var rept []string = []string{}
+
+	efilter, err := utils.ConvertExpenseFilterToJsonFile(expenseFilters)
+	if err != nil {
+		fmt.Println(err)
+		return []string{}
+	}
+
+	expenseRecords, err := database.QueryExpenses(context.TODO(), "refLedger_v2", "expenses", efilter)
+	if err != nil {
+		fmt.Println(err)
+		return []string{}
+	}
+	rept = reports.GenerateExpenseReport(expenseRecords)
+
+	return rept
+}
+
 func generateGamesReport(gameFilters model.GFilters) []string {
 	// Implementation for generating games report
 
@@ -293,6 +354,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GenerateReport is called")
 	gameFilters := model.GFilters{}
+	expenseFilters := model.EFilters{}
 	rType := r.URL.Query().Get("type")
 	rEmail := r.URL.Query().Get("emailaddr")
 	rFile := r.URL.Query().Get("filename")
@@ -320,11 +382,22 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	gameFilters.Association = rAssoc
 	gameFilters.Status = rStatus
 
-	if rType == "Games" {
+	switch rType {
+	case "Games":
 		rept = generateGamesReport(gameFilters)
-	} else {
+	case "Expenses":
+		rept = generateExpenseReport(expenseFilters)
+	case "Income":
+		rept = generateIncomeReport(rAssoc)
+	case "Payments":
+		rept = generatePaymentsReport(rAssoc)
+	case "Reconciliation":
+		rept = generateReconciliationReport(rAssoc)
+	case "Accounts Receivable":
+		rept = generateAccountsReceivableReport(rAssoc)
+	default:
 		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprint(w, "Not Implemented Yet")
+		fmt.Fprint(w, "Invalid Report Type")
 		return
 	}
 
@@ -541,8 +614,33 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func DeleteGame(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	association := r.PathValue("association")
+	gameId := r.PathValue("gameId")
+
+	fmt.Println("Deleting Game", gameId, "for association", association)
+
+	err := gc.Delete(association, gameId)
+
+	if err != nil {
+		fmt.Println("Delete failed", err)
+		http.Error(w,
+			fmt.Sprintf("Delete failed: %v", err),
+			http.StatusNotFound,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func DeleteSite(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("DeleteSite called")
 
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -550,6 +648,8 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	siteId := r.PathValue("siteId")
+
+	fmt.Println("Deleting Site", siteId)
 
 	err := sc.Delete(siteId)
 
@@ -821,6 +921,12 @@ func main() {
 		return
 	}
 
+	err = gc.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize game collection.")
+		return
+	}
+
 	f := OpenLog(logFile)
 
 	if f != nil {
@@ -871,6 +977,7 @@ func main() {
 
 	mux.HandleFunc("/api/site/{siteId}", GetSingleSite)
 	mux.HandleFunc("/api/deleteSite/{siteId}", DeleteSite)
+	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", DeleteGame)
 
 	mux.HandleFunc("/api/expenses", CreateExpense)
 	mux.HandleFunc("/api/associations", CreateAssociation)

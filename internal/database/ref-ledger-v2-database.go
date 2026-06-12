@@ -2309,3 +2309,65 @@ func (sc *SiteCollection) Dump(id string) error {
 
 	return nil
 }
+
+// Games Collection, Documents and API Code
+
+// Add to these structures when I completely migrate the games logic to methods
+type Game struct {
+	Id          string
+	Association string
+}
+
+type GameJson struct {
+	Id          string `json:"gameId"`
+	Association string `json:"association"`
+}
+
+type GameDoc struct {
+	Id          string `bson:"gameId,omitempty"`
+	Association string `bson:"association,omitempty"`
+}
+
+type GameCollection struct {
+	DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+func (gc *GameCollection) Init(client *mongo.Client) error {
+
+	gc.DB = client.Database(Database)
+	gc.Coll = gc.DB.Collection("games")
+
+	fmt.Println("Successfully initialized Game Collection")
+	return nil
+}
+
+func (gc *GameCollection) Delete(association string, gameId string) error {
+
+	var filter bson.M
+	var result *mongo.DeleteResult
+
+	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
+	if err != nil {
+		return fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
+	}
+
+	filter = bson.M{
+		"gameId":      gameIdInt64,
+		"association": association,
+	}
+
+	result, gc.LastError = gc.Coll.DeleteOne(context.TODO(), filter)
+	if gc.LastError != nil {
+		return fmt.Errorf("Failed to delete game.  Reason: %v", gc.LastError)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("game not found")
+	}
+
+	fmt.Println("Deleted Record with Game Id of", filter["gameId"], " in", gc.Coll.Name(), "Records Deleted:", result.DeletedCount)
+
+	return nil
+}
