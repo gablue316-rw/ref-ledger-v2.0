@@ -13,6 +13,8 @@ FROM alpine:latest
 
 WORKDIR /root
 
+RUN mkdir -p /root/logs
+
 COPY --from=builder /app/webpage-server .
 COPY --from=builder /app/internal/html ./internal/html
 

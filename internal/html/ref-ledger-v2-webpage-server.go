@@ -30,7 +30,7 @@ import (
 var Client *mongo.Client
 var URI string = "mongodb://localhost:27017"
 var URI_CONTAINER string = "mongodb://host.docker.internal:27017"
-var logFile = "refLedgerV2_0-webserver.log"
+var logFileFullPathName = "/root/logs/ref-ledgerV2-webServer.log"
 
 type Game struct {
 	Association string  `json:"association"`
@@ -899,13 +899,32 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
+	logFile, err := os.OpenFile(
+		logFileFullPathName,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0644,
+	)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer logFile.Close()
+
+	fileLog := log.New(
+		logFile,
+		"FILE: ",
+		log.LstdFlags|log.Lshortfile,
+	)
+
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
-	//database.InitDbase("refLedger_v2", "mongodb://localhost:27017")
+	fileLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	database.InitDbase("refLedger_v2", "mongodb://host.docker.internal:27017")
 
-	err := database.Connect()
+	err = database.Connect()
 	if err != nil {
 		fmt.Println("Failed to init database.  Terminating web page server.")
+		fileLog.Println("Failed to init database.  Terminating web page server.")
 		return
 	}
 
@@ -925,12 +944,6 @@ func main() {
 	if err != nil {
 		fmt.Println("Failed to initialize game collection.")
 		return
-	}
-
-	f := OpenLog(logFile)
-
-	if f != nil {
-		fmt.Println("Failed to open", logFile)
 	}
 
 	fmt.Println("Registering routes...")
