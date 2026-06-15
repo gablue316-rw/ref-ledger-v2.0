@@ -549,6 +549,7 @@ func ConvertGameIdStrToInt(g string) ([]int64, error) {
 		if strings.Contains(v, "-") {
 			rangeOfIds, err := ConvertGameIdRangeToInt(v)
 			if err != nil {
+				AuditLog.Printf("Failed to convert range of game ids to int for game id string [%s].  Reason: %v", v, err)
 				fmt.Println("Failed to convert range of game ids to int[", v, "]")
 				return []int64{}, err
 			}
@@ -557,6 +558,7 @@ func ConvertGameIdStrToInt(g string) ([]int64, error) {
 			gId, err := strconv.ParseInt(v, 10, 64)
 			if err != nil {
 				fmt.Println("Failed to convert single game id to int[", v, "]")
+				AuditLog.Printf("Failed to convert single game id to int for game id string [%s].  Reason: %v", v, err)
 				return []int64{}, err
 			}
 			gameIds = append(gameIds, gId)

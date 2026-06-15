@@ -367,26 +367,25 @@ func GenerateReconciliationReport(records []model.PaymentDescriptor) []string {
 
 	for _, record := range records {
 
-		totalNumOfPayments++
 		paymentAmtInt64, err = utils.ConvertAmtStrToInt64(record.PaymentAmt)
-		if err == nil {
-			totalPayments += paymentAmtInt64
-		} else {
-			fmt.Println(err)
-			return []string{}
+		if err != nil {
+			utils.AuditLog.Printf("Failed to convert payment amount string to int64 for PaymentId %s.  Reason: %v", record.PaymentId, err)
+			continue
 		}
 
 		gameIds, err = utils.ConvertGameIdStrToInt(record.GameIds)
 		if err != nil {
-			fmt.Println(err)
-			return []string{}
+			continue
 		}
 
 		calcPayment, err = database.GetGameFee(gameIds)
 		if err != nil {
-			fmt.Println(err)
-			return []string{}
+			utils.AuditLog.Printf("Failed to get game fee for PaymentId %s.  Reason: %v", record.PaymentId, err)
+			continue
 		}
+
+		totalPayments += paymentAmtInt64
+		totalNumOfPayments++
 
 		if paymentAmtInt64 > calcPayment {
 			status = "Overpaid"
@@ -450,7 +449,7 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 		if err == nil {
 			totalPayments += paymentAmtInt64
 		} else {
-			fmt.Println(err)
+			utils.AuditLog.Printf("Failed to convert payment amount string to int64 for PaymentId %s.  Reason: %v", record.PaymentId, err)
 		}
 
 		if len(record.GameIds) > 60 {
