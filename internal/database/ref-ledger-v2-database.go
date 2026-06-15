@@ -1696,6 +1696,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 	collectionName := coll.Name()
+	utils.AuditLog.Printf("InsertPaymentDocs: Inserting %d payment records into collection %s", len(payment), collection)
 	fmt.Println("Inserting records into", collectionName)
 
 	recordsInserted := 0
@@ -1718,6 +1719,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 
 		_, err = coll.InsertOne(ctx, doc)
 		if err != nil {
+			utils.AuditLog.Printf("Failed to insert payment record for PaymentId %s.  Reason: %v", doc.PaymentId, err)
 			fmt.Println("Insert failed.  Reason:", err)
 			totalErrors++
 			continue
@@ -1728,6 +1730,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
 
 		if err != nil {
+			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
 			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
 		} else {
 			UpdateGameStatusToPaid(ctx, gameIds)
