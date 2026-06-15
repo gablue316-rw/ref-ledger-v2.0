@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"ref-ledger-v2/internal/model"
 	"strconv"
@@ -14,6 +15,35 @@ import (
 
 var UtilsVersion string = "ref-ledger-models-v2.1.0"
 var layout string = "1/2/2006"
+
+var logFileFullPathName = "/root/logs/ref-ledgerV2-webServer.log"
+var AuditLog *log.Logger = nil
+
+func InitLogging() error {
+
+	if AuditLog != nil {
+		return nil
+	}
+
+	logFile, err := os.OpenFile(
+		logFileFullPathName,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0644,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	AuditLog = log.New(
+		logFile,
+		"FILE: ",
+		log.LstdFlags|log.Lshortfile,
+	)
+
+	return nil
+
+}
 
 func getEndOfWeek(startOfWeek string) string {
 

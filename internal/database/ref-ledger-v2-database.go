@@ -1544,6 +1544,7 @@ func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection st
 
 func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescriptor, dbase, collection string) {
 
+	utils.AuditLog.Printf("InsertOfficialDocs: Inserting %d official records into collection %s", len(game), collection)
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
@@ -1658,7 +1659,7 @@ func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
 		game, err = GetSingleGame(parentCtx, gameIdStr)
 
 		if err != nil {
-			fmt.Println("Failed to get game record.  Reason:", err)
+			utils.AuditLog.Printf("Failed to get game record for GameId %s.  Reason: %v", gameIdStr, err)
 			continue
 		}
 

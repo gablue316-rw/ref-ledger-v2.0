@@ -30,7 +30,6 @@ import (
 var Client *mongo.Client
 var URI string = "mongodb://localhost:27017"
 var URI_CONTAINER string = "mongodb://host.docker.internal:27017"
-var logFileFullPathName = "/root/logs/ref-ledgerV2-webServer.log"
 
 type Game struct {
 	Association string  `json:"association"`
@@ -79,6 +78,8 @@ type GameStatusUpdate struct {
 var ac database.AssociationCollection
 var sc database.SiteCollection
 var gc database.GameCollection
+
+var AuditLog *log.Logger = nil
 
 func GameDocToGameDescr(g Game) model.GameDescriptor {
 
@@ -170,6 +171,8 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 }
 
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(w, r)
 	assignors, err := ac.GetAssignorNames()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -181,6 +184,7 @@ func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(w, r)
 	officials, err := database.GetOfficialNames()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -266,7 +270,7 @@ func LogVisitor(w http.ResponseWriter, r *http.Request) {
 		protocol = r.Header.Get("X-Forwared-Proto")
 	}
 
-	log.Printf("IP=%s Method=%s Path=%s URL=%s Agent=%s Referer=%s Host=%s Protocol=%s", remoteIpAddr, method, path, url, userAgent, referer, host, protocol)
+	utils.AuditLog.Printf("IP=%s Method=%s Path=%s URL=%s Agent=%s Referer=%s Host=%s Protocol=%s", remoteIpAddr, method, path, url, userAgent, referer, host, protocol)
 
 }
 
@@ -353,6 +357,7 @@ func generateGamesReport(gameFilters model.GFilters) []string {
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GenerateReport is called")
+	LogVisitor(w, r)
 	gameFilters := model.GFilters{}
 	expenseFilters := model.EFilters{}
 	rType := r.URL.Query().Get("type")
@@ -431,6 +436,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
+	LogVisitor(w, r)
 	var game Game
 	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
@@ -482,6 +488,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
+	LogVisitor(w, r)
 	var gameUpdate GameStatusUpdate
 	var gameIds []int64 = []int64{}
 
@@ -526,6 +533,7 @@ func CreatePayment(w http.ResponseWriter, r *http.Request) {
 
 func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 
+	LogVisitor(w, r)
 	var assocJson database.AssociationJson
 
 	err := json.NewDecoder(r.Body).Decode(&assocJson)
@@ -547,6 +555,7 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 
 func CreateSite(w http.ResponseWriter, r *http.Request) {
 
+	LogVisitor(w, r)
 	var siteJson database.SiteJson
 
 	err := json.NewDecoder(r.Body).Decode(&siteJson)
@@ -567,6 +576,8 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(w, r)
 
 	var expense Expense
 	var singleExpense model.ExpenseDescriptor
@@ -592,6 +603,8 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(w, r)
 	fmt.Println("DeleteAssociation called")
 
 	if r.Method != http.MethodDelete {
@@ -616,6 +629,7 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 func DeleteGame(w http.ResponseWriter, r *http.Request) {
 
+	LogVisitor(w, r)
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -642,6 +656,7 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 
 func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
+	LogVisitor(w, r)
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -666,6 +681,7 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 
+	LogVisitor(w, r)
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -683,6 +699,7 @@ func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 
 func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 
+	LogVisitor(w, r)
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -699,6 +716,8 @@ func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSingleGame(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(w, r)
 
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -899,57 +918,53 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	logFile, err := os.OpenFile(
-		logFileFullPathName,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
-		0644,
-	)
+	var err error
 
-	if err != nil {
+	if err = utils.InitLogging(); err != nil {
 		panic(err)
 	}
 
-	defer logFile.Close()
-
-	fileLog := log.New(
-		logFile,
-		"FILE: ",
-		log.LstdFlags|log.Lshortfile,
-	)
-
+	utils.AuditLog.Println("Ref Ledger started")
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
-	fileLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
+	utils.AuditLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	database.InitDbase("refLedger_v2", "mongodb://host.docker.internal:27017")
 
 	err = database.Connect()
 	if err != nil {
 		fmt.Println("Failed to init database.  Terminating web page server.")
-		fileLog.Println("Failed to init database.  Terminating web page server.")
+		utils.AuditLog.Println("Failed to init database.  Terminating web page server.")
 		return
 	}
+
+	utils.AuditLog.Println("Database connection established successfully")
 
 	err = ac.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize associations collection.")
+		utils.AuditLog.Println("Failed to initialize associations collection.")
 		return
 	}
 
 	err = sc.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize site collection.")
+		utils.AuditLog.Println("Failed to initialize site collection.")
 		return
 	}
 
 	err = gc.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize game collection.")
+		utils.AuditLog.Println("Failed to initialize game collection.")
 		return
 	}
 
+	utils.AuditLog.Println("All collections initialized successfully.")
+
 	fmt.Println("Registering routes...")
+	utils.AuditLog.Println("Registering routes...")
 	mux := http.NewServeMux()
 
-	//mux.HandleFunc("/api/games", GetGames)
 	mux.HandleFunc("/expenses", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
 	})
@@ -1004,7 +1019,7 @@ func main() {
 	mux.Handle("/", fs)
 
 	fmt.Println("Routes successfully registered")
-	fmt.Println("Server running on port 8080")
+	utils.AuditLog.Println("Server running on port 8080")
 
 	/*
 		var Association database.Association = database.Association{
