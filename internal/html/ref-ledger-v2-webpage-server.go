@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"unicode"
 
 	"ref-ledger-v2/internal/api"
@@ -25,6 +27,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"encoding/json"
+
+	"github.com/google/uuid"
 )
 
 var Client *mongo.Client
@@ -531,6 +535,63 @@ func CreatePayment(w http.ResponseWriter, r *http.Request) {
 	database.InsertPaymentDocs(context.TODO(), paymentDescr, database.Database, "payments")
 }
 
+func ValidateLogin(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	// 1. Fetch user from DB (or hardcode for now)
+	// Replace later with Mongo lookup
+	storedHash := "$2a$10$cZW5HuePpDN5wsmlu7yqLO7gBKSleBfVZh6Jn7/fhkljLzontqPqK"
+
+	if username != "admin" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Create session
+	sessionID := uuid.New().String()
+
+	session := model.Session{
+		SessionID: sessionID,
+		Username:  username,
+		ExpiresAt: time.Now().Add(8 * time.Hour),
+	}
+
+	// 3. Store in MongoDB
+	_, err = database.Client.
+		Database("refLedger_v2").
+		Collection("sessions").
+		InsertOne(r.Context(), session)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// 4. Set cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "rl_session",
+		Value:    sessionID,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   60 * 60 * 8,
+	})
+
+	w.WriteHeader(http.StatusOK)
+}
+
 func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
@@ -916,6 +977,71 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func isAuthenticated(r *http.Request) bool {
+
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		return false
+	}
+
+	sessionID := cookie.Value
+
+	collection := database.Client.
+		Database("refLedger_v2").
+		Collection("sessions")
+
+	var session model.Session
+
+	err = collection.
+		FindOne(r.Context(), bson.M{
+			"sessionId": sessionID,
+			"expiresAt": bson.M{"$gt": time.Now()},
+		}).
+		Decode(&session)
+
+	return err == nil
+}
+
+func logout(w http.ResponseWriter, r *http.Request) {
+
+	cookie, err := r.Cookie("rl_session")
+	if err == nil {
+		database.Client.
+			Database("refLedger_v2").
+			Collection("sessions").
+			DeleteOne(r.Context(), bson.M{
+				"sessionId": cookie.Value,
+			})
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:   "rl_session",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func authRequired(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		// allow login page and static assets
+		if r.URL.Path == "/login" || r.URL.Path == "/api/login" {
+			next(w, r)
+			return
+		}
+
+		if !isAuthenticated(r) {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 func main() {
 
 	var err error
@@ -977,24 +1103,28 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/reports.html")
 	})
 
-	mux.HandleFunc("/games", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/games", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/games.html")
-	})
+	}))
 
-	mux.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/dashboard", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/dashboard.html")
-	})
+	}))
 
-	mux.HandleFunc("/payments", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/payments", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/payments.html")
-	})
+	}))
 
-	mux.HandleFunc("/associations", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/associations", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/associations.html")
-	})
+	}))
 
-	mux.HandleFunc("/sites", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/sites", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/sites.html")
+	}))
+
+	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/login.html")
 	})
 
 	mux.HandleFunc("/api/officials", GetOfficialsHandler)
@@ -1015,40 +1145,14 @@ func main() {
 	mux.HandleFunc("/api/game-update", UpdateGame)
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", CreatePayment)
-	fs := http.FileServer(http.Dir("./internal/html"))
-	mux.Handle("/", fs)
+	mux.HandleFunc("/api/login", ValidateLogin)
+	mux.HandleFunc("/logout", logout)
+	mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/index.html")
+	}))
 
 	fmt.Println("Routes successfully registered")
 	utils.AuditLog.Println("Server running on port 8080")
-
-	/*
-		var Association database.Association = database.Association{
-			Id:        "MSO",
-			Name:      "Multi Spors Officials",
-			Contact:   "Scott Henry",
-			Phone:     "(678) 778-4546",
-			Email:     "test@example.com",
-			Assignors: []string{"Scott Henry", "Euvonda Harrison", "Barry Sullivan"},
-		}
-
-		err = associations.Add(Association)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		Association.Email = "scott.henry@example.com"
-		err = associations.Update("MSO", Association)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		associations.Dump("MSO")
-
-		err = associations.Delete("MSO")
-		if err != nil {
-			fmt.Println(err)
-		}
-	*/
 
 	err = http.ListenAndServe(":8080", mux)
 

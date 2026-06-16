@@ -1,6 +1,14 @@
 package model
 
+import "time"
+
 var ModelsVersion string = "ref-ledger-models-v2.1.0"
+
+type Session struct {
+	SessionID string    `bson:"sessionId"`
+	Username  string    `bson:"username"`
+	ExpiresAt time.Time `bson:"expiresAt"`
+}
 
 type ExpenseDescriptor struct {
 	ExpenseId   string
