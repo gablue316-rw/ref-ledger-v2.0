@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ref-ledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ref-ledger
+  template:
+    metadata:
+      labels:
+        app: ref-ledger
+    spec:
+      containers:
+      - name: ref-ledger
+        image: ref-ledger:v2
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080

@@ -545,9 +545,12 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
+	fmt.Printf("Password entered: [%s]\n", password)
+	fmt.Printf("Length: %d\n", len(password))
+
 	// 1. Fetch user from DB (or hardcode for now)
 	// Replace later with Mongo lookup
-	storedHash := "$2a$10$cZW5HuePpDN5wsmlu7yqLO7gBKSleBfVZh6Jn7/fhkljLzontqPqK"
+	storedHash := "$2a$10$IZALwIK/r9iAnqwEvaZ3ruGo.ATXQHnoRCl7cb0oROAgkipwu34Se"
 
 	if username != "admin" {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -556,6 +559,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 
 	err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
 	if err != nil {
+		fmt.Println("Invalid password", err)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -566,7 +570,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	session := model.Session{
 		SessionID: sessionID,
 		Username:  username,
-		ExpiresAt: time.Now().Add(8 * time.Hour),
+		ExpiresAt: time.Now().Add(15 * time.Minute),
 	}
 
 	// 3. Store in MongoDB

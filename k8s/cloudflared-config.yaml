@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-config
+
+data:
+  config.yaml: |
+    tunnel: 4299fc7a-3088-406e-99bb-6d36c35258e2
+
+    credentials-file: /creds/credentials.json
+
+    ingress:
+      - hostname: ref-ledger.com
+        service: http://ref-ledger:8080
+
+      - service: http_status:404
