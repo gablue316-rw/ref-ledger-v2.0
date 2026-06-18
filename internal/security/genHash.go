@@ -14,6 +14,7 @@ func main() {
 	flag.Parse()
 	pwd := *password
 
+	fmt.Println("Hashing password", pwd)
 	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.DefaultCost)
 	if err != nil {
 		panic(err)
