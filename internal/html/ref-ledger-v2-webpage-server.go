@@ -82,6 +82,7 @@ type GameStatusUpdate struct {
 var ac database.AssociationCollection
 var sc database.SiteCollection
 var gc database.GameCollection
+var oc database.OfficialCollection
 
 var AuditLog *log.Logger = nil
 
@@ -640,6 +641,24 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Site updated successfully"))
 }
 
+func CreateOfficial(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(w, r)
+	var officialJson database.OfficialJson
+	err := json.NewDecoder(r.Body).Decode(&officialJson)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	err = oc.Add(oc.ConvJsonToOfficial(officialJson))
+	if err != nil {
+		fmt.Println("Failed to create official")
+		http.Error(w, "Failed to create official", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("Official updated successfully"))
+}
+
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
@@ -1089,6 +1108,13 @@ func main() {
 		return
 	}
 
+	err = oc.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize official collection.")
+		utils.AuditLog.Println("Failed to initialize official collection.")
+		return
+	}
+
 	utils.AuditLog.Println("All collections initialized successfully.")
 
 	fmt.Println("Registering routes...")
@@ -1127,11 +1153,15 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/sites.html")
 	}))
 
+	mux.HandleFunc("/officials", authRequired(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/officials.html")
+	}))
+
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/login.html")
 	})
 
-	mux.HandleFunc("/api/officials", GetOfficialsHandler)
+	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/assignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
@@ -1141,6 +1171,7 @@ func main() {
 	mux.HandleFunc("/api/deleteSite/{siteId}", DeleteSite)
 	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", DeleteGame)
 
+	mux.HandleFunc("/api/officials", CreateOfficial)
 	mux.HandleFunc("/api/expenses", CreateExpense)
 	mux.HandleFunc("/api/associations", CreateAssociation)
 	mux.HandleFunc("/api/sites", CreateSite)

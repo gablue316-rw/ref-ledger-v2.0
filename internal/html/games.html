@@ -185,7 +185,7 @@ body{padding:10px;}
 
 async function loadOfficials() {
     try {
-        const response = await fetch("/api/officials");
+        const response = await fetch("/api/loadOfficials");
 
         if (!response.ok) {
             throw new Error("Failed to load officials");

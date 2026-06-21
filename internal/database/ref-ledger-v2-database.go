@@ -2375,3 +2375,234 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 
 	return nil
 }
+
+// Official Collection, Documents and API Code
+type OfficialJson struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Phone     string `json:"phone"`
+	Email     string `json:"email"`
+	Address   string `json:"address"`
+}
+
+type OfficialDoc struct {
+	Id        int64  `bson:"id,omitempty"`
+	FirstName string `bson:"firstName,omitempty"`
+	LastName  string `bson:"lastName,omitempty"`
+	Phone     string `bson:"phone,omitempty"`
+	Email     string `bson:"email,omitempty"`
+	Address   string `bson:"address,omitempty"`
+}
+
+type Official struct {
+	FirstName string
+	LastName  string
+	Phone     string
+	Email     string
+	Address   string
+}
+
+type OfficialCollection struct {
+	DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+func (oc *OfficialCollection) ConvJsonToOfficial(oj OfficialJson) Official {
+	return Official{
+		FirstName: oj.FirstName,
+		LastName:  oj.LastName,
+		Phone:     oj.Phone,
+		Email:     oj.Email,
+		Address:   oj.Address,
+	}
+}
+
+func (oc *OfficialCollection) getNextId() (int64, error) {
+
+	var result OfficialDoc
+
+	opts := options.FindOne().
+		SetSort(bson.D{{Key: "id", Value: -1}})
+
+	err := oc.Coll.FindOne(
+		context.Background(),
+		bson.D{},
+		opts,
+	).Decode(&result)
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return 1, nil // first document
+		}
+		return 0, err
+	}
+
+	return result.Id + 1, nil
+}
+
+func (oc *OfficialCollection) convOfficialToDoc(official Official) (OfficialDoc, error) {
+
+	id, err := oc.getNextId()
+	if err != nil {
+		return OfficialDoc{}, err
+	}
+
+	return OfficialDoc{
+		Id:        id,
+		FirstName: official.FirstName,
+		LastName:  official.LastName,
+		Phone:     official.Phone,
+		Email:     official.Email,
+		Address:   official.Address,
+	}, nil
+}
+
+func (oc *OfficialCollection) convDocToOfficial(doc OfficialDoc) Official {
+	return Official{
+		FirstName: doc.FirstName,
+		LastName:  doc.LastName,
+		Phone:     doc.Phone,
+		Email:     doc.Email,
+		Address:   doc.Address,
+	}
+}
+
+func (oc *OfficialCollection) Init(client *mongo.Client) error {
+
+	oc.DB = client.Database(Database)
+	oc.Coll = oc.DB.Collection("officials")
+
+	fmt.Println("Successfully initialized Official Collection")
+	return nil
+}
+
+func (oc *OfficialCollection) Add(official Official) error {
+
+	var result *mongo.InsertOneResult
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	doc, err := oc.convOfficialToDoc(official)
+	if err != nil {
+		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
+	}
+
+	result, oc.LastError = oc.Coll.InsertOne(ctx, doc)
+	if oc.LastError != nil {
+		return fmt.Errorf("Insert failed.  Reason: %v", oc.LastError)
+	}
+	fmt.Println("Inserted ID:", result.InsertedID)
+
+	return nil
+}
+
+func (oc *OfficialCollection) Get(firstName, lastName string) (Official, error) {
+
+	var filter bson.M
+	var doc OfficialDoc
+
+	filter = bson.M{
+		"firstName": firstName,
+		"lastName":  lastName,
+	}
+
+	err := oc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return Official{}, fmt.Errorf("official not found")
+		}
+		return Official{}, fmt.Errorf("Failed to get official.  Reason: %v", err)
+	}
+
+	official := oc.convDocToOfficial(doc)
+	return official, nil
+}
+
+func (oc *OfficialCollection) Update(id string, official Official) error {
+
+	var filter bson.M
+	var doc OfficialDoc
+	var result *mongo.UpdateResult
+
+	filter = bson.M{
+		"firstName": official.FirstName,
+		"lastName":  official.LastName,
+	}
+
+	doc, err := oc.convOfficialToDoc(official)
+	if err != nil {
+		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
+	}
+
+	result, oc.LastError = oc.Coll.ReplaceOne(context.TODO(), filter, doc)
+	if oc.LastError != nil {
+		return fmt.Errorf("Failed to update official.  Reason: %v", oc.LastError)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("official not found")
+	}
+
+	fmt.Println("Record updated in", oc.Coll.Name())
+	return nil
+}
+
+func (oc *OfficialCollection) DeleteAll() error {
+
+	var result *mongo.DeleteResult
+
+	result, oc.LastError = oc.Coll.DeleteMany(context.TODO(), bson.M{})
+	if oc.LastError != nil {
+		return fmt.Errorf("Failed to delete all officials.  Reason: %v", oc.LastError)
+	}
+
+	fmt.Println("Deleted ", result.DeletedCount, " records from ", oc.Coll.Name())
+	return nil
+}
+
+func (oc *OfficialCollection) Delete(firstName, lastName string) error {
+
+	var filter bson.M
+	var result *mongo.DeleteResult
+
+	filter = bson.M{
+		"firstName": firstName,
+		"lastName":  lastName,
+	}
+
+	result, oc.LastError = oc.Coll.DeleteOne(context.TODO(), filter)
+	if oc.LastError != nil {
+		return fmt.Errorf("Failed to delete official.  Reason: %v", oc.LastError)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf("official not found")
+	}
+
+	fmt.Println("Deleted Record with Official Id of", filter["firstName"], " in", oc.Coll.Name(), "Records Deleted:", result.DeletedCount)
+
+	return nil
+}
+
+func (oc *OfficialCollection) Dump(firstName, lastName string) error {
+
+	fmt.Println("Retrieving official with Name:", firstName, lastName)
+
+	var official Official
+	official, err := oc.Get(firstName, lastName)
+	if err != nil {
+		return fmt.Errorf("Failed to get official.  Reason: %v", err)
+	}
+
+	fmt.Println("Dumping Record with Official Id of", official.FirstName, official.LastName)
+
+	fmt.Println("Name:", official.FirstName, official.LastName)
+	fmt.Println("Contact:", official.Phone)
+	fmt.Println("Phone:", official.Phone)
+	fmt.Println("Email:", official.Email)
+
+	return nil
+}
