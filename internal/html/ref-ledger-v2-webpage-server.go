@@ -188,6 +188,18 @@ func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(assignors)
 }
 
+func GetSitesDirectoryHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(w, r)
+	sites, err := sc.GetSitesDirectory()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sites)
+}
+
 func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(w, r)
 	officials, err := oc.GetOfficialsDirectory()
@@ -200,7 +212,21 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(officials)
 }
 
+func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(w, r)
+	sites, err := sc.GetSiteNames()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sites)
+}
+
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
+
 	LogVisitor(w, r)
 	officials, err := database.GetOfficialNames()
 	if err != nil {
@@ -1174,7 +1200,9 @@ func main() {
 	})
 
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
+	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
+	mux.HandleFunc("/api/sitesDirectory", GetSitesDirectoryHandler)
 	mux.HandleFunc("/api/assignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)

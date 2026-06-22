@@ -156,6 +156,16 @@
             background-color: #b91c1c;
         }
 
+        .btn-directory {
+            background-color: #7c3aed;
+            color: white;
+        }
+
+        .btn-directory:hover {
+            background-color: #6d28d9;
+            color: white;
+        }
+
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -179,6 +189,28 @@
                 width: 100%;
             }
         }
+
+        table {
+           width: 100%;
+           border-collapse: collapse;
+        }
+
+        th {
+             background-color: #2563eb;
+             color: white;
+             padding: 10px;
+             text-align: left;
+        }
+
+        td {
+             padding: 10px;
+             border-bottom: 1px solid #ddd;
+        }
+
+        tr:nth-child(even) {
+             background-color: #f9fafb;
+        }        
+
 
     </style>
 </head>
@@ -274,6 +306,13 @@
                    Delete Site
                 </button>
 
+                <button
+                    type="button"
+                    id="directoryBtn"
+                    class="btn btn-directory">
+                    Site Directory
+                </button>                       
+
             </div>
 
         </form>
@@ -284,6 +323,29 @@
         Ready to enter Sites
     </div>
 
+
+   <div class="form-card" id="directorySection" style="display:none;">
+
+       <h2>Sites Directory</h2>
+
+       <table id="sitesTable" style="width:100%; border-collapse:collapse;">
+
+           <thead>
+               <tr>
+                   <th>Site ID</th>
+                   <th>Site Name</th>
+                   <th>Contact Name</th>
+                   <th>Contact Number</th>
+                   <th>Contact Email</th>
+               </tr>
+           </thead>
+  
+           <tbody>
+           </tbody>
+
+       </table>
+
+    </div>    
 </div>
 
 <script>
@@ -381,6 +443,53 @@ document.getElementById("sitesForm").addEventListener("submit", async function(e
     }
 });
 
+document.getElementById("directoryBtn")
+.addEventListener("click", async function () {
+
+    try {
+
+        const response = await fetch("/api/sitesDirectory");
+
+        if (!response.ok) {
+            document.getElementById("message").innerText =
+                "Unable to load directory.";
+            return;
+        }
+
+        const sites = await response.json();
+
+        const tbody =
+            document.querySelector("#sitesTable tbody");
+
+        tbody.innerHTML = "";
+
+        sites.forEach(site => {
+
+            const row = document.createElement("tr");
+
+                
+            row.innerHTML = `
+                <td>${site.Id}</td>
+                <td>${site.Name}</td>
+                <td>${site.Contact}</td>
+                <td>${site.Phone}</td>
+                <td>${site.Email}</td>
+            `;
+
+            tbody.appendChild(row);
+        });
+
+        document.getElementById("directorySection").style.display = "block";
+
+        document.getElementById("message").innerText =
+            `${sites.length} sites loaded.`;
+
+    } catch (err) {
+
+        document.getElementById("message").innerText =
+            "Server unavailable.";
+    }
+});
 
 </script>
 

@@ -2210,7 +2210,7 @@ func (sc *SiteCollection) Get(id string) (*Site, error) {
 	return &site, nil
 }
 
-func (sc *SiteCollection) GetSiteName() ([]SiteName, error) {
+func (sc *SiteCollection) GetSiteNames() ([]SiteName, error) {
 	var sites []SiteName = []SiteName{}
 
 	cursor, err := sc.Coll.Find(context.TODO(), bson.M{})
@@ -2228,6 +2228,36 @@ func (sc *SiteCollection) GetSiteName() ([]SiteName, error) {
 		for part := range strings.SplitSeq(doc.Name, ",") {
 			sites = append(sites, SiteName{Name: strings.TrimSpace(part)})
 		}
+	}
+
+	return sites, nil
+}
+
+func (sc *SiteCollection) GetSitesDirectory() ([]Site, error) {
+
+	var filter bson.M
+	var sites []Site
+
+	filter = bson.M{}
+
+	opts := options.Find().
+		SetSort(bson.D{
+			{Key: "id", Value: 1},
+		})
+
+	cursor, err := sc.Coll.Find(context.TODO(), filter, opts)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return []Site{}, fmt.Errorf("Failed to query sites.  Reason: %v", err)
+	}
+
+	for cursor.Next(context.TODO()) {
+		var doc SiteDoc
+		if err := cursor.Decode(&doc); err != nil {
+			fmt.Println("Error:", err)
+			return []Site{}, fmt.Errorf("Failed to decode site document.  Reason: %v", err)
+		}
+		sites = append(sites, sc.convDocToSite(doc))
 	}
 
 	return sites, nil

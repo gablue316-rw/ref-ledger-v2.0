@@ -89,34 +89,10 @@ body{padding:10px;}
 <div class="card-title">Location & Sport</div>
 <div class="form-grid">
 <div class="form-group">
-<label for="site">Site</label>
-<select id="site">
-<option value="">Select Site</option>
-<option value="BETHSDA">Bethesda Park</option>
-<option value="BOGNP">Bogan Park</option>
-<option value="BFORD">Buford Park</option>
-<option value="BRKWHS">Brookwood High School</option>
-<option value="CGWHS">Central Gwinnett High School</option>
-<option value="COLLHS">Collins Hill High School</option>
-<option value="COLLINSHILL">Collins Hill Park</option>
-<option value="DACHS">Dacula High School</option>
-<option value="DISCHS">Discovery High School</option>
-<option value="DULHS">Duluth High School</option>
-<option value="FCENHS">Forsyth Central High School</option>
-<option value="GP">George Pierce</option>
-<option value="HBRHS">Hebron High School</option>
-<option value="LAMHS">Lambert High School</option>
-<option value="LANHS">Lanier High School</option>
-<option value="MCPCC">Mulberry Creek Park and Community Center</option>
-<option value="MLCHS">Mill Creek High School</option>
-<option value="MNRAHS">Monroe Area High School</option>
-<option value="NFORHS">North Forsyth High School</option>
-<option value="NGWHS">North Gwinnett High School</option>
-<option value="SHIHS">Shiloh High School</option>
-<option value="SFORHS">South Forsyth High School</option>
-<option value="SGWHS">South Gwinnett High School</option>
-<option value="WBARHS">Winder Barrow High School</option>
-</select>or
+    <label for="site">Site</label>
+    <select id="site">
+        <option value="">Select Site</option>
+    </select>
 </div>
 <div class="form-group"><label for="field">Field</label><input type="text" id="field"></div>
 <div class="form-group"><label for="sport">Sport</label><select id="sport"><option></option><option>Basketball</option><option>Softball</option></select></div>
@@ -184,6 +160,42 @@ body{padding:10px;}
 
 <script>
 
+async function loadSites() {
+    try {
+        const response = await fetch("/api/loadSites");
+
+        if (!response.ok) {
+            throw new Error("Failed to load sites");
+        }
+
+        const sites = await response.json();
+        console.log(sites);
+    
+        const dropdowns = [
+            "site"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Site</option>';
+
+            sites.forEach(site => {
+               const option = document.createElement("option");
+               option.value = site.name;
+               option.textContent = site.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading sites:", err);
+    }
+}
+
+
 async function loadOfficials() {
     try {
         const response = await fetch("/api/loadOfficials");
@@ -224,6 +236,7 @@ async function loadOfficials() {
 
 document.addEventListener("DOMContentLoaded", function() {
     loadOfficials();
+    loadSites();
 });
 document.getElementById("clearBtn").addEventListener("click", function () {
     document.getElementById("gameForm").reset();
