@@ -2521,6 +2521,37 @@ func (oc *OfficialCollection) Get(firstName, lastName string) (Official, error) 
 	return official, nil
 }
 
+func (oc *OfficialCollection) GetOfficialsDirectory() ([]Official, error) {
+
+	var filter bson.M
+	var officials []Official
+
+	filter = bson.M{}
+
+	opts := options.Find().
+		SetSort(bson.D{
+			{Key: "lastName", Value: 1},
+			{Key: "firstName", Value: 1},
+		})
+
+	cursor, err := oc.Coll.Find(context.TODO(), filter, opts)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return []Official{}, fmt.Errorf("Failed to query officials.  Reason: %v", err)
+	}
+
+	for cursor.Next(context.TODO()) {
+		var doc OfficialDoc
+		if err := cursor.Decode(&doc); err != nil {
+			fmt.Println("Error:", err)
+			return []Official{}, fmt.Errorf("Failed to decode official document.  Reason: %v", err)
+		}
+		officials = append(officials, oc.convDocToOfficial(doc))
+	}
+
+	return officials, nil
+}
+
 func (oc *OfficialCollection) Update(id string, official Official) error {
 
 	var filter bson.M

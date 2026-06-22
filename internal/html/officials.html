@@ -155,6 +155,16 @@
             background-color: #b91c1c;
         }
 
+        .btn-directory {
+            background-color: #7c3aed;
+            color: white;
+        }
+
+        .btn-directory:hover {
+            background-color: #6d28d9;
+            color: white;
+        }
+        
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -178,6 +188,27 @@
                 width: 100%;
             }
         }
+
+        table {
+           width: 100%;
+           border-collapse: collapse;
+        }
+
+        th {
+             background-color: #2563eb;
+             color: white;
+             padding: 10px;
+             text-align: left;
+        }
+
+        td {
+             padding: 10px;
+             border-bottom: 1px solid #ddd;
+        }
+
+        tr:nth-child(even) {
+             background-color: #f9fafb;
+        }        
 
     </style>
 </head>
@@ -276,7 +307,8 @@
                 </button>
                               
                 <button
-                    type="reset"
+                    type="clear"
+                    id="clearBtn"
                     class="btn btn-clear">
                     Clear Form
                 </button>
@@ -288,6 +320,13 @@
                     Delete Official
                 </button>
 
+                <button
+                    type="button"
+                    id="directoryBtn"
+                    class="btn btn-directory">
+                    Official Directory
+                </button>                
+
             </div>
 
         </form>
@@ -296,6 +335,28 @@
 
     <div class="message-box" id="message">
         Ready to enter officials.
+    </div>
+
+    <div class="form-card" id="directorySection" style="display:none;">
+
+       <h2>Officials Directory</h2>
+
+       <table id="officialsTable" style="width:100%; border-collapse:collapse;">
+
+           <thead>
+               <tr>
+                   <th>First Name</th>
+                   <th>Last Name</th>
+                   <th>Phone</th>
+                   <th>Email</th>
+               </tr>
+           </thead>
+  
+           <tbody>
+           </tbody>
+
+       </table>
+
     </div>
 
 </div>
@@ -391,7 +452,7 @@ document.getElementById("getOfficialBtn").addEventListener("click", async functi
     }
 });
 
-document.getElementById("deleteBtn").addEventListener("click", async function () {
+document.getElementById("deleteOfficialBtn").addEventListener("click", async function () {
 
     const firstName = document.getElementById("firstname").value;
     const lastName = document.getElementById("lastname").value;
@@ -420,6 +481,51 @@ document.getElementById("deleteBtn").addEventListener("click", async function ()
     }
 });
 
+document.getElementById("directoryBtn")
+.addEventListener("click", async function () {
+
+    try {
+
+        const response = await fetch("/api/officialsDirectory");
+
+        if (!response.ok) {
+            document.getElementById("message").innerText =
+                "Unable to load directory.";
+            return;
+        }
+
+        const officials = await response.json();
+
+        const tbody =
+            document.querySelector("#officialsTable tbody");
+
+        tbody.innerHTML = "";
+
+        officials.forEach(official => {
+
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+                <td>${official.FirstName}</td>
+                <td>${official.LastName}</td>
+                <td>${official.Phone}</td>
+                <td>${official.Email}</td>
+            `;
+
+            tbody.appendChild(row);
+        });
+
+        document.getElementById("directorySection").style.display = "block";
+
+        document.getElementById("message").innerText =
+            `${officials.length} officials loaded.`;
+
+    } catch (err) {
+
+        document.getElementById("message").innerText =
+            "Server unavailable.";
+    }
+});
 </script>
 
 </body>
