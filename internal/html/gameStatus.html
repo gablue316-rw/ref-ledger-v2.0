@@ -3,144 +3,261 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ref-Ledger V2.0 Update Game Status</title>
+    <title>Ref Ledger V2.0 Update Game Status</title>
 
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 40px 0 0 20px;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
         }
 
-        h2 {
+        body {
+            background-color: #f4f6f9;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+        }
+
+        .header {
+            background-color: #1e293b;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
             margin-bottom: 20px;
         }
 
-        .form-group {
+        .header h1 {
+            margin-bottom: 10px;
+        }
+
+        .navbar {
+            background-color: #0f172a;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 14px 20px;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .navbar a:hover {
+            background-color: #1e293b;
+        }
+
+        .navbar a.active {
+            background-color: #2563eb;
+        }
+
+        .form-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
             margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
         }
 
         label {
-            display: block;
-            font-weight: bold;
             margin-bottom: 5px;
-        }
-
-        #gameIds {
-            width: 220px;
-        }
-
-        #status {
-            width: 220px;
+            font-weight: bold;
         }
 
         input,
-        select,
-        button {
-            padding: 8px;
-            font-size: 14px;
-            box-sizing: border-box;
+        select {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            min-width: 220px;
         }
 
-        button {
-            width: 220px;
+        .button-row {
+            background-color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .btn {
+            color: white;
+            border: none;
+            padding: 11px 20px;
+            border-radius: 5px;
             cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .btn-update {
+            background-color: #16a34a;
+        }
+
+        .btn-update:hover {
+            background-color: #15803d;
+        }
+
+        .btn-clear {
+            background-color: #dc2626;
+        }
+
+        .btn-clear:hover {
+            background-color: #b91c1c;
         }
 
         #result {
-            margin-top: 15px;
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             font-weight: bold;
+            min-height: 50px;
+        }
+
+        @media (max-width: 768px) {
+            .form-card {
+                flex-direction: column;
+            }
+
+            input,
+            select,
+            .btn {
+                width: 100%;
+            }
+
+            .button-row {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
+
 <body>
 
-    <div class="container">
+<div class="container">
 
-       <div class="header">
-           <h1>Ref Ledger V2.0 Update Game Status</h1>
-           <p>Enter Game Id[s] and Game Status</p>
-       </div>
+    <div class="header">
+        <h1>Ref Ledger V2.0 Update Game Status</h1>
+        <p>Enter Game IDs and update their status</p>
     </div>
-    
+
+<nav class="navbar">
+    <a href="/">Home</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="/reports">Reports</a>
+    <a href="/games">Games</a>
+    <a href="/officials">Officials</a>
+    <a href="/payments">Payments</a>
+    <a href="/expenses">Expenses</a>
+    <a href="/associations">Associations</a>
+    <a href="/sites">Sites</a>
+    <a href="/gameStatus" class="active">Update Game Status</a>
+</nav>    
+
     <form id="statusForm">
 
-        <div class="form-group">
-            <label for="gameIds">Game IDs</label>
-            <input
-                type="text"
-                id="gameIds"
-                placeholder="1980-1982;2698-2700;2900"
-                required>
+        <div class="form-card">
+
+            <div class="form-group">
+                <label for="gameIds">Game IDs</label>
+                <input
+                    type="text"
+                    id="gameIds"
+                    placeholder="1980-1982;2698-2700;2900"
+                    required>
+            </div>
+
+            <div class="form-group">
+                <label for="status">New Status</label>
+                <select id="status" required>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Delete">Delete</option>
+                </select>
+            </div>
+
         </div>
 
-        <div class="form-group">
-            <label for="status">New Status</label>
-            <select id="status">
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending</option>
-                <option value="Delete">Delete</option>
-            </select>
-        </div>
+        <div class="button-row">
 
-        <button type="submit">
-            Update Games
-        </button>
+            <button class="btn btn-update" type="submit">
+                Update Games
+            </button>
+
+        </div>
 
     </form>
 
-    <div id="result"></div>
+    <div id="result">Ready.</div>
 
-    <script>
-        document
-            .getElementById("statusForm")
-            .addEventListener("submit", async function (e) {
+</div>
 
-                e.preventDefault();
+<script>
+document
+    .getElementById("statusForm")
+    .addEventListener("submit", async function (e) {
 
-                const gameIds = document
-                    .getElementById("gameIds")
-                    .value
-                    .trim();
+        e.preventDefault();
 
-                const status = document
-                    .getElementById("status")
-                    .value;
+        const gameIds =
+            document.getElementById("gameIds").value.trim();
 
-                try {
-                    const response = await fetch(
-                        "/api/games/status",
-                        {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json"
-                            },
-                            body: JSON.stringify({
-                                gameIds: gameIds,
-                                status: status
-                            })
-                        }
-                    );
+        const status =
+            document.getElementById("status").value;
 
-                    const result =
-                        document.getElementById("result");
+        const result =
+            document.getElementById("result");
 
-                    if (response.ok) {
-                        result.innerText =
-                            "Game status update completed.";
-                    } else {
-                        const text = await response.text();
-                        result.innerText =
-                            "Error: " + text;
-                    }
+        try {
+            result.innerText = "Updating...";
 
-                } catch (err) {
-                    document.getElementById("result").innerText =
-                        "Request failed: " + err.message;
-                }
+            const response = await fetch("/api/games/status", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    gameIds: gameIds,
+                    status: status
+                })
             });
-    </script>
+
+            if (response.ok) {
+                result.innerText = "Game status update completed.";
+            } else {
+                const text = await response.text();
+                result.innerText = "Error: " + text;
+            }
+
+        } catch (err) {
+            result.innerText = "Request failed: " + err.message;
+        }
+    });
+</script>
 
 </body>
 </html>

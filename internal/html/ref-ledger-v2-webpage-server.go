@@ -1163,7 +1163,7 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
 	})
 
-	mux.HandleFunc("/game-status", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/gameStatus", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/gameStatus.html")
 	})
 
