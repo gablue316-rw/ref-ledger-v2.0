@@ -1198,6 +1198,10 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/officials.html")
 	}))
 
+	mux.HandleFunc("/contact", authRequired(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/contact.html")
+	}))
+
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/login.html")
 	})
