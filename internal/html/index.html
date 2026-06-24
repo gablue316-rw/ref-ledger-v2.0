@@ -1,168 +1,286 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ref Ledger V2.0</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ref Ledger V2.0</title>
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-        }
+<style>
+* {
+    box-sizing: border-box;
+}
 
-        header {
-            background-color: #1f4e79;
-            color: white;
-            text-align: center;
-            padding: 25px;
-        }
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f4f6f9;
+    color: #0f172a;
+}
 
-        header h1 {
-            margin: 0;
-        }
+.navbar {
+    background: #082b4f;
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 15px 30px;
+}
 
-        .container {
-            max-width: 1200px;
-            margin: 30px auto;
-            padding: 20px;
-        }
+.logo {
+    font-size: 28px;
+    font-weight: bold;
+    margin-right: 40px;
+    white-space: nowrap;
+}
 
-        .welcome {
-            text-align: center;
-            margin-bottom: 40px;
-        }
+.nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
 
-        .nav-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 15px;
-        }
+.nav-links a {
+    color: white;
+    text-decoration: none;
 
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 18px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            transition: transform 0.2s;
-        }
+    display: flex;
+    flex-direction: column;
 
-        .card:hover {
-            transform: translateY(-4px);
-        }
+    align-items: center;
+    justify-content: center;
 
-        .card h2 {
-            margin-top: 0;
-            color: #1f4e79;
-        }
+    min-width: 90px;
+    padding: 10px;
 
-        .card p {
-            color: #555;
-            min-height: 50px;
-        }
+    border-radius: 6px;
 
-        .card a {
-            display: inline-block;
-            background-color: #1f4e79;
-            color: white;
-            text-decoration: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-weight: bold;
-        }
+    transition: .2s;
+}
 
-        .card a:hover {
-            background-color: #163b5c;
-        }
+.nav-links a:hover {
+    background: rgba(255,255,255,.10);
+}
 
-        footer {
-            text-align: center;
-            padding: 20px;
-            color: #777;
-            margin-top: 40px;
-        }
-    </style>
+.nav-links a.active {
+    background: rgba(255,255,255,.15);
+}
+
+.nav-links i {
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+
+.nav-links span {
+    font-size: 13px;
+}
+
+.hero {
+    background: white;
+    text-align: center;
+    padding: 70px 20px 30px;
+}
+
+.hero h1 {
+    font-size: 64px;
+    margin: 0 0 20px;
+    color: #082b4f;
+}
+
+.hero p {
+    font-size: 24px;
+    line-height: 1.5;
+    max-width: 850px;
+    margin: 0 auto 25px;
+}
+
+.tagline {
+    font-size: 22px;
+    font-weight: bold;
+    color: #082b4f;
+    margin-top: 25px;
+}
+
+.sports-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-top: 0;
+}
+
+.sport {
+    position: relative;
+    height: 280px;
+    overflow: hidden;
+}
+
+.sport img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.sport::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.65), rgba(0,0,0,.05));
+}
+
+.sport h2 {
+    position: absolute;
+    bottom: 18px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: white;
+    z-index: 1;
+    margin: 0;
+    font-size: 26px;
+    letter-spacing: 1px;
+}
+
+footer {
+    background: #082b4f;
+    color: white;
+    text-align: center;
+    padding: 20px;
+    font-size: 16px;
+}
+
+@media (max-width: 900px) {
+    .navbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .nav-links {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+    }
+
+    .hero h1 {
+        font-size: 42px;
+    }
+
+    .hero p {
+        font-size: 18px;
+    }
+
+    .sports-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .sports-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 </head>
 
 <body>
 
-    <header>
-        <h1>Ref Ledger V2.0</h1>
-        <p>Officials Management and Game Tracking System</p>
-    </header>
+<nav class="navbar">
 
-    <div class="container">
+    <div class="logo">
+        Ref Ledger V2.0
+    </div>
 
-        <div class="welcome">
-            <h2>Welcome</h2>
-            <p>Select an area below to manage your referee operations.</p>
-        </div>
+    <div class="nav-links">
 
-        <div class="nav-grid">
+        <a class="active" href="/">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
 
-            <div class="card">
-                <h2>Dashboard</h2>
-                <p>View key metrics, upcoming games, and system summaries.</p>
-                <a href="/dashboard">Open Dashboard</a>
-            </div>
+        <a href="/dashboard">
+            <i class="fa-solid fa-chart-column"></i>
+            <span>Dashboard</span>
+        </a>
 
-            <div class="card">
-                <h2>Reports</h2>
-                <p>Create reports.</p>
-                <a href="/reports">Generate Reports</a>
-            </div>
+        <a href="/reports">
+            <i class="fa-solid fa-file-lines"></i>
+            <span>Reports</span>
+        </a>
 
-            <div class="card">
-                <h2>Games</h2>
-                <p>Manage game schedules and assignments.</p>
-                <a href="/games">Manage Games</a>
-            </div>
+        <a href="/games">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Games</span>
+        </a>
 
-            <div class="card">
-                <h2>Officials</h2>
-                <p>Maintain referee information and availability.</p>
-                <a href="/officials">Manage Officials</a>
-            </div>
+        <a href="/officials">
+            <i class="fa-solid fa-users"></i>
+            <span>Officials</span>
+        </a>
 
-            <div class="card">
-                <h2>Associations</h2>
-                <p>Manage officiating associations and memberships.</p>
-                <a href="/associations">Manage Associations</a>
-            </div>
+        <a href="/associations">
+            <i class="fa-solid fa-building-columns"></i>
+            <span>Associations</span>
+        </a>
 
-            <div class="card">
-                <h2>Sites</h2>
-                <p>Manage schools, parks, and game locations.</p>
-                <a href="/sites">Manage Sites</a>
-            </div>
+        <a href="/sites">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Sites</span>
+        </a>
 
-           <div class="card">
-                <h2>Expenses</h2>
-                <p>Manage and track referee expenses.</p>
-                <a href="/expenses">Manage Expenses</a>
-            </div>            
+        <a href="/expenses">
+            <i class="fa-solid fa-receipt"></i>
+            <span>Expenses</span>
+        </a>
 
-            <div class="card">
-                <h2>Payments</h2>
-                <p>View received payments and manage financial transactions.</p>
-                <a href="/payments">Open Payments</a>
-            </div>    
-            
-            <div class="card">
-                <h2>Update Game Status</h2>
-                <p>Update the status of upcoming or ongoing games.</p>
-                <a href="/gameStatus">Update Status</a>
-            </div>                  
-        </div>
+        <a href="/payments">
+            <i class="fa-solid fa-dollar-sign"></i>
+            <span>Payments</span>
+        </a>
+
+        <a href="/gameStatus">
+            <i class="fa-solid fa-rotate"></i>
+            <span>Status</span>
+        </a>
 
     </div>
 
-    <footer>
-        Ref Ledger V2.0 © 2026
-    </footer>
+</nav>
+
+<section class="hero">
+    <h1>Welcome to Ref Ledger</h1>
+    <p>
+        Your all-in-one platform for managing officials, games, assignments,
+        and finances — all in one place.
+    </p>
+    <div class="tagline">Built for Officials. Powered by Experience.</div>
+</section>
+
+<section class="sports-grid">
+
+    <div class="sport">
+        <img src="/images/softball-ref.jpg?v=2" alt="Softball Referee">
+        <h2>SOFTBALL</h2>
+    </div>
+
+    <div class="sport">
+        <img src="/images/basketball-ref.jpg?v=4" alt="Basketball official">
+        <h2>BASKETBALL</h2>
+    </div>
+
+    <div class="sport">
+        <img src="/images/football-ref.jpg?v=2" alt="Football official">
+        <h2>FOOTBALL</h2>
+    </div>
+
+    <div class="sport">
+        <img src="/images/baseball-ref.jpg?v=4" alt="Baseball official">
+        <h2>BASEBALL</h2>
+    </div>
+
+</section>
+
+<footer>
+    Ref Ledger V2.0 © 2026
+</footer>
 
 </body>
 </html>

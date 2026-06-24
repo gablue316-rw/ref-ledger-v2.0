@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ref Ledger V2.0 Officials Entry</title>
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">    
 
     <style>
 
@@ -37,31 +39,61 @@
             margin-bottom: 10px;
         }
 
-        .navbar {
-            background-color: #0f172a;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
+.navbar {
+    background: #082b4f;
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 15px 30px;
+}
 
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            padding: 14px 20px;
-            font-weight: bold;
-            transition: background-color 0.2s;
-        }
+.logo {
+    font-size: 28px;
+    font-weight: bold;
+    margin-right: 40px;
+    white-space: nowrap;
+}
 
-        .navbar a:hover {
-            background-color: #1e293b;
-        }
+.nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
 
-        .navbar a.active {
-            background-color: #2563eb;
-        }
+.nav-links a {
+    color: white;
+    text-decoration: none;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 90px;
+    padding: 10px;
+
+    border-radius: 6px;
+
+    transition: .2s;
+}
+
+.nav-links a:hover {
+    background: rgba(255,255,255,.10);
+}
+
+.nav-links a.active {
+    background: rgba(255,255,255,.15);
+}
+
+.nav-links i {
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+
+.nav-links span {
+    font-size: 13px;
+}
 
         .form-card {
             background-color: white;
@@ -222,18 +254,65 @@
         <p>Manage and track Officials information.</p>
     </div>
 
-    <nav class="navbar">
-        <a href="/">Home</a>
-        <a href="/dashboard">Dashboard</a>
-        <a href="/reports">Reports</a>
-        <a href="/games">Games</a>
-        <a href="/officials" class="active">Officials</a>
-        <a href="/payments">Payments</a>
-        <a href="/expenses">Expenses</a>
-        <a href="/associations">Associations</a>
-        <a href="/sites">Sites</a>
-        <a href="/gameStatus">Update Game Status</a>             
-    </nav>
+ 
+<nav class="navbar">
+
+    <div class="nav-links">
+
+        <a href="/">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+
+        <a href="/dashboard">
+            <i class="fa-solid fa-chart-column"></i>
+            <span>Dashboard</span>
+        </a>
+
+        <a href="/reports">
+            <i class="fa-solid fa-file-lines"></i>
+            <span>Reports</span>
+        </a>
+
+        <a href="/games">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Games</span>
+        </a>
+
+        <a class="active" href="/officials">
+            <i class="fa-solid fa-users"></i>
+            <span>Officials</span>
+        </a>
+
+        <a href="/associations">
+            <i class="fa-solid fa-building-columns"></i>
+            <span>Associations</span>
+        </a>
+
+        <a href="/sites">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Sites</span>
+        </a>
+
+        <a href="/expenses">
+            <i class="fa-solid fa-receipt"></i>
+            <span>Expenses</span>
+        </a>
+
+        <a href="/payments">
+            <i class="fa-solid fa-dollar-sign"></i>
+            <span>Payments</span>
+        </a>
+
+        <a href="/gameStatus">
+            <i class="fa-solid fa-rotate"></i>
+            <span>Status</span>
+        </a>
+
+    </div>
+
+</nav>
+
 
     <div class="form-card">
 

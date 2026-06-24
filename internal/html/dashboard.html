@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ref Ledger V2.0 Game Dashboard</title>
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">    
 
     <style>
         * {
@@ -36,32 +38,62 @@
             margin-bottom: 10px;
         }
 
-        .navbar {
-            background-color: #0f172a;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
+.navbar {
+    background: #082b4f;
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 15px 30px;
+}
 
+.logo {
+    font-size: 28px;
+    font-weight: bold;
+    margin-right: 40px;
+    white-space: nowrap;
+}
 
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            padding: 14px 20px;
-            font-weight: bold;
-            transition: background-color 0.2s;
-        }
+.nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
 
-        .navbar a:hover {
-            background-color: #1e293b;
-        }
+.nav-links a {
+    color: white;
+    text-decoration: none;
 
-        .navbar a.active {
-            background-color: #2563eb;
-        }
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 90px;
+    padding: 10px;
+
+    border-radius: 6px;
+
+    transition: .2s;
+}
+
+.nav-links a:hover {
+    background: rgba(255,255,255,.10);
+}
+
+.nav-links a.active {
+    background: rgba(255,255,255,.15);
+}
+
+.nav-links i {
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+
+.nav-links span {
+    font-size: 13px;
+}
+
 
         .filters {
             background-color: white;
@@ -182,18 +214,62 @@
         <p>View and manage your game schedule</p>
     </div>
 
-    <nav class="navbar">
-        <a href="/">Home</a>
-        <a href="/dashboard" class="active">Dashboard</a>
-        <a href="/reports">Reports</a>
-        <a href="/games">Games</a>
-        <a href="/officials">Officials</a>
-        <a href="/payments">Payments</a>
-        <a href="/expenses">Expenses</a>
-        <a href="/associations">Associations</a>
-        <a href="/sites">Sites</a>
-        <a href="/gameStatus">Update Game Status</a>             
-    </nav>    
+<nav class="navbar">
+
+    <div class="nav-links">
+
+        <a href="/">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a class="active" href="/dashboard">
+            <i class="fa-solid fa-chart-column"></i>
+            <span>Dashboard</span>
+        </a>
+
+        <a href="/reports">
+            <i class="fa-solid fa-file-lines"></i>
+            <span>Reports</span>
+        </a>
+
+        <a href="/games">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Games</span>
+        </a>
+
+        <a href="/officials">
+            <i class="fa-solid fa-users"></i>
+            <span>Officials</span>
+        </a>
+
+        <a href="/associations">
+            <i class="fa-solid fa-building-columns"></i>
+            <span>Associations</span>
+        </a>
+
+        <a href="/sites">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Sites</span>
+        </a>
+
+        <a href="/expenses">
+            <i class="fa-solid fa-receipt"></i>
+            <span>Expenses</span>
+        </a>
+
+        <a href="/payments">
+            <i class="fa-solid fa-dollar-sign"></i>
+            <span>Payments</span>
+        </a>
+
+        <a href="/gameStatus">
+            <i class="fa-solid fa-rotate"></i>
+            <span>Status</span>
+        </a>
+
+    </div>
+
+</nav>
 
     <div class="filters">
         <div class="filter-group">
@@ -312,6 +388,74 @@
 </div>
 
 <script>
+    async function initialLoadGames() {
+
+        const status = "Pending"
+        // Build query string
+        const params = new URLSearchParams();
+
+        params.append("status", status);
+
+        try {
+
+            // Replace with your Go API endpoint
+            const response = await fetch(`/api/dashboard?${params.toString()}`);
+
+            console.log("Status:", response.status);
+            console.log("Content-Type:", response.headers.get("content-type"));
+
+            if (!response.ok) {
+               const text = await response.text();
+               console.error("Server returned:", text);
+               throw new Error(`HTTP ${response.status}`);
+            }
+       
+            const games = await response.json();
+
+            console.log("Games:", games);   
+
+            const tbody = document.getElementById("gamesBody");
+
+            tbody.innerHTML = "";
+
+            games.forEach(game => {
+
+                let statusClass = "";
+
+                if (game.status === "Completed") {
+                    statusClass = "completed";
+                }
+                else if (game.status === "Pending") {
+                    statusClass = "pending";
+                }
+                else {
+                    statusClass = "paid";
+                }
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${game.GameId}</td>
+                        <td>${game.Date}</td>
+                        <td>${game.Time}</td>
+                        <td>${game.Sport}</td>
+                        <td>${game.Site}</td>
+                        <td>${game.Field}</td>
+                        <td>${game.NumOfGames}</td>                                                                                                
+                        <td>${game.Level}</td>
+                        <td>${game.GameFee}</td>       
+                        <td>${game.Association}</td>              
+                        <td>${game.Status}</td>
+                        <td>${game.Officials}</td>                           
+                    </tr>
+                `;
+            });
+
+        }
+        catch (err) {
+            console.error(err);
+            alert("Failed to load games.");
+        }
+    }
 
     async function loadGames() {
 
@@ -415,7 +559,7 @@
     }
 
     // Initial page load
-    loadGames();
+    initialLoadGames();
 
 </script>
 

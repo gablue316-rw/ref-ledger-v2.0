@@ -1159,17 +1159,20 @@ func main() {
 	utils.AuditLog.Println("Registering routes...")
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/expenses", func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/images/", http.StripPrefix("/images/",
+		http.FileServer(http.Dir("./internal/html/images"))))
+
+	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
-	})
+	}))
 
-	mux.HandleFunc("/gameStatus", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/gameStatus", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/gameStatus.html")
-	})
+	}))
 
-	mux.HandleFunc("/reports", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/reports", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/reports.html")
-	})
+	}))
 
 	mux.HandleFunc("/games", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/games.html")
@@ -1223,6 +1226,17 @@ func main() {
 	mux.HandleFunc("/api/payments", CreatePayment)
 	mux.HandleFunc("/api/login", ValidateLogin)
 	mux.HandleFunc("/logout", logout)
+
+	/*
+		mux.Handle("/images/", http.StripPrefix("/images/",
+			http.FileServer(http.Dir("internal/html/images"))))
+
+
+			mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, "./internal/html/index.html")
+			}))
+	*/
+
 	mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/index.html")
 	}))
