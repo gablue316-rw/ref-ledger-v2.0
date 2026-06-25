@@ -467,8 +467,13 @@ document.getElementById("associationForm").addEventListener("submit", async func
             body: JSON.stringify(association)
         });
 
+        const message = await response.text();
+
         document.getElementById("message").innerText =
-            response.ok ? "Association saved successfully." : "Error saving association.";
+            response.ok
+                ? message || "Association saved successfully."
+                : message || "Error saving association.";
+
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }

@@ -92,6 +92,16 @@ body{background:#f4f6f9;padding:20px;color:#333;}
 .btn-get:hover{
     background:#1d4ed8;
 }
+
+        .message-box {
+            background-color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-weight: bold;
+            min-height: 60px;
+        }
+
 #message{margin-top:15px;font-weight:bold;}
 @media(max-width:768px){
 body{padding:10px;}
@@ -261,7 +271,9 @@ body{padding:10px;}
     <button type="button" id="deleteBtn" class="btn btn-delete">Delete Game</button>
 </div>
 
-<div id="message"></div>
+<div class="message-box" id="message">
+        Ready to enter Games
+</div>
 </form>
 </div>
 
@@ -503,8 +515,14 @@ document.getElementById("gameForm").addEventListener("submit", async function(e)
             body: JSON.stringify(game)
         });
 
+        const message = await response.text();
+
         document.getElementById("message").innerText =
-            response.ok ? "Game saved successfully." : "Error saving game.";
+            response.ok
+                ? message || "Game saved successfully."
+                : message || "Error saving game.";
+
+            
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }

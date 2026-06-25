@@ -477,18 +477,12 @@ document.getElementById("officialsForm")
             body: JSON.stringify(official)
         });
 
-        if (response.ok) {
+        const message = await response.text();
 
-            document.getElementById("message").innerText =
-                "Official saved successfully.";
-
-            document.getElementById("officialsForm").reset();
-
-        } else {
-
-            document.getElementById("message").innerText =
-                "Error saving official.";
-        }
+        document.getElementById("message").innerText =
+            response.ok
+                ? message || "Official saved successfully."
+                : message || "Error saving official.";
 
     } catch (err) {
 

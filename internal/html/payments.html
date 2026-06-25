@@ -401,18 +401,12 @@ document.getElementById("paymentForm")
             body: JSON.stringify(payment)
         });
 
-        if (response.ok) {
+        const message = await response.text();
 
-            document.getElementById("message").innerText =
-                "Payment saved successfully.";
-
-            document.getElementById("paymentForm").reset();
-
-        } else {
-
-            document.getElementById("message").innerText =
-                "Error saving payment.";
-        }
+        document.getElementById("message").innerText =
+            response.ok
+                ? message || "Payment saved successfully."
+                : message || "Error saving payment.";
 
     } catch (err) {
 

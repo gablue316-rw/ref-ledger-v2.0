@@ -8,6 +8,7 @@ type Session struct {
 	SessionID string    `bson:"sessionId"`
 	Username  string    `bson:"username"`
 	ExpiresAt time.Time `bson:"expiresAt"`
+	Role      string    `bson:"role"`
 }
 
 type ExpenseDescriptor struct {

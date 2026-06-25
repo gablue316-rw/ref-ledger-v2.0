@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -1243,6 +1244,36 @@ func QueryGames(parentCtx context.Context, dbase, collection, filter string) ([]
 
 	}
 	return gameRecords, nil
+}
+
+func GetSession(r *http.Request) (*model.Session, error) {
+
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		return nil, err
+	}
+
+	var session model.Session
+
+	err = Client.
+		Database("refLedger_v2").
+		Collection("sessions").
+		FindOne(
+			r.Context(),
+			bson.M{"sessionId": cookie.Value},
+		).
+		Decode(&session)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Session expired?
+	if time.Now().After(session.ExpiresAt) {
+		return nil, errors.New("session expired")
+	}
+
+	return &session, nil
 }
 
 func Connect() error {

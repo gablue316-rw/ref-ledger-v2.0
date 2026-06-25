@@ -520,8 +520,13 @@ document.getElementById("sitesForm").addEventListener("submit", async function(e
             body: JSON.stringify(site)
         });
 
+        const message = await response.text();
+
         document.getElementById("message").innerText =
-            response.ok ? "Site saved successfully." : "Error saving site.";
+            response.ok
+                ? message || "Site saved successfully."
+                : message || "Error saving site.";        
+                
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }

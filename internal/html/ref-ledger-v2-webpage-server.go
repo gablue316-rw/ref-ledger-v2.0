@@ -86,6 +86,25 @@ var oc database.OfficialCollection
 
 var AuditLog *log.Logger = nil
 
+func readOnlyForbidden(next http.HandlerFunc) http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		session, err := database.GetSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		if session.Role == "readonly" {
+			http.Error(w, "Permission denied", http.StatusForbidden)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
 func GameDocToGameDescr(g Game) model.GameDescriptor {
 
 	t, err := time.Parse("2006-01-02", g.Date)
@@ -581,6 +600,10 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var err error
+	sessionDuration := 15 * time.Minute
+	role := "user"
+
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
@@ -591,16 +614,22 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	// Replace later with Mongo lookup
 	storedHash := "$2a$10$IZALwIK/r9iAnqwEvaZ3ruGo.ATXQHnoRCl7cb0oROAgkipwu34Se"
 
-	if username != "admin" {
+	if username != "admin" && username != "test" {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
-	if err != nil {
-		fmt.Println("Invalid password", err)
-		w.WriteHeader(http.StatusUnauthorized)
-		return
+	if username == "test" {
+		role = "readonly"
+	}
+
+	if username == "admin" {
+		err = bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
+		if err != nil {
+			fmt.Println("Invalid password", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 	}
 
 	// 2. Create session
@@ -609,7 +638,8 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	session := model.Session{
 		SessionID: sessionID,
 		Username:  username,
-		ExpiresAt: time.Now().Add(15 * time.Minute),
+		ExpiresAt: time.Now().Add(sessionDuration),
+		Role:      role,
 	}
 
 	// 3. Store in MongoDB
@@ -629,7 +659,8 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
-		MaxAge:   60 * 60 * 8,
+		MaxAge:   int(sessionDuration.Seconds()),
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	w.WriteHeader(http.StatusOK)
@@ -1213,21 +1244,28 @@ func main() {
 	mux.HandleFunc("/api/assignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
-	mux.HandleFunc("/api/deleteAssociation/{assocId}", DeleteAssociation)
+	//mux.HandleFunc("/api/deleteAssociation/{assocId}", DeleteAssociation)
+
+	mux.HandleFunc("/api/deleteAssociation/{assocId}",
+		authRequired(readOnlyForbidden(DeleteAssociation)))
 
 	mux.HandleFunc("/api/site/{siteId}", GetSingleSite)
-	mux.HandleFunc("/api/deleteSite/{siteId}", DeleteSite)
-	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", DeleteGame)
+	mux.HandleFunc("/api/deleteSite/{siteId}", authRequired(readOnlyForbidden(DeleteSite)))
+	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", authRequired(readOnlyForbidden(DeleteGame)))
 
-	mux.HandleFunc("/api/officials", CreateOfficial)
-	mux.HandleFunc("/api/expenses", CreateExpense)
-	mux.HandleFunc("/api/associations", CreateAssociation)
-	mux.HandleFunc("/api/sites", CreateSite)
-	mux.HandleFunc("/api/games/status", UpdateGameStatus)
+	mux.HandleFunc("/api/officials", authRequired(readOnlyForbidden(CreateOfficial)))
+	mux.HandleFunc("/api/expenses", authRequired(readOnlyForbidden(CreateExpense)))
+	//mux.HandleFunc("/api/associations", CreateAssociation)
+
+	mux.HandleFunc("/api/associations",
+		authRequired(readOnlyForbidden(CreateAssociation)))
+
+	mux.HandleFunc("/api/sites", authRequired(readOnlyForbidden(CreateSite)))
+	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))
 	mux.HandleFunc("/api/reports", GenerateReport)
-	mux.HandleFunc("/api/game-update", UpdateGame)
+	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
-	mux.HandleFunc("/api/payments", CreatePayment)
+	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
 	mux.HandleFunc("/api/login", ValidateLogin)
 	mux.HandleFunc("/logout", logout)
 

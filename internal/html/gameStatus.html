@@ -330,13 +330,13 @@ document
                     status: status
                 })
             });
+  
+            const message = await response.text();
 
-            if (response.ok) {
-                result.innerText = "Game status update completed.";
-            } else {
-                const text = await response.text();
-                result.innerText = "Error: " + text;
-            }
+            document.getElementById("result").innerText =
+            response.ok
+                ? message || "Game status update completed."
+                : message || "Error updating game status.";
 
         } catch (err) {
             result.innerText = "Request failed: " + err.message;

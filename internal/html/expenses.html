@@ -388,18 +388,16 @@ document.getElementById("expenseForm")
             body: JSON.stringify(expense)
         });
 
+        const message = await response.text();
+
+        document.getElementById("message").innerText =
+            response.ok
+                ? message || "Expense saved successfully."
+                : message || "Error saving expense.";
+                
         if (response.ok) {
-
-            document.getElementById("message").innerText =
-                "Expense saved successfully.";
-
             document.getElementById("expenseForm").reset();
-
-        } else {
-
-            document.getElementById("message").innerText =
-                "Error saving expense.";
-        }
+        } 
 
     } catch (err) {
 
