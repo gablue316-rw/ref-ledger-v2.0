@@ -313,6 +313,13 @@
             <i class="fa-solid fa-envelope"></i>
             <span>Contact</span>
         </a>  
+
+
+        <a href="#" id="logoutBtn">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Logout</span>
+        </a>        
+
     </div>
 
 </nav>
@@ -447,6 +454,27 @@
 </div>
 
 <script>
+
+document.getElementById("logoutBtn").addEventListener("click", async () => {
+
+    try {
+
+        const response = await fetch("/api/logout", {
+            method: "POST"
+        });
+
+        if (response.ok) {
+            window.location.href = "/login";
+        } else {
+            alert("Logout failed");
+        }
+
+    } catch(err) {
+        alert("Logout failed");
+    }
+
+});        
+
 
 document.getElementById("clearBtn").addEventListener("click", function () {
     document.getElementById("officialsForm").reset();
