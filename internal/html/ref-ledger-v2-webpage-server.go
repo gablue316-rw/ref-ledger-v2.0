@@ -1094,28 +1094,6 @@ func isAuthenticated(r *http.Request) bool {
 	return err == nil
 }
 
-func logout(w http.ResponseWriter, r *http.Request) {
-
-	cookie, err := r.Cookie("rl_session")
-	if err == nil {
-		database.Client.
-			Database("refLedger_v2").
-			Collection("sessions").
-			DeleteOne(r.Context(), bson.M{
-				"sessionId": cookie.Value,
-			})
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:   "rl_session",
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
-	})
-
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
-}
-
 func authRequired(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
@@ -1132,6 +1110,29 @@ func authRequired(next http.HandlerFunc) http.HandlerFunc {
 
 		next(w, r)
 	}
+}
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+
+	cookie, err := r.Cookie("rl_session")
+	if err == nil {
+
+		database.Client.
+			Database("refLedger_v2").
+			Collection("sessions").
+			DeleteOne(r.Context(),
+				bson.M{"sessionid": cookie.Value})
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "rl_session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func main() {
@@ -1267,7 +1268,7 @@ func main() {
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
 	mux.HandleFunc("/api/login", ValidateLogin)
-	mux.HandleFunc("/logout", logout)
+	mux.HandleFunc("/api/logout", Logout)
 
 	/*
 		mux.Handle("/images/", http.StripPrefix("/images/",
