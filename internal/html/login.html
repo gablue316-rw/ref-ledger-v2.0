@@ -58,6 +58,36 @@
         margin-top: 10px;
         display: none;
     }
+
+    .create-account {
+        text-align: center;
+        margin-top: 15px;
+    }
+
+    .create-account a {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: bold;
+    }
+
+    .create-account a:hover {
+        text-decoration: underline;
+    }    
+
+    .forgot-password {
+        text-align: center;
+        margin-top: 12px;
+    }
+
+    .forgot-password a {
+        color: #2563eb;
+        text-decoration: none;
+    }
+
+    .forgot-password a:hover {
+        text-decoration: underline;
+    }    
+
 </style>
 </head>
 
@@ -66,10 +96,23 @@
 <div class="login-container">
     <h2>Ref-Ledger Login</h2>
 
-    <input type="text" id="username" placeholder="Username" />
-    <input type="password" id="password" placeholder="Password" />
-
+    <input type="text" id="username" placeholder="Username" required />
+    <input type="password" id="password" placeholder="Password" required />
+    
     <button onclick="login()">Login</button>
+
+      <div class="forgot-password">
+         <a href="/forgotPassword">
+            Forgot Password?
+         </a>
+      </div>
+
+      <div class="create-account">
+           Don't have an account?
+         <a href="/createAccount">
+            Create Account
+         </a>
+      </div>
 
     <div id="error" class="error">Invalid credentials</div>
 </div>
@@ -79,6 +122,13 @@ async function login() {
     const user = document.getElementById("username").value;
     const pass = document.getElementById("password").value;
 
+    if (!user || !pass) {
+       document.getElementById("error").innerText =
+           "Username and password are required.";
+       document.getElementById("error").style.display = "block";
+       return;
+    }
+
     const res = await fetch("/api/login", {
         method: "POST",
         headers: {
@@ -86,6 +136,8 @@ async function login() {
         },
         body: `username=${user}&password=${pass}`
     });
+
+    console.log(res);
 
     if (res.ok) {
         window.location.href = "/";

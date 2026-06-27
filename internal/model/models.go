@@ -4,11 +4,20 @@ import "time"
 
 var ModelsVersion string = "ref-ledger-models-v2.1.0"
 
+type User struct {
+	Username     string    `bson:"username" json:"username"`
+	PasswordHash string    `bson:"passwordHash" json:"-"`
+	TenantID     string    `bson:"tenantId" json:"tenantId"`
+	Role         string    `bson:"role" json:"role"`
+	CreatedAt    time.Time `bson:"createdAt" json:"createdAt"`
+}
+
 type Session struct {
-	SessionID string    `bson:"sessionId"`
-	Username  string    `bson:"username"`
-	ExpiresAt time.Time `bson:"expiresAt"`
-	Role      string    `bson:"role"`
+	SessionID string    `bson:"sessionId" json:"sessionId"`
+	Username  string    `bson:"username" json:"username"`
+	TenantID  string    `bson:"tenantId" json:"tenantId"`
+	Role      string    `bson:"role" json:"role"`
+	ExpiresAt time.Time `bson:"expiresAt" json:"expiresAt"`
 }
 
 type ExpenseDescriptor struct {
