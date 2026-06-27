@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Create Account - Ref Ledger</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f4f6f9;
+    color: #0f172a;
+}
+
+.container {
+    max-width: 420px;
+    margin: 80px auto;
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+}
+
+h1 {
+    text-align: center;
+    color: #082b4f;
+}
+
+label {
+    display: block;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 6px;
+    box-sizing: border-box;
+}
+
+button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    background: #082b4f;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover {
+    background: #0b3d70;
+}
+
+#message {
+    margin-top: 15px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.login-link {
+    text-align: center;
+    margin-top: 18px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>Create Account</h1>
+
+    <label for="username">Username</label>
+    <input id="username" type="text" required>
+
+    <label for="password">Password</label>
+    <input id="password" type="password" required>
+
+    <label for="confirmPassword">Confirm Password</label>
+    <input id="confirmPassword" type="password" required>
+
+    <button onclick="createAccount()">Create Account</button>
+
+    <div id="message"></div>
+
+    <div class="login-link">
+        Already have an account?
+        <a href="/login">Login</a>
+    </div>
+</div>
+
+<script>
+async function createAccount() {
+    const username = document.getElementById("username").value.trim();
+    const password = document.getElementById("password").value;
+    const confirmPassword = document.getElementById("confirmPassword").value;
+    const messageBox = document.getElementById("message");
+
+    messageBox.innerText = "";
+
+    if (!username || !password || !confirmPassword) {
+        messageBox.innerText = "All fields are required.";
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        messageBox.innerText = "Passwords do not match.";
+        return;
+    }
+
+    const response = await fetch("/api/createAccount", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            username: username,
+            password: password
+        })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+        messageBox.innerText = "Account created. Redirecting to login...";
+        setTimeout(() => {
+            window.location.href = "/login";
+        }, 1000);
+    } else {
+        messageBox.innerText = data.message || "Error creating account.";
+    }
+}
+</script>
+
+</body>
+</html>

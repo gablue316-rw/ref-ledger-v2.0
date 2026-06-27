@@ -19,11 +19,13 @@ import (
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/email"
+	"ref-ledger-v2/internal/handlers"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/reports"
 	"ref-ledger-v2/internal/utils"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"encoding/json"
@@ -600,46 +602,69 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var user model.User
 	var err error
+
 	sessionDuration := 15 * time.Minute
-	role := "user"
 
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	fmt.Printf("Password entered: [%s]\n", password)
-	fmt.Printf("Length: %d\n", len(password))
+	usersCollection := database.Client.
+		Database("refLedger_v2").
+		Collection("users")
 
-	// 1. Fetch user from DB (or hardcode for now)
-	// Replace later with Mongo lookup
-	storedHash := "$2a$10$IZALwIK/r9iAnqwEvaZ3ruGo.ATXQHnoRCl7cb0oROAgkipwu34Se"
+	err = usersCollection.FindOne(
+		r.Context(),
+		bson.M{"username": username},
+	).Decode(&user)
 
-	if username != "admin" && username != "test" {
+	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	if username == "test" {
-		role = "readonly"
+	err = bcrypt.CompareHashAndPassword(
+		[]byte(user.PasswordHash),
+		[]byte(password),
+	)
+
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
-	if username == "admin" {
-		err = bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
-		if err != nil {
-			fmt.Println("Invalid password", err)
+	/*
+		// 1. Fetch user from DB (or hardcode for now)
+		// Replace later with Mongo lookup
+		storedHash := "$2a$10$IZALwIK/r9iAnqwEvaZ3ruGo.ATXQHnoRCl7cb0oROAgkipwu34Se"
+
+		if username != "admin" && username != "test" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-	}
+	*/
+
+	/*
+		if username == "admin" {
+			err = bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
+			if err != nil {
+				fmt.Println("Invalid password", err)
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		}
+	*/
 
 	// 2. Create session
 	sessionID := uuid.New().String()
 
 	session := model.Session{
 		SessionID: sessionID,
-		Username:  username,
+		Username:  user.Username,
+		TenantID:  user.TenantID,
 		ExpiresAt: time.Now().Add(sessionDuration),
-		Role:      role,
+		Role:      user.Role,
 	}
 
 	// 3. Store in MongoDB
@@ -1121,7 +1146,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 			Database("refLedger_v2").
 			Collection("sessions").
 			DeleteOne(r.Context(),
-				bson.M{"sessionid": cookie.Value})
+				bson.M{"sessionId": cookie.Value})
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -1133,6 +1158,103 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func CreateAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var role string = "user"
+
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "invalid request",
+		})
+		return
+	}
+
+	req.Username = strings.TrimSpace(req.Username)
+
+	if req.Username == "" || req.Password == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "username and password are required",
+		})
+		return
+	}
+
+	usersCollection := database.Client.
+		Database("refLedger_v2").
+		Collection("users")
+
+	var existingUser model.User
+
+	err = usersCollection.FindOne(
+		r.Context(),
+		bson.M{"username": req.Username},
+	).Decode(&existingUser)
+
+	if err == nil {
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "username already exists",
+		})
+		return
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword(
+		[]byte(req.Password),
+		bcrypt.DefaultCost,
+	)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "could not create account",
+		})
+		return
+	}
+
+	tenantID := primitive.NewObjectID().Hex()
+
+	//
+	// For now, only the account admin can make database changes
+	//
+	if req.Username != "admin" {
+		role = "readonly"
+	}
+
+	user := model.User{
+		Username:     req.Username,
+		PasswordHash: string(passwordHash),
+		TenantID:     tenantID,
+		Role:         role,
+		CreatedAt:    time.Now(),
+	}
+
+	_, err = usersCollection.InsertOne(r.Context(), user)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "could not save account",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message":  "account created",
+		"tenantId": tenantID,
+	})
 }
 
 func main() {
@@ -1261,6 +1383,19 @@ func main() {
 	mux.HandleFunc("/api/associations",
 		authRequired(readOnlyForbidden(CreateAssociation)))
 
+	mux.HandleFunc("/createAccount", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/createAccount.html")
+	})
+
+	mux.HandleFunc("/forgotPassword", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/forgotPassword.html")
+	})
+
+	mux.HandleFunc("/resetPassword", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/resetPassword.html")
+	})
+
+	mux.HandleFunc("/api/createAccount", CreateAccount)
 	mux.HandleFunc("/api/sites", authRequired(readOnlyForbidden(CreateSite)))
 	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))
 	mux.HandleFunc("/api/reports", GenerateReport)
@@ -1269,6 +1404,8 @@ func main() {
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
 	mux.HandleFunc("/api/login", ValidateLogin)
 	mux.HandleFunc("/api/logout", Logout)
+	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
+	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
 
 	/*
 		mux.Handle("/images/", http.StripPrefix("/images/",
