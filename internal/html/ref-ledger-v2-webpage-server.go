@@ -77,8 +77,8 @@ type Payment struct {
 }
 
 type GameStatusUpdate struct {
-	GameIds string `json:"gameIds"`
-	Status  string `json:"status"`
+	GameIds json.RawMessage `json:"gameIds"`
+	Status  string          `json:"status"`
 }
 
 var ac database.AssociationCollection
@@ -553,8 +553,13 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var gameUpdate GameStatusUpdate
-	var gameIds []int64 = []int64{}
 
 	err := json.NewDecoder(r.Body).Decode(&gameUpdate)
 	if err != nil {
@@ -563,13 +568,46 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gameIds, err = utils.ConvertGameIdStrToInt(gameUpdate.GameIds)
-	if err != nil {
-		fmt.Println("err:", err)
+	if gameUpdate.Status == "" {
+		http.Error(w, "status is required", http.StatusBadRequest)
 		return
 	}
+
+	var gameIds []int64
+
+	// Supports dashboard JSON:
+	// { "gameIds": [101, 102], "status": "Completed" }
+	err = json.Unmarshal(gameUpdate.GameIds, &gameIds)
+
+	if err != nil {
+		// Supports existing gameStatus.html JSON:
+		// { "gameIds": "101,102", "status": "Completed" }
+		var gameIdString string
+
+		err = json.Unmarshal(gameUpdate.GameIds, &gameIdString)
+		if err != nil {
+			http.Error(w, "invalid gameIds", http.StatusBadRequest)
+			return
+		}
+
+		gameIds, err = utils.ConvertGameIdStrToInt(gameIdString)
+		if err != nil {
+			fmt.Println("err:", err)
+			http.Error(w, "invalid gameIds", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if len(gameIds) == 0 {
+		http.Error(w, "no game IDs supplied", http.StatusBadRequest)
+		return
+	}
+
 	database.UpdateGameStatus(gameIds, gameUpdate.Status)
 
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Game status updated successfully"))
 }
 
 func CreatePayment(w http.ResponseWriter, r *http.Request) {
