@@ -191,6 +191,13 @@ body {
     color: #374151;
 }
 
+.bulk-controls {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 @media (max-width: 768px) {
     .filters,
     .bulk-update {
@@ -384,7 +391,14 @@ body {
                 <option value="Cancelled">Cancelled</option>
             </select>
         </div>
-
+        
+        <div class="bulk-controls">
+            <label>
+               <input type="checkbox" id="selectAll">
+               <strong>Select All</strong>
+            </label>
+        </div>
+        
         <button class="btn update-btn" onclick="updateSelectedStatus()">
             Update Status
         </button>
@@ -457,7 +471,8 @@ function renderGames(games) {
     const tbody = document.getElementById("gamesBody");
 
     tbody.innerHTML = "";
-
+    document.getElementById("selectAll").checked = false;
+    
     games.forEach(game => {
         const statusClass = getStatusClass(game.Status);
 
@@ -486,6 +501,27 @@ function renderGames(games) {
         `;
     });
 }
+
+document.getElementById("selectAll").addEventListener("change", function () {
+    const checked = this.checked;
+
+    document.querySelectorAll(".game-check").forEach(cb => {
+        cb.checked = checked;
+    });
+});
+
+document.addEventListener("change", function (e) {
+    if (!e.target.classList.contains("game-check")) {
+        return;
+    }
+
+    const allCheckboxes = document.querySelectorAll(".game-check");
+    const checkedCheckboxes = document.querySelectorAll(".game-check:checked");
+
+    document.getElementById("selectAll").checked =
+        allCheckboxes.length > 0 &&
+        allCheckboxes.length === checkedCheckboxes.length;
+});
 
 async function initialLoadGames() {
     const params = new URLSearchParams();
