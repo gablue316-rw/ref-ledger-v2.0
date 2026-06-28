@@ -679,7 +679,10 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Create session
+	// 2. Delete previous sessions if they still exist
+	database.DeleteSessions(username)
+
+	// 3. Create session
 	sessionID := uuid.New().String()
 
 	session := model.Session{
@@ -690,7 +693,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Role:      user.Role,
 	}
 
-	// 3. Store in MongoDB
+	// 4. Store in MongoDB
 	_, err = database.Client.
 		Database("refLedger_v2").
 		Collection("sessions").
@@ -701,7 +704,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Set cookie
+	// 5. Set cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     "rl_session",
 		Value:    sessionID,
@@ -1334,6 +1337,10 @@ func main() {
 		fmt.Println("Failed to initialize official collection.")
 		utils.AuditLog.Println("Failed to initialize official collection.")
 		return
+	}
+
+	if database.IsSessionIndexed() {
+		database.CreateSessionIndices()
 	}
 
 	utils.AuditLog.Println("All collections initialized successfully.")

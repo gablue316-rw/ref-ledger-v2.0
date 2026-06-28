@@ -1246,6 +1246,76 @@ func QueryGames(parentCtx context.Context, dbase, collection, filter string) ([]
 	return gameRecords, nil
 }
 
+func IsSessionIndexed() bool {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("sessions")
+
+	cursor, err := coll.Indexes().List(ctx)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+
+	var indexes []bson.M
+	if err := cursor.All(ctx, &indexes); err != nil {
+		fmt.Println(err)
+		return false
+	}
+
+	if len(indexes) > 0 {
+		return true
+	}
+
+	return false
+
+}
+
+func CreateSessionIndices() {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("sessions")
+
+	name, err := coll.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "expiresAt", Value: 1}},
+		Options: options.Index().SetExpireAfterSeconds(0),
+	})
+
+	if err != nil {
+		fmt.Println("Failed to create", name, "index for collection session")
+		return
+	}
+
+	fmt.Println("Created index:", name)
+
+}
+
+func DeleteSessions(username string) {
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("sessions")
+	result, err := coll.DeleteMany(
+		ctx,
+		bson.M{"username": username},
+	)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("Deleted %d sessions for user %s\n", result.DeletedCount, username)
+}
+
 func GetSession(r *http.Request) (*model.Session, error) {
 
 	cookie, err := r.Cookie("rl_session")
