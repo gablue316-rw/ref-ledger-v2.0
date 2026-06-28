@@ -2311,6 +2311,23 @@ func (sc *SiteCollection) Get(id string) (*Site, error) {
 	return &site, nil
 }
 
+func GetSiteName(ctx context.Context, siteID string) (string, error) {
+	var site Site
+
+	err := Client.
+		Database("refLedger_v2").
+		Collection("sites").
+		FindOne(ctx, bson.M{"id": siteID}).
+		Decode(&site)
+
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+
+	return site.Name, nil
+}
+
 func (sc *SiteCollection) GetSiteNames() ([]SiteName, error) {
 	var sites []SiteName = []SiteName{}
 

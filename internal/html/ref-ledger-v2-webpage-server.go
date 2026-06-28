@@ -937,6 +937,17 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//
+	// Replace Site Id with Site Name
+	//
+	siteName, err := database.GetSiteName(context.TODO(), game.Site)
+
+	if err == nil {
+		game.Site = siteName
+	} else {
+		game.Site = "Unknown"
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(game)
