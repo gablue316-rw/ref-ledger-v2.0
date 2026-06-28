@@ -58,6 +58,7 @@ button:hover {
     margin-top: 15px;
     font-weight: bold;
     text-align: center;
+    color: #b00020;
 }
 
 .login-link {
@@ -72,16 +73,32 @@ button:hover {
 <div class="container">
     <h1>Create Account</h1>
 
-    <label for="username">Username</label>
-    <input id="username" type="text" required>
+    <form id="createAccountForm">
+        <label for="username">Email Address</label>
+        <input
+            type="email"
+            id="username"
+            name="username"
+            placeholder="Email Address"
+            required
+        >
 
-    <label for="password">Password</label>
-    <input id="password" type="password" required>
+        <label for="password">Password</label>
+        <input
+            id="password"
+            type="password"
+            required
+        >
 
-    <label for="confirmPassword">Confirm Password</label>
-    <input id="confirmPassword" type="password" required>
+        <label for="confirmPassword">Confirm Password</label>
+        <input
+            id="confirmPassword"
+            type="password"
+            required
+        >
 
-    <button onclick="createAccount()">Create Account</button>
+        <button type="submit">Create Account</button>
+    </form>
 
     <div id="message"></div>
 
@@ -92,44 +109,60 @@ button:hover {
 </div>
 
 <script>
-async function createAccount() {
-    const username = document.getElementById("username").value.trim();
+document
+    .getElementById("createAccountForm")
+    .addEventListener("submit", createAccount);
+
+async function createAccount(event) {
+    event.preventDefault();
+
+    const form = event.target;
+
+    // Trigger browser validation (including email validation)
+    if (!form.reportValidity()) {
+        return;
+    }
+
+    const username = document.getElementById("username").value.trim().toLowerCase();
     const password = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirmPassword").value;
     const messageBox = document.getElementById("message");
 
     messageBox.innerText = "";
 
-    if (!username || !password || !confirmPassword) {
-        messageBox.innerText = "All fields are required.";
-        return;
-    }
-
     if (password !== confirmPassword) {
         messageBox.innerText = "Passwords do not match.";
         return;
     }
 
-    const response = await fetch("/api/createAccount", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            username: username,
-            password: password
-        })
-    });
+    try {
+        const response = await fetch("/api/createAccount", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password
+            })
+        });
 
-    const data = await response.json();
+        const data = await response.json();
 
-    if (response.ok) {
-        messageBox.innerText = "Account created. Redirecting to login...";
-        setTimeout(() => {
-            window.location.href = "/login";
-        }, 1000);
-    } else {
-        messageBox.innerText = data.message || "Error creating account.";
+        if (response.ok) {
+            messageBox.style.color = "green";
+            messageBox.innerText = "Account created. Redirecting to login...";
+
+            setTimeout(() => {
+                window.location.href = "/login";
+            }, 1000);
+        } else {
+            messageBox.style.color = "#b00020";
+            messageBox.innerText = data.message || "Error creating account.";
+        }
+    } catch (err) {
+        messageBox.style.color = "#b00020";
+        messageBox.innerText = "Unable to contact server.";
     }
 }
 </script>

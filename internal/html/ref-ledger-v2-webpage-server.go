@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/mail"
+
 	"os"
 	"strconv"
 	"strings"
@@ -87,6 +89,11 @@ var gc database.GameCollection
 var oc database.OfficialCollection
 
 var AuditLog *log.Logger = nil
+
+func isValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
 
 func readOnlyForbidden(next http.HandlerFunc) http.HandlerFunc {
 
@@ -645,7 +652,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 
 	sessionDuration := 15 * time.Minute
 
-	username := r.FormValue("username")
+	username := strings.ToLower(strings.TrimSpace(r.FormValue("username")))
 	password := r.FormValue("password")
 
 	usersCollection := database.Client.
@@ -671,28 +678,6 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-
-	/*
-		// 1. Fetch user from DB (or hardcode for now)
-		// Replace later with Mongo lookup
-		storedHash := "$2a$10$IZALwIK/r9iAnqwEvaZ3ruGo.ATXQHnoRCl7cb0oROAgkipwu34Se"
-
-		if username != "admin" && username != "test" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-	*/
-
-	/*
-		if username == "admin" {
-			err = bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
-			if err != nil {
-				fmt.Println("Invalid password", err)
-				w.WriteHeader(http.StatusUnauthorized)
-				return
-			}
-		}
-	*/
 
 	// 2. Create session
 	sessionID := uuid.New().String()
@@ -1199,6 +1184,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateAccount(w http.ResponseWriter, r *http.Request) {
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1220,7 +1206,12 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.Username = strings.TrimSpace(req.Username)
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
+
+	if !isValidEmail(req.Username) {
+		http.Error(w, "Username must be a valid email address.", http.StatusBadRequest)
+		return
+	}
 
 	if req.Username == "" || req.Password == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -1267,7 +1258,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	//
 	// For now, only the account admin can make database changes
 	//
-	if req.Username != "admin" {
+	if req.Username != "gablue316@gmail.com" {
 		role = "readonly"
 	}
 
