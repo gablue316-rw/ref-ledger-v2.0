@@ -2791,12 +2791,28 @@ func (oc *OfficialCollection) Get(firstName, lastName string) (Official, error) 
 	return official, nil
 }
 
-func (oc *OfficialCollection) GetOfficialsDirectory() ([]Official, error) {
+func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName string) ([]Official, error) {
 
-	var filter bson.M
 	var officials []Official
 
-	filter = bson.M{}
+	filter := bson.M{}
+
+	firstName = strings.TrimSpace(firstName)
+	lastName = strings.TrimSpace(lastName)
+
+	if firstName != "" {
+		filter["firstName"] = bson.M{
+			"$regex":   firstName,
+			"$options": "i",
+		}
+	}
+
+	if lastName != "" {
+		filter["lastName"] = bson.M{
+			"$regex":   lastName,
+			"$options": "i",
+		}
+	}
 
 	opts := options.Find().
 		SetSort(bson.D{
@@ -2807,16 +2823,24 @@ func (oc *OfficialCollection) GetOfficialsDirectory() ([]Official, error) {
 	cursor, err := oc.Coll.Find(context.TODO(), filter, opts)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return []Official{}, fmt.Errorf("Failed to query officials.  Reason: %v", err)
+		return []Official{}, fmt.Errorf("failed to query officials. Reason: %v", err)
 	}
+	defer cursor.Close(context.TODO())
 
 	for cursor.Next(context.TODO()) {
 		var doc OfficialDoc
+
 		if err := cursor.Decode(&doc); err != nil {
 			fmt.Println("Error:", err)
-			return []Official{}, fmt.Errorf("Failed to decode official document.  Reason: %v", err)
+			return []Official{}, fmt.Errorf("failed to decode official document. Reason: %v", err)
 		}
+
 		officials = append(officials, oc.convDocToOfficial(doc))
+	}
+
+	if err := cursor.Err(); err != nil {
+		fmt.Println("Error:", err)
+		return []Official{}, fmt.Errorf("cursor error while reading officials. Reason: %v", err)
 	}
 
 	return officials, nil

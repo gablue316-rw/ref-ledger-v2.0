@@ -232,7 +232,11 @@ func GetSitesDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 
 func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(w, r)
-	officials, err := oc.GetOfficialsDirectory()
+
+	firstName := strings.TrimSpace(r.URL.Query().Get("firstname"))
+	lastName := strings.TrimSpace(r.URL.Query().Get("lastname"))
+
+	officials, err := oc.GetOfficialsDirectory(firstName, lastName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -1,3 +1,4 @@
+<!-- officials.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -121,6 +122,7 @@ input {
     display: flex;
     gap: 10px;
     margin-top: 20px;
+    flex-wrap: wrap;
 }
 
 .btn {
@@ -184,6 +186,12 @@ input {
     font-weight: bold;
     min-height: 60px;
     margin-bottom: 20px;
+}
+
+.directory-note {
+    margin-bottom: 15px;
+    color: #475569;
+    font-size: 14px;
 }
 
 table {
@@ -309,6 +317,10 @@ tr:nth-child(even) {
 
     <div class="form-card" id="directorySection" style="display:none;">
         <h2>Officials Directory</h2>
+        <p class="directory-note">
+            Directory is filtered by First Name and/or Last Name when those fields are filled in.
+            Leave both blank to show all officials.
+        </p>
 
         <table id="officialsTable">
             <thead>
@@ -356,11 +368,11 @@ document.getElementById("officialsForm").addEventListener("submit", async functi
     e.preventDefault();
 
     const official = {
-        firstName: document.getElementById("firstname").value,
-        lastName: document.getElementById("lastname").value,
-        phone: document.getElementById("phone").value,
-        email: document.getElementById("email").value,
-        address: document.getElementById("address").value
+        firstName: document.getElementById("firstname").value.trim(),
+        lastName: document.getElementById("lastname").value.trim(),
+        phone: document.getElementById("phone").value.trim(),
+        email: document.getElementById("email").value.trim(),
+        address: document.getElementById("address").value.trim()
     };
 
     try {
@@ -406,8 +418,6 @@ document.getElementById("getOfficialBtn").addEventListener("click", async functi
 
         const official = await response.json();
 
-        console.log("Returned official:", official);
-
         document.getElementById("firstname").value = official.FirstName || "";
         document.getElementById("lastname").value = official.LastName || "";
         document.getElementById("phone").value = official.Phone || "";
@@ -418,7 +428,6 @@ document.getElementById("getOfficialBtn").addEventListener("click", async functi
             "Official loaded successfully.";
 
     } catch (err) {
-        console.log("Error:", err);
         document.getElementById("message").innerText = "Server unavailable.";
     }
 });
@@ -454,8 +463,23 @@ document.getElementById("deleteOfficialBtn").addEventListener("click", async fun
 });
 
 document.getElementById("directoryBtn").addEventListener("click", async function () {
+    const firstName = document.getElementById("firstname").value.trim();
+    const lastName = document.getElementById("lastname").value.trim();
+
+    const params = new URLSearchParams();
+
+    if (firstName !== "") {
+        params.append("firstname", firstName);
+    }
+
+    if (lastName !== "") {
+        params.append("lastname", lastName);
+    }
+
+    params.append("t", Date.now());
+
     try {
-        const response = await fetch(`/api/officialsDirectory?t=${Date.now()}`);
+        const response = await fetch(`/api/officialsDirectory?${params.toString()}`);
 
         if (!response.ok) {
             document.getElementById("message").innerText =
@@ -467,6 +491,13 @@ document.getElementById("directoryBtn").addEventListener("click", async function
 
         const tbody = document.querySelector("#officialsTable tbody");
         tbody.innerHTML = "";
+
+        if (!officials || officials.length === 0) {
+            document.getElementById("directorySection").style.display = "block";
+            document.getElementById("message").innerText =
+                "No officials found for the selected filter.";
+            return;
+        }
 
         officials.forEach(function (official) {
             const row = document.createElement("tr");
