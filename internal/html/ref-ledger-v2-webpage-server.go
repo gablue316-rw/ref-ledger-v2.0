@@ -885,6 +885,24 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func GetOfficials(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(w, r)
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	official, err := oc.Get(r.PathValue("firstName"), r.PathValue("lastName"))
+	if err != nil {
+		http.Error(w, "Official not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(official)
+}
+
 func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
@@ -1428,6 +1446,7 @@ func main() {
 	mux.HandleFunc("/api/assignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
+	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficials)
 	//mux.HandleFunc("/api/deleteAssociation/{assocId}", DeleteAssociation)
 
 	mux.HandleFunc("/api/deleteAssociation/{assocId}",

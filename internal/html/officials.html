@@ -1,43 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ref Ledger V2.0 Officials Entry</title>
-    <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">    
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ref Ledger V2.0 Officials Entry</title>
 
-    <style>
+<link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: Arial, Helvetica, sans-serif;
-        }
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+}
 
-        body {
-            background-color: #f4f6f9;
-            padding: 20px;
-            color: #333;
-        }
+body {
+    background-color: #f4f6f9;
+    padding: 20px;
+    color: #333;
+}
 
-        .container {
-            max-width: 1000px;
-            margin: auto;
-        }
+.container {
+    max-width: 1000px;
+    margin: auto;
+}
 
-        .header {
-            background-color: #1e293b;
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
+.header {
+    background-color: #1e293b;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
 
-        .header h1 {
-            margin-bottom: 10px;
-        }
+.header h1 {
+    margin-bottom: 10px;
+}
 
 .navbar {
     background: #082b4f;
@@ -45,13 +45,7 @@
     display: flex;
     align-items: center;
     padding: 15px 30px;
-}
-
-.logo {
-    font-size: 28px;
-    font-weight: bold;
-    margin-right: 40px;
-    white-space: nowrap;
+    margin-bottom: 20px;
 }
 
 .nav-links {
@@ -63,18 +57,13 @@
 .nav-links a {
     color: white;
     text-decoration: none;
-
     display: flex;
     flex-direction: column;
-
     align-items: center;
     justify-content: center;
-
     min-width: 90px;
     padding: 10px;
-
     border-radius: 6px;
-
     transition: .2s;
 }
 
@@ -95,154 +84,140 @@
     font-size: 13px;
 }
 
-        .form-card {
-            background-color: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
+.form-card {
+    background-color: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
 
-        .row {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 15px;
-        }
+.row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+}
 
-        .col {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
+.col,
+.form-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
 
-        .form-group {
-            margin-bottom: 15px;
-            display: flex;
-            flex-direction: column;
-        }
+label {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
 
-        label {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
+input {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    width: 100%;
+}
 
-        input,
-        select,
-        textarea {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            width: 100%;
-        }
+.button-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
 
-        textarea {
-            resize: vertical;
-        }
+.btn {
+    border: none;
+    color: white;
+    padding: 11px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+}
 
-        .button-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
+.btn-get {
+    background: #2563eb;
+}
 
-        .btn {
-            border: none;
-            color: white;
-            padding: 11px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-        }
+.btn-get:hover {
+    background: #1d4ed8;
+}
 
-        .btn-delete{
-            background:#ffff00;color:black;
-        }
-        
-        .btn-delete:hover{
-            background:#ffc000;color: black;
-        }
+.btn-save {
+    background-color: #16a34a;
+}
 
-        .btn-get{
-            background:#2563eb;
-        }
+.btn-save:hover {
+    background-color: #15803d;
+}
 
-        .btn-get:hover{
-            background:#1d4ed8;
-        }
+.btn-clear {
+    background-color: #dc2626;
+}
 
-        .btn-save {
-            background-color: #16a34a;
-        }
+.btn-clear:hover {
+    background-color: #b91c1c;
+}
 
-        .btn-save:hover {
-            background-color: #15803d;
-        }
+.btn-delete {
+    background: #ffff00;
+    color: black;
+}
 
-        .btn-clear {
-            background-color: #dc2626;
-        }
+.btn-delete:hover {
+    background: #ffc000;
+    color: black;
+}
 
-        .btn-clear:hover {
-            background-color: #b91c1c;
-        }
+.btn-directory {
+    background-color: #7c3aed;
+    color: white;
+}
 
-        .btn-directory {
-            background-color: #7c3aed;
-            color: white;
-        }
+.btn-directory:hover {
+    background-color: #6d28d9;
+}
 
-        .btn-directory:hover {
-            background-color: #6d28d9;
-            color: white;
-        }
-        
-        .message-box {
-            background-color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            font-weight: bold;
-            min-height: 60px;
-        }
+.message-box {
+    background-color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-weight: bold;
+    min-height: 60px;
+    margin-bottom: 20px;
+}
 
-        @media (max-width: 768px) {
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
 
-            .row {
-                flex-direction: column;
-            }
+th {
+    background-color: #2563eb;
+    color: white;
+    padding: 10px;
+    text-align: left;
+}
 
-            .button-row {
-                flex-direction: column;
-            }
+td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
 
-            .btn {
-                width: 100%;
-            }
-        }
+tr:nth-child(even) {
+    background-color: #f9fafb;
+}
 
-        table {
-           width: 100%;
-           border-collapse: collapse;
-        }
+@media (max-width: 768px) {
+    .row,
+    .button-row {
+        flex-direction: column;
+    }
 
-        th {
-             background-color: #2563eb;
-             color: white;
-             padding: 10px;
-             text-align: left;
-        }
-
-        td {
-             padding: 10px;
-             border-bottom: 1px solid #ddd;
-        }
-
-        tr:nth-child(even) {
-             background-color: #f9fafb;
-        }        
-
-    </style>
+    .btn {
+        width: 100%;
+    }
+}
+</style>
 </head>
 
 <body>
@@ -254,174 +229,78 @@
         <p>Manage and track Officials information.</p>
     </div>
 
- 
-<nav class="navbar">
-
-    <div class="nav-links">
-
-        <a href="/">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
-
-        <a href="/dashboard">
-            <i class="fa-solid fa-chart-column"></i>
-            <span>Dashboard</span>
-        </a>
-
-        <a href="/reports">
-            <i class="fa-solid fa-file-lines"></i>
-            <span>Reports</span>
-        </a>
-
-        <a href="/games">
-            <i class="fa-solid fa-calendar-days"></i>
-            <span>Games</span>
-        </a>
-
-        <a class="active" href="/officials">
-            <i class="fa-solid fa-users"></i>
-            <span>Officials</span>
-        </a>
-
-        <a href="/associations">
-            <i class="fa-solid fa-building-columns"></i>
-            <span>Associations</span>
-        </a>
-
-        <a href="/sites">
-            <i class="fa-solid fa-location-dot"></i>
-            <span>Sites</span>
-        </a>
-
-        <a href="/expenses">
-            <i class="fa-solid fa-receipt"></i>
-            <span>Expenses</span>
-        </a>
-
-        <a href="/payments">
-            <i class="fa-solid fa-dollar-sign"></i>
-            <span>Payments</span>
-        </a>
-
-        <a href="/gameStatus">
-            <i class="fa-solid fa-rotate"></i>
-            <span>Status</span>
-        </a>
-        
-        <a href="/contact">
-            <i class="fa-solid fa-envelope"></i>
-            <span>Contact</span>
-        </a>  
-
-
-        <a href="#" id="logoutBtn">
-            <i class="fa-solid fa-right-from-bracket"></i>
-            <span>Logout</span>
-        </a>        
-
-    </div>
-
-</nav>
-
+    <nav class="navbar">
+        <div class="nav-links">
+            <a href="/"><i class="fa-solid fa-house"></i><span>Home</span></a>
+            <a href="/dashboard"><i class="fa-solid fa-chart-column"></i><span>Dashboard</span></a>
+            <a href="/reports"><i class="fa-solid fa-file-lines"></i><span>Reports</span></a>
+            <a href="/games"><i class="fa-solid fa-calendar-days"></i><span>Games</span></a>
+            <a class="active" href="/officials"><i class="fa-solid fa-users"></i><span>Officials</span></a>
+            <a href="/associations"><i class="fa-solid fa-building-columns"></i><span>Associations</span></a>
+            <a href="/sites"><i class="fa-solid fa-location-dot"></i><span>Sites</span></a>
+            <a href="/expenses"><i class="fa-solid fa-receipt"></i><span>Expenses</span></a>
+            <a href="/payments"><i class="fa-solid fa-dollar-sign"></i><span>Payments</span></a>
+            <a href="/gameStatus"><i class="fa-solid fa-rotate"></i><span>Status</span></a>
+            <a href="/contact"><i class="fa-solid fa-envelope"></i><span>Contact</span></a>
+            <a href="#" id="logoutBtn"><i class="fa-solid fa-right-from-bracket"></i><span>Logout</span></a>
+        </div>
+    </nav>
 
     <div class="form-card">
-
         <form id="officialsForm">
 
             <div class="row">
-
                 <div class="form-group">
-                   <label for="firstname">First Name</label>
-                   <input
-                       type="text"
-                       id="firstname"
-                       required
-                   >
+                    <label for="firstname">First Name</label>
+                    <input type="text" id="firstname" required>
                 </div>
 
                 <div class="form-group">
-                   <label for="lastname">Last Name</label>
-                   <input
-                       type="text"
-                       id="lastname"
-                       required
-                   >
+                    <label for="lastname">Last Name</label>
+                    <input type="text" id="lastname" required>
                 </div>
 
                 <div class="form-group">
-                   <label for="phone">Phone</label>
-                   <input
-                       type="text"
-                       id="phone"
-                       required
-                   >
-                </div>                
-
+                    <label for="phone">Phone</label>
+                    <input type="text" id="phone">
+                </div>
             </div>
 
             <div class="row">
-
                 <div class="col">
                     <label for="email">Email</label>
-                    <input
-                        type="email"
-                        id="email"
-                    >
+                    <input type="email" id="email">
                 </div>
 
                 <div class="col">
                     <label for="address">Address</label>
-                    <input
-                        type="text"
-                        id="address"
-                    >
-                </div>    
-
+                    <input type="text" id="address">
+                </div>
             </div>
 
-</div>
-
             <div class="button-row">
-
-                <button 
-                    type="button"
-                    id="getOfficialBtn"
-                    class="btn btn-get">
+                <button type="button" id="getOfficialBtn" class="btn btn-get">
                     Get Official
-                </button>    
+                </button>
 
-                <button
-                    type="submit"
-                    class="btn btn-save">
+                <button type="submit" class="btn btn-save">
                     Save Official
                 </button>
-                              
-                <button
-                    type="clear"
-                    id="clearBtn"
-                    class="btn btn-clear">
+
+                <button type="button" id="clearBtn" class="btn btn-clear">
                     Clear Form
                 </button>
 
-                <button
-                    type="button"
-                    id="deleteOfficialBtn"
-                    class="btn btn-delete">
+                <button type="button" id="deleteOfficialBtn" class="btn btn-delete">
                     Delete Official
                 </button>
 
-                <button
-                    type="button"
-                    id="directoryBtn"
-                    class="btn btn-directory">
+                <button type="button" id="directoryBtn" class="btn btn-directory">
                     Official Directory
-                </button>                
-
+                </button>
             </div>
 
         </form>
-
     </div>
 
     <div class="message-box" id="message">
@@ -429,36 +308,30 @@
     </div>
 
     <div class="form-card" id="directorySection" style="display:none;">
+        <h2>Officials Directory</h2>
 
-       <h2>Officials Directory</h2>
+        <table id="officialsTable">
+            <thead>
+                <tr>
+                    <th>First Name</th>
+                    <th>Last Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Address</th>
+                </tr>
+            </thead>
 
-       <table id="officialsTable" style="width:100%; border-collapse:collapse;">
-
-           <thead>
-               <tr>
-                   <th>First Name</th>
-                   <th>Last Name</th>
-                   <th>Phone</th>
-                   <th>Email</th>
-                   <th>Address</th>
-               </tr>
-           </thead>
-  
-           <tbody>
-           </tbody>
-
-       </table>
-
+            <tbody></tbody>
+        </table>
     </div>
 
 </div>
 
 <script>
-
-document.getElementById("logoutBtn").addEventListener("click", async () => {
+document.getElementById("logoutBtn").addEventListener("click", async function (e) {
+    e.preventDefault();
 
     try {
-
         const response = await fetch("/api/logout", {
             method: "POST"
         });
@@ -469,21 +342,17 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
             alert("Logout failed");
         }
 
-    } catch(err) {
+    } catch (err) {
         alert("Logout failed");
     }
-
-});        
-
+});
 
 document.getElementById("clearBtn").addEventListener("click", function () {
     document.getElementById("officialsForm").reset();
-    document.getElementById("message").innerText = "";
+    document.getElementById("message").innerText = "Form cleared.";
 });
 
-document.getElementById("officialsForm")
-.addEventListener("submit", async function(e) {
-
+document.getElementById("officialsForm").addEventListener("submit", async function (e) {
     e.preventDefault();
 
     const official = {
@@ -494,9 +363,7 @@ document.getElementById("officialsForm")
         address: document.getElementById("address").value
     };
 
-
     try {
-
         const response = await fetch("/api/officials", {
             method: "POST",
             headers: {
@@ -513,16 +380,13 @@ document.getElementById("officialsForm")
                 : message || "Error saving official.";
 
     } catch (err) {
-
-        document.getElementById("message").innerText =
-            "Server unavailable.";
+        document.getElementById("message").innerText = "Server unavailable.";
     }
 });
 
 document.getElementById("getOfficialBtn").addEventListener("click", async function () {
-
-    const firstName = document.getElementById("firstname").value;
-    const lastName = document.getElementById("lastname").value;
+    const firstName = document.getElementById("firstname").value.trim();
+    const lastName = document.getElementById("lastname").value.trim();
 
     if (!firstName || !lastName) {
         document.getElementById("message").innerText =
@@ -531,12 +395,12 @@ document.getElementById("getOfficialBtn").addEventListener("click", async functi
     }
 
     try {
-
-        const response = await fetch(`/api/officials/${firstName}/${lastName}`);
+        const response = await fetch(
+            `/api/officials/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}?t=${Date.now()}`
+        );
 
         if (!response.ok) {
-            document.getElementById("message").innerText =
-                "Official not found.";
+            document.getElementById("message").innerText = "Official not found.";
             return;
         }
 
@@ -544,25 +408,24 @@ document.getElementById("getOfficialBtn").addEventListener("click", async functi
 
         console.log("Returned official:", official);
 
-        document.getElementById("firstname").value = official.FirstName;
-        document.getElementById("lastname").value = official.LastName;
-        document.getElementById("phone").value = official.Phone;
-        document.getElementById("email").value = official.Email;    
-        document.getElementById("address").value = official.Address;
+        document.getElementById("firstname").value = official.FirstName || "";
+        document.getElementById("lastname").value = official.LastName || "";
+        document.getElementById("phone").value = official.Phone || "";
+        document.getElementById("email").value = official.Email || "";
+        document.getElementById("address").value = official.Address || "";
 
         document.getElementById("message").innerText =
             "Official loaded successfully.";
 
     } catch (err) {
-        document.getElementById("message").innerText =
-            "Server unavailable.";
+        console.log("Error:", err);
+        document.getElementById("message").innerText = "Server unavailable.";
     }
 });
 
 document.getElementById("deleteOfficialBtn").addEventListener("click", async function () {
-
-    const firstName = document.getElementById("firstname").value;
-    const lastName = document.getElementById("lastname").value;
+    const firstName = document.getElementById("firstname").value.trim();
+    const lastName = document.getElementById("lastname").value.trim();
 
     if (!firstName || !lastName) {
         document.getElementById("message").innerText =
@@ -570,11 +433,13 @@ document.getElementById("deleteOfficialBtn").addEventListener("click", async fun
         return;
     }
 
-        
     try {
-        const response = await fetch(`/api/deleteOfficial/${firstName}/${lastName}`, {
-            method: "DELETE"
-        });
+        const response = await fetch(
+            `/api/deleteOfficial/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}`,
+            {
+                method: "DELETE"
+            }
+        );
 
         const message = await response.text();
 
@@ -582,18 +447,15 @@ document.getElementById("deleteOfficialBtn").addEventListener("click", async fun
             response.ok
                 ? message || "Official deleted successfully."
                 : message || "Error deleting official.";
-    
-    } catch(err) {
+
+    } catch (err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }
 });
 
-document.getElementById("directoryBtn")
-.addEventListener("click", async function () {
-
+document.getElementById("directoryBtn").addEventListener("click", async function () {
     try {
-
-        const response = await fetch("/api/officialsDirectory");
+        const response = await fetch(`/api/officialsDirectory?t=${Date.now()}`);
 
         if (!response.ok) {
             document.getElementById("message").innerText =
@@ -603,21 +465,18 @@ document.getElementById("directoryBtn")
 
         const officials = await response.json();
 
-        const tbody =
-            document.querySelector("#officialsTable tbody");
-
+        const tbody = document.querySelector("#officialsTable tbody");
         tbody.innerHTML = "";
 
-        officials.forEach(official => {
-
+        officials.forEach(function (official) {
             const row = document.createElement("tr");
 
             row.innerHTML = `
-                <td>${official.FirstName}</td>
-                <td>${official.LastName}</td>
-                <td>${official.Phone}</td>
-                <td>${official.Email}</td>
-                <td>${official.Address}</td>
+                <td>${official.FirstName || ""}</td>
+                <td>${official.LastName || ""}</td>
+                <td>${official.Phone || ""}</td>
+                <td>${official.Email || ""}</td>
+                <td>${official.Address || ""}</td>
             `;
 
             tbody.appendChild(row);
@@ -629,9 +488,7 @@ document.getElementById("directoryBtn")
             `${officials.length} officials loaded.`;
 
     } catch (err) {
-
-        document.getElementById("message").innerText =
-            "Server unavailable.";
+        document.getElementById("message").innerText = "Server unavailable.";
     }
 });
 </script>
