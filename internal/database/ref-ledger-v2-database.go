@@ -33,6 +33,8 @@ var ExpenseTypes []string = []string{"Camp Fee", "Dues", "Equipment", "Food", "M
 var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending", "Deleted"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
+var TenantId string = "6a408f87ece367df4a66b262"
+
 type OfficialName struct {
 	Name string `json:"name"`
 }
@@ -2204,19 +2206,21 @@ func (ac *AssociationCollection) Dump(id string) error {
 
 // Site Colleciton, Documents and API Code
 type SiteJson struct {
-	Id      string `json:"id"`
-	Name    string `json:"name"`
-	Contact string `json:"contact"`
-	Phone   string `json:"phone"`
-	Email   string `json:"email"`
+	Id       string `json:"id"`
+	Name     string `json:"name"`
+	Contact  string `json:"contact"`
+	Phone    string `json:"phone"`
+	Email    string `json:"email"`
+	TenantId string `json:"-"`
 }
 
 type SiteDoc struct {
-	Id      string `bson:"id,omitempty"`
-	Name    string `bson:"name,omitempty"`
-	Contact string `bson:"contact,omitempty"`
-	Phone   string `bson:"phone,omitempty"`
-	Email   string `bson:"email,omitempty"`
+	Id       string `bson:"id,omitempty"`
+	Name     string `bson:"name,omitempty"`
+	Contact  string `bson:"contact,omitempty"`
+	Phone    string `bson:"phone,omitempty"`
+	Email    string `bson:"email,omitempty"`
+	TenantId string `bson:"tenantId"`
 }
 
 type Site struct {
@@ -2263,6 +2267,72 @@ func (sc *SiteCollection) convDocToSite(doc SiteDoc) Site {
 	}
 }
 
+func (sc *SiteCollection) IsSiteIndexed() (bool, error, int) {
+
+	ctx := context.Background()
+
+	cursor, err := sc.Coll.Indexes().List(ctx)
+	if err != nil {
+		return false, err, -1
+	}
+
+	var indexes []bson.M
+	if err := cursor.All(ctx, &indexes); err != nil {
+		return false, err, -1
+	}
+
+	numOfIndices := len(indexes)
+
+	switch numOfIndices {
+	case 0:
+		return false, fmt.Errorf("Sites collection has 0 indices"), numOfIndices
+	case 1:
+		return false, fmt.Errorf("Sites collection is not fully indexed.  It contains only the default _id index"), numOfIndices
+	case 2:
+		return false, fmt.Errorf("Sites collection is not fully indexed.  It is missing one index"), numOfIndices
+	case 3:
+		return true, fmt.Errorf("Sites collection is fully indexed"), numOfIndices
+	default:
+		return false, fmt.Errorf("Sites collection contains more indices than expected!"), numOfIndices
+	}
+
+}
+
+func (sc *SiteCollection) CreateIndices() error {
+
+	index1 := mongo.IndexModel{
+		Keys: bson.D{
+			bson.E{Key: "tenantId", Value: 1},
+			bson.E{Key: "id", Value: 1},
+		},
+		Options: options.Index().SetUnique(true),
+	}
+
+	index2 := mongo.IndexModel{
+		Keys: bson.D{
+			bson.E{Key: "tenantId", Value: 1},
+			bson.E{Key: "name", Value: 1},
+		},
+		Options: options.Index().SetUnique(true),
+	}
+
+	name, err := sc.Coll.Indexes().CreateOne(context.Background(), index1)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Created index:", name)
+
+	name, err = sc.Coll.Indexes().CreateOne(context.Background(), index2)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Created index:", name)
+
+	return nil
+}
+
 func (sc *SiteCollection) Init(client *mongo.Client) error {
 
 	sc.DB = client.Database(Database)
@@ -2272,13 +2342,14 @@ func (sc *SiteCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
-func (sc *SiteCollection) Add(site Site) error {
+func (sc *SiteCollection) Add(site Site, tenantId string) error {
 
 	var result *mongo.InsertOneResult
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
 	doc := sc.convSiteToDoc(site)
+	doc.TenantId = tenantId
 
 	result, sc.LastError = sc.Coll.InsertOne(ctx, doc)
 	if sc.LastError != nil {
@@ -2289,13 +2360,14 @@ func (sc *SiteCollection) Add(site Site) error {
 	return nil
 }
 
-func (sc *SiteCollection) Get(id string) (*Site, error) {
+func (sc *SiteCollection) Get(id, tenantId string) (*Site, error) {
 
 	var filter bson.M
 	var doc SiteDoc
 
 	filter = bson.M{
-		"id": id,
+		"id":       id,
+		"tenantId": tenantId,
 	}
 
 	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
@@ -2311,13 +2383,18 @@ func (sc *SiteCollection) Get(id string) (*Site, error) {
 	return &site, nil
 }
 
-func GetSiteName(ctx context.Context, siteID string) (string, error) {
+func GetSiteName(ctx context.Context, siteID, tenantId string) (string, error) {
 	var site Site
+
+	filter := bson.M{
+		"id":       siteID,
+		"tenantId": tenantId,
+	}
 
 	err := Client.
 		Database("refLedger_v2").
 		Collection("sites").
-		FindOne(ctx, bson.M{"id": siteID}).
+		FindOne(ctx, filter).
 		Decode(&site)
 
 	if err != nil {
@@ -2328,10 +2405,14 @@ func GetSiteName(ctx context.Context, siteID string) (string, error) {
 	return site.Name, nil
 }
 
-func (sc *SiteCollection) GetSiteNames() ([]SiteName, error) {
+func (sc *SiteCollection) GetSiteNames(tenantId string) ([]SiteName, error) {
 	var sites []SiteName = []SiteName{}
 
-	cursor, err := sc.Coll.Find(context.TODO(), bson.M{})
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	cursor, err := sc.Coll.Find(context.TODO(), filter)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to query sites.  Reason: %v", err)
 	}
@@ -2351,12 +2432,14 @@ func (sc *SiteCollection) GetSiteNames() ([]SiteName, error) {
 	return sites, nil
 }
 
-func (sc *SiteCollection) GetSitesDirectory() ([]Site, error) {
+func (sc *SiteCollection) GetSitesDirectory(tenantId string) ([]Site, error) {
 
 	var filter bson.M
 	var sites []Site
 
-	filter = bson.M{}
+	filter = bson.M{
+		"tenantId": tenantId,
+	}
 
 	opts := options.Find().
 		SetSort(bson.D{
@@ -2381,17 +2464,19 @@ func (sc *SiteCollection) GetSitesDirectory() ([]Site, error) {
 	return sites, nil
 }
 
-func (sc *SiteCollection) Update(id string, site Site) error {
+func (sc *SiteCollection) Update(id, tenantId string, site Site) error {
 
 	var filter bson.M
 	var doc SiteDoc
 	var result *mongo.UpdateResult
 
 	filter = bson.M{
-		"id": id,
+		"id":       site.Id,
+		"tenantId": tenantId,
 	}
 
 	doc = sc.convSiteToDoc(site)
+	doc.TenantId = tenantId
 
 	result, sc.LastError = sc.Coll.ReplaceOne(context.TODO(), filter, doc)
 	if sc.LastError != nil {
@@ -2406,11 +2491,15 @@ func (sc *SiteCollection) Update(id string, site Site) error {
 	return nil
 }
 
-func (sc *SiteCollection) DeleteAll() error {
+func (sc *SiteCollection) DeleteAll(tenantId string) error {
 
 	var result *mongo.DeleteResult
 
-	result, sc.LastError = sc.Coll.DeleteMany(context.TODO(), bson.M{})
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	result, sc.LastError = sc.Coll.DeleteMany(context.TODO(), filter)
 	if sc.LastError != nil {
 		return fmt.Errorf("Failed to delete all sites.  Reason: %v", sc.LastError)
 	}
@@ -2419,13 +2508,14 @@ func (sc *SiteCollection) DeleteAll() error {
 	return nil
 }
 
-func (sc *SiteCollection) Delete(id string) error {
+func (sc *SiteCollection) Delete(id, tenantId string) error {
 
 	var filter bson.M
 	var result *mongo.DeleteResult
 
 	filter = bson.M{
-		"id": id,
+		"id":       id,
+		"tenantId": tenantId,
 	}
 
 	result, sc.LastError = sc.Coll.DeleteOne(context.TODO(), filter)
@@ -2442,12 +2532,12 @@ func (sc *SiteCollection) Delete(id string) error {
 	return nil
 }
 
-func (sc *SiteCollection) Dump(id string) error {
+func (sc *SiteCollection) Dump(id, tenantId string) error {
 
 	fmt.Println("Retrieving site with ID:", id)
 
 	var site *Site
-	site, err := sc.Get(id)
+	site, err := sc.Get(id, tenantId)
 	if err != nil {
 		return fmt.Errorf("Failed to get site.  Reason: %v", err)
 	}
@@ -2458,6 +2548,38 @@ func (sc *SiteCollection) Dump(id string) error {
 	fmt.Println("Contact:", site.Contact)
 	fmt.Println("Phone:", site.Phone)
 	fmt.Println("Email:", site.Email)
+
+	return nil
+}
+
+// This can be removed once the Site Collection has been update to include the TenantId
+// This is phase 1 of coverting Ref Ledger to support multi tenant
+//
+// I am leaving this in, even though I have converted the Sites Colleciton to Multi Tenant.
+// This can be used as an example for the other collections.
+
+func (sc *SiteCollection) ConvertProc(tenantId string) error {
+
+	filter := bson.M{
+		"$or": []bson.M{
+			{"tenantId": bson.M{"$exists": false}},
+			{"tenantId": ""},
+		},
+	}
+
+	update := bson.M{
+		"$set": bson.M{"tenantId": tenantId},
+	}
+
+	result, err := sc.Coll.UpdateMany(context.Background(), filter, update)
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Printf("Matched %d documents\n", result.MatchedCount)
+	fmt.Printf("Modified %d documents\n", result.ModifiedCount)
 
 	return nil
 }

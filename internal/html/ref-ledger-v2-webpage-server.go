@@ -90,6 +90,8 @@ var oc database.OfficialCollection
 
 var AuditLog *log.Logger = nil
 
+var TenantId string = database.TenantId
+
 func isValidEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
@@ -218,7 +220,7 @@ func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 
 func GetSitesDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(w, r)
-	sites, err := sc.GetSitesDirectory()
+	sites, err := sc.GetSitesDirectory(TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -243,7 +245,7 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	sites, err := sc.GetSiteNames()
+	sites, err := sc.GetSiteNames(TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -750,7 +752,7 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = sc.Add(sc.ConvJsonToSite(siteJson))
+	err = sc.Add(sc.ConvJsonToSite(siteJson), TenantId)
 	if err != nil {
 		fmt.Println("Failed to create site")
 		http.Error(w, "Failed to create site", http.StatusInternalServerError)
@@ -870,7 +872,7 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Site", siteId)
 
-	err := sc.Delete(siteId)
+	err := sc.Delete(siteId, TenantId)
 
 	if err != nil {
 		http.Error(w,
@@ -909,7 +911,7 @@ func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	site, err := sc.Get(r.PathValue("siteId"))
+	site, err := sc.Get(r.PathValue("siteId"), TenantId)
 	if err != nil {
 		http.Error(w, "Site not found", http.StatusNotFound)
 		return
@@ -940,7 +942,7 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 	//
 	// Replace Site Id with Site Name
 	//
-	siteName, err := database.GetSiteName(context.TODO(), game.Site)
+	siteName, err := database.GetSiteName(context.TODO(), game.Site, TenantId)
 
 	if err == nil {
 		game.Site = siteName
@@ -1334,6 +1336,18 @@ func main() {
 		fmt.Println("Failed to initialize site collection.")
 		utils.AuditLog.Println("Failed to initialize site collection.")
 		return
+	}
+
+	result, err, numOfIndices := sc.IsSiteIndexed()
+
+	if result == false && numOfIndices != 3 {
+		err = sc.CreateIndices()
+	}
+
+	if err != nil {
+		fmt.Println("Failed to create indices for Sites Collection.  Reason:", err)
+	} else {
+		fmt.Println("Sites Collection successfully indexed")
 	}
 
 	err = gc.Init(database.Client)
