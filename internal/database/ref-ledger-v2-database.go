@@ -2267,7 +2267,7 @@ func (sc *SiteCollection) convDocToSite(doc SiteDoc) Site {
 	}
 }
 
-func (sc *SiteCollection) IsSiteIndexed() (bool, error, int) {
+func (sc *SiteCollection) IsIndexed() (bool, error, int) {
 
 	ctx := context.Background()
 
@@ -2291,7 +2291,7 @@ func (sc *SiteCollection) IsSiteIndexed() (bool, error, int) {
 	case 2:
 		return false, fmt.Errorf("Sites collection is not fully indexed.  It is missing one index"), numOfIndices
 	case 3:
-		return true, fmt.Errorf("Sites collection is fully indexed"), numOfIndices
+		return true, nil, numOfIndices
 	default:
 		return false, fmt.Errorf("Sites collection contains more indices than expected!"), numOfIndices
 	}
@@ -2653,6 +2653,7 @@ type OfficialJson struct {
 	Phone     string `json:"phone"`
 	Email     string `json:"email"`
 	Address   string `json:"address"`
+	TenantId  string `json:"-"`
 }
 
 type OfficialDoc struct {
@@ -2662,6 +2663,7 @@ type OfficialDoc struct {
 	Phone     string `bson:"phone,omitempty"`
 	Email     string `bson:"email,omitempty"`
 	Address   string `bson:"address,omitempty"`
+	TenantId  string `bson:"tenantId"`
 }
 
 type Official struct {
@@ -2738,6 +2740,89 @@ func (oc *OfficialCollection) convDocToOfficial(doc OfficialDoc) Official {
 	}
 }
 
+// This can be removed once the Officials Collection has been update to include the TenantId
+// This is phase 1 of coverting Ref Ledger to support multi tenant
+//
+// I am leaving this in, even though I have converted the Officials Colleciton to Multi Tenant.
+// This can be used as an example for the other collections.
+
+func (oc *OfficialCollection) ConvertProc(tenantId string) error {
+
+	filter := bson.M{
+		"$or": []bson.M{
+			{"tenantId": bson.M{"$exists": false}},
+			{"tenantId": ""},
+		},
+	}
+
+	update := bson.M{
+		"$set": bson.M{"tenantId": tenantId},
+	}
+
+	result, err := oc.Coll.UpdateMany(context.Background(), filter, update)
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Printf("Matched %d documents\n", result.MatchedCount)
+	fmt.Printf("Modified %d documents\n", result.ModifiedCount)
+
+	return nil
+}
+
+func (oc *OfficialCollection) IsIndexed() (bool, error, int) {
+
+	ctx := context.Background()
+
+	cursor, err := oc.Coll.Indexes().List(ctx)
+	if err != nil {
+		return false, err, -1
+	}
+
+	var indexes []bson.M
+	if err := cursor.All(ctx, &indexes); err != nil {
+		return false, err, -1
+	}
+
+	numOfIndices := len(indexes)
+
+	switch numOfIndices {
+	case 0:
+		return false, fmt.Errorf("Officials collection has 0 indices"), numOfIndices
+	case 1:
+		return false, fmt.Errorf("Sites collection is not fully indexed.  It contains only the default _id index"), numOfIndices
+	case 2:
+		return true, nil, numOfIndices
+	default:
+		return false, fmt.Errorf("Sites collection contains more indices than expected!"), numOfIndices
+	}
+
+}
+
+func (oc *OfficialCollection) CreateIndices() error {
+
+	index := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "tenantId", Value: 1},
+			{Key: "lastName", Value: 1},
+			{Key: "firstName", Value: 1},
+		},
+		Options: options.Index().
+			SetName("tenant_last_first"),
+	}
+
+	name, err := oc.Coll.Indexes().CreateOne(context.Background(), index)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Created index:", name)
+
+	return nil
+}
+
 func (oc *OfficialCollection) Init(client *mongo.Client) error {
 
 	oc.DB = client.Database(Database)
@@ -2747,7 +2832,7 @@ func (oc *OfficialCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
-func (oc *OfficialCollection) Add(official Official) error {
+func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 
 	var result *mongo.InsertOneResult
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
@@ -2758,6 +2843,8 @@ func (oc *OfficialCollection) Add(official Official) error {
 		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
 	}
 
+	doc.TenantId = tenantId
+
 	result, oc.LastError = oc.Coll.InsertOne(ctx, doc)
 	if oc.LastError != nil {
 		return fmt.Errorf("Insert failed.  Reason: %v", oc.LastError)
@@ -2767,7 +2854,7 @@ func (oc *OfficialCollection) Add(official Official) error {
 	return nil
 }
 
-func (oc *OfficialCollection) Get(firstName, lastName string) (Official, error) {
+func (oc *OfficialCollection) Get(firstName, lastName, tenantId string) (Official, error) {
 
 	var filter bson.M
 	var doc OfficialDoc
@@ -2775,6 +2862,7 @@ func (oc *OfficialCollection) Get(firstName, lastName string) (Official, error) 
 	filter = bson.M{
 		"firstName": firstName,
 		"lastName":  lastName,
+		"tenantId":  tenantId,
 	}
 
 	err := oc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
@@ -2791,11 +2879,13 @@ func (oc *OfficialCollection) Get(firstName, lastName string) (Official, error) 
 	return official, nil
 }
 
-func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName string) ([]Official, error) {
+func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantId string) ([]Official, error) {
 
 	var officials []Official
 
-	filter := bson.M{}
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
 
 	firstName = strings.TrimSpace(firstName)
 	lastName = strings.TrimSpace(lastName)
@@ -2846,7 +2936,7 @@ func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName string) 
 	return officials, nil
 }
 
-func (oc *OfficialCollection) Update(id string, official Official) error {
+func (oc *OfficialCollection) Update(id, tenantId string, official Official) error {
 
 	var filter bson.M
 	var doc OfficialDoc
@@ -2855,6 +2945,7 @@ func (oc *OfficialCollection) Update(id string, official Official) error {
 	filter = bson.M{
 		"firstName": official.FirstName,
 		"lastName":  official.LastName,
+		"tenantId":  tenantId,
 	}
 
 	doc, err := oc.convOfficialToDoc(official)
@@ -2875,11 +2966,14 @@ func (oc *OfficialCollection) Update(id string, official Official) error {
 	return nil
 }
 
-func (oc *OfficialCollection) DeleteAll() error {
+func (oc *OfficialCollection) DeleteAll(tenantId string) error {
 
 	var result *mongo.DeleteResult
 
-	result, oc.LastError = oc.Coll.DeleteMany(context.TODO(), bson.M{})
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+	result, oc.LastError = oc.Coll.DeleteMany(context.TODO(), filter)
 	if oc.LastError != nil {
 		return fmt.Errorf("Failed to delete all officials.  Reason: %v", oc.LastError)
 	}
@@ -2888,7 +2982,7 @@ func (oc *OfficialCollection) DeleteAll() error {
 	return nil
 }
 
-func (oc *OfficialCollection) Delete(firstName, lastName string) error {
+func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error {
 
 	var filter bson.M
 	var result *mongo.DeleteResult
@@ -2896,6 +2990,7 @@ func (oc *OfficialCollection) Delete(firstName, lastName string) error {
 	filter = bson.M{
 		"firstName": firstName,
 		"lastName":  lastName,
+		"tenantId":  tenantId,
 	}
 
 	result, oc.LastError = oc.Coll.DeleteOne(context.TODO(), filter)
@@ -2912,12 +3007,12 @@ func (oc *OfficialCollection) Delete(firstName, lastName string) error {
 	return nil
 }
 
-func (oc *OfficialCollection) Dump(firstName, lastName string) error {
+func (oc *OfficialCollection) Dump(firstName, lastName, tenantId string) error {
 
 	fmt.Println("Retrieving official with Name:", firstName, lastName)
 
 	var official Official
-	official, err := oc.Get(firstName, lastName)
+	official, err := oc.Get(firstName, lastName, tenantId)
 	if err != nil {
 		return fmt.Errorf("Failed to get official.  Reason: %v", err)
 	}

@@ -236,7 +236,7 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	firstName := strings.TrimSpace(r.URL.Query().Get("firstname"))
 	lastName := strings.TrimSpace(r.URL.Query().Get("lastname"))
 
-	officials, err := oc.GetOfficialsDirectory(firstName, lastName)
+	officials, err := oc.GetOfficialsDirectory(firstName, lastName, TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -775,7 +775,7 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	err = oc.Add(oc.ConvJsonToOfficial(officialJson))
+	err = oc.Add(oc.ConvJsonToOfficial(officialJson), TenantId)
 	if err != nil {
 		fmt.Println("Failed to create official")
 		http.Error(w, "Failed to create official", http.StatusInternalServerError)
@@ -897,7 +897,7 @@ func GetOfficials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	official, err := oc.Get(r.PathValue("firstName"), r.PathValue("lastName"))
+	official, err := oc.Get(r.PathValue("firstName"), r.PathValue("lastName"), TenantId)
 	if err != nil {
 		http.Error(w, "Official not found", http.StatusNotFound)
 		return
@@ -1360,7 +1360,7 @@ func main() {
 		return
 	}
 
-	result, err, numOfIndices := sc.IsSiteIndexed()
+	result, err, numOfIndices := sc.IsIndexed()
 
 	if result == false && numOfIndices != 3 {
 		err = sc.CreateIndices()
@@ -1386,6 +1386,17 @@ func main() {
 		return
 	}
 
+	result, err, numOfIndices = oc.IsIndexed()
+
+	if result == false && numOfIndices != 2 {
+		err = oc.CreateIndices()
+	}
+
+	if err != nil {
+		fmt.Println("Failed to create indices for Officials Collection.  Reason:", err)
+	} else {
+		fmt.Println("Officials Collection successfully indexed")
+	}
 	if database.IsSessionIndexed() {
 		database.CreateSessionIndices()
 	}
