@@ -1183,13 +1183,17 @@ func isAuthenticated(r *http.Request) bool {
 func authRequired(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		// allow login page and static assets
 		if r.URL.Path == "/login" || r.URL.Path == "/api/login" {
 			next(w, r)
 			return
 		}
 
 		if !isAuthenticated(r) {
+			if strings.HasPrefix(r.URL.Path, "/api/") {
+				http.Error(w, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}

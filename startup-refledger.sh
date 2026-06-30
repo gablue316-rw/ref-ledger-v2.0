@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e 
+
 echo "Starting Docker Desktop..."
 
 "/c/Program Files/Docker/Docker/Docker Desktop.exe" &

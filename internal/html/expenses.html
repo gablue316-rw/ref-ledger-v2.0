@@ -370,41 +370,38 @@
 <script>
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
-
     try {
-
         const response = await fetch("/api/logout", {
             method: "POST"
         });
 
-        if (response.ok) {
+        if (response.ok || response.redirected) {
             window.location.href = "/login";
         } else {
             alert("Logout failed");
         }
-
     } catch(err) {
         alert("Logout failed");
     }
-
-});        
+});
 
 document.getElementById("expenseForm")
 .addEventListener("submit", async function(e) {
 
     e.preventDefault();
 
+    const messageBox = document.getElementById("message");
+
     const expense = {
         date: document.getElementById("date").value,
         expenseType: document.getElementById("expenseType").value,
         amount: parseFloat(document.getElementById("amount").value),
-        description: document.getElementById("description").value,
+        description: document.getElementById("description").value.trim(),
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value) || 0
     };
 
     try {
-
         const response = await fetch("/api/expenses", {
             method: "POST",
             headers: {
@@ -413,21 +410,30 @@ document.getElementById("expenseForm")
             body: JSON.stringify(expense)
         });
 
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            messageBox.innerText =
+                "Permission denied. Read-only users cannot enter expenses.";
+            return;
+        }
+
         const message = await response.text();
 
-        document.getElementById("message").innerText =
+        messageBox.innerText =
             response.ok
                 ? message || "Expense saved successfully."
                 : message || "Error saving expense.";
-                
+
         if (response.ok) {
             document.getElementById("expenseForm").reset();
-        } 
+        }
 
     } catch (err) {
-
-        document.getElementById("message").innerText =
-            "Server unavailable.";
+        messageBox.innerText = "Server unavailable.";
     }
 });
 
