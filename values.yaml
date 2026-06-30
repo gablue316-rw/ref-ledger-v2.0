@@ -1,0 +1,56 @@
+# Number of Ref Ledger pods
+replicaCount: 1
+
+image:
+  repository: ref-ledger
+  tag: latest
+  pullPolicy: Never
+
+service:
+  type: ClusterIP
+  port: 8080
+
+container:
+  port: 8080
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+env:
+  TZ: America/New_York
+
+cloudflare:
+  enabled: true
+  tunnelId: 4299fc7a-3088-406e-99bb-6d36c35258e2
+  hostname: ref-ledger.com
+  credentialsSecret: cloudflared-creds
+
+mongodb:
+  host: mongodb
+  port: 27017
+  database: refLedger_v2
+
+logging:
+  level: info
+
+probes:
+  liveness:
+    path: /
+    initialDelaySeconds: 15
+    periodSeconds: 20
+
+  readiness:
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

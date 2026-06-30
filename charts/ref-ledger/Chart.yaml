@@ -1,0 +1,16 @@
+apiVersion: v2
+name: ref-ledger
+description: A Helm chart for deploying the Ref Ledger application to Kubernetes
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: Randall West
+
+keywords:
+  - ref-ledger
+  - go
+  - mongodb
+  - kubernetes
+  - cloudflare-tunnel
