@@ -1,25 +1,18 @@
 #!/bin/bash
-
 set -e
 
 echo "🚀 Starting Minikube..."
 minikube start
 
-echo "🔐 Ensuring Cloudflare secret exists..."
+echo "🔓 Applying sealed Cloudflare credentials..."
+kubectl apply -f secrets/credentials.enc.yaml
 
-if kubectl get secret cloudflared-creds >/dev/null 2>&1; then
-  echo "✔ Secret already exists"
-else
-  echo "Creating cloudflared secret..."
-  kubectl create secret generic cloudflared-creds \
-    --from-file=credentials.json=secrets/credentials.json
-fi
+echo "📦 Deploying Ref Ledger..."
+helm upgrade --install ref-ledger ./charts/ref-ledger -f values.yaml
 
-echo "📦 Applying ref-ledger Kubernetes manifests..."
-kubectl apply -f k8s/
-
-echo "🔄 Restarting Cloudflared deployment..."
-kubectl rollout restart deployment/cloudflared
+echo "⏳ Waiting for deployments..."
+kubectl rollout status deployment/ref-ledger
+kubectl rollout status deployment/cloudflared
 
 echo "⏳ Waiting for pods to become Ready..."
 
