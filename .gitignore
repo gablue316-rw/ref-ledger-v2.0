@@ -1,1 +1,5 @@
+# Local Cloudflare credentials
 secrets/credentials.json
+
+# Sealed Secrets public certificate (generated from the current cluster)
+secrets/sealed-secrets-cert.pem

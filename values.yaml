@@ -32,7 +32,7 @@ cloudflare:
     tag: latest
     pullPolicy: IfNotPresent
 
-  tunnelId: 4299fc7a-3088-406e-99bb-6d36c35258e2
+  tunnelId: 00629144-3807-4593-ac77-24698d2d12cd
   hostname: ref-ledger.com
   credentialsSecret: cloudflared-creds
 
