@@ -6,6 +6,6 @@ spec:
   selector:
     app: ref-ledger
   ports:
-    - port: 8080
-      targetPort: 8080
-  type: ClusterIP
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.container.port }}
+  type: {{ .Values.service.type }}

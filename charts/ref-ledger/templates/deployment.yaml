@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: ref-ledger
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: ref-ledger
@@ -14,7 +14,12 @@ spec:
     spec:
       containers:
       - name: ref-ledger
-        image: ref-ledger:v2
-        imagePullPolicy: Never
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
-        - containerPort: 8080
+        - containerPort: {{ .Values.container.port }}
+        env:
+        - name: TZ
+          value: "{{ .Values.env.TZ }}"
+        resources:
+{{ toYaml .Values.resources | indent 10 }}

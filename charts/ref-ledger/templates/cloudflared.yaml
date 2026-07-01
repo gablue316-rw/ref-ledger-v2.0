@@ -1,10 +1,11 @@
+{{- if .Values.cloudflare.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cloudflared
 
 spec:
-  replicas: 1
+  replicas: {{ .Values.cloudflare.replicas }}
 
   selector:
     matchLabels:
@@ -17,27 +18,29 @@ spec:
 
     spec:
       containers:
-      - name: cloudflared
-        image: cloudflare/cloudflared:latest
+        - name: cloudflared
+          image: "{{ .Values.cloudflare.image.repository }}:{{ .Values.cloudflare.image.tag }}"
+          imagePullPolicy: {{ .Values.cloudflare.image.pullPolicy }}
 
-        args:
-        - tunnel
-        - --config
-        - /etc/cloudflared/config.yaml
-        - run
+          args:
+            - tunnel
+            - --config
+            - /etc/cloudflared/config.yaml
+            - run
 
-        volumeMounts:
-        - name: config
-          mountPath: /etc/cloudflared
+          volumeMounts:
+            - name: config
+              mountPath: /etc/cloudflared
 
-        - name: creds
-          mountPath: /creds
+            - name: creds
+              mountPath: /creds
 
       volumes:
-      - name: config
-        configMap:
-          name: cloudflared-config
+        - name: config
+          configMap:
+            name: cloudflared-config
 
-      - name: creds
-        secret:
-          secretName: cloudflared-creds
+        - name: creds
+          secret:
+            secretName: {{ .Values.cloudflare.credentialsSecret }}
+{{- end }}

@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: ref-ledger
-  tag: latest
+  tag: v2
   pullPolicy: Never
 
 service:
@@ -26,6 +26,12 @@ env:
 
 cloudflare:
   enabled: true
+  replicas: 1
+  image:
+    repository: cloudflare/cloudflared
+    tag: latest
+    pullPolicy: IfNotPresent
+
   tunnelId: 4299fc7a-3088-406e-99bb-6d36c35258e2
   hostname: ref-ledger.com
   credentialsSecret: cloudflared-creds

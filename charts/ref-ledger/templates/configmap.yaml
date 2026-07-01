@@ -5,12 +5,12 @@ metadata:
 
 data:
   config.yaml: |
-    tunnel: 4299fc7a-3088-406e-99bb-6d36c35258e2
+    tunnel: {{ .Values.cloudflare.tunnelId }}
 
     credentials-file: /creds/credentials.json
 
     ingress:
-      - hostname: ref-ledger.com
-        service: http://ref-ledger:8080
+      - hostname: {{ .Values.cloudflare.hostname }}
+        service: http://ref-ledger:{{ .Values.service.port }}
 
       - service: http_status:404
