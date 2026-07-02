@@ -1360,13 +1360,6 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 
 	tenantID := primitive.NewObjectID().Hex()
 
-	//
-	// For now, only the account admin can make database changes
-	//
-	if req.Username != "gablue316@gmail.com" {
-		role = "readonly"
-	}
-
 	user := model.User{
 		Username:     req.Username,
 		PasswordHash: string(passwordHash),
