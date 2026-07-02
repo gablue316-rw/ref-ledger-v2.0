@@ -4,6 +4,7 @@ replicaCount: 1
 image:
   repository: gablue316/ref-ledger
   tag: latest
+  pullPolicy: Always
 
 service:
   type: ClusterIP
