@@ -328,8 +328,8 @@ async function loadAssociations() {
 
             associations.forEach(assoc => {
                const option = document.createElement("option");
-               option.value = assoc.name;
-               option.textContent = assoc.name;
+               option.value = assoc.id;
+               option.textContent = assoc.id;
                select.appendChild(option);
             });
         });

@@ -2023,6 +2023,10 @@ type AssociationName struct {
 	Name string `json:"name"`
 }
 
+type AssociationId struct {
+	Id string `json:"id"`
+}
+
 func (ac *AssociationCollection) Init(client *mongo.Client) error {
 
 	ac.DB = client.Database(Database)
@@ -2217,6 +2221,33 @@ func (ac *AssociationCollection) GetAssociationNames(tenantId string) ([]Associa
 	}
 
 	return associations, nil
+}
+
+func (ac *AssociationCollection) GetAssociationIds(tenantId string) ([]AssociationId, error) {
+	var ids []AssociationId = []AssociationId{}
+
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	cursor, err := ac.Coll.Find(context.TODO(), filter)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to query associations.  Reason: %v", err)
+	}
+	defer cursor.Close(context.TODO())
+
+	for cursor.Next(context.TODO()) {
+		var doc AssociationDoc
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, fmt.Errorf("Failed to decode association document.  Reason: %v", err)
+		}
+
+		for part := range strings.SplitSeq(doc.Id, ",") {
+			ids = append(ids, AssociationId{Id: strings.TrimSpace(part)})
+		}
+	}
+
+	return ids, nil
 }
 
 func (ac *AssociationCollection) Dump(id string, tenantId string) error {

@@ -249,7 +249,7 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(w, r)
 
-	associations, err := ac.GetAssociationNames(TenantId)
+	associations, err := ac.GetAssociationIds(TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
