@@ -87,6 +87,7 @@ var ac database.AssociationCollection
 var sc database.SiteCollection
 var gc database.GameCollection
 var oc database.OfficialCollection
+var ec database.ExpensesCollection
 
 var AuditLog *log.Logger = nil
 
@@ -300,7 +301,7 @@ func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	officials, err := database.GetOfficialNames()
+	officials, err := oc.GetOfficialsNames(TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -826,6 +827,29 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
+	var expenseJson database.ExpenseJson
+
+	err := json.NewDecoder(r.Body).Decode(&expenseJson)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	err = ec.Add(ec.ConvJsonToExpense(expenseJson), TenantId)
+	if err != nil {
+		fmt.Println("Failed to create expense")
+		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("Expense updated successfully"))
+}
+
+/*  DELETE THIS
+func CreateExpense(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(w, r)
 
 	var expense Expense
 	var singleExpense model.ExpenseDescriptor
@@ -849,6 +873,7 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 	database.InsertExpenseDocs(context.TODO(), expDesc, database.Database, "expenses")
 
 }
+*/
 
 func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
@@ -1401,11 +1426,6 @@ func main() {
 		return
 	}
 
-	err = ac.ConvertProc(TenantId)
-	if err != nil {
-		fmt.Println("Failed to convert associations. Reason:", err)
-	}
-
 	err = sc.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize site collection.")
@@ -1452,6 +1472,13 @@ func main() {
 	}
 	if database.IsSessionIndexed() {
 		database.CreateSessionIndices()
+	}
+
+	err = ec.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize expenses collection.")
+		utils.AuditLog.Println("Failed to initialize expenses collection.")
+		return
 	}
 
 	utils.AuditLog.Println("All collections initialized successfully.")

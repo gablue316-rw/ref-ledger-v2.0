@@ -15,6 +15,8 @@ import (
 	"github.com/jung-kurt/gofpdf"
 )
 
+var ec database.ExpensesCollection
+
 func TrimMileageStr(miles string) string {
 
 	//
@@ -722,13 +724,13 @@ func GenerateIncomeReport(assoc string) []string {
 			return []string{}
 		}
 
-		dues, err := database.GetTotalDues(a)
+		dues, err := ec.GetExpense(a, database.TenantId, "Dues")
 		if err != nil {
 			fmt.Println(err)
 			return []string{}
 		}
 
-		miles, err := database.GetTotalMileage(a)
+		miles, err := ec.GetExpense(a, database.TenantId, "Mileage")
 		if err != nil {
 			fmt.Println(err)
 			return []string{}
@@ -740,19 +742,19 @@ func GenerateIncomeReport(assoc string) []string {
 			return []string{}
 		}
 
-		food, err := database.GetTotalFoodExpense(a)
+		food, err := ec.GetExpense(a, database.TenantId, "Food")
 		if err != nil {
 			fmt.Println(err)
 			return []string{}
 		}
 
-		campFees, err := database.GetTotalCampFees(a)
+		campFees, err := ec.GetExpense(a, database.TenantId, "Camp Fees")
 		if err != nil {
 			fmt.Println(err)
 			return []string{}
 		}
 
-		equipmentFees, err := database.GetTotalEquipmentExpense(a)
+		equipmentFees, err := ec.GetExpense(a, database.TenantId, "Equipment")
 		if err != nil {
 			fmt.Println(err)
 			return []string{}
