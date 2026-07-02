@@ -33,7 +33,7 @@ var ExpenseTypes []string = []string{"Camp Fee", "Dues", "Equipment", "Food", "M
 var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending", "Deleted"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
-var TenantId string = "6a408f87ece367df4a66b262"
+var TenantId string = "na"
 
 type OfficialName struct {
 	Name string `json:"name"`
@@ -1116,6 +1116,10 @@ func DeleteSessions(username string) {
 	}
 
 	fmt.Printf("Deleted %d sessions for user %s\n", result.DeletedCount, username)
+}
+
+func UpdateTenantId(tenantId string) {
+	TenantId = tenantId
 }
 
 func GetSession(r *http.Request) (*model.Session, error) {

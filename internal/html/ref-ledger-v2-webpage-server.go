@@ -738,6 +738,8 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Role:      user.Role,
 	}
 
+	database.UpdateTenantId(user.TenantID)
+
 	// 4. Store in MongoDB
 	_, err = database.Client.
 		Database("refLedger_v2").
