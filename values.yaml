@@ -2,9 +2,8 @@
 replicaCount: 1
 
 image:
-  repository: ref-ledger
-  tag: v2
-  pullPolicy: Never
+  repository: gablue316/ref-ledger
+  tag: latest
 
 service:
   type: ClusterIP
