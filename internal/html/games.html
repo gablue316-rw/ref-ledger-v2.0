@@ -193,15 +193,14 @@ body{padding:10px;}
 <div class="card">
 <div class="card-title">Basic Game Information</div>
 <div class="form-grid">
+
 <div class="form-group">
-<label for="association">Association</label>
-<select id="association">
-<option value="">Select Association</option>
-<option value="GOLLC">GOLLC</option>
-<option value="MCBOA">MCBOA</option>
-<option value="MSO">MSO</option>
-</select>
+    <label for="association">Association</label>
+    <select id="association">
+        <option value="">Select Association</option>
+    </select>
 </div>
+
 <div class="form-group"><label for="gameId">Game ID</label><input type="number" id="gameId" required></div>
 <div class="form-group"><label for="date">Date</label><input type="date" id="date" required></div>
 <div class="form-group"><label for="time">Time</label><input type="time" id="time" required></div>
@@ -305,6 +304,41 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 
 });
 
+async function loadAssociations() {
+    try {
+        const response = await fetch("/api/loadAssociations");
+
+        if (!response.ok) {
+            throw new Error("Failed to load associations");
+        }
+
+        const associations = await response.json();
+        console.log(associations);
+    
+        const dropdowns = [
+            "association"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Association</option>';
+
+            associations.forEach(assoc => {
+               const option = document.createElement("option");
+               option.value = assoc.name;
+               option.textContent = assoc.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading associations:", err);
+    }
+}
+
 async function loadSites() {
     try {
         const response = await fetch("/api/loadSites");
@@ -382,6 +416,7 @@ async function loadOfficials() {
 document.addEventListener("DOMContentLoaded", function() {
     loadOfficials();
     loadSites();
+    loadAssociations();
 });
 document.getElementById("clearBtn").addEventListener("click", function () {
     document.getElementById("gameForm").reset();
