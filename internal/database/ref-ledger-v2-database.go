@@ -2001,6 +2001,7 @@ type AssociationDoc struct {
 	Phone     string `bson:"phone,omitempty"`
 	Email     string `bson:"email,omitempty"`
 	Assignors string `bson:"assignors,omitempty"`
+	TenantId  string `bson:"tenantId"`
 }
 
 type Association struct {
@@ -2016,6 +2017,10 @@ type AssociationCollection struct {
 	DB        *mongo.Database
 	Coll      *mongo.Collection
 	LastError error
+}
+
+type AssociationName struct {
+	Name string `json:"name"`
 }
 
 func (ac *AssociationCollection) Init(client *mongo.Client) error {
@@ -2060,13 +2065,14 @@ func (ac *AssociationCollection) convDocToAssociation(doc AssociationDoc) Associ
 	}
 }
 
-func (ac *AssociationCollection) Add(association Association) error {
+func (ac *AssociationCollection) Add(association Association, tenantId string) error {
 
 	var result *mongo.InsertOneResult
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
 	doc := ac.convAssocToDoc(association)
+	doc.TenantId = tenantId
 
 	result, ac.LastError = ac.Coll.InsertOne(ctx, doc)
 	if ac.LastError != nil {
@@ -2077,13 +2083,14 @@ func (ac *AssociationCollection) Add(association Association) error {
 	return nil
 }
 
-func (ac *AssociationCollection) Get(id string) (*Association, error) {
+func (ac *AssociationCollection) Get(id string, tenantId string) (*Association, error) {
 
 	var filter bson.M
 	var doc AssociationDoc
 
 	filter = bson.M{
-		"id": id,
+		"id":       id,
+		"tenantId": tenantId,
 	}
 
 	err := ac.Coll.FindOne(context.TODO(), filter).Decode(&doc)
@@ -2099,10 +2106,10 @@ func (ac *AssociationCollection) Get(id string) (*Association, error) {
 	return &association, nil
 }
 
-func (ac *AssociationCollection) GetAssignorNames() ([]AssignorName, error) {
+func (ac *AssociationCollection) GetAssignorNames(tenantId string) ([]AssignorName, error) {
 	var assignors []AssignorName = []AssignorName{}
 
-	cursor, err := ac.Coll.Find(context.TODO(), bson.M{})
+	cursor, err := ac.Coll.Find(context.TODO(), bson.M{"tenantId": tenantId})
 	if err != nil {
 		return nil, fmt.Errorf("Failed to query assignors.  Reason: %v", err)
 	}
@@ -2122,14 +2129,15 @@ func (ac *AssociationCollection) GetAssignorNames() ([]AssignorName, error) {
 	return assignors, nil
 }
 
-func (ac *AssociationCollection) Update(id string, association Association) error {
+func (ac *AssociationCollection) Update(id string, association Association, tenantId string) error {
 
 	var filter bson.M
 	var doc AssociationDoc
 	var result *mongo.UpdateResult
 
 	filter = bson.M{
-		"id": id,
+		"id":       id,
+		"tenantId": tenantId,
 	}
 
 	doc = ac.convAssocToDoc(association)
@@ -2147,11 +2155,11 @@ func (ac *AssociationCollection) Update(id string, association Association) erro
 	return nil
 }
 
-func (ac *AssociationCollection) DeleteAll() error {
+func (ac *AssociationCollection) DeleteAll(tenantId string) error {
 
 	var result *mongo.DeleteResult
 
-	result, ac.LastError = ac.Coll.DeleteMany(context.TODO(), bson.M{})
+	result, ac.LastError = ac.Coll.DeleteMany(context.TODO(), bson.M{"tenantId": tenantId})
 	if ac.LastError != nil {
 		return fmt.Errorf("Failed to delete all associations.  Reason: %v", ac.LastError)
 	}
@@ -2160,13 +2168,14 @@ func (ac *AssociationCollection) DeleteAll() error {
 	return nil
 }
 
-func (ac *AssociationCollection) Delete(id string) error {
+func (ac *AssociationCollection) Delete(id string, tenantId string) error {
 
 	var filter bson.M
 	var result *mongo.DeleteResult
 
 	filter = bson.M{
-		"id": id,
+		"id":       id,
+		"tenantId": tenantId,
 	}
 
 	result, ac.LastError = ac.Coll.DeleteOne(context.TODO(), filter)
@@ -2183,12 +2192,39 @@ func (ac *AssociationCollection) Delete(id string) error {
 	return nil
 }
 
-func (ac *AssociationCollection) Dump(id string) error {
+func (ac *AssociationCollection) GetAssociationNames(tenantId string) ([]AssociationName, error) {
+	var associations []AssociationName = []AssociationName{}
+
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	cursor, err := ac.Coll.Find(context.TODO(), filter)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to query associations.  Reason: %v", err)
+	}
+	defer cursor.Close(context.TODO())
+
+	for cursor.Next(context.TODO()) {
+		var doc AssociationDoc
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, fmt.Errorf("Failed to decode association document.  Reason: %v", err)
+		}
+
+		for part := range strings.SplitSeq(doc.Name, ",") {
+			associations = append(associations, AssociationName{Name: strings.TrimSpace(part)})
+		}
+	}
+
+	return associations, nil
+}
+
+func (ac *AssociationCollection) Dump(id string, tenantId string) error {
 
 	fmt.Println("Retrieving association with ID:", id)
 
 	var assoc *Association
-	assoc, err := ac.Get(id)
+	assoc, err := ac.Get(id, tenantId)
 	if err != nil {
 		return fmt.Errorf("Failed to get association.  Reason: %v", err)
 	}
@@ -2200,6 +2236,38 @@ func (ac *AssociationCollection) Dump(id string) error {
 	fmt.Println("Phone:", assoc.Phone)
 	fmt.Println("Email:", assoc.Email)
 	fmt.Println("Assignors:", assoc.Assignors)
+
+	return nil
+}
+
+// This can be removed once the Association Collection has been update to include the TenantId
+// This is phase 1 of coverting Ref Ledger to support multi tenant
+//
+// I am leaving this in, even though I have converted the Association Colleciton to Multi Tenant.
+// This can be used as an example for the other collections.
+
+func (ac *AssociationCollection) ConvertProc(tenantId string) error {
+
+	filter := bson.M{
+		"$or": []bson.M{
+			{"tenantId": bson.M{"$exists": false}},
+			{"tenantId": ""},
+		},
+	}
+
+	update := bson.M{
+		"$set": bson.M{"tenantId": tenantId},
+	}
+
+	result, err := ac.Coll.UpdateMany(context.Background(), filter, update)
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	fmt.Printf("Matched %d documents\n", result.MatchedCount)
+	fmt.Printf("Modified %d documents\n", result.ModifiedCount)
 
 	return nil
 }

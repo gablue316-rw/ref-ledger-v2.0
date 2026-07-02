@@ -208,7 +208,7 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	assignors, err := ac.GetAssignorNames()
+	assignors, err := ac.GetAssignorNames(TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -244,6 +244,19 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(officials)
+}
+
+func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(w, r)
+
+	associations, err := ac.GetAssociationNames(TenantId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(associations)
 }
 
 func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
@@ -734,7 +747,7 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson))
+	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson), TenantId)
 	if err != nil {
 		fmt.Println("Failed to create association")
 		http.Error(w, "Failed to create association", http.StatusInternalServerError)
@@ -824,7 +837,7 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 	assocId := r.PathValue("assocId")
 
-	err := ac.Delete(assocId)
+	err := ac.Delete(assocId, TenantId)
 
 	if err != nil {
 		http.Error(w,
@@ -915,7 +928,7 @@ func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	assoc, err := ac.Get(r.PathValue("assocId"))
+	assoc, err := ac.Get(r.PathValue("assocId"), TenantId)
 	if err != nil {
 		http.Error(w, "Association not found", http.StatusNotFound)
 		return
@@ -1357,6 +1370,11 @@ func main() {
 		return
 	}
 
+	err = ac.ConvertProc(TenantId)
+	if err != nil {
+		fmt.Println("Failed to convert associations. Reason:", err)
+	}
+
 	err = sc.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize site collection.")
@@ -1460,6 +1478,7 @@ func main() {
 
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
+	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
 	mux.HandleFunc("/api/sitesDirectory", GetSitesDirectoryHandler)
 	mux.HandleFunc("/api/assignors", GetAssignorsHandler)
