@@ -21,5 +21,9 @@ spec:
         env:
         - name: TZ
           value: "{{ .Values.env.TZ }}"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name          
         resources:
 {{ toYaml .Values.resources | indent 10 }}

@@ -97,6 +97,31 @@ func isValidEmail(email string) bool {
 	return err == nil
 }
 
+func PodInfoHandler(w http.ResponseWriter, r *http.Request) {
+	podName := os.Getenv("POD_NAME")
+	if podName == "" {
+		podName = "local-dev"
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprintf(w, `{"podName":"%s"}`, podName)
+}
+
+func LogRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		podName := os.Getenv("POD_NAME")
+		if podName == "" {
+			podName = "local-dev"
+		}
+
+		logPrint := fmt.Sprintf("Pod=%s Method=%s Path=%s RemoteAddr=%s", podName, r.Method, r.URL.Path, r.RemoteAddr)
+		log.Println(logPrint)
+		fmt.Println(logPrint)
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func readOnlyForbidden(next http.HandlerFunc) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1349,7 +1374,13 @@ func main() {
 		panic(err)
 	}
 
-	utils.AuditLog.Println("Ref Ledger started")
+	podName := os.Getenv("POD_NAME")
+	if podName == "" {
+		podName = "local-dev"
+	}
+
+	log.Printf("Ref Ledger running on pod: %s", podName)
+
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	utils.AuditLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	database.InitDbase("refLedger_v2", "mongodb://host.docker.internal:27017")
@@ -1476,6 +1507,8 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/login.html")
 	})
 
+	mux.HandleFunc("/api/pod", PodInfoHandler)
+
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
@@ -1542,7 +1575,9 @@ func main() {
 	fmt.Println("Routes successfully registered")
 	utils.AuditLog.Println("Server running on port 8080")
 
-	err = http.ListenAndServe(":8080", mux)
+	loggedMux := LogRequest(mux)
+
+	err = http.ListenAndServe(":8080", loggedMux)
 
 	if err != nil {
 		fmt.Println("HTTP Error", err)
