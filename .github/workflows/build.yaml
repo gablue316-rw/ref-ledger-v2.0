@@ -22,6 +22,10 @@ jobs:
           password: ${{ secrets.DOCKER_TOKEN }}
 
       - name: Build and Push
-        run: |
-          docker build -t gablue316/ref-ledger:latest .
-          docker push gablue316/ref-ledger:latest
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            gablue316/ref-ledger:latest
+            gablue316/ref-ledger:${{ github.sha }}
