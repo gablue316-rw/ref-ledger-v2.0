@@ -929,6 +929,32 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(w, r)
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	firstname := r.PathValue("firstName")
+	lastname := r.PathValue("lastName")
+
+	fmt.Println("Deleting Official", firstname, lastname)
+
+	err := oc.Delete(firstname, lastname, database.TenantId)
+
+	if err != nil {
+		http.Error(w,
+			fmt.Sprintf("Delete failed: %v", err),
+			http.StatusNotFound,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
@@ -1548,6 +1574,7 @@ func main() {
 	mux.HandleFunc("/api/site/{siteId}", GetSingleSite)
 	mux.HandleFunc("/api/deleteSite/{siteId}", authRequired(readOnlyForbidden(DeleteSite)))
 	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", authRequired(readOnlyForbidden(DeleteGame)))
+	mux.HandleFunc("/api/deleteOfficial/{firstName}/{lastName}", authRequired(readOnlyForbidden(DeleteOfficial)))
 
 	mux.HandleFunc("/api/officials", authRequired(readOnlyForbidden(CreateOfficial)))
 	mux.HandleFunc("/api/expenses", authRequired(readOnlyForbidden(CreateExpense)))
