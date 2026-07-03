@@ -738,6 +738,8 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Role:      user.Role,
 	}
 
+	log.Printf("Updating Tenant ID %s session for user: %s", user.TenantID, user.Username)
+
 	database.UpdateTenantId(user.TenantID)
 
 	// 4. Store in MongoDB

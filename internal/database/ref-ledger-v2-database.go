@@ -1119,7 +1119,9 @@ func DeleteSessions(username string) {
 }
 
 func UpdateTenantId(tenantId string) {
+	log.Printf("Changing Tenant ID from %s to %s", TenantId, tenantId)
 	TenantId = tenantId
+	log.Printf("Tenant ID is now %s", TenantId)
 }
 
 func GetSession(r *http.Request) (*model.Session, error) {

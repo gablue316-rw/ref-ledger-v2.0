@@ -486,6 +486,11 @@ document.getElementById("getSiteBtn").addEventListener("click", async function (
                 "Site not found.";
             return;
         }
+        
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
 
         const site = await response.json();
 
@@ -516,6 +521,17 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
             method: "DELETE"
         });
 
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            messageBox.innerText =
+                "Permission denied. Read-only users cannot delete sites.";
+            return;
+        }    
+
         const message = await response.text();
 
         document.getElementById("message").innerText =
@@ -545,6 +561,17 @@ document.getElementById("sitesForm").addEventListener("submit", async function(e
             headers: {"Content-Type":"application/json"},
             body: JSON.stringify(site)
         });
+
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            messageBox.innerText =
+                "Permission denied. Read-only users cannot enter sites.";
+            return;
+        }
 
         const message = await response.text();
 
