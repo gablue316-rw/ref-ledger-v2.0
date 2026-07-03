@@ -91,8 +91,6 @@ var ec database.ExpensesCollection
 
 var AuditLog *log.Logger = nil
 
-var TenantId string = database.TenantId
-
 func isValidEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
@@ -234,7 +232,7 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	assignors, err := ac.GetAssignorNames(TenantId)
+	assignors, err := ac.GetAssignorNames(database.TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -246,7 +244,7 @@ func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 
 func GetSitesDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(w, r)
-	sites, err := sc.GetSitesDirectory(TenantId)
+	sites, err := sc.GetSitesDirectory(database.TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -262,7 +260,7 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	firstName := strings.TrimSpace(r.URL.Query().Get("firstname"))
 	lastName := strings.TrimSpace(r.URL.Query().Get("lastname"))
 
-	officials, err := oc.GetOfficialsDirectory(firstName, lastName, TenantId)
+	officials, err := oc.GetOfficialsDirectory(firstName, lastName, database.TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -275,7 +273,7 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(w, r)
 
-	associations, err := ac.GetAssociationIds(TenantId)
+	associations, err := ac.GetAssociationIds(database.TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -288,7 +286,7 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	sites, err := sc.GetSiteNames(TenantId)
+	sites, err := sc.GetSiteNames(database.TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -301,7 +299,7 @@ func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	officials, err := oc.GetOfficialsNames(TenantId)
+	officials, err := oc.GetOfficialsNames(database.TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -777,7 +775,7 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson), TenantId)
+	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson), database.TenantId)
 	if err != nil {
 		fmt.Println("Failed to create association")
 		http.Error(w, "Failed to create association", http.StatusInternalServerError)
@@ -799,7 +797,7 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = sc.Add(sc.ConvJsonToSite(siteJson), TenantId)
+	err = sc.Add(sc.ConvJsonToSite(siteJson), database.TenantId)
 	if err != nil {
 		fmt.Println("Failed to create site")
 		http.Error(w, "Failed to create site", http.StatusInternalServerError)
@@ -818,7 +816,7 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	err = oc.Add(oc.ConvJsonToOfficial(officialJson), TenantId)
+	err = oc.Add(oc.ConvJsonToOfficial(officialJson), database.TenantId)
 	if err != nil {
 		fmt.Println("Failed to create official")
 		http.Error(w, "Failed to create official", http.StatusInternalServerError)
@@ -839,7 +837,7 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ec.Add(ec.ConvJsonToExpense(expenseJson), TenantId)
+	err = ec.Add(ec.ConvJsonToExpense(expenseJson), database.TenantId)
 	if err != nil {
 		fmt.Println("Failed to create expense")
 		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
@@ -891,7 +889,7 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 	assocId := r.PathValue("assocId")
 
-	err := ac.Delete(assocId, TenantId)
+	err := ac.Delete(assocId, database.TenantId)
 
 	if err != nil {
 		http.Error(w,
@@ -943,7 +941,7 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Site", siteId)
 
-	err := sc.Delete(siteId, TenantId)
+	err := sc.Delete(siteId, database.TenantId)
 
 	if err != nil {
 		http.Error(w,
@@ -964,7 +962,7 @@ func GetOfficials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	official, err := oc.Get(r.PathValue("firstName"), r.PathValue("lastName"), TenantId)
+	official, err := oc.Get(r.PathValue("firstName"), r.PathValue("lastName"), database.TenantId)
 	if err != nil {
 		http.Error(w, "Official not found", http.StatusNotFound)
 		return
@@ -982,7 +980,7 @@ func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	assoc, err := ac.Get(r.PathValue("assocId"), TenantId)
+	assoc, err := ac.Get(r.PathValue("assocId"), database.TenantId)
 	if err != nil {
 		http.Error(w, "Association not found", http.StatusNotFound)
 		return
@@ -1000,7 +998,7 @@ func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	site, err := sc.Get(r.PathValue("siteId"), TenantId)
+	site, err := sc.Get(r.PathValue("siteId"), database.TenantId)
 	if err != nil {
 		http.Error(w, "Site not found", http.StatusNotFound)
 		return
@@ -1031,7 +1029,7 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 	//
 	// Replace Site Id with Site Name
 	//
-	siteName, err := database.GetSiteName(context.TODO(), game.Site, TenantId)
+	siteName, err := database.GetSiteName(context.TODO(), game.Site, database.TenantId)
 
 	if err == nil {
 		game.Site = siteName
