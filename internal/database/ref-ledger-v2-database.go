@@ -1758,43 +1758,6 @@ func GetGameFilters() bson.M {
 	return GameFilters
 }
 
-/*
-func FindOfficial(parentCtx context.Context, name string) (bool, error) {
-
-	var filter bson.M
-	var names []string
-
-	names = strings.Split(name, " ")
-
-	if len(names) < 2 {
-		return false, fmt.Errorf("Invalid name[%s].  Missing required parameter: first and last name are both required.", name)
-	}
-
-	if names[0] == "" || names[1] == "" {
-		return false, fmt.Errorf("Invalid query.  Missing required parameter: first and last name are both required.")
-	}
-
-	filter = bson.M{
-		"firstName": names[0],
-		"lastName":  names[1],
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(Database)
-	coll := db.Collection("officials")
-
-	result := coll.FindOne(ctx, filter)
-
-	if result.Err() == mongo.ErrNoDocuments {
-		return false, nil
-	}
-
-	return true, nil
-}
-*/
-
 // Association Colleciton, Documents and API Code
 type AssociationJson struct {
 	Id        string `json:"id"`
@@ -2082,38 +2045,6 @@ func (ac *AssociationCollection) Dump(id string, tenantId string) error {
 	return nil
 }
 
-// This can be removed once the Association Collection has been update to include the TenantId
-// This is phase 1 of coverting Ref Ledger to support multi tenant
-//
-// I am leaving this in, even though I have converted the Association Colleciton to Multi Tenant.
-// This can be used as an example for the other collections.
-
-func (ac *AssociationCollection) ConvertProc(tenantId string) error {
-
-	filter := bson.M{
-		"$or": []bson.M{
-			{"tenantId": bson.M{"$exists": false}},
-			{"tenantId": ""},
-		},
-	}
-
-	update := bson.M{
-		"$set": bson.M{"tenantId": tenantId},
-	}
-
-	result, err := ac.Coll.UpdateMany(context.Background(), filter, update)
-
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	fmt.Printf("Matched %d documents\n", result.MatchedCount)
-	fmt.Printf("Modified %d documents\n", result.ModifiedCount)
-
-	return nil
-}
-
 // Site Colleciton, Documents and API Code
 type SiteJson struct {
 	Id       string `json:"id"`
@@ -2293,24 +2224,25 @@ func (sc *SiteCollection) Get(id, tenantId string) (*Site, error) {
 	return &site, nil
 }
 
-func GetSiteName(ctx context.Context, siteID, tenantId string) (string, error) {
+func (sc *SiteCollection) GetSiteName(siteID, tenantId string) (string, error) {
 	var site Site
+	var doc SiteDoc
 
 	filter := bson.M{
 		"id":       siteID,
 		"tenantId": tenantId,
 	}
 
-	err := Client.
-		Database("refLedger_v2").
-		Collection("sites").
-		FindOne(ctx, filter).
-		Decode(&site)
+	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
 
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error:", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return "", fmt.Errorf("site not found")
+		}
 		return "", err
 	}
+	site = sc.convDocToSite(doc)
 
 	return site.Name, nil
 }
@@ -2458,38 +2390,6 @@ func (sc *SiteCollection) Dump(id, tenantId string) error {
 	fmt.Println("Contact:", site.Contact)
 	fmt.Println("Phone:", site.Phone)
 	fmt.Println("Email:", site.Email)
-
-	return nil
-}
-
-// This can be removed once the Site Collection has been update to include the TenantId
-// This is phase 1 of coverting Ref Ledger to support multi tenant
-//
-// I am leaving this in, even though I have converted the Sites Colleciton to Multi Tenant.
-// This can be used as an example for the other collections.
-
-func (sc *SiteCollection) ConvertProc(tenantId string) error {
-
-	filter := bson.M{
-		"$or": []bson.M{
-			{"tenantId": bson.M{"$exists": false}},
-			{"tenantId": ""},
-		},
-	}
-
-	update := bson.M{
-		"$set": bson.M{"tenantId": tenantId},
-	}
-
-	result, err := sc.Coll.UpdateMany(context.Background(), filter, update)
-
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	fmt.Printf("Matched %d documents\n", result.MatchedCount)
-	fmt.Printf("Modified %d documents\n", result.ModifiedCount)
 
 	return nil
 }
@@ -2648,38 +2548,6 @@ func (oc *OfficialCollection) convDocToOfficial(doc OfficialDoc) Official {
 		Email:     doc.Email,
 		Address:   doc.Address,
 	}
-}
-
-// This can be removed once the Officials Collection has been update to include the TenantId
-// This is phase 1 of coverting Ref Ledger to support multi tenant
-//
-// I am leaving this in, even though I have converted the Officials Colleciton to Multi Tenant.
-// This can be used as an example for the other collections.
-
-func (oc *OfficialCollection) ConvertProc(tenantId string) error {
-
-	filter := bson.M{
-		"$or": []bson.M{
-			{"tenantId": bson.M{"$exists": false}},
-			{"tenantId": ""},
-		},
-	}
-
-	update := bson.M{
-		"$set": bson.M{"tenantId": tenantId},
-	}
-
-	result, err := oc.Coll.UpdateMany(context.Background(), filter, update)
-
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	fmt.Printf("Matched %d documents\n", result.MatchedCount)
-	fmt.Printf("Modified %d documents\n", result.ModifiedCount)
-
-	return nil
 }
 
 func (oc *OfficialCollection) IsIndexed() (bool, error, int) {
@@ -3053,38 +2921,6 @@ func (ec *ExpensesCollection) Init(client *mongo.Client) error {
 	ec.Coll = ec.DB.Collection("expenses")
 
 	fmt.Println("Successfully initialized Expense Collection")
-	return nil
-}
-
-// This can be removed once the Expenses Collection has been updated to include the TenantId
-// This is phase 1 of coverting Ref Ledger to support multi tenant
-//
-// I am leaving this in, even though I have converted the Expenses Colleciton to Multi Tenant.
-// This can be used as an example for the other collections.
-
-func (ec *ExpensesCollection) ConvertProc(tenantId string) error {
-
-	filter := bson.M{
-		"$or": []bson.M{
-			{"tenantId": bson.M{"$exists": false}},
-			{"tenantId": ""},
-		},
-	}
-
-	update := bson.M{
-		"$set": bson.M{"tenantId": tenantId},
-	}
-
-	result, err := ec.Coll.UpdateMany(context.Background(), filter, update)
-
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-
-	fmt.Printf("Matched %d documents\n", result.MatchedCount)
-	fmt.Printf("Modified %d documents\n", result.ModifiedCount)
-
 	return nil
 }
 

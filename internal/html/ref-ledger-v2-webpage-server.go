@@ -1055,7 +1055,7 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 	//
 	// Replace Site Id with Site Name
 	//
-	siteName, err := database.GetSiteName(context.TODO(), game.Site, database.TenantId)
+	siteName, err := sc.GetSiteName(game.Site, database.TenantId)
 
 	if err == nil {
 		game.Site = siteName
