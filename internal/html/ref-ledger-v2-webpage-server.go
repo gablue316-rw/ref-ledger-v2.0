@@ -106,6 +106,7 @@ func getTenantId(r *http.Request) (string, error) {
 		fmt.Println("Retrieving session id")
 		cookie, err := r.Cookie("session_id")
 		if err != nil {
+			fmt.Println("Error retrieving session id")
 			return "", err
 		}
 
@@ -760,6 +761,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("Validating Login")
 	var user model.User
 	var err error
 
@@ -778,6 +780,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	).Decode(&user)
 
 	if err != nil {
+		fmt.Println("User not found")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -788,16 +791,20 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
+		fmt.Println("Invalid password")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	// 2. Delete previous sessions if they still exist
+	fmt.Println("Deleting previous sessions")
 	database.DeleteSessions(username)
 
 	// 3. Create session
+	fmt.Println("Creating session")
 	sessionID := uuid.New().String()
 
+	fmt.Println("session ID:", sessionID)
 	session := model.Session{
 		SessionID: sessionID,
 		Username:  user.Username,
@@ -806,9 +813,11 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Role:      user.Role,
 	}
 
-	log.Printf("Updating Tenant ID %s session for user: %s", user.TenantID, user.Username)
+	fmt.Println("Updating Tenant ID", user.TenantID, "session for user:", user.Username)
 
 	database.UpdateTenantId(user.TenantID)
+
+	fmt.Println("Storing session in MongoDB")
 
 	// 4. Store in MongoDB
 	_, err = database.Client.
@@ -822,6 +831,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Set cookie
+	fmt.Println("Setting cookie")
 	http.SetCookie(w, &http.Cookie{
 		Name:     "rl_session",
 		Value:    sessionID,
