@@ -1845,20 +1845,70 @@ func (ac *AssociationCollection) convDocToAssociation(doc AssociationDoc) Associ
 	}
 }
 
+func (ac *AssociationCollection) Exists(id string, tenantId string) (bool, error) {
+
+	var doc AssociationDoc
+
+	filter := bson.M{
+		"id":       id,
+		"tenantId": tenantId,
+	}
+
+	err := ac.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (ac *AssociationCollection) Add(association Association, tenantId string) error {
 
-	var result *mongo.InsertOneResult
+	var addRes *mongo.InsertOneResult
+	var updRes *mongo.UpdateResult
+	var update bool = false
+
+	if tenantId == "na" {
+
+	}
+
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
+
+	assocExists, err := ac.Exists(association.Id, tenantId)
+	if err != nil {
+		return fmt.Errorf("error occurred while checking association existence: %v", err)
+	}
+
+	if assocExists {
+		fmt.Println("association with ID", association.Id, "already exists")
+		update = true
+	}
 
 	doc := ac.convAssocToDoc(association)
 	doc.TenantId = tenantId
 
-	result, ac.LastError = ac.Coll.InsertOne(ctx, doc)
-	if ac.LastError != nil {
-		return fmt.Errorf("Insert failed.  Reason: %v", ac.LastError)
+	if update {
+		updRes, ac.LastError = ac.Coll.ReplaceOne(ctx, bson.M{"id": association.Id, "tenantId": tenantId}, doc)
+	} else {
+		addRes, ac.LastError = ac.Coll.InsertOne(ctx, doc)
 	}
-	fmt.Println("Inserted ID:", result.InsertedID)
+
+	if ac.LastError != nil {
+		if update {
+			return fmt.Errorf("Update failed.  Reason: %v", ac.LastError)
+		} else {
+			return fmt.Errorf("Insert failed.  Reason: %v", ac.LastError)
+		}
+	}
+
+	if update {
+		fmt.Println("Updated ID:", updRes.UpsertedID)
+	} else {
+		fmt.Println("Inserted ID:", addRes.InsertedID)
+	}
 
 	return nil
 }

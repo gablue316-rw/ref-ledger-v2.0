@@ -846,16 +846,29 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 
 func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 
+	var tId string = database.TenantId
+	var err error
+
 	LogVisitor(w, r)
 	var assocJson database.AssociationJson
 
-	err := json.NewDecoder(r.Body).Decode(&assocJson)
+	err = json.NewDecoder(r.Body).Decode(&assocJson)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
+
 		return
 	}
 
-	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson), database.TenantId)
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson), tId)
 	if err != nil {
 		fmt.Println("Failed to create association")
 		http.Error(w, "Failed to create association", http.StatusInternalServerError)
@@ -868,16 +881,28 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 
 func CreateSite(w http.ResponseWriter, r *http.Request) {
 
+	var tId string = database.TenantId
+	var err error
+
 	LogVisitor(w, r)
 	var siteJson database.SiteJson
 
-	err := json.NewDecoder(r.Body).Decode(&siteJson)
+	err = json.NewDecoder(r.Body).Decode(&siteJson)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	err = sc.Add(sc.ConvJsonToSite(siteJson), database.TenantId)
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	err = sc.Add(sc.ConvJsonToSite(siteJson), tId)
 	if err != nil {
 		fmt.Println("Failed to create site")
 		http.Error(w, "Failed to create site", http.StatusInternalServerError)
