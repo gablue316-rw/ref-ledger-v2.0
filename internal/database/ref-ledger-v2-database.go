@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -2819,6 +2820,11 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 
 	result := []OfficialName{}
 
+	if tenantId != "na" {
+		fmt.Println("Attempting to retrieve officials names with invalid tenant ID:", tenantId)
+
+	}
+
 	filter := bson.M{
 		"tenantId": tenantId,
 	}
@@ -3068,4 +3074,47 @@ func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
 	fmt.Println("Inserted ID:", result.InsertedID)
 
 	return nil
+}
+
+type SessionDoc struct {
+	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	SessionID string             `bson:"sessionId" json:"sessionId"`
+	Username  string             `bson:"username" json:"username"`
+	TenantID  string             `bson:"tenantId" json:"tenantId"`
+	Role      string             `bson:"role" json:"role"`
+	ExpiresAt time.Time          `bson:"expiresAt" json:"expiresAt"`
+}
+
+type SessionsCollection struct {
+	DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+func (sc *SessionsCollection) Init(client *mongo.Client) error {
+
+	sc.DB = client.Database(Database)
+	sc.Coll = sc.DB.Collection("sessions")
+
+	fmt.Println("Successfully initialized Sessions Collection")
+	return nil
+}
+
+func (sc *SessionsCollection) GetTenantID(sessionID string) (string, error) {
+
+	filter := bson.M{
+		"sessionId": sessionID,
+	}
+
+	var session SessionDoc
+
+	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&session)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return "", fmt.Errorf("session not found")
+		}
+		return "", fmt.Errorf("failed to retrieve session: %v", err)
+	}
+
+	return session.TenantID, nil
 }

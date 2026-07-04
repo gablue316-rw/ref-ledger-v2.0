@@ -88,12 +88,37 @@ var sc database.SiteCollection
 var gc database.GameCollection
 var oc database.OfficialCollection
 var ec database.ExpensesCollection
+var se database.SessionsCollection
 
 var AuditLog *log.Logger = nil
 
 func isValidEmail(email string) bool {
 	_, err := mail.ParseAddress(email)
 	return err == nil
+}
+
+func getTenantId(r *http.Request) (string, error) {
+
+	tId := database.TenantId
+
+	if tId == "na" {
+		cookie, err := r.Cookie("session_id")
+		if err != nil {
+			return "", err
+		}
+
+		sessionId := cookie.Value
+		fmt.Println("Session ID:", sessionId)
+
+		tId, err = se.GetTenantID(sessionId)
+
+		if err != nil {
+			return "", err
+		}
+		database.UpdateTenantId(tId)
+	}
+
+	return tId, nil
 }
 
 func PodInfoHandler(w http.ResponseWriter, r *http.Request) {
@@ -271,9 +296,24 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
+
 	LogVisitor(w, r)
 
-	associations, err := ac.GetAssociationIds(database.TenantId)
+	var tId string = database.TenantId
+	var err error
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	database.UpdateTenantId(tId)
+
+	associations, err := ac.GetAssociationIds(tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -286,7 +326,22 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	sites, err := sc.GetSiteNames(database.TenantId)
+
+	var tId string = database.TenantId
+	var err error
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	database.UpdateTenantId(tId)
+
+	sites, err := sc.GetSiteNames(tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -299,7 +354,22 @@ func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	officials, err := oc.GetOfficialsNames(database.TenantId)
+
+	var tId string = database.TenantId
+	var err error
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	database.UpdateTenantId(tId)
+
+	officials, err := oc.GetOfficialsNames(tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1499,6 +1569,13 @@ func main() {
 	if err != nil {
 		fmt.Println("Failed to initialize expenses collection.")
 		utils.AuditLog.Println("Failed to initialize expenses collection.")
+		return
+	}
+
+	err = se.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize sessions collection.")
+		utils.AuditLog.Println("Failed to initialize sessions collection.")
 		return
 	}
 
