@@ -101,7 +101,9 @@ func getTenantId(r *http.Request) (string, error) {
 
 	tId := database.TenantId
 
+	fmt.Println("Validating tenant ID")
 	if tId == "na" {
+		fmt.Println("Retrieving session id")
 		cookie, err := r.Cookie("session_id")
 		if err != nil {
 			return "", err
@@ -110,14 +112,18 @@ func getTenantId(r *http.Request) (string, error) {
 		sessionId := cookie.Value
 		fmt.Println("Session ID:", sessionId)
 
+		fmt.Println("Retrieving tenant id for session:", sessionId)
 		tId, err = se.GetTenantID(sessionId)
 
 		if err != nil {
 			return "", err
 		}
+
+		fmt.Println("Updating tenant ID with:", tId)
 		database.UpdateTenantId(tId)
 	}
 
+	fmt.Println("Returning tenant ID:", tId)
 	return tId, nil
 }
 
@@ -311,8 +317,6 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	database.UpdateTenantId(tId)
-
 	associations, err := ac.GetAssociationIds(tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -339,8 +343,6 @@ func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	database.UpdateTenantId(tId)
-
 	sites, err := sc.GetSiteNames(tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -366,8 +368,6 @@ func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	database.UpdateTenantId(tId)
 
 	officials, err := oc.GetOfficialsNames(tId)
 	if err != nil {

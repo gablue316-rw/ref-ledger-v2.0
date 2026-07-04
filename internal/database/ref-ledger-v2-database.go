@@ -2820,11 +2820,6 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 
 	result := []OfficialName{}
 
-	if tenantId != "na" {
-		fmt.Println("Attempting to retrieve officials names with invalid tenant ID:", tenantId)
-
-	}
-
 	filter := bson.M{
 		"tenantId": tenantId,
 	}
