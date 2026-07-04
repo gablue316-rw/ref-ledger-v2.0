@@ -2005,22 +2005,26 @@ func (ac *AssociationCollection) GetAssociationIds(tenantId string) ([]Associati
 		"tenantId": tenantId,
 	}
 
+	fmt.Println("Retrieving association IDs for tenant:", tenantId)
 	cursor, err := ac.Coll.Find(context.TODO(), filter)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to query associations.  Reason: %v", err)
 	}
 	defer cursor.Close(context.TODO())
 
+	var totalAssociations int64 = 0
 	for cursor.Next(context.TODO()) {
 		var doc AssociationDoc
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, fmt.Errorf("Failed to decode association document.  Reason: %v", err)
 		}
 
+		totalAssociations++
 		for part := range strings.SplitSeq(doc.Id, ",") {
 			ids = append(ids, AssociationId{Id: strings.TrimSpace(part)})
 		}
 	}
+	fmt.Println("Total associations found for tenant", tenantId, ":", totalAssociations)
 
 	return ids, nil
 }
@@ -2255,23 +2259,27 @@ func (sc *SiteCollection) GetSiteNames(tenantId string) ([]SiteName, error) {
 		"tenantId": tenantId,
 	}
 
+	fmt.Println("Retrieving site names for tenant:", tenantId)
 	cursor, err := sc.Coll.Find(context.TODO(), filter)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to query sites.  Reason: %v", err)
 	}
 	defer cursor.Close(context.TODO())
 
+	var totalSites int64 = 0
 	for cursor.Next(context.TODO()) {
 		var doc SiteDoc
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, fmt.Errorf("Failed to decode site document.  Reason: %v", err)
 		}
+		totalSites++
 
 		for part := range strings.SplitSeq(doc.Name, ",") {
 			sites = append(sites, SiteName{Name: strings.TrimSpace(part)})
 		}
 	}
 
+	fmt.Println("Total sites found for tenant", tenantId, ":", totalSites)
 	return sites, nil
 }
 
@@ -2815,6 +2823,7 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 		"tenantId": tenantId,
 	}
 
+	fmt.Println("Retrieving officials names for tenant:", tenantId)
 	opts := options.Find().
 		SetSort(bson.D{
 			{Key: "lastName", Value: 1},
@@ -2836,6 +2845,8 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 	})
 
 	var doc OfficialDoc
+	var totalOfficials int64 = 0
+
 	for cursor.Next(context.TODO()) {
 
 		if err := cursor.Decode(&doc); err != nil {
@@ -2844,6 +2855,7 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 		}
 
 		result = append(result, OfficialName{Name: doc.FirstName + " " + doc.LastName})
+		totalOfficials++
 	}
 
 	if err := cursor.Err(); err != nil {
@@ -2851,6 +2863,7 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 		return []OfficialName{}, fmt.Errorf("cursor error while reading officials. Reason: %v", err)
 	}
 
+	fmt.Println("Total officials found for tenant", tenantId, ":", totalOfficials)
 	return result, nil
 }
 
