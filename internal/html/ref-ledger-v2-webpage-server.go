@@ -106,7 +106,7 @@ func getTenantId(r *http.Request) (string, error) {
 		fmt.Println("Retrieving session id")
 		cookie, err := r.Cookie("session_id")
 		if err != nil {
-			fmt.Println("Error retrieving session id")
+			fmt.Println("Error retrieving session id.  Reason:", err)
 			return "", err
 		}
 

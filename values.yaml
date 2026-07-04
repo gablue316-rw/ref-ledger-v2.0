@@ -1,5 +1,5 @@
 # Number of Ref Ledger pods
-replicaCount: 3
+replicaCount: 1
 
 image:
   repository: gablue316/ref-ledger
