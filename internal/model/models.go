@@ -129,6 +129,7 @@ type GameDoc struct {
 	U2          string `bson:"u2,omitempty"`
 	ECO         string `bson:"eco,omitempty"`
 	Assignor    string `bson:"assignor,omitempty"`
+	TenantId    string `bson:"tenantId"`
 }
 
 type JsonDoc struct {

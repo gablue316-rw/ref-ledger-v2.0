@@ -1723,6 +1723,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 	for _, v := range game {
 
 		doc := utils.ConvertGameDescrToGameDoc(v)
+		doc.TenantId = TenantId
 
 		gameExists, err := GameExists(doc)
 
