@@ -21,6 +21,7 @@ import (
 var ApiVersion string = "ref-ledger-api-v2.1.0"
 var oc database.OfficialCollection
 var TenantId string = database.TenantId
+var OcInitialized bool = false
 
 func GetAssociations(parentCtx context.Context) (string, error) {
 	fmt.Println("Getting Associations")
@@ -355,30 +356,48 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	var errorFormat string = "%s %s not found!  Record Dropped!"
 
+	if !OcInitialized {
+		err := oc.Init(database.Client)
+		if err != nil {
+			fmt.Println("Officials Collection is not initialized")
+			return fmt.Errorf("Officials Collection is not initialized")
+		}
+		OcInitialized = true
+	}
+
+	fmt.Println("Referee=", g.Referee)
 	if g.Referee != "Unassigned" {
 		results, err := oc.OfficialExists(g.Referee, TenantId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "Referee", g.Referee)
 		}
 	}
+
+	fmt.Println("U1=", g.U1)
 	if g.U1 != "Unassigned" {
 		results, err := oc.OfficialExists(g.U1, TenantId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "U1", g.U1)
 		}
 	}
+
+	fmt.Println("U2=", g.U2)
 	if g.U2 != "Unassigned" {
 		results, err := oc.OfficialExists(g.U2, TenantId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "U2", g.U2)
 		}
 	}
+
+	fmt.Println("ECO=", g.ECO)
 	if g.ECO != "Unassigned" {
 		results, err := oc.OfficialExists(g.ECO, TenantId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "ECO", g.ECO)
 		}
 	}
+
+	fmt.Println("Assignor=", g.Assignor)
 	if g.Assignor != "Unassigned" {
 		results, err := oc.OfficialExists(g.Assignor, TenantId)
 		if !results || err != nil {

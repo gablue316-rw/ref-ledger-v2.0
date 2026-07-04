@@ -2495,9 +2495,10 @@ type Official struct {
 }
 
 type OfficialCollection struct {
-	DB        *mongo.Database
-	Coll      *mongo.Collection
-	LastError error
+	DB          *mongo.Database
+	Coll        *mongo.Collection
+	LastError   error
+	Initialized bool
 }
 
 func (oc *OfficialCollection) ConvJsonToOfficial(oj OfficialJson) Official {
@@ -2615,6 +2616,7 @@ func (oc *OfficialCollection) Init(client *mongo.Client) error {
 
 	oc.DB = client.Database(Database)
 	oc.Coll = oc.DB.Collection("officials")
+	oc.Initialized = true
 
 	fmt.Println("Successfully initialized Official Collection")
 	return nil
