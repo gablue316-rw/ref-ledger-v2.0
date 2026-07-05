@@ -417,7 +417,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("Assignor=", assignor)
 	if assignor != "Unassigned" {
-		results, err := ac.AssignorExists(assignor, g.Association, tId)
+		results, err := ac.AssignorExists(assignor, tId, g.Association)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "Assignor", assignor)
 		}
