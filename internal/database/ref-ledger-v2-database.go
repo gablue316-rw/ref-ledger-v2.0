@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -1941,9 +1942,12 @@ func (ac *AssociationCollection) AssignorExists(name string, tenantId string, as
 	var doc AssociationDoc
 
 	filter := bson.M{
-		"id":        associationId,
-		"tenantId":  tenantId,
-		"assignors": name,
+		"id":       associationId,
+		"tenantId": tenantId,
+		"assignors": bson.M{
+			"$regex":   "(^|,\\s*)" + regexp.QuoteMeta(name) + "(\\s*,|$)",
+			"$options": "i",
+		},
 	}
 
 	if tenantId == "na" {
