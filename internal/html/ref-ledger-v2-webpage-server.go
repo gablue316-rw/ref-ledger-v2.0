@@ -967,35 +967,6 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Expense updated successfully"))
 }
 
-/*  DELETE THIS
-func CreateExpense(w http.ResponseWriter, r *http.Request) {
-
-	LogVisitor(w, r)
-
-	var expense Expense
-	var singleExpense model.ExpenseDescriptor
-
-	var expDesc []model.ExpenseDescriptor
-
-	err := json.NewDecoder(r.Body).Decode(&expense)
-	if err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
-		return
-	}
-
-	fmt.Println("Expense in json: ", expense)
-	singleExpense = ExpenseDocToExpenseDescr(expense)
-	singleExpense.ExpenseId = api.GenerateExpenseId(singleExpense)
-	fmt.Println("Expense Descr: ", singleExpense)
-	expDesc = append(expDesc, singleExpense)
-
-	fmt.Println("Expenses:", expDesc)
-
-	database.InsertExpenseDocs(context.TODO(), expDesc, database.Database, "expenses")
-
-}
-*/
-
 func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
@@ -1157,6 +1128,8 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
 
+	var tId string = database.TenantId
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1174,11 +1147,22 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 	//
 	// Replace Site Id with Site Name
 	//
-	siteName, err := sc.GetSiteName(game.Site, database.TenantId)
+	if tId == "na" {
+		fmt.Println("Invalid Tenant Id")
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	siteName, err := sc.GetSiteName(game.Site, tId)
 
 	if err == nil {
 		game.Site = siteName
 	} else {
+		fmt.Println("Failed to get site name:", err)
 		game.Site = "Unknown"
 	}
 
