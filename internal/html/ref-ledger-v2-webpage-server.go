@@ -636,14 +636,35 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
 	var game Game
+	var tId string = database.TenantId
+	var err error
+	var siteId string
 	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
-	err := json.NewDecoder(r.Body).Decode(&game)
+	err = json.NewDecoder(r.Body).Decode(&game)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// The HTML uses the site name, so we need to convert it to an ID
+	siteId, err = sc.GetSiteId(game.Site, tId)
+	if err != nil {
+		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+		return
+	}
+
+	game.Site = siteId
 
 	singleGameDesc = GameDocToGameDescr(game)
 

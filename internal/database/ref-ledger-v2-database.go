@@ -2359,6 +2359,31 @@ func (sc *SiteCollection) GetSiteName(siteID, tenantId string) (string, error) {
 	return site.Name, nil
 }
 
+func (sc *SiteCollection) GetSiteId(name, tenantId string) (string, error) {
+
+	var site Site
+	var doc SiteDoc
+
+	filter := bson.M{
+		"name":     name,
+		"tenantId": tenantId,
+	}
+
+	fmt.Println("Retrieving site ID for name ", name, "and tenant ID ", tenantId, "using the following filter:", filter)
+	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return "", fmt.Errorf("site not found")
+		}
+		return "", err
+	}
+	site = sc.convDocToSite(doc)
+
+	return site.Id, nil
+}
+
 func (sc *SiteCollection) GetSiteNames(tenantId string) ([]SiteName, error) {
 	var sites []SiteName = []SiteName{}
 
