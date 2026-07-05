@@ -365,43 +365,49 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 		OcInitialized = true
 	}
 
-	fmt.Println("Referee=", g.Referee)
-	if g.Referee != "Unassigned" {
-		results, err := oc.OfficialExists(g.Referee, TenantId)
+	var ref string = strings.TrimSpace(g.Referee)
+	var u1 string = strings.TrimSpace(g.U1)
+	var u2 string = strings.TrimSpace(g.U2)
+	var eco string = strings.TrimSpace(g.ECO)
+	var assignor string = strings.TrimSpace(g.Assignor)
+
+	fmt.Println("Referee=", ref)
+	if ref != "Unassigned" {
+		results, err := oc.OfficialExists(ref, TenantId)
 		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "Referee", g.Referee)
+			return fmt.Errorf(errorFormat, "Referee", ref)
 		}
 	}
 
-	fmt.Println("U1=", g.U1)
-	if g.U1 != "Unassigned" {
-		results, err := oc.OfficialExists(g.U1, TenantId)
+	fmt.Println("U1=", u1)
+	if u1 != "Unassigned" {
+		results, err := oc.OfficialExists(u1, TenantId)
 		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "U1", g.U1)
+			return fmt.Errorf(errorFormat, "U1", u1)
 		}
 	}
 
-	fmt.Println("U2=", g.U2)
-	if g.U2 != "Unassigned" {
-		results, err := oc.OfficialExists(g.U2, TenantId)
+	fmt.Println("U2=", u2)
+	if u2 != "Unassigned" {
+		results, err := oc.OfficialExists(u2, TenantId)
 		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "U2", g.U2)
+			return fmt.Errorf(errorFormat, "U2", u2)
 		}
 	}
 
-	fmt.Println("ECO=", g.ECO)
-	if g.ECO != "Unassigned" {
-		results, err := oc.OfficialExists(g.ECO, TenantId)
+	fmt.Println("ECO=", eco)
+	if eco != "Unassigned" {
+		results, err := oc.OfficialExists(eco, TenantId)
 		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "ECO", g.ECO)
+			return fmt.Errorf(errorFormat, "ECO", eco)
 		}
 	}
 
-	fmt.Println("Assignor=", g.Assignor)
-	if g.Assignor != "Unassigned" {
-		results, err := oc.OfficialExists(g.Assignor, TenantId)
+	fmt.Println("Assignor=", assignor)
+	if assignor != "Unassigned" {
+		results, err := oc.OfficialExists(assignor, TenantId)
 		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "Assignor", g.Assignor)
+			return fmt.Errorf(errorFormat, "Assignor", assignor)
 		}
 	}
 	return nil
