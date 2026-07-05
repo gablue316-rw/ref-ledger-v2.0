@@ -1939,6 +1939,7 @@ func (ac *AssociationCollection) Get(id string, tenantId string) (*Association, 
 }
 
 func (ac *AssociationCollection) AssignorExists(name string, tenantId string, associationId string) (bool, error) {
+
 	var doc AssociationDoc
 
 	filter := bson.M{
@@ -1956,13 +1957,17 @@ func (ac *AssociationCollection) AssignorExists(name string, tenantId string, as
 
 	fmt.Println("Filter:", filter)
 	fmt.Println("Checking if assignor exists")
+
 	err := ac.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
+		if err == mongo.ErrNoDocuments {
 			return false, nil
+		} else {
+			return false, fmt.Errorf("Database error: %v", err)
 		}
-		return false, err
 	}
+
 	return true, nil
 }
 
