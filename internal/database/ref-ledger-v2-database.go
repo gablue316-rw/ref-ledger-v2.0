@@ -1941,10 +1941,12 @@ func (ac *AssociationCollection) AssignorExists(name string, tenantId string) (b
 	var doc AssociationDoc
 
 	filter := bson.M{
-		"assignors": bson.M{
-			"$in": []string{name},
-		},
-		"tenantId": tenantId,
+		"assignors": name,
+		"tenantId":  tenantId,
+	}
+
+	if tenantId == "na" {
+		fmt.Println("Invalid Tenant ID")
 	}
 
 	err := ac.Coll.FindOne(context.TODO(), filter).Decode(&doc)
