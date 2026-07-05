@@ -2344,6 +2344,7 @@ func (sc *SiteCollection) GetSiteName(siteID, tenantId string) (string, error) {
 		"tenantId": tenantId,
 	}
 
+	fmt.Println("Retrieving site name for ID ", siteID, "and tenant ID ", tenantId, "using the following filter:", filter)
 	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
 
 	if err != nil {
