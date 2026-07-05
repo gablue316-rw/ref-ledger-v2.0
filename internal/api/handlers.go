@@ -20,7 +20,7 @@ import (
 
 var ApiVersion string = "ref-ledger-api-v2.1.0"
 var oc database.OfficialCollection
-var TenantId string = database.TenantId
+
 var OcInitialized bool = false
 
 func GetAssociations(parentCtx context.Context) (string, error) {
@@ -355,6 +355,7 @@ func ValidateOfficialDescriptor(parentCtx context.Context, p model.OfficialDescr
 func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) error {
 
 	var errorFormat string = "%s %s not found!  Record Dropped!"
+    var tId string = database.TenantId
 
 	if !OcInitialized {
 		err := oc.Init(database.Client)
@@ -373,7 +374,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("Referee=", ref)
 	if ref != "Unassigned" {
-		results, err := oc.OfficialExists(ref, TenantId)
+		results, err := oc.OfficialExists(ref, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "Referee", ref)
 		}
@@ -381,7 +382,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("U1=", u1)
 	if u1 != "Unassigned" {
-		results, err := oc.OfficialExists(u1, TenantId)
+		results, err := oc.OfficialExists(u1, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "U1", u1)
 		}
@@ -389,7 +390,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("U2=", u2)
 	if u2 != "Unassigned" {
-		results, err := oc.OfficialExists(u2, TenantId)
+		results, err := oc.OfficialExists(u2, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "U2", u2)
 		}
@@ -397,7 +398,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("ECO=", eco)
 	if eco != "Unassigned" {
-		results, err := oc.OfficialExists(eco, TenantId)
+		results, err := oc.OfficialExists(eco, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "ECO", eco)
 		}
@@ -405,7 +406,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("Assignor=", assignor)
 	if assignor != "Unassigned" {
-		results, err := oc.OfficialExists(assignor, TenantId)
+		results, err := oc.OfficialExists(assignor, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "Assignor", assignor)
 		}
@@ -448,6 +449,7 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 	var cmdList []string
 	var int64Fields []string = []string{"numOfGames", "gameFee", "travelPay", "assignorFee", "deductions"}
 	var officialFields []string = []string{"referee", "u1", "u2", "eco", "assignor"}
+	var tId string = database.TenantId
 
 	cmdList = strings.Split(cmd, ";")
 
@@ -493,7 +495,7 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 
 		exists := slices.Contains(officialFields, field)
 		if exists {
-			found, err := oc.OfficialExists(value, TenantId)
+			found, err := oc.OfficialExists(value, tId)
 			if !found || err != nil {
 				return fmt.Errorf("Failed to find %s %s.  Reason: %s", field, value, err)
 			}
