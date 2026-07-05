@@ -145,6 +145,7 @@ func LogRequest(next http.Handler) http.Handler {
 			podName = "local-dev"
 		}
 
+		getTenantId(r)
 		logPrint := fmt.Sprintf("Pod=%s Method=%s Path=%s RemoteAddr=%s", podName, r.Method, r.URL.Path, r.RemoteAddr)
 		log.Println(logPrint)
 		fmt.Println(logPrint)
