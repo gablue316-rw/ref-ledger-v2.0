@@ -1937,6 +1937,26 @@ func (ac *AssociationCollection) Get(id string, tenantId string) (*Association, 
 	return &association, nil
 }
 
+func (ac *AssociationCollection) AssignorExists(name string, tenantId string) (bool, error) {
+	var doc AssociationDoc
+
+	filter := bson.M{
+		"assignors": bson.M{
+			"$in": []string{name},
+		},
+		"tenantId": tenantId,
+	}
+
+	err := ac.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 func (ac *AssociationCollection) GetAssignorNames(tenantId string) ([]AssignorName, error) {
 	var assignors []AssignorName
 

@@ -20,8 +20,10 @@ import (
 
 var ApiVersion string = "ref-ledger-api-v2.1.0"
 var oc database.OfficialCollection
+var ac database.AssociationCollection
 
 var OcInitialized bool = false
+var AcInitialized bool = false
 
 func GetAssociations(parentCtx context.Context) (string, error) {
 	fmt.Println("Getting Associations")
@@ -355,7 +357,7 @@ func ValidateOfficialDescriptor(parentCtx context.Context, p model.OfficialDescr
 func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) error {
 
 	var errorFormat string = "%s %s not found!  Record Dropped!"
-    var tId string = database.TenantId
+	var tId string = database.TenantId
 
 	if !OcInitialized {
 		err := oc.Init(database.Client)
@@ -364,6 +366,15 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 			return fmt.Errorf("Officials Collection is not initialized")
 		}
 		OcInitialized = true
+	}
+
+	if !AcInitialized {
+		err := ac.Init(database.Client)
+		if err != nil {
+			fmt.Println("Association Collection is not initialized")
+			return fmt.Errorf("Association Collection is not initialized")
+		}
+		AcInitialized = true
 	}
 
 	var ref string = strings.TrimSpace(g.Referee)
@@ -406,7 +417,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("Assignor=", assignor)
 	if assignor != "Unassigned" {
-		results, err := oc.OfficialExists(assignor, tId)
+		results, err := ac.AssignorExists(assignor, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "Assignor", assignor)
 		}
