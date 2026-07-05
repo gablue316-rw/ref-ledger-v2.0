@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -1937,24 +1938,44 @@ func (ac *AssociationCollection) Get(id string, tenantId string) (*Association, 
 }
 
 func (ac *AssociationCollection) GetAssignorNames(tenantId string) ([]AssignorName, error) {
-	var assignors []AssignorName = []AssignorName{}
+	var assignors []AssignorName
 
 	cursor, err := ac.Coll.Find(context.TODO(), bson.M{"tenantId": tenantId})
 	if err != nil {
-		return nil, fmt.Errorf("Failed to query assignors.  Reason: %v", err)
+		return nil, fmt.Errorf("failed to query assignors. Reason: %v", err)
 	}
 	defer cursor.Close(context.TODO())
 
+	unique := make(map[string]struct{})
+
 	for cursor.Next(context.TODO()) {
 		var doc AssociationDoc
+
 		if err := cursor.Decode(&doc); err != nil {
-			return nil, fmt.Errorf("Failed to decode assignor document.  Reason: %v", err)
+			return nil, fmt.Errorf("failed to decode assignor document. Reason: %v", err)
 		}
 
 		for part := range strings.SplitSeq(doc.Assignors, ",") {
-			assignors = append(assignors, AssignorName{Name: strings.TrimSpace(part)})
+			name := strings.TrimSpace(part)
+			if name == "" {
+				continue
+			}
+
+			unique[name] = struct{}{}
 		}
 	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf("cursor error. Reason: %v", err)
+	}
+
+	for name := range unique {
+		assignors = append(assignors, AssignorName{Name: name})
+	}
+
+	sort.Slice(assignors, func(i, j int) bool {
+		return assignors[i].Name < assignors[j].Name
+	})
 
 	return assignors, nil
 }
