@@ -264,7 +264,19 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(w, r)
-	assignors, err := ac.GetAssignorNames(database.TenantId)
+	var tId string = database.TenantId
+	var err error
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	assignors, err := ac.GetAssignorNames(tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1674,7 +1686,7 @@ func main() {
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
 	mux.HandleFunc("/api/sitesDirectory", GetSitesDirectoryHandler)
-	mux.HandleFunc("/api/assignors", GetAssignorsHandler)
+	mux.HandleFunc("/api/loadAssignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
 	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficials)

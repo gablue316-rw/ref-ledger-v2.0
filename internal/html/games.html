@@ -263,11 +263,15 @@ body{padding:10px;}
     <select id="eco">
         <option value="">Select Official</option>
     </select>
+</div>  
+
+<div class="form-group">
+    <label for="assignor">Assignor</label>
+    <select id="assignor">
+        <option value="">Select Assignor</option>
+    </select>
 </div>
 
-<div class="form-group"><label for="assignor">Assignor</label><select id="assignor"><option></option><option>Euvonda Harrison</option><option>Scott Henry</option><option>Brian Hinson</option><option>Kevin Self</option><option>Barry Sullivan</option></select></div>
-</div>
-</div>
 
 <div class="button-row">
     <button type="button" id="getGameBtn" class="btn btn-get">Get Game</button>
@@ -303,6 +307,41 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
     }
 
 });
+
+async function loadAssignors() {
+       try {
+        const response = await fetch("/api/loadAssignors");
+
+        if (!response.ok) {
+            throw new Error("Failed to load assignors");
+        }
+
+        const assignors = await response.json();
+        console.log(assignors);
+    
+        const dropdowns = [
+            "assignor"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Assignor</option>';
+
+            assignors.forEach(assignor => {
+               const option = document.createElement("option");
+               option.value = assignor.name;
+               option.textContent = assignor.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading assignors:", err);
+    }
+}
 
 async function loadAssociations() {
     try {
@@ -417,6 +456,7 @@ document.addEventListener("DOMContentLoaded", function() {
     loadOfficials();
     loadSites();
     loadAssociations();
+    loadAssignors();
 });
 document.getElementById("clearBtn").addEventListener("click", function () {
     document.getElementById("gameForm").reset();
