@@ -659,6 +659,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc)
 	if err != nil {
 		fmt.Println(err)
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 

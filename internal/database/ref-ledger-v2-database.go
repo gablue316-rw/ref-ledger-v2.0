@@ -2946,6 +2946,10 @@ func (oc *OfficialCollection) OfficialExists(name, tenantId string) (bool, error
 	var filter bson.M
 	var names []string
 
+	if tenantId == "na" {
+		fmt.Println("Invalid tenantId")
+	}
+
 	names = strings.Split(name, " ")
 
 	if len(names) < 2 || names[0] == "" || names[1] == "" {
