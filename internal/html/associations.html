@@ -188,6 +188,14 @@
             background-color: #b91c1c;
         }
 
+        .btn-directory {
+            background-color: #dc2626;
+        }
+
+        .btn-directory:hover {
+            background-color: #b91c1c;
+        }
+
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -370,6 +378,13 @@
                    Delete Association
                 </button>
 
+                <button
+                   type="button"
+                   id="directoryBtn"
+                   class="btn btn-directory">
+                   Association Directory
+                </button>
+
             </div>
 
         </form>
@@ -503,6 +518,24 @@ document.getElementById("associationForm").addEventListener("submit", async func
     }
 });
 
+document.getElementById("directoryBtn").addEventListener("click", async function () {
+
+    try {
+        const response = await fetch(`/api/associationsDirectory`);
+
+        if (!response.ok) {
+            document.getElementById("message").innerText =
+                "Unable to load directory.";
+            return;
+        }
+
+        document.getElementById("message").innerText = "Not implemented yet.";
+        
+    } catch (err) {
+        document.getElementById("message").innerText = "Server unavailable.";
+    }
+
+});
 
 </script>
 

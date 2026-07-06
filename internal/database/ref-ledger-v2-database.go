@@ -2024,6 +2024,41 @@ func (ac *AssociationCollection) GetAssignorNames(tenantId string) ([]AssignorNa
 	return assignors, nil
 }
 
+func (ac *AssociationCollection) GetAssociationsDirectory(tenantId string) ([]Association, error) {
+
+	var associations []Association
+
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	cursor, err := ac.Coll.Find(context.TODO(), filter)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return []Association{}, fmt.Errorf("failed to query associations. Reason: %v", err)
+	}
+	defer cursor.Close(context.TODO())
+
+	for cursor.Next(context.TODO()) {
+		var doc AssociationDoc
+
+		if err := cursor.Decode(&doc); err != nil {
+			fmt.Println("Error:", err)
+			return []Association{}, fmt.Errorf("failed to decode association document. Reason: %v", err)
+		}
+
+		associations = append(associations, ac.convDocToAssociation(doc))
+	}
+
+	if err := cursor.Err(); err != nil {
+		fmt.Println("Error:", err)
+		return []Association{}, fmt.Errorf("cursor error while reading associations. Reason: %v", err)
+	}
+
+	return associations, nil
+
+}
+
 func (ac *AssociationCollection) Update(id string, association Association, tenantId string) error {
 
 	var filter bson.M

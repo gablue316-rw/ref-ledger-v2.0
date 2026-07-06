@@ -299,6 +299,19 @@ func GetSitesDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sites)
 }
 
+func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(w, r)
+
+	associations, err := ac.GetAssociationsDirectory(database.TenantId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(associations)
+}
+
 func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(w, r)
 
@@ -1672,6 +1685,7 @@ func main() {
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
+	mux.HandleFunc("/api/associationsDirectory", GetAssociationsDirectoryHandler)
 	mux.HandleFunc("/api/sitesDirectory", GetSitesDirectoryHandler)
 	mux.HandleFunc("/api/loadAssignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
