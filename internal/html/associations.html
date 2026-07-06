@@ -438,14 +438,10 @@
 
     </div>
 
-    <div class="directory-card" id="directoryCard">
+<<div class="directory-card" id="directorySection">
+    <div class="directory-header">Association Directory</div>
 
-    <div class="directory-header">
-        Association Directory
-    </div>
-
-    <table class="directory-table">
-
+    <table id="associationsTable" class="directory-table">
         <thead>
             <tr>
                 <th>ID</th>
@@ -456,13 +452,9 @@
                 <th>Assignors</th>
             </tr>
         </thead>
-
-        <tbody id="directoryBody">
-        </tbody>
-
+        <tbody></tbody>
     </table>
-
-    </div>    
+</div>
     
     <div class="message-box" id="message">
         Ready to enter Associations
@@ -591,11 +583,9 @@ document.getElementById("associationForm").addEventListener("submit", async func
     }
 });
 
-document.getElementById("directoryBtn").addEventListener("click", async () => {
-
+document.getElementById("directoryBtn").addEventListener("click", async function () {
     try {
-
-        const response = await fetch("/api/associationsDirectory");
+        const response = await fetch(`/api/associationsDirectory?t=${Date.now()}`);
 
         if (!response.ok) {
             document.getElementById("message").innerText =
@@ -605,55 +595,51 @@ document.getElementById("directoryBtn").addEventListener("click", async () => {
 
         const associations = await response.json();
 
-        const tbody = document.getElementById("directoryBody");
-
+        const tbody = document.querySelector("#associationsTable tbody");
         tbody.innerHTML = "";
 
-        associations.forEach(a => {
+        if (!associations || associations.length === 0) {
+            document.getElementById("directorySection").style.display = "block";
+            document.getElementById("message").innerText =
+                "No associations found.";
+            return;
+        }
 
+        associations.forEach(function (association) {
             const row = document.createElement("tr");
 
             row.innerHTML = `
-                <td>${a.Id}</td>
-                <td>${a.Name}</td>
-                <td>${a.Contact}</td>
-                <td>${a.Phone}</td>
-                <td>${a.Email}</td>
-                <td>${a.Assignors}</td>
+                <td>${association.Id || ""}</td>
+                <td>${association.Name || ""}</td>
+                <td>${association.Contact || ""}</td>
+                <td>${association.Phone || ""}</td>
+                <td>${association.Email || ""}</td>
+                <td>${association.Assignors || ""}</td>
             `;
 
-            row.addEventListener("click", () => {
-
-                document.getElementById("assocId").value = a.Id;
-                document.getElementById("assocName").value = a.Name;
-                document.getElementById("contactName").value = a.Contact;
-                document.getElementById("contactNumber").value = a.Phone;
-                document.getElementById("contactEmail").value = a.Email;
-                document.getElementById("assignors").value = a.Assignors;
-
-                document.getElementById("directoryCard").style.display = "none";
+            row.addEventListener("click", function () {
+                document.getElementById("assocId").value = association.Id || "";
+                document.getElementById("assocName").value = association.Name || "";
+                document.getElementById("contactName").value = association.Contact || "";
+                document.getElementById("contactNumber").value = association.Phone || "";
+                document.getElementById("contactEmail").value = association.Email || "";
+                document.getElementById("assignors").value = association.Assignors || "";
 
                 document.getElementById("message").innerText =
                     "Association loaded.";
             });
 
             tbody.appendChild(row);
-
         });
 
-        document.getElementById("directoryCard").style.display = "block";
+        document.getElementById("directorySection").style.display = "block";
 
         document.getElementById("message").innerText =
-            `${associations.length} association(s) found.`;
+            `${associations.length} associations loaded.`;
 
+    } catch (err) {
+        document.getElementById("message").innerText = "Server unavailable.";
     }
-    catch(err) {
-
-        document.getElementById("message").innerText =
-            "Server unavailable.";
-
-    }
-
 });
 
 </script>
