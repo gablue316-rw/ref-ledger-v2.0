@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ref-ledger
+  namespace: argocd
+
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/gablue316/ref-ledger-v2.0
+    targetRevision: main
+    path: charts/ref-ledger
+    helm:
+      valueFiles:
+        - ../../values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: default
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

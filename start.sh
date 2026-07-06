@@ -1,27 +1,43 @@
 #!/bin/bash
 set -e
 
-echo "🚀 Starting Minikube..."
+echo "Starting Minikube..."
 minikube start
 
-echo "🔓 Applying sealed Cloudflare credentials..."
-kubectl apply -f secrets/credentials.enc.yaml
+echo "Waiting for Kubernetes node..."
+kubectl wait --for=condition=Ready nodes --all --timeout=120s
 
-echo "📦 Deploying Ref Ledger..."
-helm upgrade --install ref-ledger ./charts/ref-ledger -f values.yaml
+echo "Checking ArgoCD installation..."
+if ! kubectl get namespace argocd >/dev/null 2>&1; then
+    echo "ArgoCD namespace not found. Install ArgoCD first."
+    exit 1
+fi
 
-echo "⏳ Waiting for deployments..."
-kubectl rollout status deployment/ref-ledger
-kubectl rollout status deployment/cloudflared
+echo "Waiting for ArgoCD..."
+kubectl rollout status deployment/argocd-server -n argocd --timeout=180s
+kubectl rollout status deployment/argocd-repo-server -n argocd --timeout=180s
+kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=180s
 
-echo "⏳ Waiting for pods to become Ready..."
+echo "Waiting for Ref Ledger deployment..."
+until kubectl get deployment ref-ledger -n default >/dev/null 2>&1
+do
+    sleep 5
+done
 
-kubectl wait \
-    --for=condition=Ready \
-    pod \
-    --all \
-    --timeout=120s
+kubectl rollout status deployment/ref-ledger -n default --timeout=180s
 
-kubectl get pods
+echo "Waiting for cloudflared deployment..."
+until kubectl get deployment cloudflared -n default >/dev/null 2>&1
+do
+    sleep 5
+done
 
-echo "Ref Ledger started successfully."
+kubectl rollout status deployment/cloudflared -n default --timeout=180s
+
+echo "Current ArgoCD pods:"
+kubectl get pods -n argocd
+
+echo "Current application pods:"
+kubectl get pods -n default
+
+echo "Cluster started successfully."
