@@ -26,13 +26,13 @@ import (
 	"ref-ledger-v2/internal/reports"
 	"ref-ledger-v2/internal/utils"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var Client *mongo.Client
@@ -1274,35 +1274,15 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pipeline := mongo.Pipeline{
-		{
-			{Key: "$match", Value: mongoDbFilter},
-		},
-		{
-			{Key: "$addFields", Value: bson.D{
-				{Key: "convertedDate", Value: bson.D{
-					{Key: "$dateFromString", Value: bson.D{
-						{Key: "dateString", Value: "$date"},
-						{Key: "format", Value: "%m/%d/%Y"},
-					}},
-				}},
-			}},
-		},
-		{
-			{Key: "$sort", Value: bson.D{
-				{Key: "convertedDate", Value: 1},
-			}},
-		},
-		{
-			{Key: "$project", Value: bson.D{
-				{Key: "convertedDate", Value: 0},
-			}},
-		},
-	}
-
 	// 2. Query MongoDB
 
-	cursor, err := coll.Aggregate(context.TODO(), pipeline)
+	opts := options.Find().
+		SetSort(bson.D{
+			{Key: "gameDateTime", Value: 1},
+		})
+
+	cursor, err := coll.Find(context.TODO(), mongoDbFilter, opts)
+
 	if err != nil {
 		fmt.Println("MONGO FIND ERROR:", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1595,11 +1575,6 @@ func main() {
 		fmt.Println("Failed to initialize game collection.")
 		utils.AuditLog.Println("Failed to initialize game collection.")
 		return
-	}
-
-	err = gc.AddGameDateTimeToExistingGames()
-	if err != nil {
-		fmt.Println("Failed to add game date/time to existing games.  Reason:", err)
 	}
 
 	err = oc.Init(database.Client)

@@ -50,6 +50,25 @@ type SiteName struct {
 	Name string `json:"name"`
 }
 
+func convertDateStringToTime(date, gameTime string) (time.Time, error) {
+
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	dt, err := time.ParseInLocation(
+		"1/2/2006 3:04 PM",
+		date+" "+gameTime,
+		loc,
+	)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	return dt, nil
+}
+
 func foundAssociation(assoc string) bool {
 
 	associations := []string{"GOLLC", "MCBOA", "MSO"}
@@ -608,36 +627,15 @@ func QueryAggregatedGames(parentCtx context.Context, dbase, collection, filter s
 	db := Client.Database(Database)
 	coll := db.Collection("games")
 
-	pipeline := mongo.Pipeline{
-		{
-			{Key: "$match", Value: mongoDbFilter},
-		},
-		{
-			{Key: "$addFields", Value: bson.D{
-				{Key: "convertedDate", Value: bson.D{
-					{Key: "$dateFromString", Value: bson.D{
-						{Key: "dateString", Value: "$date"},
-						{Key: "format", Value: "%m/%d/%Y"},
-					}},
-				}},
-			}},
-		},
-		{
-			{Key: "$sort", Value: bson.D{
-				{Key: "convertedDate", Value: 1},
-			}},
-		},
-		{
-			{Key: "$project", Value: bson.D{
-				{Key: "convertedDate", Value: 0},
-			}},
-		},
-	}
+	opts := options.Find().
+		SetSort(bson.D{
+			{Key: "gameDateTime", Value: 1},
+		})
 
-	cursor, err := coll.Aggregate(ctx, pipeline)
+	cursor, err := coll.Find(ctx, mongoDbFilter, opts)
 
 	if err != nil {
-		fmt.Println("Aggregate failed.  Reason:", err)
+		fmt.Println("Find failed.  Reason:", err)
 		return []model.GameDescriptor{}, err
 	}
 
@@ -1685,6 +1683,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
+	var err error
 
 	fmt.Println("Updating one game")
 
@@ -1692,6 +1691,11 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	coll := db.Collection(collection)
 
 	doc := utils.ConvertGameDescrToGameDoc(game)
+	doc.GameDateTime, err = convertDateStringToTime(game.Date, game.Time)
+	if err != nil {
+		return err
+	}
+
 	filter := bson.M{
 		"gameId": doc.GameId,
 	}
@@ -1715,6 +1719,8 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
+	var err error
+
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 	collectionName := coll.Name()
@@ -1727,6 +1733,10 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 
 		doc := utils.ConvertGameDescrToGameDoc(v)
 		doc.TenantId = TenantId
+		doc.GameDateTime, err = convertDateStringToTime(v.Date, v.Time)
+		if err != nil {
+			fmt.Println(err)
+		}
 
 		gameExists, err := GameExists(doc)
 
