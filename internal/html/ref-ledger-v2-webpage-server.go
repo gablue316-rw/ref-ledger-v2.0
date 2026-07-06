@@ -1597,6 +1597,11 @@ func main() {
 		return
 	}
 
+	err = gc.AddGameDateTimeToExistingGames(database.TenantId)
+	if err != nil {
+		fmt.Println("Failed to add game date/time to existing games.  Reason:", err)
+	}
+
 	err = oc.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize official collection.")

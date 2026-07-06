@@ -2597,6 +2597,73 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 	return nil
 }
 
+func (gc *GameCollection) AddGameDateTimeToExistingGames(tenantId string) error {
+	ctx := context.TODO()
+
+	filter := bson.M{
+		"tenantId":     tenantId,
+		"gameDateTime": bson.M{"$exists": false},
+	}
+
+	cursor, err := gc.Coll.Find(ctx, filter)
+	if err != nil {
+		return fmt.Errorf("failed to find games missing gameDateTime: %v", err)
+	}
+	defer cursor.Close(ctx)
+
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		return fmt.Errorf("failed to load timezone: %v", err)
+	}
+
+	for cursor.Next(ctx) {
+		var doc model.GameDoc
+
+		if err := cursor.Decode(&doc); err != nil {
+			return fmt.Errorf("failed to decode game: %v", err)
+		}
+
+		gameDateTime, err := time.ParseInLocation(
+			"1/2/2006 3:04 PM",
+			doc.Date+" "+doc.Time,
+			loc,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to parse date/time for gameId %d: date=%s time=%s error=%v",
+				doc.GameId,
+				doc.Date,
+				doc.Time,
+				err,
+			)
+		}
+
+		update := bson.M{
+			"$set": bson.M{
+				"gameDateTime": gameDateTime,
+			},
+		}
+
+		_, err = gc.Coll.UpdateOne(
+			ctx,
+			bson.M{
+				"tenantId": tenantId,
+				"gameId":   doc.GameId,
+			},
+			update,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update gameId %d: %v", doc.GameId, err)
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		return fmt.Errorf("cursor error: %v", err)
+	}
+
+	return nil
+}
+
 // Official Collection, Documents and API Code
 type OfficialJson struct {
 	FirstName string `json:"firstName"`
