@@ -196,6 +196,7 @@
             background-color: #b91c1c;
         }
 
+ 
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -204,6 +205,52 @@
             font-weight: bold;
             min-height: 60px;
         }
+
+.directory-card {
+    display: none;
+    margin-top: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+    overflow: hidden;
+}
+
+.directory-header {
+    background: #1e293b;
+    color: white;
+    padding: 15px 20px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.directory-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.directory-table th {
+    background: #082b4f;
+    color: white;
+    padding: 12px;
+    text-align: left;
+}
+
+.directory-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #ddd;
+}
+
+.directory-table tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.directory-table tr:hover {
+    background: #eef4ff;
+}
+
+.directory-table tbody tr {
+    cursor: pointer;
+}
 
         @media (max-width: 768px) {
 
@@ -391,6 +438,32 @@
 
     </div>
 
+    <div class="directory-card" id="directoryCard">
+
+    <div class="directory-header">
+        Association Directory
+    </div>
+
+    <table class="directory-table">
+
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Association</th>
+                <th>Contact</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Assignors</th>
+            </tr>
+        </thead>
+
+        <tbody id="directoryBody">
+        </tbody>
+
+    </table>
+
+    </div>    
+    
     <div class="message-box" id="message">
         Ready to enter Associations
     </div>
@@ -518,25 +591,69 @@ document.getElementById("associationForm").addEventListener("submit", async func
     }
 });
 
-document.getElementById("directoryBtn").addEventListener("click", async function () {
-    try {
-        const response = await fetch("/api/associationsDirectory");
+document.getElementById("directoryBtn").addEventListener("click", async () => {
 
-        const text = await response.text();
+    try {
+
+        const response = await fetch("/api/associationsDirectory");
 
         if (!response.ok) {
             document.getElementById("message").innerText =
-                text || "Unable to load directory.";
+                "Unable to load association directory.";
             return;
         }
 
-        document.getElementById("message").innerText = text;
+        const associations = await response.json();
 
-    } catch (err) {
-        console.error("Directory error:", err);
+        const tbody = document.getElementById("directoryBody");
+
+        tbody.innerHTML = "";
+
+        associations.forEach(a => {
+
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+                <td>${a.Id}</td>
+                <td>${a.Name}</td>
+                <td>${a.Contact}</td>
+                <td>${a.Phone}</td>
+                <td>${a.Email}</td>
+                <td>${a.Assignors}</td>
+            `;
+
+            row.addEventListener("click", () => {
+
+                document.getElementById("assocId").value = a.Id;
+                document.getElementById("assocName").value = a.Name;
+                document.getElementById("contactName").value = a.Contact;
+                document.getElementById("contactNumber").value = a.Phone;
+                document.getElementById("contactEmail").value = a.Email;
+                document.getElementById("assignors").value = a.Assignors;
+
+                document.getElementById("directoryCard").style.display = "none";
+
+                document.getElementById("message").innerText =
+                    "Association loaded.";
+            });
+
+            tbody.appendChild(row);
+
+        });
+
+        document.getElementById("directoryCard").style.display = "block";
+
         document.getElementById("message").innerText =
-            "Unable to load data: " + err.message;
+            `${associations.length} association(s) found.`;
+
     }
+    catch(err) {
+
+        document.getElementById("message").innerText =
+            "Server unavailable.";
+
+    }
+
 });
 
 </script>
