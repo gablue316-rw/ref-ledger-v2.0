@@ -264,7 +264,7 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	var tId string = database.TenantId
 	var err error
 
@@ -288,7 +288,7 @@ func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSitesDirectoryHandler(w http.ResponseWriter, r *http.Request) {
-	LogVisitor(w, r)
+	LogVisitor(r)
 	sites, err := sc.GetSitesDirectory(database.TenantId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -300,7 +300,7 @@ func GetSitesDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
-	LogVisitor(w, r)
+	LogVisitor(r)
 
 	associations, err := ac.GetAssociationsDirectory(database.TenantId)
 	if err != nil {
@@ -313,7 +313,7 @@ func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
-	LogVisitor(w, r)
+	LogVisitor(r)
 
 	firstName := strings.TrimSpace(r.URL.Query().Get("firstname"))
 	lastName := strings.TrimSpace(r.URL.Query().Get("lastname"))
@@ -330,7 +330,7 @@ func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 
 func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 
 	var tId string = database.TenantId
 	var err error
@@ -356,10 +356,17 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 
 func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 
 	var tId string = database.TenantId
 	var err error
+
+	fmt.Println("Request path:", r.URL.Path)
+	fmt.Println("TenantId global:", database.TenantId)
+
+	for _, c := range r.Cookies() {
+		fmt.Println("Cookie:", c.Name, c.Value)
+	}
 
 	if tId == "na" {
 		tId, err = getTenantId(r)
@@ -382,7 +389,7 @@ func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 
 	var tId string = database.TenantId
 	var err error
@@ -465,7 +472,7 @@ func OpenLog(f string) *os.File {
 	return file
 }
 
-func LogVisitor(w http.ResponseWriter, r *http.Request) {
+func LogVisitor(r *http.Request) {
 
 	remoteIpAddr := GetIpAddress(r)
 	method := r.Method
@@ -568,7 +575,7 @@ func generateGamesReport(gameFilters model.GFilters) []string {
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GenerateReport is called")
-	LogVisitor(w, r)
+	LogVisitor(r)
 	gameFilters := model.GFilters{}
 	expenseFilters := model.EFilters{}
 	rType := r.URL.Query().Get("type")
@@ -647,7 +654,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	var game Game
 	var tId string = database.TenantId
 	var err error
@@ -721,7 +728,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -897,7 +904,7 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 	var tId string = database.TenantId
 	var err error
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	var assocJson database.AssociationJson
 
 	err = json.NewDecoder(r.Body).Decode(&assocJson)
@@ -932,7 +939,7 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	var tId string = database.TenantId
 	var err error
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	var siteJson database.SiteJson
 
 	err = json.NewDecoder(r.Body).Decode(&siteJson)
@@ -962,7 +969,7 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateOfficial(w http.ResponseWriter, r *http.Request) {
-	LogVisitor(w, r)
+	LogVisitor(r)
 	var officialJson database.OfficialJson
 	err := json.NewDecoder(r.Body).Decode(&officialJson)
 	if err != nil {
@@ -981,7 +988,7 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	var expenseJson database.ExpenseJson
 
 	err := json.NewDecoder(r.Body).Decode(&expenseJson)
@@ -1003,7 +1010,7 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	fmt.Println("DeleteAssociation called")
 
 	if r.Method != http.MethodDelete {
@@ -1028,7 +1035,7 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 func DeleteGame(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -1055,7 +1062,7 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 
 func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -1081,7 +1088,7 @@ func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 
 func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
@@ -1106,7 +1113,7 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 func GetOfficials(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1124,7 +1131,7 @@ func GetOfficials(w http.ResponseWriter, r *http.Request) {
 
 func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1142,7 +1149,7 @@ func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 
 func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -1160,7 +1167,7 @@ func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 
 func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 
 	var tId string = database.TenantId
 
@@ -1210,7 +1217,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GetGames has been called")
 
-	LogVisitor(w, r)
+	LogVisitor(r)
 
 	var games []model.HtmlResponse
 	var gameView []model.GameView

@@ -575,15 +575,20 @@ async function fetchGames(params) {
 
 async function loadSites() {
     try {
+
         const response = await fetch("/api/loadSites");
 
         if (!response.ok) {
-            throw new Error("Failed to load sites");
+           const text = await response.text();
+           console.error("loadSites failed:", response.status, text);
+           alert("loadSites failed: " + response.status + "\n" + text);
+           return;
         }
 
         const sites = await response.json();
-        console.log(sites);
-    
+        console.log("Sites returned on dashboard:", sites);
+        alert(JSON.stringify(sites));
+        
         const dropdowns = [
             "site"
         ];
@@ -610,6 +615,7 @@ async function loadSites() {
 
 document.addEventListener("DOMContentLoaded", function() {
     loadSites();  
+    initialLoadGames();
 })
 
 async function updateSelectedStatus() {
@@ -673,7 +679,6 @@ function clearFilters() {
     loadGames();
 }
 
-initialLoadGames();
 </script>
 
 </body>
