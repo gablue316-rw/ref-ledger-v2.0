@@ -2600,6 +2600,7 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 func (gc *GameCollection) AddGameDateTimeToExistingGames(tenantId string) error {
 	ctx := context.TODO()
 
+	fmt.Println("Adding game date/time to existing games...")
 	filter := bson.M{
 		"tenantId":     tenantId,
 		"gameDateTime": bson.M{"$exists": false},
@@ -2615,6 +2616,8 @@ func (gc *GameCollection) AddGameDateTimeToExistingGames(tenantId string) error 
 	if err != nil {
 		return fmt.Errorf("failed to load timezone: %v", err)
 	}
+
+	var recordsUpdated int64 = 0
 
 	for cursor.Next(ctx) {
 		var doc model.GameDoc
@@ -2655,12 +2658,14 @@ func (gc *GameCollection) AddGameDateTimeToExistingGames(tenantId string) error 
 		if err != nil {
 			return fmt.Errorf("failed to update gameId %d: %v", doc.GameId, err)
 		}
+		recordsUpdated++
 	}
 
 	if err := cursor.Err(); err != nil {
 		return fmt.Errorf("cursor error: %v", err)
 	}
 
+	fmt.Println("Successfully added game date/time to existing games.  Records updated:", recordsUpdated)
 	return nil
 }
 
