@@ -40,12 +40,12 @@ jobs:
 
       - name: Update Helm image tag
         run: |
-          sed -i "0,/tag:/s/tag:.*/tag: ${{ env.IMAGE_TAG }}/" charts/ref-ledger/values.yaml
+          sed -i "0,/tag:/s/tag:.*/tag: ${{ env.IMAGE_TAG }}/" values.yaml
 
       - name: Commit Helm image tag
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add charts/ref-ledger/values.yaml
+          git add values.yaml
           git commit -m "Update image tag to ${{ env.IMAGE_TAG }}" || echo "No changes to commit"
           git push
