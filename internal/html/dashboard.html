@@ -344,21 +344,13 @@ body {
             <input type="text" id="official" placeholder="Enter Official's Name">
         </div>
 
-        <div class="filter-group">
-            <label for="site">Site</label>
-            <select id="site">
-                <option value="">All</option>
-                <option value="BETH">Bethesda Park</option>
-                <option value="BFDAR">Buford Arena</option>
-                <option value="BFDHS">Buford High School</option>
-                <option value="BFORD">Buford Park</option>
-                <option value="BOGNP">Bogan Park</option>
-                <option value="GP">George Pierce</option>
-                <option value="PCHTR">Peachtree Ridge Park</option>
-                <option value="VICLD">Victor Lord Park</option>
-            </select>
+        <div class="form-group">
+             <label for="site">Site</label>
+             <select id="site">
+                 <option value="">Select Site</option>
+             </select>
         </div>
-
+        
         <div class="filter-group">
             <label for="level">Level</label>
             <select id="level">
@@ -580,6 +572,45 @@ async function fetchGames(params) {
         alert("Failed to load games.");
     }
 }
+
+async function loadSites() {
+    try {
+        const response = await fetch("/api/loadSites");
+
+        if (!response.ok) {
+            throw new Error("Failed to load sites");
+        }
+
+        const sites = await response.json();
+        console.log(sites);
+    
+        const dropdowns = [
+            "site"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Site</option>';
+
+            sites.forEach(site => {
+               const option = document.createElement("option");
+               option.value = site.name;
+               option.textContent = site.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading sites:", err);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    loadSites();  
+})
 
 async function updateSelectedStatus() {
     const newStatus = document.getElementById("bulkStatus").value;
