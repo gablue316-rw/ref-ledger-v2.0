@@ -635,6 +635,13 @@ func getMissingPaidGames(assoc string) []string {
 
 func GenerateIncomeReport(assoc string) []string {
 
+	err := ec.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize expenses collection.")
+		utils.AuditLog.Println("Failed to initialize expenses collection.")
+		return []string{}
+	}
+
 	fmt.Println("Generating Income Report")
 	rept := []string{}
 	expenseRpt := []string{}
