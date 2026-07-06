@@ -519,22 +519,24 @@ document.getElementById("associationForm").addEventListener("submit", async func
 });
 
 document.getElementById("directoryBtn").addEventListener("click", async function () {
-
     try {
-        const response = await fetch(`/api/associationsDirectory`);
+        const response = await fetch("/api/associationsDirectory");
+
+        const text = await response.text();
 
         if (!response.ok) {
             document.getElementById("message").innerText =
-                "Unable to load directory.";
+                text || "Unable to load directory.";
             return;
         }
 
-        document.getElementById("message").innerText = "Not implemented yet.";
-        
-    } catch (err) {
-        document.getElementById("message").innerText = "Server unavailable.";
-    }
+        document.getElementById("message").innerText = text;
 
+    } catch (err) {
+        console.error("Directory error:", err);
+        document.getElementById("message").innerText =
+            "Unable to load data: " + err.message;
+    }
 });
 
 </script>
