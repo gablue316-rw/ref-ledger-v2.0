@@ -1597,7 +1597,7 @@ func main() {
 		return
 	}
 
-	err = gc.AddGameDateTimeToExistingGames(database.TenantId)
+	err = gc.AddGameDateTimeToExistingGames()
 	if err != nil {
 		fmt.Println("Failed to add game date/time to existing games.  Reason:", err)
 	}

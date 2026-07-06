@@ -2597,14 +2597,20 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 	return nil
 }
 
-func (gc *GameCollection) AddGameDateTimeToExistingGames(tenantId string) error {
+func (gc *GameCollection) AddGameDateTimeToExistingGames() error {
 	ctx := context.TODO()
 
 	fmt.Println("Adding game date/time to existing games...")
 	filter := bson.M{
-		"tenantId":     tenantId,
 		"gameDateTime": bson.M{"$exists": false},
 	}
+
+	count, err := gc.Coll.CountDocuments(context.TODO(), filter)
+	if err != nil {
+		return fmt.Errorf("failed to count documents: %v", err)
+	}
+
+	fmt.Println("Matching documents:", count)
 
 	cursor, err := gc.Coll.Find(ctx, filter)
 	if err != nil {
@@ -2650,7 +2656,7 @@ func (gc *GameCollection) AddGameDateTimeToExistingGames(tenantId string) error 
 		_, err = gc.Coll.UpdateOne(
 			ctx,
 			bson.M{
-				"tenantId": tenantId,
+				"tenantId": doc.TenantId,
 				"gameId":   doc.GameId,
 			},
 			update,
