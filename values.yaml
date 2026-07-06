@@ -3,7 +3,7 @@ replicaCount: 1
 
 image:
   repository: gablue316/ref-ledger
-  tag: latest
+  tag: 0000000 
   pullPolicy: Always
 
 service:
