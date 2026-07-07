@@ -104,7 +104,7 @@ func getTenantId(r *http.Request) (string, error) {
 	fmt.Println("Validating tenant ID")
 	if tId == "na" {
 		fmt.Println("Retrieving session id")
-		cookie, err := r.Cookie("session_id")
+		cookie, err := r.Cookie("rl_session")
 		if err != nil {
 			fmt.Println("Error retrieving session id.  Reason:", err)
 			return "", err
