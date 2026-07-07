@@ -333,12 +333,9 @@
 
         <div class="filter-group">
             <label for="association">Association</label>
-            <select id="association">
-                <option value="">All</option>
-                <option value="GOLLC">GOLLC</option>
-                <option value="MCBOA">MCBOA</option>
-                <option value="MSO">MSO</option>
-            </select>
+               <select id="association">
+                  <option value="">Select Association</option>
+               </select>
         </div>
 
         <div class="filter-group">
@@ -359,6 +356,13 @@
                 id="gameids" 
                 placeholder="Enter Game IDs (1980-1983,1995)" 
             >
+        </div>
+        
+        <div class="filter-group">
+            <label for="site">Site</label>
+               <select id="site">
+                  <option value="">Select Site</option>
+               </select>
         </div>
          
     </div>
@@ -420,6 +424,84 @@ Select report options and click "Create Report".
 
 <script>
 
+async function loadAssociations() {
+    try {
+        const response = await fetch("/api/loadAssociations");
+
+        if (!response.ok) {
+            throw new Error("Failed to load associations");
+        }
+
+        const associations = await response.json();
+        console.log(associations);
+    
+        const dropdowns = [
+            "association"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Association</option>';
+
+            associations.forEach(assoc => {
+               const option = document.createElement("option");
+               option.value = assoc.id;
+               option.textContent = assoc.id;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading associations:", err);
+    }
+}
+
+async function loadSites() {
+    try {
+
+        const response = await fetch("/api/loadSites");
+
+        if (!response.ok) {
+           const text = await response.text();
+           console.error("loadSites failed:", response.status, text);
+           alert("loadSites failed: " + response.status + "\n" + text);
+           return;
+        }
+
+        const sites = await response.json();
+ 
+        const dropdowns = [
+            "site"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Site</option>';
+
+            sites.forEach(site => {
+               const option = document.createElement("option");
+               option.value = site.name;
+               option.textContent = site.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading sites:", err);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    loadSites();  
+    loadAssociations();
+})
+
 document.getElementById("logoutBtn").addEventListener("click", async () => {
 
     try {
@@ -460,6 +542,9 @@ async function generateReport() {
    const gameids =
         document.getElementById("gameids").value; 
 
+   const site =
+        document.getElementById("site").value; 
+
     const params = new URLSearchParams();
 
     if (type)
@@ -479,6 +564,9 @@ async function generateReport() {
 
     if (gameids)
         params.append("gameids", gameids);
+
+    if (site)
+        params.append("site", site);
 
     try {
 
@@ -518,6 +606,7 @@ function clearFilters() {
     document.getElementById("filename").value = "";
     document.getElementById("status").value = "";
     document.getElementById("gameids").value = "";
+    document.getElementById("site").value = "";
 
     document.getElementById("reportContainer").textContent =
         'Select report options and click "Create Report".';
