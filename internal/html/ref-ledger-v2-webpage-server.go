@@ -1222,7 +1222,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	var games []model.HtmlResponse
 	var gameView []model.GameView
 	var gameFilters model.GFilters = model.GFilters{}
-
+	var siteId string
+	var tId string = database.TenantId
 	var HtmlAssocGameTotals reports.AssocGameTotalsMap
 	HtmlAssocGameTotals.Init()
 
@@ -1272,12 +1273,29 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		gameFilters.GameId = gameId
 	}
 
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if len(site) > 0 {
+		siteId, err = sc.GetSiteId(site, tId)
+		if err != nil {
+			http.Error(w, "Invalid site ID", http.StatusBadRequest)
+			return
+		}
+	}
+
 	gameFilters.Status = status
 	gameFilters.Association = association
 	gameFilters.Level = level
 	gameFilters.FromDate = bDate
 	gameFilters.ToDate = eDate
-	gameFilters.Site = site
+	gameFilters.Site = siteId
 	gameFilters.Official = official
 
 	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
