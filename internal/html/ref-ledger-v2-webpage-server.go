@@ -576,6 +576,11 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GenerateReport is called")
 	LogVisitor(r)
+
+	var tId string = database.TenantId
+	var err error
+	var siteId string
+
 	gameFilters := model.GFilters{}
 	expenseFilters := model.EFilters{}
 	rType := r.URL.Query().Get("type")
@@ -584,8 +589,27 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	rStatus := r.URL.Query().Get("status")
 	rAssoc := r.URL.Query().Get("association")
 	rGameIds := r.URL.Query().Get("gameids")
+	rSite := r.URL.Query().Get("site")
 
 	rept := []string{}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// The HTML uses the site name, so we need to convert it to an ID
+	if rSite != "" {
+		siteId, err = sc.GetSiteId(rSite, tId)
+		if err != nil {
+			http.Error(w, "Invalid site ID", http.StatusBadRequest)
+			return
+		}
+	}
 
 	if len(rGameIds) > 0 {
 		ids, err := utils.ConvertGameIdStrToInt(rGameIds)
@@ -604,6 +628,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	gameFilters.Association = rAssoc
 	gameFilters.Status = rStatus
+	gameFilters.Site = siteId
 
 	switch rType {
 	case "Games":
