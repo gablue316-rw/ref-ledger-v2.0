@@ -3222,6 +3222,7 @@ func (ec *ExpensesCollection) convExpenseToDoc(expense Expense) ExpenseDoc {
 
 func (ec *ExpensesCollection) ConvJsonToExpense(expenseJson ExpenseJson) Expense {
 
+	fmt.Println("Converting JSON to Expense", expenseJson)
 	expenseAmt := utils.ConvertInt64ToAmtStr(expenseJson.Amount)
 	gameId := utils.ConvertInt64ToStr(expenseJson.GameId)
 	return Expense{
@@ -3314,6 +3315,7 @@ func (ec *ExpensesCollection) GenerateExpenseId(expense Expense) string {
 
 func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
 
+	fmt.Println("Adding expense:", expense)
 	var result *mongo.InsertOneResult
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()

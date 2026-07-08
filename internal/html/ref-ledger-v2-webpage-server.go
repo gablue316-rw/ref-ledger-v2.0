@@ -1016,9 +1016,18 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 	var expenseJson database.ExpenseJson
 
-	err := json.NewDecoder(r.Body).Decode(&expenseJson)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		http.Error(w, "Unable to read request body", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Request Body:")
+	fmt.Println(string(body))
+
+	if err := json.Unmarshal(body, &expenseJson); err != nil {
+		fmt.Println("JSON error:", err)
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
 
