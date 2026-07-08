@@ -481,15 +481,33 @@ func LogVisitor(r *http.Request) {
 	userAgent := r.UserAgent()
 	referer := r.Referer()
 	host := r.Host
+
 	protocol := "HTTP"
 	if r.TLS != nil {
 		protocol = "HTTPS"
 	} else {
-		protocol = r.Header.Get("X-Forwared-Proto")
+		protocol = r.Header.Get("X-Forwarded-Proto")
 	}
 
-	utils.AuditLog.Printf("IP=%s Method=%s Path=%s URL=%s Agent=%s Referer=%s Host=%s Protocol=%s", remoteIpAddr, method, path, url, userAgent, referer, host, protocol)
+	username := "anonymous"
 
+	session, err := database.GetSession(r)
+	if err == nil {
+		username = session.Username
+	}
+
+	log.Printf(
+		"User=%s IP=%s Method=%s Path=%s URL=%s Host=%s Protocol=%s UserAgent=%q Referer=%q",
+		username,
+		remoteIpAddr,
+		method,
+		path,
+		url,
+		host,
+		protocol,
+		userAgent,
+		referer,
+	)
 }
 
 func generatePaymentsReport(assoc string) []string {
