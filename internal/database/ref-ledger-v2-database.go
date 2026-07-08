@@ -3320,6 +3320,14 @@ func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
+	dt, err := time.Parse("2006-01-02", expense.Date)
+	if err != nil {
+		return err
+	}
+	formattedDate := dt.Format("1/2/2006")
+
+	expense.Date = formattedDate
+
 	doc := ec.convExpenseToDoc(expense)
 	doc.TenantId = tenantId
 	doc.ExpenseId = ec.GenerateExpenseId(expense)
