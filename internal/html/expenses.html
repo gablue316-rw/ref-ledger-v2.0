@@ -392,10 +392,15 @@ document.getElementById("expenseForm")
 
     const messageBox = document.getElementById("message");
 
+
+    const amount = Math.round(
+        parseFloat(document.getElementById("amount").value) * 100
+    );
+    
     const expense = {
         date: document.getElementById("date").value,
         expenseType: document.getElementById("expenseType").value,
-        amount: parseFloat(document.getElementById("amount").value),
+        amount: amount,
         description: document.getElementById("description").value.trim(),
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value) || 0
