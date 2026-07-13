@@ -181,6 +181,39 @@
             min-height: 60px;
         }
 
+.games-table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.games-table th {
+    background-color: #0f172a;
+    color: white;
+    text-align: left;
+    padding: 14px;
+}
+
+.games-table td {
+    padding: 14px;
+    border-bottom: 1px solid #eee;
+}
+
+.games-table tr:hover {
+    background-color: #f8fafc;
+}
+
+.bulk-controls {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+
         @media (max-width: 768px) {
 
             .row {
@@ -193,6 +226,10 @@
 
             .btn {
                 width: 100%;
+            }
+        
+            .games-table {
+                 font-size: 14px;
             }
         }
 
@@ -330,6 +367,13 @@
                     >
                 </div>
 
+                <div class="bulk-controls">
+                    <label>
+                        <input type="checkbox" id="selectAll">
+                        <strong>Select All</strong>
+                    </label>
+                </div>
+
             </div>
 
             <div class="button-row">
@@ -356,9 +400,36 @@
         Ready to enter payments.
     </div>
 
+    <table class="games-table">
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Game ID</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Sport</th>
+                <th>Site</th>
+                <th>Field</th>
+                <th>Num of Games</th>
+                <th>Level</th>
+                <th>Game Fee</th>
+                <th>Assoc</th>
+                <th>Status</th>
+                <th>Officials</th>
+            </tr>
+        </thead>
+
+        <tbody id="gamesBody">
+        </tbody>
+    </table>
+
 </div>
 
 <script>
+
+document.addEventListener("DOMContentLoaded", function() { 
+    loadCompletedGames();
+})
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
 
@@ -451,6 +522,90 @@ document.getElementById("paymentForm")
     }
 });
 
+function getStatusClass(status) {
+    if (status === "Completed") {
+        return "completed";
+    }
+
+    if (status === "Pending") {
+        return "pending";
+    }
+
+    if (status === "Paid") {
+        return "paid";
+    }
+
+    if (status === "Cancelled") {
+        return "cancelled";
+    }
+
+    return "pending";
+}
+
+function renderGames(games) {
+    const tbody = document.getElementById("gamesBody");
+
+    tbody.innerHTML = "";
+    document.getElementById("selectAll").checked = false;
+    
+    games.forEach(game => {
+        const statusClass = getStatusClass(game.Status);
+
+        tbody.innerHTML += `
+            <tr>
+                <td>
+                    <input type="checkbox" class="game-check" value="${game.GameId}">
+                </td>
+                <td>${game.GameId}</td>
+                <td>${game.Date}</td>
+                <td>${game.Time}</td>
+                <td>${game.Sport}</td>
+                <td>${game.Site}</td>
+                <td>${game.Field}</td>
+                <td>${game.NumOfGames}</td>
+                <td>${game.Level}</td>
+                <td>${game.GameFee}</td>
+                <td>${game.Association}</td>
+                <td>
+                    <span class="status ${statusClass}">
+                        ${game.Status}
+                    </span>
+                </td>
+                <td>${game.Officials}</td>
+            </tr>
+        `;
+    });
+}
+
+async function loadCompletedGames() {
+    
+    const params = new URLSearchParams();
+    params.append("status", "Completed");
+
+       try {
+        const response = await fetch(`/api/dashboard?${params.toString()}`);
+
+        console.log("Status:", response.status);
+        console.log("Content-Type:", response.headers.get("content-type"));
+
+        if (!response.ok) {
+            const text = await response.text();
+            console.error("Server returned:", text);
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const games = await response.json();
+
+        console.log("Completed Games:", games);
+
+        renderGames(games);
+
+    } catch (err) {
+        console.error(err);
+        alert("Failed to load completed games.");
+    }
+
+}
 </script>
 
 </body>
