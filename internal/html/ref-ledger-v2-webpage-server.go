@@ -647,6 +647,8 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	gameFilters.Association = rAssoc
 	gameFilters.Status = rStatus
 	gameFilters.Site = siteId
+	gameFilters.TenantId = tId
+	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
 
 	switch rType {
 	case "Games":
