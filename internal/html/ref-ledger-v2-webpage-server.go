@@ -1349,6 +1349,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	gameFilters.ToDate = eDate
 	gameFilters.Site = siteId
 	gameFilters.Official = official
+	gameFilters.TenantId = tId
 
 	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
 	if err != nil {
