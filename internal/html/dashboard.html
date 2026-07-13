@@ -321,14 +321,11 @@ body {
         </div>
 
         <div class="filter-group">
-            <label for="association">Association</label>
-            <select id="association">
-                <option value="">All</option>
-                <option value="GOLLC">GOLLC</option>
-                <option value="MCBOA">MCBOA</option>
-                <option value="MSO">MSO</option>
-            </select>
-        </div>
+             <label for="association">Association</label>
+             <select id="association">
+                 <option value="">Select Association</option>
+             </select>
+        </div>        
 
         <div class="filter-group">
             <label for="sport">Sport</label>
@@ -340,10 +337,12 @@ body {
         </div>
 
         <div class="filter-group">
-            <label for="official">Official</label>
-            <input type="text" id="official" placeholder="Enter Official's Name">
-        </div>
-
+             <label for="official">Official</label>
+             <select id="official">
+                 <option value="">Select Official</option>
+             </select>
+        </div>    
+        
         <div class="filter-group">
              <label for="site">Site</label>
              <select id="site">
@@ -515,7 +514,42 @@ document.addEventListener("change", function (e) {
         allCheckboxes.length === checkedCheckboxes.length;
 });
 
-async function initialLoadGames() {
+async function loadAssociations() {
+    try {
+        const response = await fetch("/api/loadAssociations");
+
+        if (!response.ok) {
+            throw new Error("Failed to load associations");
+        }
+
+        const associations = await response.json();
+        console.log(associations);
+    
+        const dropdowns = [
+            "association"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Association</option>';
+
+            associations.forEach(assoc => {
+               const option = document.createElement("option");
+               option.value = assoc.id;
+               option.textContent = assoc.id;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading associations:", err);
+    }
+}
+
+async function loadPendingGames() {
     const params = new URLSearchParams();
     params.append("status", "Pending");
 
@@ -611,9 +645,46 @@ async function loadSites() {
     }
 }
 
+async function loadOfficials() {
+    try {
+        const response = await fetch("/api/loadOfficials");
+
+        if (!response.ok) {
+            throw new Error("Failed to load officials");
+        }
+
+        const officials = await response.json();
+        console.log(officials);
+    
+        const dropdowns = [
+            "official"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Official</option>';
+
+            officials.forEach(official => {
+               const option = document.createElement("option");
+               option.value = official.name;
+               option.textContent = official.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading officials:", err);
+    }
+}
+
 document.addEventListener("DOMContentLoaded", function() {
     loadSites();  
-    initialLoadGames();
+    loadAssociations();
+    loadPendingGames();
+    loadOfficials();
 })
 
 async function updateSelectedStatus() {
@@ -655,7 +726,7 @@ async function updateSelectedStatus() {
 
         document.getElementById("bulkStatus").value = "";
 
-        loadGames();
+        loadPendingGames();
 
     } catch (err) {
         console.error(err);
