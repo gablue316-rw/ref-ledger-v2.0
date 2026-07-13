@@ -799,6 +799,7 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 	fmt.Println("Building MongoDb Game Filter")
 	mongoFilter := bson.M{}
 
+	fmt.Println("Building MongoDb Game Filter with Tenant ID:", filter.TenantId)
 	mongoFilter["tenantId"] = filter.TenantId
 
 	if len(filter.Status) > 0 {

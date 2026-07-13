@@ -392,6 +392,7 @@ func ConvertGameFiltersToJsonFile(filters model.GFilters) (string, error) {
 	jsonFilters.U2 = filters.Official
 	jsonFilters.TenantId = filters.TenantId
 
+	fmt.Println("JSON Filters:", jsonFilters)
 	// write JSON file
 	file, err := os.Create(fileName)
 	if err != nil {
