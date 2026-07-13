@@ -9,7 +9,7 @@ spec:
 
   source:
     repoURL: https://github.com/gablue316-rw/ref-ledger-v2.0
-    targetRevision: main
+    targetRevision: development
     path: charts/ref-ledger
     helm:
       valueFiles:
