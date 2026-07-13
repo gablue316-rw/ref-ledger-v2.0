@@ -579,6 +579,7 @@ func generateGamesReport(gameFilters model.GFilters) []string {
 		return []string{}
 	}
 
+	fmt.Println("Generated Games Filter:", gFilter)
 	gameRecords, err := database.QueryAggregatedGames(context.TODO(), "refLedger_v2", "games", gFilter)
 	if err != nil {
 		fmt.Println("Failed to query aggregated games")
