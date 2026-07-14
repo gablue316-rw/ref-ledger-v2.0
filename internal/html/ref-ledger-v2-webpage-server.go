@@ -731,18 +731,17 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	game.Site = siteId
 
-	singleGameDesc = GameDocToGameDescr(game)
+	if game.Status == "Cancelled" {
+		game.GameFee = float64(0)
+		game.TravelPay = float64(0)
+		game.AssignorFee = float64(0)
+		game.Deductions = float64(0)
+	}
 
-	if singleGameDesc.Status == "Delete" {
-		api.DelGame(context.TODO(), singleGameDesc)
+	singleGameDesc = GameDocToGameDescr(game)
+	if game.Status == "Delete" {
+		api.DelGame(context.TODO(), singleGameDesc.GameId)
 		return
-	} else {
-		if singleGameDesc.Status == "Cancelled" {
-			singleGameDesc.GameFee = "0"
-			singleGameDesc.TravelPay = "0"
-			singleGameDesc.AssignorFee = "0"
-			singleGameDesc.Deductions = "0"
-		}
 	}
 
 	var gDoc model.GameDoc = model.GameDoc{}

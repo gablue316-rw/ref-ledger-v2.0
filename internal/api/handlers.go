@@ -101,11 +101,11 @@ func DecryptEmailCredentials(userName, password string) (string, string) {
 
 }
 
-func DelGame(parentCtx context.Context, game model.GameDescriptor) {
+func DelGame(parentCtx context.Context, gameId string) {
 
-	fmt.Println("Deleting game with Game Id:", game.GameId)
-	gameId, _ := utils.ConvertStrToInt64(game.GameId)
-	filter := bson.M{"gameId": gameId}
+	fmt.Println("Deleting game with Game Id:", gameId)
+	gId, _ := utils.ConvertStrToInt64(gameId)
+	filter := bson.M{"gameId": gId}
 
 	database.DeleteOneDoc(parentCtx, filter, "refLedger_v2", "games")
 
@@ -245,7 +245,7 @@ func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
 		recordsRead++
 
 		if g.Status == "Delete" {
-			DelGame(parentCtx, g)
+			DelGame(parentCtx, g.GameId)
 			recordsDeleted++
 			continue
 		}
@@ -319,7 +319,7 @@ func UpdateGames(parentCtx context.Context, file string) error {
 		}
 
 		if game.Status == "Delete" {
-			DelGame(parentCtx, game)
+			DelGame(parentCtx, game.GameId)
 			recordsDeleted++
 			continue
 		}
