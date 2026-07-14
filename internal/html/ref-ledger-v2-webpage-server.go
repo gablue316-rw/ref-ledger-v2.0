@@ -647,6 +647,8 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	gameFilters.Association = rAssoc
 	gameFilters.Status = rStatus
 	gameFilters.Site = siteId
+	gameFilters.TenantId = tId
+	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
 
 	switch rType {
 	case "Games":
@@ -1349,7 +1351,9 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	gameFilters.ToDate = eDate
 	gameFilters.Site = siteId
 	gameFilters.Official = official
+	gameFilters.TenantId = tId
 
+	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
 	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
 	if err != nil {
 		fmt.Println(err)

@@ -619,6 +619,7 @@ func QueryAggregatedGames(parentCtx context.Context, dbase, collection, filter s
 
 	mongoDbFilter, err := BuildMongoGameFilterFromFile(filter)
 
+	fmt.Println("mongoDbFilter:", mongoDbFilter)
 	if err != nil {
 		fmt.Println("Failed to build Mongo DB Filter for games collection")
 		return []model.GameDescriptor{}, err
@@ -797,6 +798,9 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
 	fmt.Println("Building MongoDb Game Filter")
 	mongoFilter := bson.M{}
+
+	fmt.Println("Building MongoDb Game Filter with Tenant ID:", filter.TenantId)
+	mongoFilter["tenantId"] = filter.TenantId
 
 	if len(filter.Status) > 0 {
 		mongoFilter["status"] = bson.M{
