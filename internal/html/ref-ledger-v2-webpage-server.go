@@ -736,6 +736,13 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	if singleGameDesc.Status == "Delete" {
 		api.DelGame(context.TODO(), singleGameDesc)
 		return
+	} else {
+		if singleGameDesc.Status == "Cancelled" {
+			singleGameDesc.GameFee = "0"
+			singleGameDesc.TravelPay = "0"
+			singleGameDesc.AssignorFee = "0"
+			singleGameDesc.Deductions = "0"
+		}
 	}
 
 	var gDoc model.GameDoc = model.GameDoc{}
@@ -773,6 +780,9 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
+	var tId string = database.TenantId
+	var err error
+
 	LogVisitor(r)
 
 	if r.Method != http.MethodPost {
@@ -782,7 +792,7 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
 	var gameUpdate GameStatusUpdate
 
-	err := json.NewDecoder(r.Body).Decode(&gameUpdate)
+	err = json.NewDecoder(r.Body).Decode(&gameUpdate)
 	if err != nil {
 		fmt.Println("err:", err)
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -824,7 +834,16 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	database.UpdateGameStatus(gameIds, gameUpdate.Status)
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	gc.UpdateGameStatus(gameIds, gameUpdate.Status)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)

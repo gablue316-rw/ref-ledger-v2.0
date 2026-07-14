@@ -1490,65 +1490,6 @@ func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescript
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
 }
 
-func UpdateGameStatus(gameIds []int64, status string) {
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-	collectionName := coll.Name()
-	fmt.Println("Updating Games Status to", status, "for game ids:", gameIds)
-
-	recordsUpdated := 0
-	totalErrors := 0
-
-	var game model.GameDescriptor = model.GameDescriptor{}
-
-	for _, id := range gameIds {
-
-		gameIdStr, err := utils.ConvertSingleGameIdToStr(id)
-
-		if err != nil {
-			fmt.Println("Failed to convert Game Id to string.  Reason:", err)
-			continue
-		}
-
-		game, err = GetSingleGame(ctx, gameIdStr)
-
-		if err != nil {
-			fmt.Println("Failed to get game record.  Reason:", err)
-			continue
-		}
-
-		if game.Status == status {
-			fmt.Println("Game Id", id, "already set to status", status)
-			continue
-		}
-
-		filter := bson.M{
-			"gameId": id,
-		}
-
-		update := bson.M{
-			"$set": bson.M{
-				"status": status,
-			},
-		}
-
-		err = UpdateOneDoc(ctx, filter, update, Database, "games")
-		if err != nil {
-			totalErrors++
-			fmt.Println(err)
-		} else {
-			recordsUpdated++
-		}
-
-	}
-
-	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
-}
-
 func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -2624,6 +2565,7 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 
 	var filter bson.M
 	var result *mongo.DeleteResult
+	var tId string = TenantId
 
 	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
 	if err != nil {
@@ -2633,6 +2575,7 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 	filter = bson.M{
 		"gameId":      gameIdInt64,
 		"association": association,
+		"tenantId":    tId,
 	}
 
 	result, gc.LastError = gc.Coll.DeleteOne(context.TODO(), filter)
@@ -2649,82 +2592,79 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 	return nil
 }
 
-func (gc *GameCollection) AddGameDateTimeToExistingGames() error {
-	ctx := context.TODO()
+func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 
-	fmt.Println("Adding game date/time to existing games...")
-	filter := bson.M{
-		"gameDateTime": bson.M{"$exists": false},
-	}
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+	var tId string = TenantId
+	update := bson.M{}
+	filter := bson.M{}
 
-	count, err := gc.Coll.CountDocuments(context.TODO(), filter)
-	if err != nil {
-		return fmt.Errorf("failed to count documents: %v", err)
-	}
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+	collectionName := coll.Name()
+	fmt.Println("Updating Games Status to", status, "for game ids:", gameIds)
 
-	fmt.Println("Matching documents:", count)
+	recordsUpdated := 0
+	totalErrors := 0
 
-	cursor, err := gc.Coll.Find(ctx, filter)
-	if err != nil {
-		return fmt.Errorf("failed to find games missing gameDateTime: %v", err)
-	}
-	defer cursor.Close(ctx)
-
-	loc, err := time.LoadLocation("America/New_York")
-	if err != nil {
-		return fmt.Errorf("failed to load timezone: %v", err)
-	}
-
-	var recordsUpdated int64 = 0
-
-	for cursor.Next(ctx) {
-		var doc model.GameDoc
-
-		if err := cursor.Decode(&doc); err != nil {
-			return fmt.Errorf("failed to decode game: %v", err)
-		}
-
-		gameDateTime, err := time.ParseInLocation(
-			"1/2/2006 3:04 PM",
-			doc.Date+" "+doc.Time,
-			loc,
-		)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to parse date/time for gameId %d: date=%s time=%s error=%v",
-				doc.GameId,
-				doc.Date,
-				doc.Time,
-				err,
-			)
-		}
-
-		update := bson.M{
+	if status == "Cancelled" {
+		update = bson.M{
 			"$set": bson.M{
-				"gameDateTime": gameDateTime,
+				"gameFee":     int64(0),
+				"travelPay":   int64(0),
+				"assignorFee": int64(0),
+				"deductions":  int64(0),
+				"status":      "Cancelled",
 			},
 		}
-
-		_, err = gc.Coll.UpdateOne(
-			ctx,
-			bson.M{
-				"tenantId": doc.TenantId,
-				"gameId":   doc.GameId,
+	} else {
+		update = bson.M{
+			"$set": bson.M{
+				"status": "Cancelled",
 			},
-			update,
-		)
+		}
+	}
+	var game model.GameDescriptor = model.GameDescriptor{}
+
+	for _, id := range gameIds {
+
+		gameIdStr, err := utils.ConvertSingleGameIdToStr(id)
+
 		if err != nil {
-			return fmt.Errorf("failed to update gameId %d: %v", doc.GameId, err)
+			fmt.Println("Failed to convert Game Id to string.  Reason:", err)
+			continue
 		}
-		recordsUpdated++
+
+		game, err = GetSingleGame(ctx, gameIdStr)
+
+		if err != nil {
+			fmt.Println("Failed to get game record.  Reason:", err)
+			continue
+		}
+
+		if game.Status == status {
+			fmt.Println("Game Id", id, "already set to status", status)
+			continue
+		}
+
+		filter = bson.M{
+			"gameId":      id,
+			"association": game.Association,
+			"tenantId":    tId,
+		}
+
+		err = UpdateOneDoc(ctx, filter, update, Database, "games")
+		if err != nil {
+			totalErrors++
+			fmt.Println(err)
+		} else {
+			recordsUpdated++
+		}
+
 	}
 
-	if err := cursor.Err(); err != nil {
-		return fmt.Errorf("cursor error: %v", err)
-	}
-
-	fmt.Println("Successfully added game date/time to existing games.  Records updated:", recordsUpdated)
-	return nil
+	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
 }
 
 // Official Collection, Documents and API Code
