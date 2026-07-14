@@ -758,7 +758,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if gameExists {
-		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games")
+		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games", tId)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -767,7 +767,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gameDesc = append(gameDesc, singleGameDesc)
-	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games")
+	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games", tId)
 
 }
 

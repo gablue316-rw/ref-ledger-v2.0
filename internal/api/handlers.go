@@ -561,7 +561,7 @@ func AddExpenses(parentCtx context.Context, expense []model.ExpenseDescriptor) {
 
 func AddGames(parentCtx context.Context, game []model.GameDescriptor) {
 
-	database.InsertGameDocs(parentCtx, game, database.Database, "games")
+	database.InsertGameDocs(parentCtx, game, database.Database, "games", database.TenantId)
 }
 
 func AddOfficials(parentCtx context.Context, official []model.OfficialDescriptor) {

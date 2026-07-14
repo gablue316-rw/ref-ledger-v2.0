@@ -1683,7 +1683,7 @@ func InsertExpenseDocs(parentCtx context.Context, expense []model.ExpenseDescrip
 
 }
 
-func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbase, collection string) error {
+func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbase, collection, tId string) error {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -1695,13 +1695,16 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	coll := db.Collection(collection)
 
 	doc := utils.ConvertGameDescrToGameDoc(game)
+	doc.TenantId = tId
+
 	doc.GameDateTime, err = convertDateStringToTime(game.Date, game.Time)
 	if err != nil {
 		return err
 	}
 
 	filter := bson.M{
-		"gameId": doc.GameId,
+		"gameId":   doc.GameId,
+		"tenantId": tId,
 	}
 
 	update := bson.M{
@@ -1718,7 +1721,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	return nil
 }
 
-func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection string) {
+func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbase, collection, tId string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -1736,7 +1739,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 	for _, v := range game {
 
 		doc := utils.ConvertGameDescrToGameDoc(v)
-		doc.TenantId = TenantId
+		doc.TenantId = tId
 		doc.GameDateTime, err = convertDateStringToTime(v.Date, v.Time)
 		if err != nil {
 			fmt.Println(err)
@@ -1887,7 +1890,7 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 	var update bool = false
 
 	if tenantId == "na" {
-
+		fmt.Println("Invalid Tenant ID")
 	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
