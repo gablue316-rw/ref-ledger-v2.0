@@ -1643,9 +1643,11 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		return err
 	}
 
+	fmt.Println("UpdateOneGameDoc:  Updated game document:", doc)
 	filter := bson.M{
-		"gameId":   doc.GameId,
-		"tenantId": tId,
+		"gameId":      doc.GameId,
+		"association": doc.Association,
+		"tenantId":    tId,
 	}
 
 	update := bson.M{
@@ -1658,7 +1660,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		return err
 	}
 
-	fmt.Println("Updated document:", result.ModifiedCount)
+	fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
 	return nil
 }
 
