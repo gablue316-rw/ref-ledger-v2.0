@@ -713,6 +713,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("UpdateGame: Game Fee:", game.GameFee)
 	if tId == "na" {
 		tId, err = getTenantId(r)
 
@@ -732,6 +733,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	game.Site = siteId
 
 	if game.Status == "Cancelled" {
+		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
 		game.GameFee = float64(0)
 		game.TravelPay = float64(0)
 		game.AssignorFee = float64(0)
@@ -740,10 +742,12 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	singleGameDesc = GameDocToGameDescr(game)
 	if game.Status == "Delete" {
+		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
 		api.DelGame(context.TODO(), singleGameDesc.GameId)
 		return
 	}
 
+	fmt.Println("UpdateGame: Single Game Descriptor:", singleGameDesc)
 	var gDoc model.GameDoc = model.GameDoc{}
 
 	gDoc.GameId = int64(game.GameId)

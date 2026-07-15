@@ -1630,7 +1630,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	defer cancel()
 	var err error
 
-	fmt.Println("Updating one game")
+	fmt.Println("UpdateOneGameDoc:  Updating game with ID:", game.GameId, "Game Description:", game)
 
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
