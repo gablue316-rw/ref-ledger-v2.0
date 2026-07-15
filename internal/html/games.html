@@ -612,6 +612,15 @@ document.getElementById("gameForm").addEventListener("submit", async function(e)
         assignor: document.getElementById("assignor").value
     };
 
+    if (game.status == "Cancelled") {
+        game.gameFee = 0;
+        game.travelPay = 0;
+        game.assignorFee = 0;
+        game.deductions = 0;
+        document.getElementById("message").innerText =
+            "Clearing Game Financials";       
+    }
+
     try {
         const response = await fetch("/api/game-update", {
             method: "POST",
