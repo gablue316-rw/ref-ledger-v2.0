@@ -119,10 +119,10 @@ type GameDoc struct {
 	Field        string    `bson:"field,omitempty"`
 	NumOfGames   int64     `bson:"numOfGames,omitempty"`
 	Level        string    `bson:"level,omitempty"`
-	GameFee      int64     `bson:"gameFee,omitempty"`
-	TravelPay    int64     `bson:"travelPay,omitempty"`
-	AssignorFee  int64     `bson:"assignorFee,omitempty"`
-	Deductions   int64     `bson:"deductions,omitempty"`
+	GameFee      int64     `bson:"gameFee"`
+	TravelPay    int64     `bson:"travelPay"`
+	AssignorFee  int64     `bson:"assignorFee"`
+	Deductions   int64     `bson:"deductions"`
 	Association  string    `bson:"association,omitempty"`
 	Status       string    `bson:"status,omitempty"`
 	Referee      string    `bson:"referee,omitempty"`
