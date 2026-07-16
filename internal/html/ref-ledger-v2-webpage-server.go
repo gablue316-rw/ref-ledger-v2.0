@@ -401,7 +401,7 @@ func ImportOfficialsPageHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(
 		w,
 		r,
-		"./html/importOfficials.html",
+		"./internal/html/importOfficials.html",
 	)
 }
 
