@@ -3,16 +3,22 @@ package main
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/mail"
 
+	"crypto/rand"
+	"encoding/hex"
+
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -483,6 +489,515 @@ func DownloadOfficialsTemplateHandler(
 
 		return
 	}
+}
+
+const oneMB = 1048576
+const fiveMB = 5 * oneMB
+const maxOfficialsCSVSize = fiveMB
+const maxOfficialsCSVRows = 1000
+const previewExpiration = 15 * time.Minute
+
+type OfficialImportData struct {
+	FirstName string `json:"firstName" bson:"firstName"`
+	LastName  string `json:"lastName" bson:"lastName"`
+	Phone     string `json:"phone" bson:"phone"`
+	Email     string `json:"email" bson:"email"`
+	Address   string `json:"address" bson:"address"`
+}
+
+type OfficialPreviewRow struct {
+	RowNumber int                `json:"rowNumber"`
+	Valid     bool               `json:"valid"`
+	Data      OfficialImportData `json:"data"`
+	Errors    []string           `json:"errors"`
+}
+
+type OfficialsImportPreview struct {
+	Token     string
+	TenantID  string
+	Rows      []OfficialPreviewRow
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+type OfficialsPreviewResponse struct {
+	PreviewToken string               `json:"previewToken"`
+	TotalRows    int                  `json:"totalRows"`
+	ValidRows    int                  `json:"validRows"`
+	InvalidRows  int                  `json:"invalidRows"`
+	Rows         []OfficialPreviewRow `json:"rows"`
+}
+
+/* This temporary in-memory store is sufficient while Ref Ledger is running as one pod. Important:
+If Kubernetes runs multiple Ref Ledger pods, the preview request and commit request might reach different pods.
+In that case, store previews in MongoDB instead of memory. */
+
+var officialsPreviewStore = struct {
+	sync.RWMutex
+	items map[string]OfficialsImportPreview
+}{
+	items: make(map[string]OfficialsImportPreview),
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(value); err != nil {
+		log.Printf("writeJSON: unable to encode response: %v", err)
+	}
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
+}
+
+func validateOfficialsCSVFile(fileHeader *multipart.FileHeader) error {
+
+	if fileHeader == nil {
+		return errors.New("CSV file information is missing")
+	}
+
+	if fileHeader.Size <= 0 {
+		return errors.New("the selected CSV file is empty")
+	}
+
+	if fileHeader.Size > maxOfficialsCSVSize {
+		return errors.New("the selected CSV file exceeds the 5 MB limit")
+	}
+
+	fileName := strings.ToLower(strings.TrimSpace(fileHeader.Filename))
+
+	if !strings.HasSuffix(fileName, ".csv") {
+		return errors.New("the selected file must have a .csv extension")
+	}
+
+	return nil
+}
+
+func normalizeHeaderName(value string) string {
+
+	value = strings.TrimSpace(value)
+
+	/* Remove the UTF-8 byte order mark that Excel may add to the first column heading. */
+
+	value = strings.TrimPrefix(value, "\uFEFF")
+	value = strings.ToLower(value)
+	value = strings.ReplaceAll(value, "_", "")
+	value = strings.ReplaceAll(value, " ", "")
+
+	return value
+}
+
+func validateOfficialsCSVHeader(header []string) error {
+
+	expected := []string{
+		"firstname",
+		"lastname",
+		"phone",
+		"email",
+		"address",
+	}
+
+	if len(header) != len(expected) {
+		return fmt.Errorf("invalid CSV header: expected %d columns but found %d",
+			len(expected),
+			len(header))
+	}
+
+	for i := range header {
+		actualName := normalizeHeaderName(header[i])
+		if actualName != expected[i] {
+			return fmt.Errorf(
+				"invalid CSV header in column %d: expected %q but found %q",
+				i+1,
+				expected[i],
+				strings.TrimSpace(header[i]),
+			)
+		}
+	}
+
+	return nil
+}
+
+func csvColumn(record []string, index int) string {
+
+	if index < 0 || index >= len(record) {
+		return ""
+	}
+
+	return strings.TrimSpace(record[index])
+
+}
+
+func isBlankCSVRecord(record []string) bool {
+
+	for _, value := range record {
+		if strings.TrimSpace(value) != "" {
+			return false
+		}
+	}
+
+	return true
+}
+
+func normalizeOfficialName(firstName string, lastName string) string {
+
+	return strings.ToLower(strings.TrimSpace(firstName)) + "|" + strings.ToLower(strings.TrimSpace(lastName))
+}
+
+func buildOfficialPreviewRow(rowNumber int, record []string) OfficialPreviewRow {
+
+	row := OfficialPreviewRow{
+		RowNumber: rowNumber,
+		Valid:     false,
+		Errors:    make([]string, 0),
+	}
+
+	if len(record) != 5 {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Expected 5 columns but found %d",
+				len(record),
+			),
+		)
+
+		/* Still copy any available values so the user can see what was read from the CSV. */
+
+		row.Data = OfficialImportData{
+			FirstName: csvColumn(record, 0),
+			LastName:  csvColumn(record, 1),
+			Phone:     csvColumn(record, 2),
+			Email:     csvColumn(record, 3),
+			Address:   csvColumn(record, 4),
+		}
+		return row
+	}
+
+	row.Data = OfficialImportData{
+		FirstName: strings.TrimSpace(record[0]),
+		LastName:  strings.TrimSpace(record[1]),
+		Phone:     strings.TrimSpace(record[2]),
+		Email:     strings.TrimSpace(record[3]),
+		Address:   strings.TrimSpace(record[4]),
+	}
+
+	if row.Data.FirstName == "" {
+		row.Errors = append(
+			row.Errors,
+			"First name is required",
+		)
+	}
+
+	if row.Data.LastName == "" {
+		row.Errors = append(
+			row.Errors,
+			"Last name is required",
+		)
+	}
+
+	if len(row.Data.FirstName) > 100 {
+		row.Errors = append(
+			row.Errors,
+			"First name cannot exceed 100 characters",
+		)
+	}
+	if len(row.Data.LastName) > 100 {
+		row.Errors = append(
+			row.Errors,
+			"Last name cannot exceed 100 characters",
+		)
+	}
+	if len(row.Data.Phone) > 50 {
+		row.Errors = append(
+			row.Errors,
+			"Phone number cannot exceed 50 characters",
+		)
+	}
+	if len(row.Data.Email) > 254 {
+		row.Errors = append(
+			row.Errors,
+			"Email cannot exceed 254 characters",
+		)
+	}
+	if len(row.Data.Address) > 500 {
+		row.Errors = append(
+			row.Errors,
+			"Address cannot exceed 500 characters",
+		)
+	}
+	if row.Data.Email != "" {
+		if _, err := mail.ParseAddress(row.Data.Email); err != nil {
+			row.Errors = append(
+				row.Errors,
+				"Email address is invalid",
+			)
+		}
+	}
+
+	row.Valid = len(row.Errors) == 0
+
+	return row
+
+}
+
+func generatePreviewToken() (string, error) {
+
+	bytes := make([]byte, 32)
+
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(bytes), nil
+}
+
+func saveOfficialsPreview(preview OfficialsImportPreview) {
+
+	officialsPreviewStore.Lock()
+
+	defer officialsPreviewStore.Unlock()
+
+	officialsPreviewStore.items[preview.Token] = preview
+}
+
+func removeExpiredOfficialsPreviews() {
+	now := time.Now()
+	officialsPreviewStore.Lock()
+	defer officialsPreviewStore.Unlock()
+	for token, preview := range officialsPreviewStore.items {
+		if now.After(preview.ExpiresAt) {
+			delete(
+				officialsPreviewStore.items,
+				token,
+			)
+		}
+	}
+}
+
+func PreviewOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxOfficialsCSVSize+(oneMB))
+
+	if err := r.ParseMultipartForm(maxOfficialsCSVSize); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "The CSV upload is invalid or exceeds the 5 MB limit.")
+		return
+	}
+
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "An Officials CSV file is required.")
+		return
+	}
+
+	defer file.Close()
+
+	if err := validateOfficialsCSVFile(fileHeader); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	csvReader := csv.NewReader(file)
+
+	/* Allow variable-length records so we can report a useful row-level error instead of stopping immediately. */
+	csvReader.FieldsPerRecord = -1
+
+	/* This trims spaces that appear outside quoted CSV values. For example: John, Smith is treated similarly to: John,Smith */
+	csvReader.TrimLeadingSpace = true
+
+	header, err := csvReader.Read()
+	if err == io.EOF {
+		writeJSONError(w, http.StatusBadRequest, "The CSV file is empty.")
+		return
+	}
+
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Unable to read the CSV header: "+err.Error())
+		return
+	}
+
+	if err := validateOfficialsCSVHeader(header); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	rows := make([]OfficialPreviewRow, 0)
+
+	/* Used to detect duplicates inside the uploaded CSV file. */
+	namesInFile := make(map[string]int)
+	csvRowNumber := 1
+
+	for {
+		record, readErr := csvReader.Read()
+
+		if readErr == io.EOF {
+			break
+		}
+
+		csvRowNumber++
+		if len(rows) >= maxOfficialsCSVRows {
+			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("The CSV file contains mxore than %d data rows.", maxOfficialsCSVRows))
+			return
+		}
+
+		if readErr != nil {
+			rows = append(
+				rows,
+				OfficialPreviewRow{
+					RowNumber: csvRowNumber,
+					Valid:     false,
+					Data:      OfficialImportData{},
+					Errors: []string{
+						"Unable to parse CSV row: " + readErr.Error(),
+					},
+				},
+			)
+			/* Some CSV syntax errors leave the reader unable to continue reliably. Stop after recording the error. */
+			break
+		}
+
+		if isBlankCSVRecord(record) {
+			continue
+		}
+
+		previewRow := buildOfficialPreviewRow(
+			csvRowNumber,
+			record,
+		)
+
+		nameKey := normalizeOfficialName(
+			previewRow.Data.FirstName,
+			previewRow.Data.LastName,
+		)
+
+		if nameKey != "|" {
+			if previousRow, found := namesInFile[nameKey]; found {
+				previewRow.Errors = append(
+					previewRow.Errors,
+					fmt.Sprintf(
+						"Duplicate official in CSV file; first appeared on row %d",
+						previousRow,
+					),
+				)
+			} else {
+				namesInFile[nameKey] = csvRowNumber
+			}
+		}
+
+		previewRow.Valid = len(previewRow.Errors) == 0
+
+		rows = append(rows, previewRow)
+	}
+
+	if len(rows) == 0 {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The CSV file does not contain any officials.",
+		)
+		return
+	}
+	/* Check MongoDB for officials that already exist. This only runs for rows that passed the basic CSV validation. */
+
+	for i := range rows {
+		if !rows[i].Valid {
+			continue
+		}
+
+		name := rows[i].Data.FirstName + " " + rows[i].Data.LastName
+
+		exists, err := oc.OfficialExists(name, tId)
+
+		if err != nil {
+			log.Printf(
+				"PreviewOfficialsImportHandler: duplicate lookup failed for tenant %s, official %s %s: %v",
+				tId,
+				rows[i].Data.FirstName,
+				rows[i].Data.LastName,
+				err,
+			)
+			writeJSONError(
+				w,
+				http.StatusInternalServerError,
+				"Unable to validate officials against the database.",
+			)
+			return
+		}
+
+		if exists {
+			rows[i].Errors = append(
+				rows[i].Errors,
+				"Official already exists",
+			)
+			rows[i].Valid = false
+		}
+	}
+
+	validRows := 0
+	invalidRows := 0
+
+	for _, row := range rows {
+		if row.Valid {
+			validRows++
+		} else {
+			invalidRows++
+		}
+	}
+
+	previewToken, err := generatePreviewToken()
+	if err != nil {
+		log.Printf(
+			"PreviewOfficialsImportHandler: unable to generate preview token: %v",
+			err,
+		)
+		writeJSONError(
+			w,
+			http.StatusInternalServerError,
+			"Unable to create the import preview.",
+		)
+		return
+	}
+
+	now := time.Now()
+	preview := OfficialsImportPreview{
+		Token:     previewToken,
+		TenantID:  tId,
+		Rows:      rows,
+		CreatedAt: now,
+		ExpiresAt: now.Add(previewExpiration),
+	}
+
+	saveOfficialsPreview(preview)
+	removeExpiredOfficialsPreviews()
+
+	response := OfficialsPreviewResponse{
+		PreviewToken: previewToken,
+		TotalRows:    len(rows),
+		ValidRows:    validRows,
+		InvalidRows:  invalidRows,
+		Rows:         rows,
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }
 
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
@@ -1881,6 +2396,8 @@ func main() {
 	})
 
 	mux.HandleFunc("/api/pod", PodInfoHandler)
+
+	mux.HandleFunc("/api/import/officials/preview", authRequired(readOnlyForbidden(PreviewOfficialsImportHandler)))
 
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
