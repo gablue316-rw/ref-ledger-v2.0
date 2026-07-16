@@ -1,0 +1,1289 @@
+<html>
+<!-- importOfficials.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>Ref Ledger V2.0 Import Officials</title>
+
+<link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+>
+
+<style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+    background-color: #f4f6f9;
+    padding: 20px;
+    color: #333;
+}
+
+.container {
+    max-width: 1000px;
+    margin: auto;
+}
+
+.header {
+    background-color: #1e293b;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.header h1 {
+    margin-bottom: 10px;
+}
+
+.navbar {
+    background: #082b4f;
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 15px 30px;
+    margin-bottom: 20px;
+}
+
+.nav-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 90px;
+    padding: 10px;
+    border-radius: 6px;
+    transition: 0.2s;
+}
+
+.nav-links a:hover {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.nav-links a.active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.nav-links i {
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+
+.nav-links span {
+    font-size: 13px;
+}
+
+.form-card {
+    background-color: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.form-card h2 {
+    margin-bottom: 10px;
+}
+
+.description {
+    color: #475569;
+    line-height: 1.5;
+    margin-bottom: 20px;
+}
+
+.instructions {
+    background-color: #eff6ff;
+    border-left: 5px solid #2563eb;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.instructions h3 {
+    margin-bottom: 10px;
+    color: #1e3a8a;
+}
+
+.instructions ol {
+    padding-left: 22px;
+    line-height: 1.7;
+}
+
+.template-format {
+    margin-top: 15px;
+    padding: 12px;
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    overflow-x: auto;
+}
+
+.template-format code {
+    white-space: nowrap;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 14px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 7px;
+}
+
+input[type="file"] {
+    width: 100%;
+    padding: 11px;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    background-color: white;
+    font-size: 15px;
+}
+
+.selected-file {
+    margin-top: 10px;
+    padding: 12px;
+    background-color: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
+    color: #475569;
+    word-break: break-word;
+}
+
+.button-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    border: none;
+    color: white;
+    padding: 11px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+}
+
+.btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.btn-template {
+    background-color: #7c3aed;
+}
+
+.btn-template:hover:not(:disabled) {
+    background-color: #6d28d9;
+}
+
+.btn-preview {
+    background-color: #2563eb;
+}
+
+.btn-preview:hover:not(:disabled) {
+    background-color: #1d4ed8;
+}
+
+.btn-import {
+    background-color: #16a34a;
+}
+
+.btn-import:hover:not(:disabled) {
+    background-color: #15803d;
+}
+
+.btn-clear {
+    background-color: #dc2626;
+}
+
+.btn-clear:hover:not(:disabled) {
+    background-color: #b91c1c;
+}
+
+.btn-cancel {
+    background-color: #64748b;
+}
+
+.btn-cancel:hover {
+    background-color: #475569;
+}
+
+.message-box {
+    background-color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    font-weight: bold;
+    min-height: 60px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+}
+
+.message-box.info {
+    border-left: 6px solid #2563eb;
+    color: #1e3a8a;
+}
+
+.message-box.success {
+    border-left: 6px solid #16a34a;
+    color: #166534;
+}
+
+.message-box.error {
+    border-left: 6px solid #dc2626;
+    color: #991b1b;
+}
+
+.message-box.warning {
+    border-left: 6px solid #f59e0b;
+    color: #92400e;
+}
+
+.preview-section {
+    display: none;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.summary-card {
+    padding: 18px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+}
+
+.summary-card.total {
+    background-color: #eff6ff;
+}
+
+.summary-card.valid {
+    background-color: #f0fdf4;
+}
+
+.summary-card.invalid {
+    background-color: #fef2f2;
+}
+
+.summary-number {
+    display: block;
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.summary-card.total .summary-number {
+    color: #1d4ed8;
+}
+
+.summary-card.valid .summary-number {
+    color: #15803d;
+}
+
+.summary-card.invalid .summary-number {
+    color: #b91c1c;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    margin-top: 15px;
+}
+
+table {
+    width: 100%;
+    min-width: 900px;
+    border-collapse: collapse;
+}
+
+th {
+    background-color: #2563eb;
+    color: white;
+    padding: 11px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+td {
+    padding: 11px;
+    border-bottom: 1px solid #ddd;
+    vertical-align: top;
+}
+
+tr:nth-child(even) {
+    background-color: #f9fafb;
+}
+
+.status-valid {
+    color: #15803d;
+    font-weight: bold;
+}
+
+.status-error {
+    color: #b91c1c;
+    font-weight: bold;
+}
+
+.error-list {
+    color: #b91c1c;
+    line-height: 1.4;
+}
+
+.import-options {
+    margin-top: 20px;
+    padding: 18px;
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+}
+
+.import-options h3 {
+    margin-bottom: 12px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.radio-option input {
+    margin-top: 3px;
+}
+
+.radio-option label {
+    margin: 0;
+    font-weight: normal;
+}
+
+.mobile-preview-note {
+    display: none;
+    color: #64748b;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .header {
+        padding: 16px;
+    }
+
+    .navbar {
+        padding: 12px;
+    }
+
+    .nav-links a {
+        min-width: 75px;
+        padding: 8px;
+    }
+
+    .form-card {
+        padding: 18px;
+    }
+
+    .button-row {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+    }
+
+    .summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-preview-note {
+        display: block;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <h1>Ref Ledger V2.0 Import Officials</h1>
+        <p>Import multiple officials from a CSV file.</p>
+    </div>
+
+    <nav class="navbar">
+        <div class="nav-links">
+            <a href="/">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+            </a>
+
+            <a href="/dashboard">
+                <i class="fa-solid fa-chart-column"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <a href="/reports">
+                <i class="fa-solid fa-file-lines"></i>
+                <span>Reports</span>
+            </a>
+
+            <a href="/games">
+                <i class="fa-solid fa-calendar-days"></i>
+                <span>Games</span>
+            </a>
+
+            <a class="active" href="/officials">
+                <i class="fa-solid fa-users"></i>
+                <span>Officials</span>
+            </a>
+
+            <a href="/associations">
+                <i class="fa-solid fa-building-columns"></i>
+                <span>Associations</span>
+            </a>
+
+            <a href="/sites">
+                <i class="fa-solid fa-location-dot"></i>
+                <span>Sites</span>
+            </a>
+
+            <a href="/expenses">
+                <i class="fa-solid fa-receipt"></i>
+                <span>Expenses</span>
+            </a>
+
+            <a href="/payments">
+                <i class="fa-solid fa-dollar-sign"></i>
+                <span>Payments</span>
+            </a>
+
+            <a href="/gameStatus">
+                <i class="fa-solid fa-rotate"></i>
+                <span>Status</span>
+            </a>
+
+            <a href="/contact">
+                <i class="fa-solid fa-envelope"></i>
+                <span>Contact</span>
+            </a>
+
+            <a href="#" id="logoutBtn">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Logout</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="form-card">
+
+        <h2>Officials CSV Import</h2>
+
+        <p class="description">
+            Download the CSV template, enter the officials, and upload the
+            completed file. The file will be validated before any records are
+            added.
+        </p>
+
+        <div class="instructions">
+            <h3>Import Instructions</h3>
+
+            <ol>
+                <li>Download the Officials CSV template.</li>
+                <li>Open the template in Excel, Google Sheets, or another spreadsheet program.</li>
+                <li>Enter one official per row.</li>
+                <li>Do not change the column headings.</li>
+                <li>Save or export the completed file as CSV.</li>
+                <li>Select the file below and preview it before importing.</li>
+            </ol>
+
+            <div class="template-format">
+                <code>firstName,lastName,phone,email,address</code>
+            </div>
+        </div>
+
+        <div class="button-row">
+            <a
+                href="/api/import/officials/template"
+                class="btn btn-template"
+            >
+                <i class="fa-solid fa-download"></i>
+                Download Officials Template
+            </a>
+        </div>
+
+        <form id="importOfficialsForm">
+
+            <div class="form-group">
+                <label for="csvFile">Officials CSV File</label>
+
+                <input
+                    type="file"
+                    id="csvFile"
+                    name="file"
+                    accept=".csv,text/csv"
+                    required
+                >
+
+                <div id="selectedFile" class="selected-file">
+                    No file selected.
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="submit"
+                    id="previewBtn"
+                    class="btn btn-preview"
+                >
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    Preview Officials
+                </button>
+
+                <button
+                    type="button"
+                    id="clearFileBtn"
+                    class="btn btn-clear"
+                >
+                    <i class="fa-solid fa-eraser"></i>
+                    Clear
+                </button>
+
+                <a href="/officials" class="btn btn-cancel">
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Return to Officials
+                </a>
+            </div>
+
+        </form>
+
+    </div>
+
+    <div class="message-box info" id="message">
+        Select an Officials CSV file to begin.
+    </div>
+
+    <div class="form-card preview-section" id="previewSection">
+
+        <h2>Officials Import Preview</h2>
+
+        <p class="description">
+            Review each official and correct any errors before completing the
+            import.
+        </p>
+
+        <div class="summary-grid">
+
+            <div class="summary-card total">
+                <span class="summary-number" id="totalRows">0</span>
+                Total Rows
+            </div>
+
+            <div class="summary-card valid">
+                <span class="summary-number" id="validRows">0</span>
+                Valid Rows
+            </div>
+
+            <div class="summary-card invalid">
+                <span class="summary-number" id="invalidRows">0</span>
+                Rows With Errors
+            </div>
+
+        </div>
+
+        <p class="mobile-preview-note">
+            Swipe left and right to view all preview columns.
+        </p>
+
+        <div class="table-container">
+            <table id="previewTable">
+
+                <thead>
+                    <tr>
+                        <th>CSV Row</th>
+                        <th>Status</th>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Phone</th>
+                        <th>Email</th>
+                        <th>Address</th>
+                        <th>Errors</th>
+                    </tr>
+                </thead>
+
+                <tbody id="previewTableBody"></tbody>
+
+            </table>
+        </div>
+
+        <div class="import-options">
+
+            <h3>Duplicate Officials</h3>
+
+            <div class="radio-option">
+                <input
+                    type="radio"
+                    id="skipDuplicates"
+                    name="duplicateAction"
+                    value="skip"
+                    checked
+                >
+
+                <label for="skipDuplicates">
+                    Skip officials whose first and last names already exist.
+                </label>
+            </div>
+
+            <div class="radio-option">
+                <input
+                    type="radio"
+                    id="stopOnDuplicate"
+                    name="duplicateAction"
+                    value="stop"
+                >
+
+                <label for="stopOnDuplicate">
+                    Stop the entire import when a duplicate is found.
+                </label>
+            </div>
+
+        </div>
+
+        <div class="button-row">
+
+            <button
+                type="button"
+                id="importBtn"
+                class="btn btn-import"
+                disabled
+            >
+                <i class="fa-solid fa-file-import"></i>
+                Import Valid Officials
+            </button>
+
+            <button
+                type="button"
+                id="clearPreviewBtn"
+                class="btn btn-clear"
+            >
+                <i class="fa-solid fa-xmark"></i>
+                Clear Preview
+            </button>
+
+            <a href="/officials" class="btn btn-cancel">
+                <i class="fa-solid fa-arrow-left"></i>
+                Return to Officials
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+const importOfficialsForm =
+    document.getElementById("importOfficialsForm");
+
+const csvFile =
+    document.getElementById("csvFile");
+
+const selectedFile =
+    document.getElementById("selectedFile");
+
+const previewBtn =
+    document.getElementById("previewBtn");
+
+const importBtn =
+    document.getElementById("importBtn");
+
+const clearFileBtn =
+    document.getElementById("clearFileBtn");
+
+const clearPreviewBtn =
+    document.getElementById("clearPreviewBtn");
+
+const previewSection =
+    document.getElementById("previewSection");
+
+const previewTableBody =
+    document.getElementById("previewTableBody");
+
+const messageBox =
+    document.getElementById("message");
+
+let previewToken = "";
+let validRowCount = 0;
+
+document
+    .getElementById("logoutBtn")
+    .addEventListener("click", async function (event) {
+        event.preventDefault();
+
+        try {
+            const response = await fetch("/api/logout", {
+                method: "POST"
+            });
+
+            if (response.ok) {
+                window.location.href = "/login";
+                return;
+            }
+
+            showMessage("Logout failed.", "error");
+
+        } catch (error) {
+            showMessage("Logout failed. Server unavailable.", "error");
+        }
+    });
+
+csvFile.addEventListener("change", function () {
+    clearPreview();
+
+    if (csvFile.files.length === 0) {
+        selectedFile.textContent = "No file selected.";
+
+        showMessage(
+            "Select an Officials CSV file to begin.",
+            "info"
+        );
+
+        return;
+    }
+
+    const file = csvFile.files[0];
+
+    selectedFile.textContent =
+        file.name + " (" + formatFileSize(file.size) + ")";
+
+    showMessage(
+        "File selected. Select Preview Officials to validate it.",
+        "info"
+    );
+});
+
+clearFileBtn.addEventListener("click", function () {
+    importOfficialsForm.reset();
+
+    selectedFile.textContent = "No file selected.";
+
+    clearPreview();
+
+    showMessage(
+        "File selection and preview cleared.",
+        "info"
+    );
+});
+
+clearPreviewBtn.addEventListener("click", function () {
+    clearPreview();
+
+    showMessage(
+        "Preview cleared. You may select another file or preview the current file again.",
+        "info"
+    );
+});
+
+importOfficialsForm.addEventListener(
+    "submit",
+    async function (event) {
+        event.preventDefault();
+
+        if (csvFile.files.length === 0) {
+            showMessage(
+                "Select an Officials CSV file.",
+                "error"
+            );
+
+            return;
+        }
+
+        const file = csvFile.files[0];
+
+        if (!file.name.toLowerCase().endsWith(".csv")) {
+            showMessage(
+                "The selected file must have a .csv extension.",
+                "error"
+            );
+
+            return;
+        }
+
+        const maximumFileSize = 5 * 1024 * 1024;
+
+        if (file.size > maximumFileSize) {
+            showMessage(
+                "The selected file is too large. The maximum file size is 5 MB.",
+                "error"
+            );
+
+            return;
+        }
+
+        const formData = new FormData();
+
+        formData.append("file", file);
+
+        setPreviewLoading(true);
+
+        clearPreview();
+
+        showMessage(
+            "Validating the Officials CSV file...",
+            "info"
+        );
+
+        try {
+            const response = await fetch(
+                "/api/import/officials/preview",
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+            if (
+                response.status === 401 ||
+                response.redirected
+            ) {
+                window.location.href = "/login";
+                return;
+            }
+
+            if (response.status === 403) {
+                showMessage(
+                    "Permission denied. Read-only users cannot import officials.",
+                    "error"
+                );
+
+                return;
+            }
+
+            const result = await readResponse(response);
+
+            if (!response.ok) {
+                throw new Error(
+                    result.error ||
+                    result.message ||
+                    "Unable to preview the Officials CSV file."
+                );
+            }
+
+            displayPreview(result);
+
+            if (Number(result.invalidRows || 0) > 0) {
+                showMessage(
+                    "Preview complete. Some rows contain errors and will not be imported.",
+                    "warning"
+                );
+            } else {
+                showMessage(
+                    "Preview complete. All rows are valid.",
+                    "success"
+                );
+            }
+
+        } catch (error) {
+            clearPreview();
+
+            showMessage(
+                error.message || "Server unavailable.",
+                "error"
+            );
+
+        } finally {
+            setPreviewLoading(false);
+        }
+    }
+);
+
+importBtn.addEventListener("click", async function () {
+    if (!previewToken) {
+        showMessage(
+            "Preview the Officials CSV file before importing.",
+            "error"
+        );
+
+        return;
+    }
+
+    if (validRowCount === 0) {
+        showMessage(
+            "There are no valid officials to import.",
+            "error"
+        );
+
+        return;
+    }
+
+    const duplicateActionElement =
+        document.querySelector(
+            'input[name="duplicateAction"]:checked'
+        );
+
+    const duplicateAction =
+        duplicateActionElement
+            ? duplicateActionElement.value
+            : "skip";
+
+    importBtn.disabled = true;
+
+    importBtn.innerHTML =
+        '<i class="fa-solid fa-spinner fa-spin"></i> Importing Officials...';
+
+    showMessage(
+        "Importing valid officials...",
+        "info"
+    );
+
+    try {
+        const response = await fetch(
+            "/api/import/officials/commit",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    previewToken: previewToken,
+                    duplicateAction: duplicateAction
+                })
+            }
+        );
+
+        if (
+            response.status === 401 ||
+            response.redirected
+        ) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            showMessage(
+                "Permission denied. Read-only users cannot import officials.",
+                "error"
+            );
+
+            resetImportButton();
+            return;
+        }
+
+        const result = await readResponse(response);
+
+        if (!response.ok) {
+            throw new Error(
+                result.error ||
+                result.message ||
+                "Unable to import officials."
+            );
+        }
+
+        const added = Number(result.added || 0);
+        const skipped = Number(result.skipped || 0);
+        const failed = Number(result.failed || 0);
+
+        showMessage(
+            "Import complete. Added: " +
+            added +
+            ", skipped: " +
+            skipped +
+            ", failed: " +
+            failed +
+            ".",
+            failed > 0 ? "warning" : "success"
+        );
+
+        previewToken = "";
+        validRowCount = 0;
+
+        importBtn.disabled = true;
+
+        importBtn.innerHTML =
+            '<i class="fa-solid fa-check"></i> Import Complete';
+
+    } catch (error) {
+        showMessage(
+            error.message || "Server unavailable.",
+            "error"
+        );
+
+        resetImportButton();
+    }
+});
+
+function displayPreview(result) {
+    const rows =
+        Array.isArray(result.rows)
+            ? result.rows
+            : [];
+
+    previewToken =
+        result.previewToken || "";
+
+    const totalRows =
+        Number(
+            result.totalRows !== undefined
+                ? result.totalRows
+                : rows.length
+        );
+
+    validRowCount =
+        Number(result.validRows || 0);
+
+    const invalidRows =
+        Number(result.invalidRows || 0);
+
+    document.getElementById("totalRows").textContent =
+        totalRows;
+
+    document.getElementById("validRows").textContent =
+        validRowCount;
+
+    document.getElementById("invalidRows").textContent =
+        invalidRows;
+
+    previewTableBody.innerHTML = "";
+
+    rows.forEach(function (row) {
+        const tableRow =
+            document.createElement("tr");
+
+        const data =
+            row.data && typeof row.data === "object"
+                ? row.data
+                : {};
+
+        appendCell(
+            tableRow,
+            row.rowNumber ?? ""
+        );
+
+        const statusCell =
+            document.createElement("td");
+
+        statusCell.textContent =
+            row.valid ? "Valid" : "Error";
+
+        statusCell.className =
+            row.valid
+                ? "status-valid"
+                : "status-error";
+
+        tableRow.appendChild(statusCell);
+
+        appendCell(
+            tableRow,
+            getValue(data, "firstName", "FirstName")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "lastName", "LastName")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "phone", "Phone")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "email", "Email")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "address", "Address")
+        );
+
+        const errorCell =
+            document.createElement("td");
+
+        errorCell.className = "error-list";
+
+        if (Array.isArray(row.errors)) {
+            errorCell.textContent =
+                row.errors.join("; ");
+        } else {
+            errorCell.textContent =
+                row.error || "";
+        }
+
+        tableRow.appendChild(errorCell);
+
+        previewTableBody.appendChild(tableRow);
+    });
+
+    previewSection.style.display = "block";
+
+    importBtn.disabled =
+        !previewToken || validRowCount === 0;
+
+    importBtn.innerHTML =
+        '<i class="fa-solid fa-file-import"></i> Import Valid Officials';
+
+    previewSection.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
+}
+
+function appendCell(row, value) {
+    const cell =
+        document.createElement("td");
+
+    cell.textContent =
+        value === null || value === undefined
+            ? ""
+            : String(value);
+
+    row.appendChild(cell);
+}
+
+function getValue(data, camelCaseName, exportedName) {
+    if (
+        Object.prototype.hasOwnProperty.call(
+            data,
+            camelCaseName
+        )
+    ) {
+        return data[camelCaseName] ?? "";
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(
+            data,
+            exportedName
+        )
+    ) {
+        return data[exportedName] ?? "";
+    }
+
+    return "";
+}
+
+function clearPreview() {
+    previewToken = "";
+    validRowCount = 0;
+
+    document.getElementById("totalRows").textContent =
+        "0";
+
+    document.getElementById("validRows").textContent =
+        "0";
+
+    document.getElementById("invalidRows").textContent =
+        "0";
+
+    previewTableBody.innerHTML = "";
+
+    previewSection.style.display = "none";
+
+    resetImportButton();
+}
+
+function resetImportButton() {
+    importBtn.disabled =
+        !previewToken || validRowCount === 0;
+
+    importBtn.innerHTML =
+        '<i class="fa-solid fa-file-import"></i> Import Valid Officials';
+}
+
+function setPreviewLoading(isLoading) {
+    previewBtn.disabled = isLoading;
+    csvFile.disabled = isLoading;
+    clearFileBtn.disabled = isLoading;
+
+    if (isLoading) {
+        previewBtn.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i> Validating...';
+    } else {
+        previewBtn.innerHTML =
+            '<i class="fa-solid fa-magnifying-glass"></i> Preview Officials';
+    }
+}
+
+function showMessage(text, type) {
+    messageBox.textContent = text;
+    messageBox.className =
+        "message-box " + type;
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024) {
+        return bytes + " bytes";
+    }
+
+    if (bytes < 1024 * 1024) {
+        return (
+            bytes / 1024
+        ).toFixed(1) + " KB";
+    }
+
+    return (
+        bytes / (1024 * 1024)
+    ).toFixed(1) + " MB";
+}
+
+async function readResponse(response) {
+    const contentType =
+        response.headers.get("content-type") || "";
+
+    if (
+        contentType.includes("application/json")
+    ) {
+        return await response.json();
+    }
+
+    const text =
+        await response.text();
+
+    return {
+        message: text
+    };
+}
+</script>
+
+</body>
+</html>

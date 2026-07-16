@@ -387,6 +387,12 @@ func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sites)
 }
 
+func ImportOfficialsPageHandler(w http.ResponseWriter, r *http.Request) {
+
+	http.Error(w, "Not implemented", http.StatusNotImplemented)
+
+}
+
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
@@ -1803,6 +1809,7 @@ func main() {
 	mux.HandleFunc("/api/deleteSite/{siteId}", authRequired(readOnlyForbidden(DeleteSite)))
 	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", authRequired(readOnlyForbidden(DeleteGame)))
 	mux.HandleFunc("/api/deleteOfficial/{firstName}/{lastName}", authRequired(readOnlyForbidden(DeleteOfficial)))
+	mux.HandleFunc("/importOfficials", authRequired(ImportOfficialsPageHandler))
 
 	mux.HandleFunc("/api/officials", authRequired(readOnlyForbidden(CreateOfficial)))
 	mux.HandleFunc("/api/expenses", authRequired(readOnlyForbidden(CreateExpense)))
