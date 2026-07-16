@@ -1,3 +1,4 @@
+values.yaml merge=ours
 *.jpg binary
 *.jpeg binary
 *.png binary
