@@ -528,6 +528,20 @@ type OfficialsPreviewResponse struct {
 	Rows         []OfficialPreviewRow `json:"rows"`
 }
 
+type OfficialsCommitRowResult struct {
+	RowNumber int    `json:"rowNumber"`
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+}
+
+type OfficialsCommitResponse struct {
+	Added   int                        `json:"added"`
+	Skipped int                        `json:"skipped"`
+	Failed  int                        `json:"failed"`
+	Message string                     `json:"message"`
+	Rows    []OfficialsCommitRowResult `json:"rows,omitempty"`
+}
+
 /* This temporary in-memory store is sufficient while Ref Ledger is running as one pod. Important:
 If Kubernetes runs multiple Ref Ledger pods, the preview request and commit request might reach different pods.
 In that case, store previews in MongoDB instead of memory. */
@@ -761,6 +775,15 @@ func saveOfficialsPreview(preview OfficialsImportPreview) {
 	officialsPreviewStore.items[preview.Token] = preview
 }
 
+func deleteOfficialsPreview(token string) {
+
+	officialsPreviewStore.Lock()
+	defer officialsPreviewStore.Unlock()
+
+	delete(officialsPreviewStore.items, token)
+
+}
+
 func removeExpiredOfficialsPreviews() {
 	now := time.Now()
 	officialsPreviewStore.Lock()
@@ -773,6 +796,304 @@ func removeExpiredOfficialsPreviews() {
 			)
 		}
 	}
+}
+
+func getOfficialsPreview(token string) (OfficialsImportPreview, bool) {
+
+	officialsPreviewStore.RLock()
+	defer officialsPreviewStore.RUnlock()
+
+	preview, found := officialsPreviewStore.items[token]
+
+	if !found {
+		return OfficialsImportPreview{}, false
+	}
+
+	// Treat expired previews as missing.
+	if time.Now().After(preview.ExpiresAt) {
+		return OfficialsImportPreview{}, false
+	}
+
+	return preview, true
+}
+
+func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	if r.Method != http.MethodPost {
+		writeJSONError(
+			w,
+			http.StatusMethodNotAllowed,
+			"Method not allowed.",
+		)
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var request struct {
+		PreviewToken    string `json:"previewToken"`
+		DuplicateAction string `json:"duplicateAction"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&request); err != nil {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Invalid request body.",
+		)
+		return
+	}
+
+	request.PreviewToken = strings.TrimSpace(request.PreviewToken)
+	request.DuplicateAction = strings.ToLower(strings.TrimSpace(request.DuplicateAction))
+
+	if request.PreviewToken == "" {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Preview token is required.",
+		)
+		return
+	}
+
+	if request.DuplicateAction == "" {
+		request.DuplicateAction = "skip"
+	}
+
+	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			`Duplicate action must be "skip" or "stop".`,
+		)
+		return
+	}
+
+	preview, found := getOfficialsPreview(request.PreviewToken)
+	if !found {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The import preview was not found or has expired.",
+		)
+		return
+	}
+
+	if preview.TenantID != tId {
+		writeJSONError(
+			w,
+			http.StatusForbidden,
+			"The import preview does not belong to the current tenant.",
+		)
+		return
+	}
+
+	if time.Now().After(preview.ExpiresAt) {
+		deleteOfficialsPreview(request.PreviewToken)
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The import preview has expired. Preview the CSV file again.",
+		)
+		return
+	}
+
+	if oc.Coll == nil {
+		log.Printf("CommitOfficialsImportHandler: officials collection is nil")
+		writeJSONError(
+			w,
+			http.StatusInternalServerError,
+			"Officials collection is not available.",
+		)
+		return
+	}
+
+	added := 0
+	skipped := 0
+	failed := 0
+	rowResults := make([]OfficialsCommitRowResult, 0)
+
+	for _, previewRow := range preview.Rows {
+		if !previewRow.Valid {
+			continue
+		}
+		data := previewRow.Data
+
+		name := data.FirstName + " " + data.LastName
+		exists, err := oc.OfficialExists(name, tId)
+
+		if err != nil {
+			log.Printf(
+				"CommitOfficialsImportHandler: "+"duplicate lookup failed: tenant=%s row=%d official=%s %s error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.FirstName,
+				data.LastName,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				OfficialsCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message:   "Unable to check whether the official already exists.",
+				},
+			)
+			continue
+		}
+
+		if exists {
+			if request.DuplicateAction == "stop" {
+				writeJSON(
+					w,
+					http.StatusConflict,
+					OfficialsCommitResponse{
+						Added:   added,
+						Skipped: skipped,
+						Failed:  failed,
+						Message: fmt.Sprintf(
+							"Import stopped because %s %s already exists.",
+							data.FirstName,
+							data.LastName,
+						),
+						Rows: rowResults,
+					},
+				)
+
+				return
+			}
+
+			skipped++
+
+			rowResults = append(
+				rowResults,
+				OfficialsCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "skipped",
+					Message: fmt.Sprintf(
+						"%s %s already exists.",
+						data.FirstName,
+						data.LastName,
+					),
+				},
+			)
+
+			continue
+
+		}
+
+		official := database.Official{
+			FirstName: data.FirstName,
+			LastName:  data.LastName,
+			Phone:     data.Phone,
+			Email:     data.Email,
+			Address:   data.Address,
+		}
+
+		err = oc.Add(official, tId)
+
+		if err != nil {
+			if mongo.IsDuplicateKeyError(err) {
+				if request.DuplicateAction == "stop" {
+					writeJSON(
+						w,
+						http.StatusConflict,
+						OfficialsCommitResponse{
+							Added:   added,
+							Skipped: skipped,
+							Failed:  failed,
+							Message: fmt.Sprintf(
+								"Import stopped because %s %s already exists.",
+								data.FirstName,
+								data.LastName,
+							),
+							Rows: rowResults,
+						},
+					)
+					return
+				}
+
+				skipped++
+
+				rowResults = append(
+					rowResults,
+					OfficialsCommitRowResult{
+						RowNumber: previewRow.RowNumber,
+						Status:    "skipped",
+						Message: fmt.Sprintf(
+							"%s %s already exists.",
+							data.FirstName,
+							data.LastName,
+						),
+					},
+				)
+
+				continue
+
+			}
+
+			log.Printf(
+				"CommitOfficialsImportHandler: "+"insert failed: tenant=%s row=%d official=%s %s error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.FirstName,
+				data.LastName,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				OfficialsCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message:   "Unable to insert official.",
+				},
+			)
+
+			continue
+		}
+		added++
+		rowResults = append(
+			rowResults,
+			OfficialsCommitRowResult{
+				RowNumber: previewRow.RowNumber,
+				Status:    "added",
+				Message:   fmt.Sprintf("%s %s was added.", data.FirstName, data.LastName),
+			},
+		)
+	}
+
+	deleteOfficialsPreview(request.PreviewToken)
+
+	writeJSON(
+		w,
+		http.StatusOK,
+		OfficialsCommitResponse{
+			Added:   added,
+			Skipped: skipped,
+			Failed:  failed,
+			Message: "Officials import completed.",
+			Rows:    rowResults,
+		},
+	)
 }
 
 func PreviewOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
@@ -2398,6 +2719,7 @@ func main() {
 	mux.HandleFunc("/api/pod", PodInfoHandler)
 
 	mux.HandleFunc("/api/import/officials/preview", authRequired(readOnlyForbidden(PreviewOfficialsImportHandler)))
+	mux.HandleFunc("/api/import/officials/commit", authRequired(readOnlyForbidden(CommitOfficialsImportHandler)))
 
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
