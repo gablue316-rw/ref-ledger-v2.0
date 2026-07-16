@@ -318,7 +318,7 @@ tr:nth-child(even) {
 
                 <button type="button" id="importOfficialsBtn" class="btn btn-import">
                     <i class="fa-solid fa-file-import"></i>
-                    Bulk Import Officials
+                    Import Officials
                 </button>
 
             </div>
@@ -416,7 +416,7 @@ document.getElementById("officialsForm").addEventListener("submit", async functi
                 "Permission denied. Read-only users cannot add or update officials.";
             return;
         }
-        
+
         const message = await response.text();
 
         document.getElementById("message").innerText =

@@ -389,8 +389,20 @@ func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
 
 func ImportOfficialsPageHandler(w http.ResponseWriter, r *http.Request) {
 
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
 
+	http.ServeFile(
+		w,
+		r,
+		"./html/importOfficials.html",
+	)
 }
 
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
