@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"log"
@@ -403,6 +404,85 @@ func ImportOfficialsPageHandler(w http.ResponseWriter, r *http.Request) {
 		r,
 		"./internal/html/importOfficials.html",
 	)
+}
+
+func DownloadOfficialsTemplateHandler(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	// Tell the browser this response is a CSV file download.
+	w.Header().Set(
+		"Content-Type",
+		"text/csv; charset=utf-8",
+	)
+
+	w.Header().Set(
+		"Content-Disposition",
+		`attachment; filename="officials-import-template.csv"`,
+	)
+
+	// Prevent the browser from caching an old template.
+	w.Header().Set(
+		"Cache-Control",
+		"no-store",
+	)
+
+	csvWriter := csv.NewWriter(w)
+
+	// Flush writes any buffered CSV data to the HTTP response.
+	defer csvWriter.Flush()
+
+	headers := []string{
+		"firstName",
+		"lastName",
+		"phone",
+		"email",
+		"address",
+	}
+
+	if err := csvWriter.Write(headers); err != nil {
+		log.Printf(
+			"DownloadOfficialsTemplateHandler: unable to write CSV headers: %v",
+			err,
+		)
+
+		return
+	}
+
+	/*
+		Optional example row.
+
+		This also demonstrates how encoding/csv automatically handles
+		an address containing a comma by surrounding the field with quotes.
+
+		Remove this section if you want the downloaded template to contain
+		only the header row.
+	*/
+	exampleRow := []string{
+		"John",
+		"Smith",
+		"404-555-1212",
+		"john.smith@example.com",
+		"123 Main Street, Suite 200",
+	}
+
+	if err := csvWriter.Write(exampleRow); err != nil {
+		log.Printf(
+			"DownloadOfficialsTemplateHandler: unable to write example row: %v",
+			err,
+		)
+
+		return
+	}
 }
 
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
@@ -1814,6 +1894,7 @@ func main() {
 	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficials)
 	//mux.HandleFunc("/api/deleteAssociation/{assocId}", DeleteAssociation)
 
+	mux.HandleFunc("/api/import/officials/template", authRequired(readOnlyForbidden(DownloadOfficialsTemplateHandler)))
 	mux.HandleFunc("/api/deleteAssociation/{assocId}",
 		authRequired(readOnlyForbidden(DeleteAssociation)))
 
@@ -1821,7 +1902,7 @@ func main() {
 	mux.HandleFunc("/api/deleteSite/{siteId}", authRequired(readOnlyForbidden(DeleteSite)))
 	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", authRequired(readOnlyForbidden(DeleteGame)))
 	mux.HandleFunc("/api/deleteOfficial/{firstName}/{lastName}", authRequired(readOnlyForbidden(DeleteOfficial)))
-	mux.HandleFunc("/importOfficials", authRequired(ImportOfficialsPageHandler))
+	mux.HandleFunc("/importOfficials", authRequired(readOnlyForbidden(ImportOfficialsPageHandler)))
 
 	mux.HandleFunc("/api/officials", authRequired(readOnlyForbidden(CreateOfficial)))
 	mux.HandleFunc("/api/expenses", authRequired(readOnlyForbidden(CreateExpense)))
