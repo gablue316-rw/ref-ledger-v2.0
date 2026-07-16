@@ -178,6 +178,15 @@ input {
     background-color: #6d28d9;
 }
 
+.btn-import {
+    background-color: #0f766e;
+    color: white;
+}
+
+.btn-import:hover {
+    background-color: #115e59;
+}
+
 .message-box {
     background-color: white;
     padding: 15px 20px;
@@ -306,6 +315,12 @@ tr:nth-child(even) {
                 <button type="button" id="directoryBtn" class="btn btn-directory">
                     Official Directory
                 </button>
+
+                <button type="button" id="importOfficialsBtn" class="btn btn-import">
+                    <i class="fa-solid fa-file-import"></i>
+                    Import Officials
+                </button>
+
             </div>
 
         </form>
@@ -340,6 +355,13 @@ tr:nth-child(even) {
 </div>
 
 <script>
+
+document
+    .getElementById("importOfficialsBtn")
+    .addEventListener("click", function () {
+        window.location.href = "/importOfficials";
+    });
+
 document.getElementById("logoutBtn").addEventListener("click", async function (e) {
     e.preventDefault();
 
@@ -390,10 +412,10 @@ document.getElementById("officialsForm").addEventListener("submit", async functi
         }
 
         if (response.status === 403) {
-            messageBox.innerText =
-                "Permission denied. Read-only users cannot enter expenses.";
+            document.getElementById("message").innerText =
+                "Permission denied. Read-only users cannot add or update officials.";
             return;
-        }        
+        }
 
         const message = await response.text();
 
