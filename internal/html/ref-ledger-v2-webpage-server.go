@@ -412,10 +412,61 @@ func ImportOfficialsPageHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
-func DownloadOfficialsTemplateHandler(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
+func ImportAssociationsPageHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	http.ServeFile(
+		w,
+		r,
+		"./internal/html/importAssociations.html",
+	)
+}
+
+func ImportSitesPageHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	http.ServeFile(
+		w,
+		r,
+		"./internal/html/importSites.html",
+	)
+}
+
+func ImportGamesPageHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	http.ServeFile(
+		w,
+		r,
+		"./internal/html/importOfficials.html",
+	)
+}
+
+func DownloadOfficialsTemplateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(
 			w,
@@ -484,6 +535,161 @@ func DownloadOfficialsTemplateHandler(
 	if err := csvWriter.Write(exampleRow); err != nil {
 		log.Printf(
 			"DownloadOfficialsTemplateHandler: unable to write example row: %v",
+			err,
+		)
+
+		return
+	}
+}
+
+func DownloadAssociationsTemplateHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	// Tell the browser this response is a CSV file download.
+	w.Header().Set(
+		"Content-Type",
+		"text/csv; charset=utf-8",
+	)
+
+	w.Header().Set(
+		"Content-Disposition",
+		`attachment; filename="associations-import-template.csv"`,
+	)
+
+	// Prevent the browser from caching an old template.
+	w.Header().Set(
+		"Cache-Control",
+		"no-store",
+	)
+
+	csvWriter := csv.NewWriter(w)
+
+	// Flush writes any buffered CSV data to the HTTP response.
+	defer csvWriter.Flush()
+
+	headers := []string{
+		"associationId",
+		"associationName",
+		"contactName",
+		"contactNumber",
+		"contactEmail",
+		"assignors(comma-separated)",
+	}
+
+	if err := csvWriter.Write(headers); err != nil {
+		log.Printf(
+			"DownloadAssociationsTemplateHandler: unable to write CSV headers: %v",
+			err,
+		)
+
+		return
+	}
+
+	/*
+		Optional example row.
+
+		This also demonstrates how encoding/csv automatically handles
+		an address containing a comma by surrounding the field with quotes.
+
+		Remove this section if you want the downloaded template to contain
+		only the header row.
+	*/
+	exampleRow := []string{
+		"MCBOA",
+		"Multi County Basketball Officials Association",
+		"John Smith",
+		"404-555-1212",
+		"john.smith@example.com",
+		"John Smith, Jane Doe",
+	}
+
+	if err := csvWriter.Write(exampleRow); err != nil {
+		log.Printf(
+			"DownloadAssociationsTemplateHandler: unable to write example row: %v",
+			err,
+		)
+
+		return
+	}
+}
+
+func DownloadSitesTemplateHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	// Tell the browser this response is a CSV file download.
+	w.Header().Set(
+		"Content-Type",
+		"text/csv; charset=utf-8",
+	)
+
+	w.Header().Set(
+		"Content-Disposition",
+		`attachment; filename="sites-import-template.csv"`,
+	)
+
+	// Prevent the browser from caching an old template.
+	w.Header().Set(
+		"Cache-Control",
+		"no-store",
+	)
+
+	csvWriter := csv.NewWriter(w)
+
+	// Flush writes any buffered CSV data to the HTTP response.
+	defer csvWriter.Flush()
+
+	headers := []string{
+		"siteId",
+		"siteName",
+		"contactName",
+		"contactNumber",
+		"contactEmail",
+	}
+
+	if err := csvWriter.Write(headers); err != nil {
+		log.Printf(
+			"DownloadSitesTemplateHandler: unable to write CSV headers: %v",
+			err,
+		)
+
+		return
+	}
+
+	/*
+		Optional example row.
+
+		This also demonstrates how encoding/csv automatically handles
+		an address containing a comma by surrounding the field with quotes.
+
+		Remove this section if you want the downloaded template to contain
+		only the header row.
+	*/
+	exampleRow := []string{
+		"ALBI",
+		"Al Bishop Softball Complex",
+		"John Smith",
+		"404-555-1212",
+		"john.smith@example.com",
+	}
+
+	if err := csvWriter.Write(exampleRow); err != nil {
+		log.Printf(
+			"DownloadSitesTemplateHandler: unable to write example row: %v",
 			err,
 		)
 
@@ -2742,6 +2948,9 @@ func main() {
 	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", authRequired(readOnlyForbidden(DeleteGame)))
 	mux.HandleFunc("/api/deleteOfficial/{firstName}/{lastName}", authRequired(readOnlyForbidden(DeleteOfficial)))
 	mux.HandleFunc("/importOfficials", authRequired(readOnlyForbidden(ImportOfficialsPageHandler)))
+	mux.HandleFunc("/importAssociations", authRequired(readOnlyForbidden(ImportAssociationsPageHandler)))
+	mux.HandleFunc("/importGames", authRequired(readOnlyForbidden(ImportGamesPageHandler)))
+	mux.HandleFunc("/importSites", authRequired(readOnlyForbidden(ImportSitesPageHandler)))
 
 	mux.HandleFunc("/api/officials", authRequired(readOnlyForbidden(CreateOfficial)))
 	mux.HandleFunc("/api/expenses", authRequired(readOnlyForbidden(CreateExpense)))
