@@ -1,0 +1,30 @@
+##
+## Run these in PowerShell Window when running Ref Ledger as a standalone (non-containerized) image.
+##
+[System.Environment]::SetEnvironmentVariable(
+    "MONGODB_URI",
+    "mongodb://localhost:27017",
+    "User"
+)
+
+[System.Environment]::SetEnvironmentVariable(
+    "LOG_FILE_PATH",
+    "./logs/ref-ledgerV2-webServer.log",
+    "User"
+)
+
+##
+## For container use the following, if you are not using the values.yaml file
+##
+
+[System.Environment]::SetEnvironmentVariable(
+    "MONGODB_URI",
+    "mongodb://host.docker.internal:27017",
+    "User"
+)
+
+[System.Environment]::SetEnvironmentVariable(
+    "LOG_FILE_PATH",
+    "/root/logs/ref-ledgerV2-webServer.log",
+    "User"
+)

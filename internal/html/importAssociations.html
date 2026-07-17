@@ -1113,29 +1113,34 @@ function displayPreview(result) {
 
         appendCell(
             tableRow,
-            getValue(data, "firstName", "FirstName")
+            getValue(data, "associationId", "AssociationId")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "lastName", "LastName")
+            getValue(data, "associationName", "AssociationName")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "phone", "Phone")
+            getValue(data, "contactName", "ContactName")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "email", "Email")
+            getValue(data, "contactNumber", "ContactNumber")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "address", "Address")
+            getValue(data, "contactEmail", "ContactEmail")
         );
 
+        appendCell(
+            tableRow,
+            getValue(data, "assignors", "Assignors")
+        );        
+        
         const errorCell =
             document.createElement("td");
 

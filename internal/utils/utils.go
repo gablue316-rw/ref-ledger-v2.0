@@ -16,14 +16,45 @@ import (
 var UtilsVersion string = "ref-ledger-models-v2.1.0"
 var layout string = "1/2/2006"
 
-var logFileFullPathName = "/root/logs/ref-ledgerV2-webServer.log"
+/* Log file paths for standalone and containerized deployments */
+/* Use standalone when running Ref Ledger outside of a Docker container, and use container when running Ref Ledger inside a Docker container. */
+
+/* Check environment_variables.txt for the environment variables that must be set for Ref Ledger to run properly. */
+var logFileFullPathName string = ""
+
 var AuditLog *log.Logger = nil
+
+func GetLogFilePath() string {
+
+	fmt.Println("Getting log file path from environment variable LOG_FILE_PATH...")
+	logFilePath := os.Getenv("LOG_FILE_PATH")
+	if logFilePath == "" {
+		log.Fatal("LOG_FILE_PATH environment variable is not set")
+	}
+
+	fmt.Println("Log file path:", logFilePath)
+	return logFilePath
+}
+
+func GetMongoURI() string {
+
+	fmt.Println("Getting MongoDB URI from environment variable MONGODB_URI...")
+	uri := os.Getenv("MONGODB_URI")
+	if uri == "" {
+		log.Fatal("MONGODB_URI environment variable is not set")
+	}
+
+	fmt.Println("MongoDB URI:", uri)
+	return uri
+}
 
 func InitLogging() error {
 
 	if AuditLog != nil {
 		return nil
 	}
+
+	logFileFullPathName = GetLogFilePath()
 
 	logFile, err := os.OpenFile(
 		logFileFullPathName,
