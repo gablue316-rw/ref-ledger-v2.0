@@ -196,6 +196,14 @@
             background-color: #b91c1c;
         }
 
+        .btn-import {
+            background-color: #0f766e;
+            color: white;
+        }
+
+        .btn-import:hover {
+            background-color: #115e59;
+        }
  
         .message-box {
             background-color: white;
@@ -432,6 +440,12 @@
                    Association Directory
                 </button>
 
+                <button type="button" id="importAssociationsBtn" class="btn btn-import">
+                    <i class="fa-solid fa-file-import"></i>
+                    Import Associations
+                </button>
+
+
             </div>
 
         </form>
@@ -463,6 +477,12 @@
 </div>
 
 <script>
+
+document
+    .getElementById("importAssociationsBtn")
+    .addEventListener("click", function () {
+        window.location.href = "/importAssociations";
+    });
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
 

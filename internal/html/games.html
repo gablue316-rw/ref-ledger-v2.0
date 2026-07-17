@@ -93,6 +93,15 @@ body{background:#f4f6f9;padding:20px;color:#333;}
     background:#1d4ed8;
 }
 
+.btn-import {
+    background-color: #0f766e;
+    color: white;
+}
+
+.btn-import:hover {
+    background-color: #115e59;
+}
+
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -280,7 +289,12 @@ body{padding:10px;}
     <button type="button" id="getGameBtn" class="btn btn-get">Get Game</button>
     <button type="submit" class="btn btn-save">Save Game</button>
     <button type="button" id="clearBtn" class="btn btn-clear">Clear Form</button>
-    <button type="button" id="deleteBtn" class="btn btn-delete">Delete Game</button>
+    <button type="button" id="deleteBtn" class="btn btn-delete">Delete Game</button> 
+    <button type="button" id="importGamesBtn" class="btn btn-import">
+       <i class="fa-solid fa-file-import"></i>
+          Import Games
+    </button>
+
 </div>
 
 <div class="message-box" id="message">
@@ -290,6 +304,13 @@ body{padding:10px;}
 </div>
 
 <script>
+
+document
+    .getElementById("importGamesBtn")
+    .addEventListener("click", function () {
+        window.location.href = "/importGames";
+    });
+
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
 

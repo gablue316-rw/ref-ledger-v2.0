@@ -200,6 +200,15 @@
             color: white;
         }
 
+        .btn-import {
+            background-color: #0f766e;
+            color: white;
+        }
+
+        .btn-import:hover {
+            background-color: #115e59;
+        }        
+
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -403,6 +412,11 @@
                     Site Directory
                 </button>                       
 
+                <button type="button" id="importSitesBtn" class="btn btn-import">
+                    <i class="fa-solid fa-file-import"></i>
+                    Import Sites
+                </button>
+
             </div>
 
         </form>
@@ -439,6 +453,12 @@
 </div>
 
 <script>
+
+document
+    .getElementById("importSitesBtn")
+    .addEventListener("click", function () {
+        window.location.href = "/importSites";
+    });
 
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
