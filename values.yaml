@@ -9,7 +9,7 @@ autoscaling:
   
 image:
   repository: gablue316/ref-ledger
-  tag: dev-v1.89
+  tag: dev-v1.92
   pullPolicy: Always
 
 service:
