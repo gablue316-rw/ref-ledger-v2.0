@@ -385,7 +385,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("Referee=", ref)
 	if ref != "Unassigned" {
-		results, err := oc.OfficialExists(ref, tId)
+		results, err := oc.Exists(ref, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "Referee", ref)
 		}
@@ -393,7 +393,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("U1=", u1)
 	if u1 != "Unassigned" {
-		results, err := oc.OfficialExists(u1, tId)
+		results, err := oc.Exists(u1, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "U1", u1)
 		}
@@ -401,7 +401,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("U2=", u2)
 	if u2 != "Unassigned" {
-		results, err := oc.OfficialExists(u2, tId)
+		results, err := oc.Exists(u2, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "U2", u2)
 		}
@@ -409,7 +409,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	fmt.Println("ECO=", eco)
 	if eco != "Unassigned" {
-		results, err := oc.OfficialExists(eco, tId)
+		results, err := oc.Exists(eco, tId)
 		if !results || err != nil {
 			return fmt.Errorf(errorFormat, "ECO", eco)
 		}
@@ -506,7 +506,7 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 
 		exists := slices.Contains(officialFields, field)
 		if exists {
-			found, err := oc.OfficialExists(value, tId)
+			found, err := oc.Exists(value, tId)
 			if !found || err != nil {
 				return fmt.Errorf("Failed to find %s %s.  Reason: %s", field, value, err)
 			}

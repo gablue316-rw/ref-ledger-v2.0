@@ -464,7 +464,7 @@ func ImportGamesPageHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(
 		w,
 		r,
-		"./internal/html/importOfficials.html",
+		"./internal/html/importGames.html",
 	)
 }
 
@@ -623,6 +623,113 @@ func DownloadAssociationsTemplateHandler(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	// Tell the browser this response is a CSV file download.
+	w.Header().Set(
+		"Content-Type",
+		"text/csv; charset=utf-8",
+	)
+
+	w.Header().Set(
+		"Content-Disposition",
+		`attachment; filename="games-import-template.csv"`,
+	)
+
+	// Prevent the browser from caching an old template.
+	w.Header().Set(
+		"Cache-Control",
+		"no-store",
+	)
+
+	csvWriter := csv.NewWriter(w)
+
+	// Flush writes any buffered CSV data to the HTTP response.
+	defer csvWriter.Flush()
+
+	headers := []string{
+		"gameId",
+		"date",
+		"time",
+		"sport",
+		"site",
+		"field",
+		"numOfGames",
+		"level",
+		"gameFee",
+		"travelPay",
+		"assignorFee",
+		"deductions",
+		"association",
+		"status",
+		"referee",
+		"u1",
+		"u2",
+		"eco",
+		"assignor",
+	}
+
+	if err := csvWriter.Write(headers); err != nil {
+		log.Printf(
+			"DownloadGamesTemplateHandler: unable to write CSV headers: %v",
+			err,
+		)
+
+		return
+	}
+
+	/*
+		Optional example row.
+
+		This also demonstrates how encoding/csv automatically handles
+		an address containing a comma by surrounding the field with quotes.
+
+		Remove this section if you want the downloaded template to contain
+		only the header row.
+	*/
+
+	exampleRow := []string{
+		"777",
+		"10/1/2026",
+		"7:00 PM",
+		"Softball",
+		"Mill Creek High School",
+		"Softball Field",
+		"1",
+		"Varsity",
+		"$50.00",
+		"$25.00",
+		"$10.00",
+		"$5.00",
+		"MSO",
+		"Pending",
+		"John Doe",
+		"Jane Smith",
+		"Bob Johnson",
+		"Alice Brown",
+		"Charlie Davis",
+	}
+
+	if err := csvWriter.Write(exampleRow); err != nil {
+		log.Printf(
+			"DownloadGamesTemplateHandler: unable to write example row: %v",
+			err,
+		)
+
+		return
+	}
+
+}
+
 func DownloadSitesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(
@@ -704,6 +811,65 @@ const fiveMB = 5 * oneMB
 const maxCSVSize = fiveMB
 const maxCSVRows = 1000
 const previewExpiration = 15 * time.Minute
+
+type GameImportData struct {
+	GameId      int64  `json:"gameId"`
+	Date        string `json:"date"`
+	Time        string `json:"time"`
+	Sport       string `json:"sport"`
+	Site        string `json:"site"`
+	Field       string `json:"field"`
+	NumOfGames  int64  `json:"numOfGames"`
+	Level       string `json:"level"`
+	GameFee     string `json:"gameFee"`
+	TravelPay   string `json:"travelPay"`
+	AssignorFee string `json:"assignorFee"`
+	Deductions  string `json:"deductions"`
+	Association string `json:"association"`
+	Status      string `json:"status"`
+	Referee     string `json:"referee"`
+	U1          string `json:"u1"`
+	U2          string `json:"u2"`
+	ECO         string `json:"eco"`
+	Assignor    string `json:"assignor"`
+}
+
+type GamePreviewRow struct {
+	RowNumber int            `json:"rowNumber"`
+	Valid     bool           `json:"valid"`
+	Data      GameImportData `json:"data"`
+	Errors    []string       `json:"errors"`
+}
+
+type GamesImportPreview struct {
+	Token     string
+	TenantID  string
+	Rows      []GamePreviewRow
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+type GamesPreviewResponse struct {
+	PreviewToken string           `json:"previewToken"`
+	TotalRows    int              `json:"totalRows"`
+	ValidRows    int              `json:"validRows"`
+	InvalidRows  int              `json:"invalidRows"`
+	Rows         []GamePreviewRow `json:"rows"`
+}
+
+type GamesCommitRowResult struct {
+	RowNumber int    `json:"rowNumber"`
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+}
+
+type GamesCommitResponse struct {
+	Added   int                    `json:"added"`
+	Skipped int                    `json:"skipped"`
+	Failed  int                    `json:"failed"`
+	Message string                 `json:"message"`
+	Rows    []GamesCommitRowResult `json:"rows,omitempty"`
+}
 
 type OfficialImportData struct {
 	FirstName string `json:"firstName" bson:"firstName"`
@@ -866,6 +1032,13 @@ var sitesPreviewStore = struct {
 	items: make(map[string]SitesImportPreview),
 }
 
+var gamesPreviewStore = struct {
+	sync.RWMutex
+	items map[string]GamesImportPreview
+}{
+	items: make(map[string]GamesImportPreview),
+}
+
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -981,6 +1154,51 @@ func validateSitesCSVHeader(header []string) error {
 
 }
 
+func validateGamesCSVHeader(header []string) error {
+
+	expected := []string{
+		"gameid",
+		"date",
+		"time",
+		"sport",
+		"site",
+		"field",
+		"numofgames",
+		"level",
+		"gamefee",
+		"travelpay",
+		"assignorfee",
+		"deductions",
+		"association",
+		"status",
+		"referee",
+		"u1",
+		"u2",
+		"eco",
+		"assignor",
+	}
+
+	if len(header) != len(expected) {
+		return fmt.Errorf("invalid CSV header: expected %d columns but found %d",
+			len(expected),
+			len(header))
+	}
+
+	for i := range header {
+		actualName := normalizeHeaderName(header[i])
+		if actualName != expected[i] {
+			return fmt.Errorf(
+				"invalid CSV header in column %d: expected %q but found %q",
+				i+1,
+				expected[i],
+				strings.TrimSpace(header[i]),
+			)
+		}
+	}
+
+	return nil
+}
+
 func validateOfficialsCSVHeader(header []string) error {
 
 	expected := []string{
@@ -1044,6 +1262,139 @@ func normalizeOfficialName(firstName string, lastName string) string {
 
 func normalizeSiteId(siteId string) string {
 	return strings.ToLower(strings.TrimSpace(siteId))
+}
+
+func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreviewRow {
+
+	row := GamePreviewRow{
+		RowNumber: rowNumber,
+		Valid:     false,
+		Errors:    make([]string, 0),
+	}
+
+	// Need to convert the first column to int64 for GameId and NumOfGames
+	gameId, _ := strconv.ParseInt(csvColumn(record, 0), 10, 64)
+	numOfGames, _ := strconv.ParseInt(csvColumn(record, 6), 10, 64)
+
+	if len(record) != 19 {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Expected 19 columns but found %d",
+				len(record),
+			),
+		)
+
+		/* Still copy any available values so the user can see what was read from the CSV. */
+
+		row.Data = GameImportData{
+			GameId:      gameId,
+			Date:        csvColumn(record, 1),
+			Time:        csvColumn(record, 2),
+			Sport:       csvColumn(record, 3),
+			Site:        csvColumn(record, 4),
+			Field:       csvColumn(record, 5),
+			NumOfGames:  numOfGames,
+			Level:       csvColumn(record, 7),
+			GameFee:     csvColumn(record, 8),
+			TravelPay:   csvColumn(record, 9),
+			AssignorFee: csvColumn(record, 10),
+			Deductions:  csvColumn(record, 11),
+			Association: csvColumn(record, 12),
+			Status:      csvColumn(record, 13),
+			Referee:     csvColumn(record, 14),
+			U1:          csvColumn(record, 15),
+			U2:          csvColumn(record, 16),
+			ECO:         csvColumn(record, 17),
+			Assignor:    csvColumn(record, 18),
+		}
+		return row
+	}
+
+	row.Data = GameImportData{
+		GameId:      gameId,
+		Date:        csvColumn(record, 1),
+		Time:        csvColumn(record, 2),
+		Sport:       csvColumn(record, 3),
+		Site:        csvColumn(record, 4),
+		Field:       csvColumn(record, 5),
+		NumOfGames:  numOfGames,
+		Level:       csvColumn(record, 7),
+		GameFee:     csvColumn(record, 8),
+		TravelPay:   csvColumn(record, 9),
+		AssignorFee: csvColumn(record, 10),
+		Deductions:  csvColumn(record, 11),
+		Association: csvColumn(record, 12),
+		Status:      csvColumn(record, 13),
+		Referee:     csvColumn(record, 14),
+		U1:          csvColumn(record, 15),
+		U2:          csvColumn(record, 16),
+		ECO:         csvColumn(record, 17),
+		Assignor:    csvColumn(record, 18),
+	}
+
+	// Validate fields
+
+	_, err := sc.GetSiteId(row.Data.Site, tId)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf("Error occurred while fetching site ID: %v", err),
+		)
+	}
+
+	_, err = ac.Exists(row.Data.Association, tId)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf("Error occurred while fetching association ID: %v", err),
+		)
+	}
+
+	_, err = oc.Exists(row.Data.Referee, tId)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf("Error occurred while fetching referee: %v", err),
+		)
+	}
+
+	_, err = oc.Exists(row.Data.U1, tId)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf("Error occurred while fetching U1: %v", err),
+		)
+	}
+
+	_, err = oc.Exists(row.Data.U2, tId)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf("Error occurred while fetching U2: %v", err),
+		)
+	}
+
+	_, err = oc.Exists(row.Data.ECO, tId)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf("Error occurred while fetching ECO: %v", err),
+		)
+	}
+
+	_, err = ac.AssignorExists(row.Data.Assignor, tId, row.Data.Association)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf("Error occurred while fetching Assignor: %v", err),
+		)
+	}
+
+	row.Valid = len(row.Errors) == 0
+
+	return row
+
 }
 
 func buildOfficialPreviewRow(rowNumber int, record []string) OfficialPreviewRow {
@@ -1353,6 +1704,16 @@ func saveSitesPreview(preview SitesImportPreview) {
 	sitesPreviewStore.items[preview.Token] = preview
 }
 
+func saveGamesPreview(preview GamesImportPreview) {
+
+	fmt.Println("Saving Games Preview", preview, "with Token:", preview.Token)
+	gamesPreviewStore.Lock()
+
+	defer gamesPreviewStore.Unlock()
+
+	gamesPreviewStore.items[preview.Token] = preview
+}
+
 func deleteOfficialsPreview(token string) {
 
 	officialsPreviewStore.Lock()
@@ -1388,6 +1749,20 @@ func removeExpiredOfficialsPreviews() {
 		if now.After(preview.ExpiresAt) {
 			delete(
 				officialsPreviewStore.items,
+				token,
+			)
+		}
+	}
+}
+
+func removeExpiredGamesPreviews() {
+	now := time.Now()
+	gamesPreviewStore.Lock()
+	defer gamesPreviewStore.Unlock()
+	for token, preview := range gamesPreviewStore.items {
+		if now.After(preview.ExpiresAt) {
+			delete(
+				gamesPreviewStore.items,
 				token,
 			)
 		}
@@ -1869,7 +2244,7 @@ func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 		data := previewRow.Data
 
 		name := data.FirstName + " " + data.LastName
-		exists, err := oc.OfficialExists(name, tId)
+		exists, err := oc.Exists(name, tId)
 
 		if err != nil {
 			log.Printf(
@@ -2747,6 +3122,229 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	fmt.Println("Previewing games import...")
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+(oneMB))
+
+	if err := r.ParseMultipartForm(maxCSVSize); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "The CSV upload is invalid or exceeds the 5 MB limit.")
+		return
+	}
+
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "A Games CSV file is required.")
+		return
+	}
+
+	defer file.Close()
+
+	if err := validateCSVFile(fileHeader); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	csvReader := csv.NewReader(file)
+
+	/* Allow variable-length records so we can report a useful row-level error instead of stopping immediately. */
+	csvReader.FieldsPerRecord = -1
+
+	/* This trims spaces that appear outside quoted CSV values. For example: John, Smith is treated similarly to: John,Smith */
+	csvReader.TrimLeadingSpace = true
+
+	header, err := csvReader.Read()
+	if err == io.EOF {
+		writeJSONError(w, http.StatusBadRequest, "The CSV file is empty.")
+		return
+	}
+
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Unable to read the CSV header: "+err.Error())
+		return
+	}
+
+	if err := validateGamesCSVHeader(header); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	rows := make([]GamePreviewRow, 0)
+
+	/* Used to detect duplicates inside the uploaded CSV file. */
+	gamesInFile := make(map[int64]int)
+	csvRowNumber := 1
+
+	for {
+		record, readErr := csvReader.Read()
+
+		if readErr == io.EOF {
+			break
+		}
+
+		csvRowNumber++
+		if len(rows) >= maxCSVRows {
+			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("The CSV file contains more than %d data rows.", maxCSVRows))
+			return
+		}
+
+		if readErr != nil {
+			rows = append(
+				rows,
+				GamePreviewRow{
+					RowNumber: csvRowNumber,
+					Valid:     false,
+					Data:      GameImportData{},
+					Errors: []string{
+						"Unable to parse CSV row: " + readErr.Error(),
+					},
+				},
+			)
+			/* Some CSV syntax errors leave the reader unable to continue reliably. Stop after recording the error. */
+			break
+		}
+
+		if isBlankCSVRecord(record) {
+			continue
+		}
+
+		previewRow := buildGamePreviewRow(
+			csvRowNumber,
+			record,
+			tId,
+		)
+
+		gameId := previewRow.Data.GameId
+
+		if gameId != 0 {
+			if _, found := gamesInFile[gameId]; found {
+				previewRow.Errors = append(
+					previewRow.Errors,
+					fmt.Sprintf(
+						"Duplicate game in CSV file; first appeared on row %d",
+						gamesInFile[gameId],
+					),
+				)
+			} else {
+				gamesInFile[gameId] = csvRowNumber
+			}
+		}
+
+		previewRow.Valid = len(previewRow.Errors) == 0
+
+		rows = append(rows, previewRow)
+	}
+
+	if len(rows) == 0 {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The CSV file does not contain any games.",
+		)
+		return
+	}
+
+	/* Check MongoDB for officials that already exist. This only runs for rows that passed the basic CSV validation. */
+
+	for i := range rows {
+		if !rows[i].Valid {
+			continue
+		}
+
+		fmt.Println("Checking if game exists in database: ", rows[i].Data.GameId)
+		exists, err := gc.Exists(rows[i].Data.Association, utils.ConvertInt64ToStr(rows[i].Data.GameId), tId)
+		if err != nil {
+			log.Printf(
+				"PreviewGamesImportHandler: duplicate lookup failed for tenant %s, game %d: %v",
+				tId,
+				rows[i].Data.GameId,
+				err,
+			)
+			writeJSONError(
+				w,
+				http.StatusInternalServerError,
+				"Unable to validate games against the database.",
+			)
+			fmt.Println("Error occurred while checking game existence: ", err)
+		}
+
+		if exists {
+			rows[i].Errors = append(
+				rows[i].Errors,
+				"Game already exists",
+			)
+			rows[i].Valid = false
+		}
+	}
+
+	validRows := 0
+	invalidRows := 0
+
+	for _, row := range rows {
+		if row.Valid {
+			validRows++
+		} else {
+			invalidRows++
+		}
+	}
+
+	previewToken, err := generatePreviewToken()
+	if err != nil {
+		log.Printf(
+			"PreviewGamesImportHandler: unable to generate preview token: %v",
+			err,
+		)
+		writeJSONError(
+			w,
+			http.StatusInternalServerError,
+			"Unable to create the import preview.",
+		)
+		return
+	}
+
+	now := time.Now()
+	preview := GamesImportPreview{
+		Token:     previewToken,
+		TenantID:  tId,
+		Rows:      rows,
+		CreatedAt: now,
+		ExpiresAt: now.Add(previewExpiration),
+	}
+
+	saveGamesPreview(preview)
+	removeExpiredGamesPreviews()
+
+	response := GamesPreviewResponse{
+		PreviewToken: previewToken,
+		TotalRows:    len(rows),
+		ValidRows:    validRows,
+		InvalidRows:  invalidRows,
+		Rows:         rows,
+	}
+
+	writeJSON(w, http.StatusOK, response)
+
+}
+
 func PreviewOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 
 	var tId string = database.TenantId
@@ -2897,7 +3495,7 @@ func PreviewOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 
 		name := rows[i].Data.FirstName + " " + rows[i].Data.LastName
 
-		exists, err := oc.OfficialExists(name, tId)
+		exists, err := oc.Exists(name, tId)
 
 		if err != nil {
 			log.Printf(
@@ -4380,6 +4978,9 @@ func main() {
 	mux.HandleFunc("/api/import/sites/preview", authRequired(readOnlyForbidden(PreviewSitesImportHandler)))
 	mux.HandleFunc("/api/import/sites/commit", authRequired(readOnlyForbidden(CommitSitesImportHandler)))
 
+	mux.HandleFunc("/api/import/games/preview", authRequired(readOnlyForbidden(PreviewGamesImportHandler)))
+	//mux.HandleFunc("/api/import/games/commit", authRequired(readOnlyForbidden(CommitGamesImportHandler)))
+
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
@@ -4395,6 +4996,8 @@ func main() {
 	mux.HandleFunc("/api/import/officials/template", authRequired(readOnlyForbidden(DownloadOfficialsTemplateHandler)))
 	mux.HandleFunc("/api/import/associations/template", authRequired(readOnlyForbidden(DownloadAssociationsTemplateHandler)))
 	mux.HandleFunc("/api/import/sites/template", authRequired(readOnlyForbidden(DownloadSitesTemplateHandler)))
+	mux.HandleFunc("/api/import/games/template", authRequired(readOnlyForbidden(DownloadGamesTemplateHandler)))
+
 	mux.HandleFunc("/api/deleteAssociation/{assocId}",
 		authRequired(readOnlyForbidden(DeleteAssociation)))
 
