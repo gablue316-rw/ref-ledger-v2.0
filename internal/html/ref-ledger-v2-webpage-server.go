@@ -47,6 +47,7 @@ import (
 var Client *mongo.Client
 var uri string
 
+/* July 18, 2026 */
 type Game struct {
 	Association string  `json:"association"`
 	GameId      int     `json:"gameId"`
