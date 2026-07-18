@@ -796,6 +796,51 @@ type AssociationsCommitResponse struct {
 	Rows    []AssociationsCommitRowResult `json:"rows,omitempty"`
 }
 
+type SiteImportData struct {
+	SiteId        string `json:"siteId" bson:"siteId"`
+	SiteName      string `json:"siteName" bson:"siteName"`
+	ContactName   string `json:"contactName" bson:"contactName"`
+	ContactNumber string `json:"contactNumber" bson:"contactNumber"`
+	ContactEmail  string `json:"contactEmail" bson:"contactEmail"`
+}
+
+type SitePreviewRow struct {
+	RowNumber int            `json:"rowNumber"`
+	Valid     bool           `json:"valid"`
+	Data      SiteImportData `json:"data"`
+	Errors    []string       `json:"errors"`
+}
+
+type SitesImportPreview struct {
+	Token     string
+	TenantID  string
+	Rows      []SitePreviewRow
+	CreatedAt time.Time
+	ExpiresAt time.Time
+}
+
+type SitesPreviewResponse struct {
+	PreviewToken string           `json:"previewToken"`
+	TotalRows    int              `json:"totalRows"`
+	ValidRows    int              `json:"validRows"`
+	InvalidRows  int              `json:"invalidRows"`
+	Rows         []SitePreviewRow `json:"rows"`
+}
+
+type SitesCommitRowResult struct {
+	RowNumber int    `json:"rowNumber"`
+	Status    string `json:"status"`
+	Message   string `json:"message"`
+}
+
+type SitesCommitResponse struct {
+	Added   int                    `json:"added"`
+	Skipped int                    `json:"skipped"`
+	Failed  int                    `json:"failed"`
+	Message string                 `json:"message"`
+	Rows    []SitesCommitRowResult `json:"rows,omitempty"`
+}
+
 /* This temporary in-memory store is sufficient while Ref Ledger is running as one pod. Important:
 If Kubernetes runs multiple Ref Ledger pods, the preview request and commit request might reach different pods.
 In that case, store previews in MongoDB instead of memory. */
@@ -812,6 +857,13 @@ var associationsPreviewStore = struct {
 	items map[string]AssociationsImportPreview
 }{
 	items: make(map[string]AssociationsImportPreview),
+}
+
+var sitesPreviewStore = struct {
+	sync.RWMutex
+	items map[string]SitesImportPreview
+}{
+	items: make(map[string]SitesImportPreview),
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
@@ -895,6 +947,40 @@ func validateAssociationsCSVHeader(header []string) error {
 
 	return nil
 }
+
+func validateSitesCSVHeader(header []string) error {
+
+	expected := []string{
+		"siteid",
+		"sitename",
+		"contactname",
+		"contactnumber",
+		"contactemail",
+	}
+
+	if len(header) != len(expected) {
+		return fmt.Errorf("invalid CSV header: expected %d columns but found %d",
+			len(expected),
+			len(header))
+	}
+
+	for i := range header {
+		actualName := normalizeHeaderName(header[i])
+		expectedName := normalizeHeaderName(expected[i])
+		if actualName != expectedName {
+			return fmt.Errorf(
+				"invalid CSV header in column %d: expected %q but found %q",
+				i+1,
+				expectedName,
+				actualName,
+			)
+		}
+	}
+
+	return nil
+
+}
+
 func validateOfficialsCSVHeader(header []string) error {
 
 	expected := []string{
@@ -954,6 +1040,10 @@ func normalizeAssociationId(associationId string) string {
 func normalizeOfficialName(firstName string, lastName string) string {
 
 	return strings.ToLower(strings.TrimSpace(firstName)) + "|" + strings.ToLower(strings.TrimSpace(lastName))
+}
+
+func normalizeSiteId(siteId string) string {
+	return strings.ToLower(strings.TrimSpace(siteId))
 }
 
 func buildOfficialPreviewRow(rowNumber int, record []string) OfficialPreviewRow {
@@ -1042,6 +1132,97 @@ func buildOfficialPreviewRow(rowNumber int, record []string) OfficialPreviewRow 
 			row.Errors = append(
 				row.Errors,
 				"Email address is invalid",
+			)
+		}
+	}
+
+	row.Valid = len(row.Errors) == 0
+
+	return row
+
+}
+
+func buildSitePreviewRow(rowNumber int, record []string) SitePreviewRow {
+
+	row := SitePreviewRow{
+		RowNumber: rowNumber,
+		Valid:     false,
+		Errors:    make([]string, 0),
+	}
+
+	if len(record) != 5 {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Expected 5 columns but found %d",
+				len(record),
+			),
+		)
+
+		/* Still copy any available values so the user can see what was read from the CSV. */
+
+		row.Data = SiteImportData{
+			SiteId:        csvColumn(record, 0),
+			SiteName:      csvColumn(record, 1),
+			ContactName:   csvColumn(record, 2),
+			ContactNumber: csvColumn(record, 3),
+			ContactEmail:  csvColumn(record, 4),
+		}
+		return row
+	}
+
+	row.Data = SiteImportData{
+		SiteId:        strings.TrimSpace(record[0]),
+		SiteName:      strings.TrimSpace(record[1]),
+		ContactName:   strings.TrimSpace(record[2]),
+		ContactNumber: strings.TrimSpace(record[3]),
+		ContactEmail:  strings.TrimSpace(record[4]),
+	}
+
+	if row.Data.SiteId == "" {
+		row.Errors = append(
+			row.Errors,
+			"Site ID is required",
+		)
+	}
+
+	if row.Data.SiteName == "" {
+		row.Errors = append(
+			row.Errors,
+			"Site name is required",
+		)
+	}
+
+	if len(row.Data.SiteName) > 100 {
+		row.Errors = append(
+			row.Errors,
+			"Site name cannot exceed 100 characters",
+		)
+	}
+	if len(row.Data.ContactName) > 100 {
+		row.Errors = append(
+			row.Errors,
+			"Contact name cannot exceed 100 characters",
+		)
+	}
+	if len(row.Data.ContactNumber) > 50 {
+		row.Errors = append(
+			row.Errors,
+			"Contact number cannot exceed 50 characters",
+		)
+	}
+	if len(row.Data.ContactEmail) > 254 {
+		row.Errors = append(
+			row.Errors,
+			"Contact email cannot exceed 254 characters",
+		)
+	}
+
+	if row.Data.ContactEmail != "" {
+		if _, err := mail.ParseAddress(row.Data.ContactEmail); err != nil {
+			row.Errors = append(
+				row.Errors,
+				"Contact email address is invalid",
 			)
 		}
 	}
@@ -1163,12 +1344,30 @@ func saveOfficialsPreview(preview OfficialsImportPreview) {
 	officialsPreviewStore.items[preview.Token] = preview
 }
 
+func saveSitesPreview(preview SitesImportPreview) {
+
+	sitesPreviewStore.Lock()
+
+	defer sitesPreviewStore.Unlock()
+
+	sitesPreviewStore.items[preview.Token] = preview
+}
+
 func deleteOfficialsPreview(token string) {
 
 	officialsPreviewStore.Lock()
 	defer officialsPreviewStore.Unlock()
 
 	delete(officialsPreviewStore.items, token)
+
+}
+
+func deleteSitesPreview(token string) {
+
+	sitesPreviewStore.Lock()
+	defer sitesPreviewStore.Unlock()
+
+	delete(sitesPreviewStore.items, token)
 
 }
 
@@ -1189,6 +1388,20 @@ func removeExpiredOfficialsPreviews() {
 		if now.After(preview.ExpiresAt) {
 			delete(
 				officialsPreviewStore.items,
+				token,
+			)
+		}
+	}
+}
+
+func removeExpiredSitesPreviews() {
+	now := time.Now()
+	sitesPreviewStore.Lock()
+	defer sitesPreviewStore.Unlock()
+	for token, preview := range sitesPreviewStore.items {
+		if now.After(preview.ExpiresAt) {
+			delete(
+				sitesPreviewStore.items,
 				token,
 			)
 		}
@@ -1223,6 +1436,25 @@ func getAssociationsPreview(token string) (AssociationsImportPreview, bool) {
 	// Treat expired previews as missing.
 	if time.Now().After(preview.ExpiresAt) {
 		return AssociationsImportPreview{}, false
+	}
+
+	return preview, true
+}
+
+func getSitesPreview(token string) (SitesImportPreview, bool) {
+
+	officialsPreviewStore.RLock()
+	defer officialsPreviewStore.RUnlock()
+
+	preview, found := sitesPreviewStore.items[token]
+
+	if !found {
+		return SitesImportPreview{}, false
+	}
+
+	// Treat expired previews as missing.
+	if time.Now().After(preview.ExpiresAt) {
+		return SitesImportPreview{}, false
 	}
 
 	return preview, true
@@ -1800,6 +2032,278 @@ func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 	)
 }
 
+func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	if r.Method != http.MethodPost {
+		writeJSONError(
+			w,
+			http.StatusMethodNotAllowed,
+			"Method not allowed.",
+		)
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var request struct {
+		PreviewToken    string `json:"previewToken"`
+		DuplicateAction string `json:"duplicateAction"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&request); err != nil {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Invalid request body.",
+		)
+		return
+	}
+
+	request.PreviewToken = strings.TrimSpace(request.PreviewToken)
+	request.DuplicateAction = strings.ToLower(strings.TrimSpace(request.DuplicateAction))
+
+	if request.PreviewToken == "" {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Preview token is required.",
+		)
+		return
+	}
+
+	if request.DuplicateAction == "" {
+		request.DuplicateAction = "skip"
+	}
+
+	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			`Duplicate action must be "skip" or "stop".`,
+		)
+		return
+	}
+
+	preview, found := getSitesPreview(request.PreviewToken)
+	if !found {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The import preview was not found or has expired.",
+		)
+		return
+	}
+
+	if preview.TenantID != tId {
+		writeJSONError(
+			w,
+			http.StatusForbidden,
+			"The import preview does not belong to the current tenant.",
+		)
+		return
+	}
+
+	if time.Now().After(preview.ExpiresAt) {
+		deleteOfficialsPreview(request.PreviewToken)
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The import preview has expired. Preview the CSV file again.",
+		)
+		return
+	}
+
+	if oc.Coll == nil {
+		log.Printf("CommitSitesImportHandler: sites collection is nil")
+		writeJSONError(
+			w,
+			http.StatusInternalServerError,
+			"Sites collection is not available.",
+		)
+		return
+	}
+
+	added := 0
+	skipped := 0
+	failed := 0
+	rowResults := make([]SitesCommitRowResult, 0)
+
+	for _, previewRow := range preview.Rows {
+		if !previewRow.Valid {
+			continue
+		}
+		data := previewRow.Data
+
+		exists, err := sc.Exists(data.SiteId, tId)
+
+		if err != nil {
+			log.Printf(
+				"CommitSitesImportHandler: "+"duplicate lookup failed: tenant=%s row=%d site=%s error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.SiteId,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				SitesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message:   "Unable to check whether the site already exists.",
+				},
+			)
+			continue
+		}
+
+		if exists {
+			if request.DuplicateAction == "stop" {
+				writeJSON(
+					w,
+					http.StatusConflict,
+					SitesCommitResponse{
+						Added:   added,
+						Skipped: skipped,
+						Failed:  failed,
+						Message: fmt.Sprintf(
+							"Import stopped because %s already exists.",
+							data.SiteId,
+						),
+						Rows: rowResults,
+					},
+				)
+
+				return
+			}
+
+			skipped++
+
+			rowResults = append(
+				rowResults,
+				SitesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "skipped",
+					Message: fmt.Sprintf(
+						"%s already exists.",
+						data.SiteId,
+					),
+				},
+			)
+
+			continue
+
+		}
+
+		site := database.Site{
+			Id:      data.SiteId,
+			Name:    data.SiteName,
+			Contact: data.ContactName,
+			Phone:   data.ContactNumber,
+			Email:   data.ContactEmail,
+		}
+
+		err = sc.Add(site, tId)
+
+		if err != nil {
+			if mongo.IsDuplicateKeyError(err) {
+				if request.DuplicateAction == "stop" {
+					writeJSON(
+						w,
+						http.StatusConflict,
+						SitesCommitResponse{
+							Added:   added,
+							Skipped: skipped,
+							Failed:  failed,
+							Message: fmt.Sprintf(
+								"Import stopped because %s already exists.",
+								data.SiteId,
+							),
+							Rows: rowResults,
+						},
+					)
+					return
+				}
+
+				skipped++
+
+				rowResults = append(
+					rowResults,
+					SitesCommitRowResult{
+						RowNumber: previewRow.RowNumber,
+						Status:    "skipped",
+						Message: fmt.Sprintf(
+							"%s already exists.",
+							data.SiteId,
+						),
+					},
+				)
+
+				continue
+
+			}
+
+			log.Printf(
+				"CommitSitesImportHandler: "+"insert failed: tenant=%s row=%d site=%s error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.SiteId,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				SitesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message:   "Unable to insert site.",
+				},
+			)
+
+			continue
+		}
+		added++
+		rowResults = append(
+			rowResults,
+			SitesCommitRowResult{
+				RowNumber: previewRow.RowNumber,
+				Status:    "added",
+				Message:   fmt.Sprintf("%s %s was added.", data.SiteId, data.SiteName),
+			},
+		)
+	}
+
+	deleteSitesPreview(request.PreviewToken)
+
+	writeJSON(
+		w,
+		http.StatusOK,
+		SitesCommitResponse{
+			Added:   added,
+			Skipped: skipped,
+			Failed:  failed,
+			Message: "Sites import completed.",
+			Rows:    rowResults,
+		},
+	)
+}
+
 func PreviewAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
 
 	var tId string = database.TenantId
@@ -2019,6 +2523,228 @@ func PreviewAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+(oneMB))
+
+	if err := r.ParseMultipartForm(maxCSVSize); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "The CSV upload is invalid or exceeds the 5 MB limit.")
+		return
+	}
+
+	file, fileHeader, err := r.FormFile("file")
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "An Officials CSV file is required.")
+		return
+	}
+
+	defer file.Close()
+
+	if err := validateCSVFile(fileHeader); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	csvReader := csv.NewReader(file)
+
+	/* Allow variable-length records so we can report a useful row-level error instead of stopping immediately. */
+	csvReader.FieldsPerRecord = -1
+
+	/* This trims spaces that appear outside quoted CSV values. For example: John, Smith is treated similarly to: John,Smith */
+	csvReader.TrimLeadingSpace = true
+
+	header, err := csvReader.Read()
+	if err == io.EOF {
+		writeJSONError(w, http.StatusBadRequest, "The CSV file is empty.")
+		return
+	}
+
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Unable to read the CSV header: "+err.Error())
+		return
+	}
+
+	if err := validateSitesCSVHeader(header); err != nil {
+		writeJSONError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	rows := make([]SitePreviewRow, 0)
+
+	/* Used to detect duplicates inside the uploaded CSV file. */
+	namesInFile := make(map[string]int)
+	csvRowNumber := 1
+
+	for {
+		record, readErr := csvReader.Read()
+
+		if readErr == io.EOF {
+			break
+		}
+
+		csvRowNumber++
+		if len(rows) >= maxCSVRows {
+			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("The CSV file contains more than %d data rows.", maxCSVRows))
+			return
+		}
+
+		if readErr != nil {
+			rows = append(
+				rows,
+				SitePreviewRow{
+					RowNumber: csvRowNumber,
+					Valid:     false,
+					Data:      SiteImportData{},
+					Errors: []string{
+						"Unable to parse CSV row: " + readErr.Error(),
+					},
+				},
+			)
+			/* Some CSV syntax errors leave the reader unable to continue reliably. Stop after recording the error. */
+			break
+		}
+
+		if isBlankCSVRecord(record) {
+			continue
+		}
+
+		previewRow := buildSitePreviewRow(
+			csvRowNumber,
+			record,
+		)
+
+		nameKey := normalizeSiteId(previewRow.Data.SiteId)
+
+		if nameKey != "|" {
+			if previousRow, found := namesInFile[nameKey]; found {
+				previewRow.Errors = append(
+					previewRow.Errors,
+					fmt.Sprintf(
+						"Duplicate site in CSV file; first appeared on row %d",
+						previousRow,
+					),
+				)
+			} else {
+				namesInFile[nameKey] = csvRowNumber
+			}
+		}
+
+		previewRow.Valid = len(previewRow.Errors) == 0
+
+		rows = append(rows, previewRow)
+	}
+
+	if len(rows) == 0 {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The CSV file does not contain any sites.",
+		)
+		return
+	}
+	/* Check MongoDB for sites that already exist. This only runs for rows that passed the basic CSV validation. */
+
+	for i := range rows {
+		if !rows[i].Valid {
+			continue
+		}
+
+		siteId := rows[i].Data.SiteId
+
+		exists, err := sc.Exists(siteId, tId)
+
+		if err != nil {
+			log.Printf(
+				"PreviewSitesImportHandler: duplicate lookup failed for tenant %s, site %s: %v",
+				tId,
+				rows[i].Data.SiteId,
+				err,
+			)
+			writeJSONError(
+				w,
+				http.StatusInternalServerError,
+				"Unable to validate sites against the database.",
+			)
+			return
+		}
+
+		if exists {
+			rows[i].Errors = append(
+				rows[i].Errors,
+				"Site already exists",
+			)
+			rows[i].Valid = false
+		}
+	}
+
+	validRows := 0
+	invalidRows := 0
+
+	for _, row := range rows {
+		if row.Valid {
+			validRows++
+		} else {
+			invalidRows++
+		}
+	}
+
+	previewToken, err := generatePreviewToken()
+	if err != nil {
+		log.Printf(
+			"PreviewSitesImportHandler: unable to generate preview token: %v",
+			err,
+		)
+		writeJSONError(
+			w,
+			http.StatusInternalServerError,
+			"Unable to create the import preview.",
+		)
+		return
+	}
+
+	now := time.Now()
+	preview := SitesImportPreview{
+		Token:     previewToken,
+		TenantID:  tId,
+		Rows:      rows,
+		CreatedAt: now,
+		ExpiresAt: now.Add(previewExpiration),
+	}
+
+	saveSitesPreview(preview)
+	removeExpiredSitesPreviews()
+
+	response := SitesPreviewResponse{
+		PreviewToken: previewToken,
+		TotalRows:    len(rows),
+		ValidRows:    validRows,
+		InvalidRows:  invalidRows,
+		Rows:         rows,
+	}
+
+	writeJSON(w, http.StatusOK, response)
+
 }
 
 func PreviewOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
@@ -3651,6 +4377,9 @@ func main() {
 	mux.HandleFunc("/api/import/associations/preview", authRequired(readOnlyForbidden(PreviewAssociationsImportHandler)))
 	mux.HandleFunc("/api/import/associations/commit", authRequired(readOnlyForbidden(CommitAssociationsImportHandler)))
 
+	mux.HandleFunc("/api/import/sites/preview", authRequired(readOnlyForbidden(PreviewSitesImportHandler)))
+	mux.HandleFunc("/api/import/sites/commit", authRequired(readOnlyForbidden(CommitSitesImportHandler)))
+
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
@@ -3665,6 +4394,7 @@ func main() {
 
 	mux.HandleFunc("/api/import/officials/template", authRequired(readOnlyForbidden(DownloadOfficialsTemplateHandler)))
 	mux.HandleFunc("/api/import/associations/template", authRequired(readOnlyForbidden(DownloadAssociationsTemplateHandler)))
+	mux.HandleFunc("/api/import/sites/template", authRequired(readOnlyForbidden(DownloadSitesTemplateHandler)))
 	mux.HandleFunc("/api/deleteAssociation/{assocId}",
 		authRequired(readOnlyForbidden(DeleteAssociation)))
 

@@ -2307,6 +2307,26 @@ func (sc *SiteCollection) Add(site Site, tenantId string) error {
 	return nil
 }
 
+func (sc *SiteCollection) Exists(id, tenantId string) (bool, error) {
+
+	var doc SiteDoc
+
+	filter := bson.M{
+		"id":       id,
+		"tenantId": tenantId,
+	}
+
+	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (sc *SiteCollection) Get(id, tenantId string) (*Site, error) {
 
 	var filter bson.M
