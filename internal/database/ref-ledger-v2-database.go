@@ -2307,6 +2307,26 @@ func (sc *SiteCollection) Add(site Site, tenantId string) error {
 	return nil
 }
 
+func (sc *SiteCollection) Exists(id, tenantId string) (bool, error) {
+
+	var doc SiteDoc
+
+	filter := bson.M{
+		"id":       id,
+		"tenantId": tenantId,
+	}
+
+	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
 func (sc *SiteCollection) Get(id, tenantId string) (*Site, error) {
 
 	var filter bson.M
@@ -2592,6 +2612,34 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 	fmt.Println("Deleted Record with Game Id of", filter["gameId"], " in", gc.Coll.Name(), "Records Deleted:", result.DeletedCount)
 
 	return nil
+}
+
+func (gc *GameCollection) Exists(association string, gameId string, tenantId string) (bool, error) {
+
+	var filter bson.M
+
+	if tenantId == "na" {
+		fmt.Println("Invalid tenantId")
+	}
+
+	gId, err := utils.ConvertStrToInt64(gameId)
+	if err != nil {
+		return false, fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
+	}
+
+	filter = bson.M{
+		"gameId":      gId,
+		"association": association,
+		"tenantId":    tenantId,
+	}
+
+	result := gc.Coll.FindOne(context.TODO(), filter)
+
+	if result.Err() == mongo.ErrNoDocuments {
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
@@ -3073,7 +3121,7 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 	return result, nil
 }
 
-func (oc *OfficialCollection) OfficialExists(name, tenantId string) (bool, error) {
+func (oc *OfficialCollection) Exists(name, tenantId string) (bool, error) {
 
 	var filter bson.M
 	var names []string
