@@ -2614,6 +2614,34 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 	return nil
 }
 
+func (gc *GameCollection) Exists(association string, gameId string, tenantId string) (bool, error) {
+
+	var filter bson.M
+
+	if tenantId == "na" {
+		fmt.Println("Invalid tenantId")
+	}
+
+	gId, err := utils.ConvertStrToInt64(gameId)
+	if err != nil {
+		return false, fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
+	}
+
+	filter = bson.M{
+		"gameId":      gId,
+		"association": association,
+		"tenantId":    tenantId,
+	}
+
+	result := gc.Coll.FindOne(context.TODO(), filter)
+
+	if result.Err() == mongo.ErrNoDocuments {
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
@@ -3093,7 +3121,7 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 	return result, nil
 }
 
-func (oc *OfficialCollection) OfficialExists(name, tenantId string) (bool, error) {
+func (oc *OfficialCollection) Exists(name, tenantId string) (bool, error) {
 
 	var filter bson.M
 	var names []string

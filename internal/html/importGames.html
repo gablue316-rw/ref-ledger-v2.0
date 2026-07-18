@@ -1,12 +1,12 @@
 <html>
-<!-- importAssociations.html -->
+<!-- importGames.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<title>Ref Ledger V2.0 Import Associations</title>
+<title>Ref Ledger V2.0 Import Games</title>
 
 <link
     rel="stylesheet"
@@ -446,8 +446,8 @@ tr:nth-child(even) {
 <div class="container">
 
     <div class="header">
-        <h1>Ref Ledger V2.0 Import Associations</h1>
-        <p>Import multiple associations from a CSV file.</p>
+        <h1>Ref Ledger V2.0 Import Games</h1>
+        <p>Import multiple games from a CSV file.</p>
     </div>
 
     <nav class="navbar">
@@ -467,7 +467,7 @@ tr:nth-child(even) {
                 <span>Reports</span>
             </a>
 
-            <a href="/games">
+            <a class="active" href="/games">
                 <i class="fa-solid fa-calendar-days"></i>
                 <span>Games</span>
             </a>
@@ -477,7 +477,7 @@ tr:nth-child(even) {
                 <span>Officials</span>
             </a>
 
-            <a class="active" href="/associations">
+            <a href="/associations">
                 <i class="fa-solid fa-building-columns"></i>
                 <span>Associations</span>
             </a>
@@ -516,10 +516,10 @@ tr:nth-child(even) {
 
     <div class="form-card">
 
-        <h2>Associations CSV Import</h2>
+        <h2>Games CSV Import</h2>
 
         <p class="description">
-            Download the CSV template, enter the associations, and upload the
+            Download the CSV template, enter the games, and upload the
             completed file. The file will be validated before any records are
             added.
         </p>
@@ -528,33 +528,33 @@ tr:nth-child(even) {
             <h3>Import Instructions</h3>
 
             <ol>
-                <li>Download the Associations CSV template.</li>
+                <li>Download the Games CSV template.</li>
                 <li>Open the template in Excel, Google Sheets, or another spreadsheet program.</li>
-                <li>Enter one association per row.</li>
+                <li>Enter one game per row.</li>
                 <li>Do not change the column headings.</li>
                 <li>Save or export the completed file as CSV.</li>
                 <li>Select the file below and preview it before importing.</li>
             </ol>
 
             <div class="template-format">
-                <code>associationId,associationName,contactName,contactNumber,contactEmail,assignors</code>
+                <code>firstName,lastName,phone,email,address</code>
             </div>
         </div>
 
         <div class="button-row">
             <a
-                href="/api/import/associations/template"
+                href="/api/import/games/template"
                 class="btn btn-template"
             >
                 <i class="fa-solid fa-download"></i>
-                Download Associations Template
+                Download Games Template
             </a>
         </div>
 
-        <form id="importAssociationsForm">
+        <form id="importGamesForm">
 
             <div class="form-group">
-                <label for="csvFile">Associations CSV File</label>
+                <label for="csvFile">Games CSV File</label>
 
                 <input
                     type="file"
@@ -576,7 +576,7 @@ tr:nth-child(even) {
                     class="btn btn-preview"
                 >
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    Preview Associations
+                    Preview Games
                 </button>
 
                 <button
@@ -588,9 +588,9 @@ tr:nth-child(even) {
                     Clear
                 </button>
 
-                <a href="/associations" class="btn btn-cancel">
+                <a href="/games" class="btn btn-cancel">
                     <i class="fa-solid fa-arrow-left"></i>
-                    Return to Associations
+                    Return to Games
                 </a>
             </div>
 
@@ -599,15 +599,15 @@ tr:nth-child(even) {
     </div>
 
     <div class="message-box info" id="message">
-        Select an Associations CSV file to begin.
+        Select an Games CSV file to begin.
     </div>
 
     <div class="form-card preview-section" id="previewSection">
 
-        <h2>Associations Import Preview</h2>
+        <h2>Games Import Preview</h2>
 
         <p class="description">
-            Review each association and correct any errors before completing the
+            Review each game and correct any errors before completing the
             import.
         </p>
 
@@ -641,12 +641,26 @@ tr:nth-child(even) {
                     <tr>
                         <th>CSV Row</th>
                         <th>Status</th>
-                        <th>Association ID</th>
-                        <th>Association Name</th>
-                        <th>Contact Name</th>
-                        <th>Contact Number</th>
-                        <th>Contact Email</th>
-                        <th>Assignors</th>
+                        <th>Game Id</th>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Sport</th>
+                        <th>Site</th>
+                        <th>Field</th>
+                        <th>Num of Games</th>
+                        <th>Level</th>
+                        <th>Game Fee</th>
+                        <th>Travel Pay</th>
+                        <th>Assignor Fee</th>
+                        <th>Deductions</th>
+                        <th>Association</th>
+                        <th>Status</th>
+                        <th>Referee</th>
+                        <th>U1</th>
+                        <th>U2</th> 
+                        <th>ECO</th>
+                        <th>Assignor</th>
+                        <th>Errors</th>
                     </tr>
                 </thead>
 
@@ -657,7 +671,7 @@ tr:nth-child(even) {
 
         <div class="import-options">
 
-            <h3>Duplicate Associations</h3>
+            <h3>Duplicate Games</h3>
 
             <div class="radio-option">
                 <input
@@ -669,7 +683,7 @@ tr:nth-child(even) {
                 >
 
                 <label for="skipDuplicates">
-                    Skip associations whose IDs already exist.
+                    Skip games whose details already exist.
                 </label>
             </div>
 
@@ -697,7 +711,7 @@ tr:nth-child(even) {
                 disabled
             >
                 <i class="fa-solid fa-file-import"></i>
-                Import Valid Associations
+                Import Valid Games
             </button>
 
             <button
@@ -709,9 +723,9 @@ tr:nth-child(even) {
                 Clear Preview
             </button>
 
-            <a href="/associations" class="btn btn-cancel">
+            <a href="/games" class="btn btn-cancel">
                 <i class="fa-solid fa-arrow-left"></i>
-                Return to Associations
+                Return to Games
             </a>
 
         </div>
@@ -721,8 +735,8 @@ tr:nth-child(even) {
 </div>
 
 <script>
-const importAssociationsForm =
-    document.getElementById("importAssociationsForm");
+const importGamesForm =
+    document.getElementById("importGamesForm");
 
 const csvFile =
     document.getElementById("csvFile");
@@ -783,7 +797,7 @@ csvFile.addEventListener("change", function () {
         selectedFile.textContent = "No file selected.";
 
         showMessage(
-            "Select an Associations CSV file to begin.",
+            "Select a Games CSV file to begin.",
             "info"
         );
 
@@ -796,13 +810,13 @@ csvFile.addEventListener("change", function () {
         file.name + " (" + formatFileSize(file.size) + ")";
 
     showMessage(
-        "File selected. Select Preview Associations to validate it.",
+        "File selected. Select Preview Games to validate it.",
         "info"
     );
 });
 
 clearFileBtn.addEventListener("click", function () {
-    importAssociationsForm.reset();
+    importGamesForm.reset();
 
     selectedFile.textContent = "No file selected.";
 
@@ -823,14 +837,14 @@ clearPreviewBtn.addEventListener("click", function () {
     );
 });
 
-importAssociationsForm.addEventListener(
+importGamesForm.addEventListener(
     "submit",
     async function (event) {
         event.preventDefault();
 
         if (csvFile.files.length === 0) {
             showMessage(
-                "Select an Associations CSV file.",
+                "Select a Games CSV file.",
                 "error"
             );
 
@@ -868,13 +882,13 @@ importAssociationsForm.addEventListener(
         clearPreview();
 
         showMessage(
-            "Validating the Associations CSV file...",
+            "Validating the Games CSV file...",
             "info"
         );
 
         try {
             const response = await fetch(
-                "/api/import/associations/preview",
+                "/api/import/games/preview",
                 {
                     method: "POST",
                     body: formData
@@ -891,7 +905,7 @@ importAssociationsForm.addEventListener(
 
             if (response.status === 403) {
                 showMessage(
-                    "Permission denied. Read-only users cannot import associations.",
+                    "Permission denied. Read-only users cannot import games.",
                     "error"
                 );
 
@@ -904,7 +918,7 @@ importAssociationsForm.addEventListener(
                 throw new Error(
                     result.error ||
                     result.message ||
-                    "Unable to preview the Associations CSV file."
+                    "Unable to preview the Games CSV file."
                 );
             }
 
@@ -939,7 +953,7 @@ importAssociationsForm.addEventListener(
 importBtn.addEventListener("click", async function () {
     if (!previewToken) {
         showMessage(
-            "Preview the Associations CSV file before importing.",
+            "Preview the Games CSV file before importing.",
             "error"
         );
 
@@ -948,7 +962,7 @@ importBtn.addEventListener("click", async function () {
 
     if (validRowCount === 0) {
         showMessage(
-            "There are no valid associations to import.",
+            "There are no valid games to import.",
             "error"
         );
 
@@ -968,16 +982,16 @@ importBtn.addEventListener("click", async function () {
     importBtn.disabled = true;
 
     importBtn.innerHTML =
-        '<i class="fa-solid fa-spinner fa-spin"></i> Importing Associations...';
+        '<i class="fa-solid fa-spinner fa-spin"></i> Importing Games...';
 
     showMessage(
-        "Importing valid associations...",
+        "Importing valid games...",
         "info"
     );
 
     try {
         const response = await fetch(
-            "/api/import/associations/commit",
+            "/api/import/games/commit",
             {
                 method: "POST",
                 headers: {
@@ -1000,7 +1014,7 @@ importBtn.addEventListener("click", async function () {
 
         if (response.status === 403) {
             showMessage(
-                "Permission denied. Read-only users cannot import associations.",
+                "Permission denied. Read-only users cannot import games.",
                 "error"
             );
 
@@ -1014,7 +1028,7 @@ importBtn.addEventListener("click", async function () {
             throw new Error(
                 result.error ||
                 result.message ||
-                "Unable to import associations."
+                "Unable to import games."
             );
         }
 
@@ -1113,33 +1127,99 @@ function displayPreview(result) {
 
         appendCell(
             tableRow,
-            getValue(data, "associationId", "AssociationId")
+            getValue(data, "gameId", "GameId")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "associationName", "AssociationName")
+            getValue(data, "date", "Date")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "contactName", "ContactName")
+            getValue(data, "time", "Time")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "contactNumber", "ContactNumber")
+            getValue(data, "sport", "Sport")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "contactEmail", "ContactEmail")
+            getValue(data, "site", "Site")
         );
 
         appendCell(
             tableRow,
-            getValue(data, "assignors", "Assignors")
+            getValue(data, "field", "Field")
         );        
+
+        appendCell(
+            tableRow,
+            getValue(data, "numOfGames", "NumOfGames")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "level", "Level")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "gameFee", "GameFee")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "travelPay", "TravelPay")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "assignorFee", "AssignorFee")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "deductions", "Deductions")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "association", "Association")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "status", "Status")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "referee", "Referee")
+        );
+        
+        appendCell(
+            tableRow,
+            getValue(data, "u1", "U1")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "u2", "U2")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "eco", "ECO")
+        );
+        
+        appendCell(
+            tableRow,
+            getValue(data, "assignor", "Assignor")
+        );
+
         
         const errorCell =
             document.createElement("td");
@@ -1165,7 +1245,7 @@ function displayPreview(result) {
         !previewToken || validRowCount === 0;
 
     importBtn.innerHTML =
-        '<i class="fa-solid fa-file-import"></i> Import Valid Associations';
+        '<i class="fa-solid fa-file-import"></i> Import Valid Games';
 
     previewSection.scrollIntoView({
         behavior: "smooth",
@@ -1232,7 +1312,7 @@ function resetImportButton() {
         !previewToken || validRowCount === 0;
 
     importBtn.innerHTML =
-        '<i class="fa-solid fa-file-import"></i> Import Valid Associations';
+        '<i class="fa-solid fa-file-import"></i> Import Valid Games';
 }
 
 function setPreviewLoading(isLoading) {
@@ -1245,7 +1325,7 @@ function setPreviewLoading(isLoading) {
             '<i class="fa-solid fa-spinner fa-spin"></i> Validating...';
     } else {
         previewBtn.innerHTML =
-            '<i class="fa-solid fa-magnifying-glass"></i> Preview Associations';
+            '<i class="fa-solid fa-magnifying-glass"></i> Preview Games';
     }
 }
 
