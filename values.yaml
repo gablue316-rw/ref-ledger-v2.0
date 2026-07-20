@@ -29,6 +29,8 @@ resources:
 
 env:
   TZ: America/New_York
+  MONGODB_URI: "mongodb://host.docker.internal:27017"
+  LOG_FILE_PATH: "/root/logs/ref-ledgerV2-webServer.log"
 
 cloudflare:
   enabled: true

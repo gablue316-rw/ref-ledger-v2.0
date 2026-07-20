@@ -16,7 +16,6 @@ import (
 var UtilsVersion string = "ref-ledger-models-v2.1.0"
 var layout string = "1/2/2006"
 
-/* July 18, 2026 */
 /* Log file paths for standalone and containerized deployments */
 /* Use standalone when running Ref Ledger outside of a Docker container, and use container when running Ref Ledger inside a Docker container. */
 
@@ -647,6 +646,8 @@ func ConvertStrToInt64(s string) (int64, error) {
 func ConvertAmtStrToInt64(s string) (int64, error) {
 
 	var dollars, cents, amount int64
+
+	s = strings.ReplaceAll(s, "$", "")
 
 	if s == "" {
 		return int64(0), nil

@@ -2642,6 +2642,24 @@ func (gc *GameCollection) Exists(association string, gameId string, tenantId str
 	return true, nil
 }
 
+func (gc *GameCollection) Add(tenantId string, game model.GameDescriptor) error {
+
+	var result *mongo.InsertOneResult
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	doc := utils.ConvertGameDescrToGameDoc(game)
+	doc.TenantId = tenantId
+
+	result, gc.LastError = gc.Coll.InsertOne(ctx, doc)
+	if gc.LastError != nil {
+		return fmt.Errorf("Insert failed.  Reason: %v", gc.LastError)
+	}
+	fmt.Println("Inserted ID:", result.InsertedID)
+
+	return nil
+}
+
 func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)

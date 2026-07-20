@@ -13,17 +13,27 @@ spec:
         app: ref-ledger
     spec:
       containers:
-      - name: ref-ledger
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        ports:
-        - containerPort: {{ .Values.container.port }}
-        env:
-        - name: TZ
-          value: "{{ .Values.env.TZ }}"
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name          
-        resources:
-{{ toYaml .Values.resources | indent 10 }}
+        - name: ref-ledger
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - containerPort: {{ .Values.container.port }}
+
+          env:
+            - name: TZ
+              value: {{ .Values.env.TZ | quote }}
+
+            - name: MONGODB_URI
+              value: {{ .Values.env.MONGODB_URI | quote }}
+
+            - name: LOG_FILE_PATH
+              value: {{ .Values.env.LOG_FILE_PATH | quote }}
+
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+          resources:
+{{- toYaml .Values.resources | nindent 12 }}

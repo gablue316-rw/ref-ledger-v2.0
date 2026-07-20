@@ -1723,6 +1723,15 @@ func deleteOfficialsPreview(token string) {
 
 }
 
+func deleteGamesPreview(token string) {
+
+	gamesPreviewStore.Lock()
+	defer gamesPreviewStore.Unlock()
+
+	delete(gamesPreviewStore.items, token)
+
+}
+
 func deleteSitesPreview(token string) {
 
 	sitesPreviewStore.Lock()
@@ -1830,6 +1839,25 @@ func getSitesPreview(token string) (SitesImportPreview, bool) {
 	// Treat expired previews as missing.
 	if time.Now().After(preview.ExpiresAt) {
 		return SitesImportPreview{}, false
+	}
+
+	return preview, true
+}
+
+func getGamesPreview(token string) (GamesImportPreview, bool) {
+
+	gamesPreviewStore.RLock()
+	defer gamesPreviewStore.RUnlock()
+
+	preview, found := gamesPreviewStore.items[token]
+
+	if !found {
+		return GamesImportPreview{}, false
+	}
+
+	// Treat expired previews as missing.
+	if time.Now().After(preview.ExpiresAt) {
+		return GamesImportPreview{}, false
 	}
 
 	return preview, true
@@ -2402,6 +2430,291 @@ func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 			Skipped: skipped,
 			Failed:  failed,
 			Message: "Officials import completed.",
+			Rows:    rowResults,
+		},
+	)
+}
+
+func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	if r.Method != http.MethodPost {
+		writeJSONError(
+			w,
+			http.StatusMethodNotAllowed,
+			"Method not allowed.",
+		)
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var request struct {
+		PreviewToken    string `json:"previewToken"`
+		DuplicateAction string `json:"duplicateAction"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&request); err != nil {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Invalid request body.",
+		)
+		return
+	}
+
+	request.PreviewToken = strings.TrimSpace(request.PreviewToken)
+	request.DuplicateAction = strings.ToLower(strings.TrimSpace(request.DuplicateAction))
+
+	if request.PreviewToken == "" {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Preview token is required.",
+		)
+		return
+	}
+
+	if request.DuplicateAction == "" {
+		request.DuplicateAction = "skip"
+	}
+
+	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			`Duplicate action must be "skip" or "stop".`,
+		)
+		return
+	}
+
+	preview, found := getGamesPreview(request.PreviewToken)
+	if !found {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The import preview was not found or has expired.",
+		)
+		return
+	}
+
+	if preview.TenantID != tId {
+		writeJSONError(
+			w,
+			http.StatusForbidden,
+			"The import preview does not belong to the current tenant.",
+		)
+		return
+	}
+
+	if time.Now().After(preview.ExpiresAt) {
+		deleteGamesPreview(request.PreviewToken)
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The import preview has expired. Preview the CSV file again.",
+		)
+		return
+	}
+
+	if oc.Coll == nil {
+		log.Printf("CommitGamesImportHandler: games collection is nil")
+		writeJSONError(
+			w,
+			http.StatusInternalServerError,
+			"Games collection is not available.",
+		)
+		return
+	}
+
+	added := 0
+	skipped := 0
+	failed := 0
+	rowResults := make([]GamesCommitRowResult, 0)
+
+	for _, previewRow := range preview.Rows {
+		if !previewRow.Valid {
+			continue
+		}
+		data := previewRow.Data
+
+		exists, err := gc.Exists(data.Association, utils.ConvertInt64ToStr(data.GameId), tId)
+
+		if err != nil {
+			log.Printf(
+				"CommitGamesImportHandler: "+"duplicate lookup failed: tenant=%s row=%d game=%d error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.GameId,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				GamesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message:   "Unable to check whether the game already exists.",
+				},
+			)
+			continue
+		}
+
+		if exists {
+			if request.DuplicateAction == "stop" {
+				writeJSON(
+					w,
+					http.StatusConflict,
+					GamesCommitResponse{
+						Added:   added,
+						Skipped: skipped,
+						Failed:  failed,
+						Message: fmt.Sprintf(
+							"Import stopped because game %d already exists.",
+							data.GameId,
+						),
+						Rows: rowResults,
+					},
+				)
+
+				return
+			}
+
+			skipped++
+
+			rowResults = append(
+				rowResults,
+				GamesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "skipped",
+					Message: fmt.Sprintf(
+						"Game %d already exists.",
+						data.GameId,
+					),
+				},
+			)
+
+			continue
+
+		}
+
+		game := model.GameDescriptor{
+			GameId:      utils.ConvertInt64ToStr(data.GameId),
+			Date:        data.Date,
+			Time:        data.Time,
+			Sport:       data.Sport,
+			Site:        data.Site,
+			Field:       data.Field,
+			NumOfGames:  utils.ConvertInt64ToStr(data.NumOfGames),
+			Level:       data.Level,
+			GameFee:     data.GameFee,
+			TravelPay:   data.TravelPay,
+			AssignorFee: data.AssignorFee,
+			Deductions:  data.Deductions,
+			Association: data.Association,
+			Status:      data.Status,
+			Referee:     data.Referee,
+			U1:          data.U1,
+			U2:          data.U2,
+			ECO:         data.ECO,
+			Assignor:    data.Assignor,
+		}
+
+		err = gc.Add(tId, game)
+		if err != nil {
+			if mongo.IsDuplicateKeyError(err) {
+				if request.DuplicateAction == "stop" {
+					writeJSON(
+						w,
+						http.StatusConflict,
+						GamesCommitResponse{
+							Added:   added,
+							Skipped: skipped,
+							Failed:  failed,
+							Message: fmt.Sprintf(
+								"Import stopped because game %d already exists.",
+								data.GameId,
+							),
+							Rows: rowResults,
+						},
+					)
+					return
+				}
+
+				skipped++
+
+				rowResults = append(
+					rowResults,
+					GamesCommitRowResult{
+						RowNumber: previewRow.RowNumber,
+						Status:    "skipped",
+						Message: fmt.Sprintf(
+							"Game %d already exists.",
+							data.GameId,
+						),
+					},
+				)
+
+				continue
+
+			}
+
+			log.Printf(
+				"CommitGamesImportHandler: "+"insert failed: tenant=%s row=%d game=%d error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.GameId,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				GamesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message:   "Unable to insert game.",
+				},
+			)
+
+			continue
+		}
+		added++
+		rowResults = append(
+			rowResults,
+			GamesCommitRowResult{
+				RowNumber: previewRow.RowNumber,
+				Status:    "added",
+				Message:   fmt.Sprintf("Game %d was added.", data.GameId),
+			},
+		)
+	}
+
+	deleteGamesPreview(request.PreviewToken)
+
+	writeJSON(
+		w,
+		http.StatusOK,
+		GamesCommitResponse{
+			Added:   added,
+			Skipped: skipped,
+			Failed:  failed,
+			Message: "Games import completed.",
 			Rows:    rowResults,
 		},
 	)
@@ -3263,14 +3576,13 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/* Check MongoDB for officials that already exist. This only runs for rows that passed the basic CSV validation. */
+	/* Check MongoDB for games that already exist. This only runs for rows that passed the basic CSV validation. */
 
 	for i := range rows {
 		if !rows[i].Valid {
 			continue
 		}
 
-		fmt.Println("Checking if game exists in database: ", rows[i].Data.GameId)
 		exists, err := gc.Exists(rows[i].Data.Association, utils.ConvertInt64ToStr(rows[i].Data.GameId), tId)
 		if err != nil {
 			log.Printf(
@@ -3284,7 +3596,6 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 				http.StatusInternalServerError,
 				"Unable to validate games against the database.",
 			)
-			fmt.Println("Error occurred while checking game existence: ", err)
 		}
 
 		if exists {
@@ -4625,7 +4936,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Association: game.Association,
 		}
 
-		view.GameFee = fmt.Sprintf("$%.2f", float64(game.GameFee)/100)
+		view.GameFee = fmt.Sprintf("$%.2f", float64(gameFee)/100)
 
 		abbrev := utils.DayOfWeekAbbreviation(game.Date)
 		view.Date = fmt.Sprintf("%s (%s)", game.Date, abbrev)
@@ -4979,7 +5290,7 @@ func main() {
 	mux.HandleFunc("/api/import/sites/commit", authRequired(readOnlyForbidden(CommitSitesImportHandler)))
 
 	mux.HandleFunc("/api/import/games/preview", authRequired(readOnlyForbidden(PreviewGamesImportHandler)))
-	//mux.HandleFunc("/api/import/games/commit", authRequired(readOnlyForbidden(CommitGamesImportHandler)))
+	mux.HandleFunc("/api/import/games/commit", authRequired(readOnlyForbidden(CommitGamesImportHandler)))
 
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
