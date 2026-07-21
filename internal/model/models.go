@@ -10,6 +10,7 @@ type User struct {
 	TenantID     string    `bson:"tenantId" json:"tenantId"`
 	Role         string    `bson:"role" json:"role"`
 	CreatedAt    time.Time `bson:"createdAt" json:"createdAt"`
+	Name         string    `bson:"name" json:"name"`
 }
 
 type Session struct {

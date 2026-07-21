@@ -5042,6 +5042,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Name     string `json:"name"`
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -5108,6 +5109,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		TenantID:     tenantID,
 		Role:         role,
 		CreatedAt:    time.Now(),
+		Name:         "",
 	}
 
 	_, err = usersCollection.InsertOne(r.Context(), user)

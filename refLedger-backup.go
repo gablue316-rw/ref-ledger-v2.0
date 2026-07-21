@@ -2,510 +2,723 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
-	defaultMongoURI      = "mongodb://localhost:27017"
-	defaultDatabase      = "refLedger_v2"
-	defaultBackupDir     = `C:\Personal\MongoDB-Backups`
-	defaultBackupHour    = 2
-	defaultBackupMinute  = 0
-	defaultCheckInterval = time.Minute
-	defaultBackupTimeout = 30 * time.Minute
-	defaultMongodumpPath = "mongodump"
+	defaultMongoURI  = "mongodb://localhost:27017/?replicaSet=refLedgerRS"
+	defaultBackupDir = `C:\Personal\MongoDB-Backups`
+
+	// The program checks the schedule once per minute.
+	checkInterval = time.Minute
+
+	// Backup time in local system time.
+	backupHour   = 2
+	backupMinute = 0
 )
 
 type Config struct {
-	MongoURI      string
-	Database      string
-	BackupDir     string
-	MongodumpPath string
-	BackupHour    int
-	BackupMinute  int
+	MongoURI  string
+	BackupDir string
+}
+
+type BackupState struct {
+	LastOplogTimestamp primitive.Timestamp `bson:"-" json:"-"`
+	LastSeconds        uint32              `json:"lastSeconds"`
+	LastIncrement      uint32              `json:"lastIncrement"`
+
+	LastDailyDate   string `json:"lastDailyDate"`
+	LastWeeklyDate  string `json:"lastWeeklyDate"`
+	LastMonthlyDate string `json:"lastMonthlyDate"`
+}
+
+type OplogMetadata struct {
+	Filename string `json:"filename"`
+
+	StartSeconds   uint32 `json:"startSeconds"`
+	StartIncrement uint32 `json:"startIncrement"`
+
+	EndSeconds   uint32 `json:"endSeconds"`
+	EndIncrement uint32 `json:"endIncrement"`
+
+	EntryCount int64     `json:"entryCount"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 func main() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds)
+	cfg := loadConfig()
 
-	config, err := loadConfig()
+	if err := os.MkdirAll(cfg.BackupDir, 0755); err != nil {
+		log.Fatalf("create backup directory: %v", err)
+	}
+
+	ctx := context.Background()
+
+	client, err := mongo.Connect(
+		ctx,
+		options.Client().ApplyURI(cfg.MongoURI),
+	)
 	if err != nil {
-		log.Fatalf("Configuration error: %v", err)
+		log.Fatalf("connect to MongoDB: %v", err)
+	}
+	defer client.Disconnect(ctx)
+
+	if err := client.Ping(ctx, nil); err != nil {
+		log.Fatalf("ping MongoDB: %v", err)
 	}
 
-	if err := validateConfig(config); err != nil {
-		log.Fatalf("Invalid configuration: %v", err)
+	if err := verifyReplicaSet(ctx, client); err != nil {
+		log.Fatalf("MongoDB replica-set check failed: %v", err)
 	}
 
-	if err := os.MkdirAll(config.BackupDir, 0755); err != nil {
-		log.Fatalf(
-			"Could not create backup directory %q: %v",
-			config.BackupDir,
+	statePath := filepath.Join(cfg.BackupDir, "backup-state.json")
+
+	state, err := loadState(statePath)
+	if err != nil {
+		log.Fatalf("load backup state: %v", err)
+	}
+
+	/*
+		The first time the program runs, initialize the oplog position to
+		the newest current entry. This prevents the first daily job from
+		copying the entire existing oplog.
+
+		You should create a full backup immediately after this initialization.
+	*/
+	if state.LastSeconds == 0 && state.LastIncrement == 0 {
+		latest, err := getLatestOplogTimestamp(ctx, client)
+		if err != nil {
+			log.Fatalf("initialize oplog position: %v", err)
+		}
+
+		setStateTimestamp(&state, latest)
+
+		if err := saveState(statePath, state); err != nil {
+			log.Fatalf("save initial state: %v", err)
+		}
+
+		log.Printf(
+			"Initialized oplog position at %d:%d",
+			latest.T,
+			latest.I,
+		)
+
+		log.Println("Creating initial full backup...")
+
+		if err := createFullBackup(cfg, "Initial"); err != nil {
+			log.Fatalf("initial full backup failed: %v", err)
+		}
+	}
+
+	log.Println("Ref Ledger backup service started")
+	log.Printf("Backup directory: %s", cfg.BackupDir)
+	log.Printf("MongoDB URI: %s", redactMongoURI(cfg.MongoURI))
+
+	runScheduler(ctx, client, cfg, statePath, &state)
+}
+
+func runScheduler(
+	ctx context.Context,
+	client *mongo.Client,
+	cfg Config,
+	statePath string,
+	state *BackupState,
+) {
+	// Check immediately at startup.
+	runScheduledBackups(ctx, client, cfg, statePath, state, time.Now())
+
+	ticker := time.NewTicker(checkInterval)
+	defer ticker.Stop()
+
+	for now := range ticker.C {
+		runScheduledBackups(ctx, client, cfg, statePath, state, now)
+	}
+}
+
+func runScheduledBackups(
+	ctx context.Context,
+	client *mongo.Client,
+	cfg Config,
+	statePath string,
+	state *BackupState,
+	now time.Time,
+) {
+	if now.Hour() != backupHour || now.Minute() != backupMinute {
+		return
+	}
+
+	today := now.Format("2006-01-02")
+
+	/*
+		Run the daily oplog backup first.
+
+		This closes the previous daily oplog segment before any full backup
+		starts. Weekly and monthly backups then create new full recovery
+		baselines.
+	*/
+	if state.LastDailyDate != today {
+		if err := createDailyOplogBackup(ctx, client, cfg, state); err != nil {
+			log.Printf("daily oplog backup failed: %v", err)
+		} else {
+			state.LastDailyDate = today
+
+			if err := saveState(statePath, *state); err != nil {
+				log.Printf("save state after daily backup: %v", err)
+			}
+		}
+	}
+
+	// Monday
+	if now.Weekday() == time.Monday && state.LastWeeklyDate != today {
+		if err := createFullBackup(cfg, "Weekly"); err != nil {
+			log.Printf("weekly full backup failed: %v", err)
+		} else {
+			state.LastWeeklyDate = today
+
+			if err := saveState(statePath, *state); err != nil {
+				log.Printf("save state after weekly backup: %v", err)
+			}
+		}
+	}
+
+	// First day of the month
+	if now.Day() == 1 && state.LastMonthlyDate != today {
+		if err := createFullBackup(cfg, "Monthly"); err != nil {
+			log.Printf("monthly full backup failed: %v", err)
+		} else {
+			state.LastMonthlyDate = today
+
+			if err := saveState(statePath, *state); err != nil {
+				log.Printf("save state after monthly backup: %v", err)
+			}
+		}
+	}
+}
+
+func createDailyOplogBackup(
+	ctx context.Context,
+	client *mongo.Client,
+	cfg Config,
+	state *BackupState,
+) error {
+	startTimestamp := stateTimestamp(*state)
+
+	endTimestamp, err := getLatestOplogTimestamp(ctx, client)
+	if err != nil {
+		return fmt.Errorf("get ending oplog timestamp: %w", err)
+	}
+
+	if compareTimestamps(endTimestamp, startTimestamp) <= 0 {
+		log.Println("No new oplog entries to back up")
+		return nil
+	}
+
+	if err := verifyOplogStartStillExists(ctx, client, startTimestamp); err != nil {
+		return err
+	}
+
+	timestampText := time.Now().Format("2006-01-02-15-04-05")
+
+	filename := fmt.Sprintf(
+		"Daily-oplog-%s-%d-%d_to_%d-%d.bson",
+		timestampText,
+		startTimestamp.T,
+		startTimestamp.I,
+		endTimestamp.T,
+		endTimestamp.I,
+	)
+
+	finalPath := filepath.Join(cfg.BackupDir, filename)
+	tempPath := finalPath + ".tmp"
+
+	entryCount, err := writeOplogRange(
+		ctx,
+		client,
+		tempPath,
+		startTimestamp,
+		endTimestamp,
+	)
+	if err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+
+	if entryCount == 0 {
+		_ = os.Remove(tempPath)
+		log.Println("No new oplog entries were found")
+		return nil
+	}
+
+	if err := os.Rename(tempPath, finalPath); err != nil {
+		_ = os.Remove(tempPath)
+		return fmt.Errorf("rename oplog backup: %w", err)
+	}
+
+	metadata := OplogMetadata{
+		Filename: filename,
+
+		StartSeconds:   startTimestamp.T,
+		StartIncrement: startTimestamp.I,
+
+		EndSeconds:   endTimestamp.T,
+		EndIncrement: endTimestamp.I,
+
+		EntryCount: entryCount,
+		CreatedAt:  time.Now(),
+	}
+
+	if err := saveOplogMetadata(finalPath+".json", metadata); err != nil {
+		/*
+			Do not advance the state if the metadata could not be written.
+			The BSON backup remains intact, allowing the situation to be
+			investigated manually.
+		*/
+		return fmt.Errorf("save oplog metadata: %w", err)
+	}
+
+	setStateTimestamp(state, endTimestamp)
+
+	log.Printf(
+		"Daily oplog backup completed: %s; entries=%d; range=%d:%d through %d:%d",
+		finalPath,
+		entryCount,
+		startTimestamp.T,
+		startTimestamp.I,
+		endTimestamp.T,
+		endTimestamp.I,
+	)
+
+	return nil
+}
+
+func writeOplogRange(
+	ctx context.Context,
+	client *mongo.Client,
+	outputPath string,
+	start primitive.Timestamp,
+	end primitive.Timestamp,
+) (int64, error) {
+	oplog := client.Database("local").Collection("oplog.rs")
+
+	filter := bson.D{
+		{
+			Key: "ts",
+			Value: bson.D{
+				{Key: "$gt", Value: start},
+				{Key: "$lte", Value: end},
+			},
+		},
+	}
+
+	findOptions := options.Find().
+		SetSort(bson.D{{Key: "$natural", Value: 1}}).
+		SetBatchSize(1000)
+
+	cursor, err := oplog.Find(ctx, filter, findOptions)
+	if err != nil {
+		return 0, fmt.Errorf("query oplog: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	file, err := os.OpenFile(
+		outputPath,
+		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+		0600,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("create oplog file: %w", err)
+	}
+
+	shouldDelete := true
+
+	defer func() {
+		_ = file.Close()
+
+		if shouldDelete {
+			_ = os.Remove(outputPath)
+		}
+	}()
+
+	var count int64
+
+	for cursor.Next(ctx) {
+		var raw bson.Raw
+
+		if err := cursor.Decode(&raw); err != nil {
+			return count, fmt.Errorf("decode oplog entry: %w", err)
+		}
+
+		/*
+			mongorestore expects a BSON stream: one complete BSON document
+			immediately followed by the next BSON document.
+		*/
+		if _, err := file.Write(raw); err != nil {
+			return count, fmt.Errorf("write oplog entry: %w", err)
+		}
+
+		count++
+	}
+
+	if err := cursor.Err(); err != nil {
+		return count, fmt.Errorf("read oplog cursor: %w", err)
+	}
+
+	if err := file.Sync(); err != nil {
+		return count, fmt.Errorf("flush oplog file: %w", err)
+	}
+
+	if err := file.Close(); err != nil {
+		return count, fmt.Errorf("close oplog file: %w", err)
+	}
+
+	shouldDelete = false
+
+	return count, nil
+}
+
+func createFullBackup(cfg Config, backupType string) error {
+	timestampText := time.Now().Format("2006-01-02-15-04-05")
+
+	var filename string
+
+	switch backupType {
+	case "Weekly":
+		filename = fmt.Sprintf(
+			"Weekly-refLedger_%s",
+			timestampText,
+		)
+
+	case "Monthly":
+		filename = fmt.Sprintf(
+			"Monthly-refLedger-%s",
+			timestampText,
+		)
+
+	case "Initial":
+		filename = fmt.Sprintf(
+			"Initial-refLedger-%s",
+			timestampText,
+		)
+
+	default:
+		return fmt.Errorf("unsupported backup type %q", backupType)
+	}
+
+	finalPath := filepath.Join(cfg.BackupDir, filename)
+	tempPath := finalPath + ".tmp"
+
+	/*
+		Do not use --db here.
+
+		--oplog requires a full dump of the replica-set member. The output
+		is a compressed directory containing all databases plus oplog.bson.gz.
+	*/
+	args := []string{
+		"--uri=" + cfg.MongoURI,
+		"--oplog",
+		"--gzip",
+		"--out=" + tempPath,
+	}
+
+	cmd := exec.Command("mongodump", args...)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_ = os.RemoveAll(tempPath)
+
+		return fmt.Errorf(
+			"mongodump failed: %w: %s",
+			err,
+			strings.TrimSpace(string(output)),
+		)
+	}
+
+	if err := os.Rename(tempPath, finalPath); err != nil {
+		_ = os.RemoveAll(tempPath)
+		return fmt.Errorf("rename full backup directory: %w", err)
+	}
+
+	log.Printf(
+		"%s full backup completed: %s",
+		backupType,
+		finalPath,
+	)
+
+	return nil
+}
+
+func getLatestOplogTimestamp(
+	ctx context.Context,
+	client *mongo.Client,
+) (primitive.Timestamp, error) {
+	oplog := client.Database("local").Collection("oplog.rs")
+
+	var entry struct {
+		Timestamp primitive.Timestamp `bson:"ts"`
+	}
+
+	err := oplog.FindOne(
+		ctx,
+		bson.D{},
+		options.FindOne().SetSort(
+			bson.D{{Key: "$natural", Value: -1}},
+		),
+	).Decode(&entry)
+
+	if err != nil {
+		return primitive.Timestamp{}, fmt.Errorf(
+			"read latest oplog entry: %w",
 			err,
 		)
 	}
 
-	log.Println("RefLedger MongoDB backup service started")
-	log.Printf("Database: %s", config.Database)
-	log.Printf("MongoDB URI: %s", sanitizeMongoURI(config.MongoURI))
-	log.Printf("Backup directory: %s", config.BackupDir)
-	log.Printf(
-		"Scheduled backup time: %02d:%02d",
-		config.BackupHour,
-		config.BackupMinute,
-	)
-	log.Println("Weekly backups run on Monday")
-	log.Println("Monthly backups run on the first day of the month")
-
-	/*
-		Check immediately when the application starts.
-
-		This allows a missed backup to run if the application starts after
-		the scheduled backup time.
-	*/
-	runScheduledBackups(config, time.Now())
-
-	ticker := time.NewTicker(defaultCheckInterval)
-	defer ticker.Stop()
-
-	for currentTime := range ticker.C {
-		runScheduledBackups(config, currentTime)
-	}
+	return entry.Timestamp, nil
 }
 
-func loadConfig() (Config, error) {
-	config := Config{
-		MongoURI:      getEnvironmentValue("MONGODB_URI", defaultMongoURI),
-		Database:      getEnvironmentValue("BACKUP_DATABASE", defaultDatabase),
-		BackupDir:     getEnvironmentValue("BACKUP_DIRECTORY", defaultBackupDir),
-		MongodumpPath: getEnvironmentValue("MONGODUMP_PATH", defaultMongodumpPath),
-		BackupHour:    defaultBackupHour,
-		BackupMinute:  defaultBackupMinute,
+func getOldestOplogTimestamp(
+	ctx context.Context,
+	client *mongo.Client,
+) (primitive.Timestamp, error) {
+	oplog := client.Database("local").Collection("oplog.rs")
+
+	var entry struct {
+		Timestamp primitive.Timestamp `bson:"ts"`
 	}
 
-	var err error
+	err := oplog.FindOne(
+		ctx,
+		bson.D{},
+		options.FindOne().SetSort(
+			bson.D{{Key: "$natural", Value: 1}},
+		),
+	).Decode(&entry)
 
-	config.BackupHour, err = getEnvironmentInteger(
-		"BACKUP_HOUR",
-		defaultBackupHour,
-	)
 	if err != nil {
-		return Config{}, err
-	}
-
-	config.BackupMinute, err = getEnvironmentInteger(
-		"BACKUP_MINUTE",
-		defaultBackupMinute,
-	)
-	if err != nil {
-		return Config{}, err
-	}
-
-	return config, nil
-}
-
-func validateConfig(config Config) error {
-	if strings.TrimSpace(config.MongoURI) == "" {
-		return errors.New("MONGODB_URI cannot be empty")
-	}
-
-	if strings.TrimSpace(config.Database) == "" {
-		return errors.New("BACKUP_DATABASE cannot be empty")
-	}
-
-	if strings.TrimSpace(config.BackupDir) == "" {
-		return errors.New("BACKUP_DIRECTORY cannot be empty")
-	}
-
-	if strings.TrimSpace(config.MongodumpPath) == "" {
-		return errors.New("MONGODUMP_PATH cannot be empty")
-	}
-
-	if config.BackupHour < 0 || config.BackupHour > 23 {
-		return fmt.Errorf(
-			"BACKUP_HOUR must be between 0 and 23; received %d",
-			config.BackupHour,
+		return primitive.Timestamp{}, fmt.Errorf(
+			"read oldest oplog entry: %w",
+			err,
 		)
 	}
 
-	if config.BackupMinute < 0 || config.BackupMinute > 59 {
+	return entry.Timestamp, nil
+}
+
+func verifyOplogStartStillExists(
+	ctx context.Context,
+	client *mongo.Client,
+	start primitive.Timestamp,
+) error {
+	oldest, err := getOldestOplogTimestamp(ctx, client)
+	if err != nil {
+		return err
+	}
+
+	if compareTimestamps(start, oldest) < 0 {
 		return fmt.Errorf(
-			"BACKUP_MINUTE must be between 0 and 59; received %d",
-			config.BackupMinute,
+			"oplog gap detected: last backup ended at %d:%d, "+
+				"but the oldest available oplog entry is %d:%d; "+
+				"create a new full backup before continuing",
+			start.T,
+			start.I,
+			oldest.T,
+			oldest.I,
 		)
 	}
 
 	return nil
 }
 
-func runScheduledBackups(config Config, currentTime time.Time) {
-	if !scheduledTimeReached(
-		currentTime,
-		config.BackupHour,
-		config.BackupMinute,
-	) {
-		return
-	}
-
-	/*
-		Daily backup always runs.
-	*/
-	runBackupIfMissing(config, "Daily", currentTime)
-
-	/*
-		Monday is time.Weekday value time.Monday.
-	*/
-	if currentTime.Weekday() == time.Monday {
-		runBackupIfMissing(config, "Weekly", currentTime)
-	}
-
-	/*
-		The first day of the month creates the monthly backup.
-	*/
-	if currentTime.Day() == 1 {
-		runBackupIfMissing(config, "Monthly", currentTime)
-	}
-}
-
-func scheduledTimeReached(
-	currentTime time.Time,
-	backupHour int,
-	backupMinute int,
-) bool {
-	if currentTime.Hour() > backupHour {
-		return true
-	}
-
-	if currentTime.Hour() == backupHour &&
-		currentTime.Minute() >= backupMinute {
-		return true
-	}
-
-	return false
-}
-
-func runBackupIfMissing(
-	config Config,
-	backupType string,
-	currentTime time.Time,
-) {
-	exists, err := backupExistsForDate(
-		config.BackupDir,
-		backupType,
-		config.Database,
-		currentTime,
-	)
-	if err != nil {
-		log.Printf(
-			"Could not check for an existing %s backup: %v",
-			backupType,
-			err,
-		)
-		return
-	}
-
-	if exists {
-		return
-	}
-
-	if err := createBackup(config, backupType, currentTime); err != nil {
-		log.Printf("%s backup failed: %v", backupType, err)
-		return
-	}
-
-	log.Printf("%s backup completed successfully", backupType)
-}
-
-func backupExistsForDate(
-	backupDirectory string,
-	backupType string,
-	database string,
-	currentTime time.Time,
-) (bool, error) {
-	datePrefix := currentTime.Format("2006-01-02")
-
-	var filenamePattern string
-
-	switch backupType {
-	case "Daily":
-		filenamePattern = fmt.Sprintf(
-			"Daily-%s-%s-*.archive.gz",
-			database,
-			datePrefix,
-		)
-
-	case "Weekly":
-		filenamePattern = fmt.Sprintf(
-			"Weekly-%s_%s-*.archive.gz",
-			database,
-			datePrefix,
-		)
-
-	case "Monthly":
-		filenamePattern = fmt.Sprintf(
-			"Monthly-%s-%s-*.archive.gz",
-			database,
-			datePrefix,
-		)
-
-	default:
-		return false, fmt.Errorf(
-			"unsupported backup type %q",
-			backupType,
-		)
-	}
-
-	fullPattern := filepath.Join(backupDirectory, filenamePattern)
-
-	matches, err := filepath.Glob(fullPattern)
-	if err != nil {
-		return false, fmt.Errorf(
-			"could not search for backup files using %q: %w",
-			fullPattern,
-			err,
-		)
-	}
-
-	return len(matches) > 0, nil
-}
-
-func createBackup(
-	config Config,
-	backupType string,
-	currentTime time.Time,
+func verifyReplicaSet(
+	ctx context.Context,
+	client *mongo.Client,
 ) error {
-	filename, err := buildBackupFilename(
-		backupType,
-		config.Database,
-		currentTime,
+	var result bson.M
+
+	err := client.Database("admin").RunCommand(
+		ctx,
+		bson.D{{Key: "hello", Value: 1}},
+	).Decode(&result)
+
+	if err != nil {
+		return err
+	}
+
+	setName, ok := result["setName"].(string)
+	if !ok || setName == "" {
+		return errors.New(
+			"MongoDB is not running as a replica-set member",
+		)
+	}
+
+	log.Printf("Connected to replica set: %s", setName)
+
+	return nil
+}
+
+func loadConfig() Config {
+	mongoURI := os.Getenv("MONGODB_URI")
+	if mongoURI == "" {
+		mongoURI = defaultMongoURI
+	}
+
+	backupDir := os.Getenv("MONGODB_BACKUP_DIR")
+	if backupDir == "" {
+		backupDir = defaultBackupDir
+	}
+
+	return Config{
+		MongoURI:  mongoURI,
+		BackupDir: backupDir,
+	}
+}
+
+func loadState(path string) (BackupState, error) {
+	var state BackupState
+
+	file, err := os.Open(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return state, nil
+	}
+	if err != nil {
+		return state, err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+
+	if err := decoder.Decode(&state); err != nil {
+		return state, err
+	}
+
+	state.LastOplogTimestamp = primitive.Timestamp{
+		T: state.LastSeconds,
+		I: state.LastIncrement,
+	}
+
+	return state, nil
+}
+
+func saveState(path string, state BackupState) error {
+	state.LastSeconds = state.LastOplogTimestamp.T
+	state.LastIncrement = state.LastOplogTimestamp.I
+
+	tempPath := path + ".tmp"
+
+	file, err := os.OpenFile(
+		tempPath,
+		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+		0600,
 	)
 	if err != nil {
 		return err
 	}
 
-	backupPath := filepath.Join(config.BackupDir, filename)
-	temporaryPath := backupPath + ".partial"
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
 
-	/*
-		Remove a leftover partial file from a previously interrupted backup.
-	*/
-	if err := os.Remove(temporaryPath); err != nil &&
-		!errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf(
-			"could not remove old partial backup %q: %w",
-			temporaryPath,
-			err,
-		)
+	if err := encoder.Encode(state); err != nil {
+		_ = file.Close()
+		_ = os.Remove(tempPath)
+		return err
 	}
 
-	log.Printf(
-		"Starting %s backup: %s",
-		backupType,
-		backupPath,
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		_ = os.Remove(tempPath)
+		return err
+	}
+
+	if err := file.Close(); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+
+	return os.Rename(tempPath, path)
+}
+
+func saveOplogMetadata(
+	path string,
+	metadata OplogMetadata,
+) error {
+	file, err := os.OpenFile(
+		path,
+		os.O_CREATE|os.O_WRONLY|os.O_TRUNC,
+		0600,
 	)
-
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		defaultBackupTimeout,
-	)
-	defer cancel()
-
-	args := []string{
-		"--uri=" + config.MongoURI,
-		"--db=" + config.Database,
-		"--archive=" + temporaryPath,
-		"--gzip",
-	}
-
-	command := exec.CommandContext(
-		ctx,
-		config.MongodumpPath,
-		args...,
-	)
-
-	output, commandErr := command.CombinedOutput()
-
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		_ = os.Remove(temporaryPath)
-
-		return fmt.Errorf(
-			"mongodump exceeded the %s timeout",
-			defaultBackupTimeout,
-		)
-	}
-
-	if commandErr != nil {
-		_ = os.Remove(temporaryPath)
-
-		return fmt.Errorf(
-			"mongodump returned an error: %w; output: %s",
-			commandErr,
-			strings.TrimSpace(string(output)),
-		)
-	}
-
-	fileInfo, err := os.Stat(temporaryPath)
 	if err != nil {
-		return fmt.Errorf(
-			"mongodump completed, but the backup file was not found: %w",
-			err,
-		)
+		return err
 	}
+	defer file.Close()
 
-	if fileInfo.Size() == 0 {
-		_ = os.Remove(temporaryPath)
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
 
-		return errors.New(
-			"mongodump created an empty backup file",
-		)
-	}
-
-	/*
-		Rename only after mongodump succeeds.
-
-		This prevents an incomplete backup from appearing to be a valid
-		completed backup.
-	*/
-	if err := os.Rename(temporaryPath, backupPath); err != nil {
-		return fmt.Errorf(
-			"could not rename completed backup to %q: %w",
-			backupPath,
-			err,
-		)
-	}
-
-	log.Printf(
-		"Created %s backup: %s (%s)",
-		backupType,
-		backupPath,
-		formatFileSize(fileInfo.Size()),
-	)
-
-	return nil
+	return encoder.Encode(metadata)
 }
 
-func buildBackupFilename(
-	backupType string,
-	database string,
-	currentTime time.Time,
-) (string, error) {
-	timestamp := currentTime.Format("2006-01-02-15-04-05")
-
-	switch backupType {
-	case "Daily":
-		return fmt.Sprintf(
-			"Daily-%s-%s.archive.gz",
-			database,
-			timestamp,
-		), nil
-
-	case "Weekly":
-		/*
-			This uses the underscore from your requested weekly pattern:
-
-			Weekly-refLedger_v2_2026-07-20-18-14-19
-		*/
-		return fmt.Sprintf(
-			"Weekly-%s_%s.archive.gz",
-			database,
-			timestamp,
-		), nil
-
-	case "Monthly":
-		return fmt.Sprintf(
-			"Monthly-%s-%s.archive.gz",
-			database,
-			timestamp,
-		), nil
-
-	default:
-		return "", fmt.Errorf(
-			"unsupported backup type %q",
-			backupType,
-		)
+func stateTimestamp(state BackupState) primitive.Timestamp {
+	return primitive.Timestamp{
+		T: state.LastSeconds,
+		I: state.LastIncrement,
 	}
 }
 
-func getEnvironmentValue(name string, defaultValue string) string {
-	value := strings.TrimSpace(os.Getenv(name))
-
-	if value == "" {
-		return defaultValue
-	}
-
-	return value
+func setStateTimestamp(
+	state *BackupState,
+	timestamp primitive.Timestamp,
+) {
+	state.LastOplogTimestamp = timestamp
+	state.LastSeconds = timestamp.T
+	state.LastIncrement = timestamp.I
 }
 
-func getEnvironmentInteger(
-	name string,
-	defaultValue int,
-) (int, error) {
-	value := strings.TrimSpace(os.Getenv(name))
-
-	if value == "" {
-		return defaultValue, nil
+func compareTimestamps(
+	left primitive.Timestamp,
+	right primitive.Timestamp,
+) int {
+	if left.T < right.T {
+		return -1
 	}
 
-	integerValue, err := strconv.Atoi(value)
-	if err != nil {
-		return 0, fmt.Errorf(
-			"%s must be an integer; received %q",
-			name,
-			value,
-		)
+	if left.T > right.T {
+		return 1
 	}
 
-	return integerValue, nil
+	if left.I < right.I {
+		return -1
+	}
+
+	if left.I > right.I {
+		return 1
+	}
+
+	return 0
 }
 
-func sanitizeMongoURI(uri string) string {
-	/*
-		Avoid displaying a MongoDB password in the log.
+func redactMongoURI(uri string) string {
+	at := strings.LastIndex(uri, "@")
+	scheme := strings.Index(uri, "://")
 
-		Example:
-
-		mongodb://username:password@localhost:27017
-
-		becomes:
-
-		mongodb://***:***@localhost:27017
-	*/
-	schemeIndex := strings.Index(uri, "://")
-	atIndex := strings.LastIndex(uri, "@")
-
-	if schemeIndex == -1 || atIndex == -1 || atIndex < schemeIndex {
+	if at == -1 || scheme == -1 || at < scheme {
 		return uri
 	}
 
-	return uri[:schemeIndex+3] + "***:***" + uri[atIndex:]
+	return uri[:scheme+3] + "***:***" + uri[at:]
 }
 
-func formatFileSize(size int64) string {
-	const (
-		kilobyte = 1024
-		megabyte = 1024 * kilobyte
-		gigabyte = 1024 * megabyte
-	)
-
-	switch {
-	case size >= gigabyte:
-		return fmt.Sprintf("%.2f GB", float64(size)/gigabyte)
-
-	case size >= megabyte:
-		return fmt.Sprintf("%.2f MB", float64(size)/megabyte)
-
-	case size >= kilobyte:
-		return fmt.Sprintf("%.2f KB", float64(size)/kilobyte)
-
-	default:
-		return fmt.Sprintf("%d bytes", size)
-	}
-}
+// Keep io imported if you later add streamed file compression.
+var _ io.Writer

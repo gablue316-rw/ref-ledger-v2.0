@@ -83,6 +83,12 @@ button:hover {
             required
         >
 
+        <label for="name">Name</label>
+        <input
+            id="name"
+            type="text"
+            required
+        >
         <label for="password">Password</label>
         <input
             id="password"
@@ -124,6 +130,7 @@ async function createAccount(event) {
     }
 
     const username = document.getElementById("username").value.trim().toLowerCase();
+    const name = document.getElementById("name").value.trim();
     const password = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirmPassword").value;
     const messageBox = document.getElementById("message");
@@ -143,6 +150,7 @@ async function createAccount(event) {
             },
             body: JSON.stringify({
                 username: username,
+                name: name,
                 password: password
             })
         });
