@@ -5109,7 +5109,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		TenantID:     tenantID,
 		Role:         role,
 		CreatedAt:    time.Now(),
-		Name:         "",
+		Name:         req.Name,
 	}
 
 	_, err = usersCollection.InsertOne(r.Context(), user)
