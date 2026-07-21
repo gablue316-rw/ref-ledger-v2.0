@@ -3,3 +3,6 @@ secrets/credentials.json
 
 # Sealed Secrets public certificate (generated from the current cluster)
 secrets/sealed-secrets-cert.pem
+
+# Token
+ref-ledger-docker/.env
