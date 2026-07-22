@@ -5409,7 +5409,7 @@ func main() {
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
 	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
 
-	http.Handle(
+	mux.Handle(
 		"/components/",
 		http.StripPrefix(
 			"/components/",
@@ -5419,7 +5419,7 @@ func main() {
 		),
 	)
 
-	http.Handle(
+	mux.Handle(
 		"/css/",
 		http.StripPrefix(
 			"/css/",
