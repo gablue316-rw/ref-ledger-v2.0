@@ -5410,6 +5410,10 @@ func main() {
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
 	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
 
+	mux.HandleFunc("/components-test", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "NEW BINARY IS RUNNING")
+	})
+
 	mux.HandleFunc("/debug/components", func(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Fprintln(w, "components route is active")
