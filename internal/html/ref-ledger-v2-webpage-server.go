@@ -98,6 +98,7 @@ var gc database.GameCollection
 var oc database.OfficialCollection
 var ec database.ExpensesCollection
 var se database.SessionsCollection
+var uc database.UsersCollection
 
 var AuditLog *log.Logger = nil
 
@@ -268,6 +269,53 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 		GameId:      strconv.Itoa(e.GameID),
 		Description: e.Description,
 	}
+
+}
+
+type UserSessionResponse struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	Name     string `json:"name"`
+}
+
+func getCurrentSession(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+
+	var tId string = database.TenantId
+	var err error
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	session, err := database.GetSession(r)
+
+	if err != nil {
+		http.Error(w, "Session not found", http.StatusUnauthorized)
+		return
+	}
+
+	name, err := uc.GetName(session.TenantID, session.Username)
+
+	if err != nil {
+		http.Error(w, "User  not found", http.StatusUnauthorized)
+		return
+	}
+
+	response := UserSessionResponse{
+		Username: session.Username,
+		Role:     session.Role,
+		Name:     name,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 
 }
 
@@ -5227,6 +5275,12 @@ func main() {
 		return
 	}
 
+	err = uc.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize users collection.")
+		utils.AuditLog.Println("Failed to initialize users collection.")
+		return
+	}
 	utils.AuditLog.Println("All collections initialized successfully.")
 
 	fmt.Println("Registering routes...")
@@ -5280,6 +5334,7 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/login.html")
 	})
 
+	mux.HandleFunc("/api/session", getCurrentSession)
 	mux.HandleFunc("/api/pod", PodInfoHandler)
 
 	mux.HandleFunc("/api/import/officials/preview", authRequired(readOnlyForbidden(PreviewOfficialsImportHandler)))

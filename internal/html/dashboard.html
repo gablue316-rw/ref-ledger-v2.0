@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ref Ledger V2.0 Game Dashboard</title>
 
+<link 
+rel="stylesheet" 
+href="/css/user-profile.css">
+
 <link rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 
@@ -83,6 +87,10 @@ body {
 
 .nav-links span {
     font-size: 13px;
+}
+
+.navbar {
+    justify-content: space-between;
 }
 
 .filters,
@@ -290,6 +298,28 @@ body {
             </a>
 
         </div>
+         <div id="user-profile-container">
+
+        <div class="user-profile">
+
+            <div id="user-avatar" class="user-avatar">
+               <i class="fa-solid fa-user"></i>
+            </div>
+
+            <div class="user-details">
+
+                <div id="user-name" class="user-name">
+                    Loading...
+                </div>
+
+                <div id="user-role" class="user-role">
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
     </nav>
 
     <div class="filters">
@@ -750,5 +780,6 @@ function clearFilters() {
 
 </script>
 
+<script src="/components/user-profile.js"></script>
 </body>
 </html>

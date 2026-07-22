@@ -3398,3 +3398,36 @@ func (sc *SessionsCollection) GetTenantID(sessionID string) (string, error) {
 
 	return session.TenantID, nil
 }
+
+type UsersCollection struct {
+	DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+func (uc *UsersCollection) Init(client *mongo.Client) error {
+
+	uc.DB = client.Database(Database)
+	uc.Coll = uc.DB.Collection("users")
+
+	fmt.Println("Successfully initialized Users Collection")
+	return nil
+}
+
+func (uc *UsersCollection) GetName(tenantId, username string) (string, error) {
+
+	filter := bson.M{
+		"tenantId": tenantId,
+		"username": username,
+	}
+
+	var user model.User
+
+	// Query to find all documents
+	err := uc.Coll.FindOne(context.TODO(), filter).Decode(&user)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve user: %v", err)
+	}
+
+	return user.Name, nil
+}
