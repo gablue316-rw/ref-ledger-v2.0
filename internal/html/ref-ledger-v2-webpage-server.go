@@ -282,6 +282,7 @@ func getCurrentSession(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
 
+	fmt.Println("getCurrentSession")
 	var tId string = database.TenantId
 	var err error
 
@@ -5408,6 +5409,12 @@ func main() {
 	mux.HandleFunc("/api/logout", Logout)
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
 	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
+
+	mux.HandleFunc("/debug/components", func(w http.ResponseWriter, r *http.Request) {
+
+		fmt.Fprintln(w, "components route is active")
+
+	})
 
 	mux.Handle(
 		"/components/",
