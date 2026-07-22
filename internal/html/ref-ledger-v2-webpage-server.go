@@ -5409,15 +5409,25 @@ func main() {
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
 	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
 
-	/*
-		mux.Handle("/images/", http.StripPrefix("/images/",
-			http.FileServer(http.Dir("internal/html/images"))))
+	http.Handle(
+		"/components/",
+		http.StripPrefix(
+			"/components/",
+			http.FileServer(
+				http.Dir("./internal/html/components"),
+			),
+		),
+	)
 
-
-			mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
-				http.ServeFile(w, r, "./internal/html/index.html")
-			}))
-	*/
+	http.Handle(
+		"/css/",
+		http.StripPrefix(
+			"/css/",
+			http.FileServer(
+				http.Dir("./internal/html/css"),
+			),
+		),
+	)
 
 	mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/index.html")

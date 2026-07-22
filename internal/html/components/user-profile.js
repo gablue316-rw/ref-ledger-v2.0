@@ -1,3 +1,5 @@
+console.log("user-profile.js loaded");
+
 async function loadUserProfile() {
 
 
@@ -8,15 +10,13 @@ async function loadUserProfile() {
             await fetch("/api/session");
 
 
-        if (!response.ok) {
-            return;
-        }
-
-
+        console.log("Status:", response.status);
+       
         const user =
             await response.json();
 
-
+        console.log("User:", user);
+        
         document
         .getElementById("user-name")
         .innerText =
@@ -51,23 +51,31 @@ async function loadUserProfile() {
 
 function getInitials(name) {
 
-
-    if (!name)
+    if (!name) {
         return "?";
+    }
 
 
     let parts =
         name
-        .replace("@"," ")
-        .replace("."," ")
+        .replace("@", " ")
+        .replace(".", " ")
         .split(" ");
 
 
+    let first =
+        parts[0] ? parts[0][0] : "";
+
+
+    let second =
+        parts.length > 1 && parts[1]
+            ? parts[1][0]
+            : "";
+
+
     return (
-        parts[0][0] +
-        (parts[1]?.[0] || "")
-    )
-    .toUpperCase();
+        first + second
+    ).toUpperCase();
 
 }
 
