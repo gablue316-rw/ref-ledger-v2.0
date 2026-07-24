@@ -4933,6 +4933,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("Game Filters",gameFilters)
+	
 	// 2. Query MongoDB
 
 	opts := options.Find().
