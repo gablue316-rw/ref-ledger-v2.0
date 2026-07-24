@@ -559,28 +559,29 @@ function renderGames(
                 <input
                     type="checkbox"
                     class="game-check"
-                    value="${game.gameId}">
+                    value="${game.GameId}">
             </td>
-            <td>${game.gameId || ""}</td>
-            <td>${game.date || ""}</td>
-            <td>${game.time || ""}</td>
-            <td>${game.sport || ""}</td>
-            <td>${game.site || ""}</td>
-            <td>${game.field || ""}</td>
-            <td>${game.numberOfGames || ""}</td>
-            <td>${game.level || ""}</td>
-            <td>${game.gameFee || ""}</td>
-            <td>${game.association || ""}</td>
+            <td>${game.GameId || ""}</td>
+            <td>${game.Date || ""}</td>
+            <td>${game.Time || ""}</td>
+            <td>${game.Sport || ""}</td>
+            <td>${game.Site || ""}</td>
+            <td>${game.Field || ""}</td>
+            <td>${game.NumOfGames ?? ""}</td>
+            <td>${game.Level || ""}</td>
+            <td>${game.GameFee || ""}</td>
+            <td>${game.Association || ""}</td>
             <td>
-                <span class="status ${getStatusClass(game.status)}">
-                    ${game.status || ""}
-                </span>
+               <span class="status ${getStatusClass(game.Status)}">
+                   ${game.Status || ""}
+               </span>
             </td>
-            <td>${game.officials || ""}</td>
+            <td>${game.Officials || ""}</td>
         `;
 
         tbody.appendChild(row);
-    });
+    });    
+
 }
 
 document.getElementById("selectAll").addEventListener("change", function () {
