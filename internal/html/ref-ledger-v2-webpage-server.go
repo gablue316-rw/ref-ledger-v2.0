@@ -5013,6 +5013,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 	*/
 
+	fmt.Println("Returning the following",gameView)
+
 	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
 
