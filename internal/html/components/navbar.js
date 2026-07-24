@@ -1,5 +1,5 @@
 //
-// Ref Ledger Shared Navbar
+// Ref Ledger shared navbar
 //
 
 document.addEventListener("DOMContentLoaded", async function () {
@@ -7,113 +7,43 @@ document.addEventListener("DOMContentLoaded", async function () {
     const container =
         document.getElementById("navbar-container");
 
-    if (!container)
+    if (!container) {
         return;
+    }
 
     try {
 
         const response =
             await fetch("/components/navbar.html");
 
-        if (!response.ok)
-            throw new Error("Unable to load navbar.");
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load navbar: HTTP ${response.status}`
+            );
+        }
 
         container.innerHTML =
             await response.text();
 
-        initializeNavbar();
-
         highlightCurrentPage();
 
-        loadUser();
+        initializeLogout();
 
-        loadGamesToday();
+        await loadCurrentUser();
 
-    }
-    catch (err) {
+    } catch (error) {
 
-        console.error(err);
+        console.error(
+            "Unable to initialize navbar:",
+            error
+        );
 
     }
 
 });
 
 //
-// Initialize dropdown menu
-//
-
-function initializeNavbar() {
-
-    const button =
-        document.getElementById("userMenuButton");
-
-    const menu =
-        document.getElementById("userDropdown");
-
-    if (!button || !menu)
-        return;
-
-    button.addEventListener("click", function (e) {
-
-        e.stopPropagation();
-
-        const expanded =
-            button.getAttribute("aria-expanded") === "true";
-
-        button.setAttribute(
-            "aria-expanded",
-            !expanded
-        );
-
-        menu.hidden = expanded;
-
-    });
-
-    menu.addEventListener("click", function (e) {
-
-        e.stopPropagation();
-
-    });
-
-    document.addEventListener("click", closeMenu);
-
-    document.addEventListener("keydown", function (e) {
-
-        if (e.key === "Escape")
-            closeMenu();
-
-    });
-
-    const logout =
-        document.getElementById("logoutBtn");
-
-    if (logout)
-        logout.addEventListener("click", logoutUser);
-
-}
-
-function closeMenu() {
-
-    const button =
-        document.getElementById("userMenuButton");
-
-    const menu =
-        document.getElementById("userDropdown");
-
-    if (!button || !menu)
-        return;
-
-    button.setAttribute(
-        "aria-expanded",
-        "false"
-    );
-
-    menu.hidden = true;
-
-}
-
-//
-// Highlight active page
+// Highlight the current page
 //
 
 function highlightCurrentPage() {
@@ -121,26 +51,30 @@ function highlightCurrentPage() {
     let page =
         window.location.pathname;
 
-    if (page === "/")
+    if (page === "/") {
         page = "home";
-    else
-        page = page.replace("/", "");
+    } else {
+        page = page
+            .replace(/^\/+/, "")
+            .replace(/\/+$/, "");
+    }
 
-    const link =
+    const activeLink =
         document.querySelector(
-            '[data-page="' + page + '"]'
+            `.nav-links a[data-page="${page}"]`
         );
 
-    if (link)
-        link.classList.add("active");
+    if (activeLink) {
+        activeLink.classList.add("active");
+    }
 
 }
 
 //
-// Load logged in user
+// Load logged-in user
 //
 
-async function loadUser() {
+async function loadCurrentUser() {
 
     const userName =
         document.getElementById("userName");
@@ -148,21 +82,25 @@ async function loadUser() {
     const userRole =
         document.getElementById("userRole");
 
+    if (!userName || !userRole) {
+        return;
+    }
+
     try {
 
         const response =
             await fetch("/api/session");
 
         if (response.status === 401) {
-
             window.location.href = "/login";
-
             return;
-
         }
 
-        if (!response.ok)
-            throw new Error();
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load session: HTTP ${response.status}`
+            );
+        }
 
         const session =
             await response.json();
@@ -176,8 +114,12 @@ async function loadUser() {
         userRole.textContent =
             formatRole(session.role);
 
-    }
-    catch (err) {
+    } catch (error) {
+
+        console.error(
+            "Unable to load user information:",
+            error
+        );
 
         userName.textContent =
             "Unknown User";
@@ -189,105 +131,23 @@ async function loadUser() {
 
 }
 
+//
+// Format roles such as site_admin
+//
+
 function formatRole(role) {
 
-    if (!role)
+    if (!role) {
         return "";
+    }
 
     return role
         .replaceAll("_", " ")
         .replaceAll("-", " ")
-        .replace(/\b\w/g, c => c.toUpperCase());
-
-}
-
-//
-// Games today
-//
-
-async function loadGamesToday() {
-
-    const count =
-        document.getElementById("gamesTodayCount");
-
-    if (!count)
-        return;
-
-    const today = getToday();
-
-    const params =
-        new URLSearchParams({
-            begindate: today,
-            enddate: today
-        });
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/dashboard?" + params.toString()
-            );
-
-        if (response.status === 404) {
-            count.textContent = "0";
-            return;
-        }
-
-        if (!response.ok)
-            throw new Error(
-                `Unable to load today's games: ${response.status}`
-            );
-
-        const result =
-            await response.json();
-
-        count.textContent =
-            gameCount(result);
-
-    } catch (error) {
-
-        console.error(
-            "Unable to load today's game count:",
-            error
+        .replace(
+            /\b\w/g,
+            character => character.toUpperCase()
         );
-
-        count.textContent = "0";
-    }
-}
-
-function gameCount(result) {
-
-    if (Array.isArray(result))
-        return result.length;
-
-    if (Array.isArray(result.games))
-        return result.games.length;
-
-    if (Array.isArray(result.data))
-        return result.data.length;
-
-    if (typeof result.count === "number")
-        return result.count;
-
-    return 0;
-
-}
-
-function getToday() {
-
-    const d = new Date();
-
-    const y = d.getFullYear();
-
-    const m =
-        String(d.getMonth() + 1)
-            .padStart(2, "0");
-
-    const day =
-        String(d.getDate())
-            .padStart(2, "0");
-
-    return `${y}-${m}-${day}`;
 
 }
 
@@ -295,24 +155,48 @@ function getToday() {
 // Logout
 //
 
-async function logoutUser() {
+function initializeLogout() {
+
+    const logoutButton =
+        document.getElementById("logoutBtn");
+
+    if (!logoutButton) {
+        return;
+    }
+
+    logoutButton.addEventListener(
+        "click",
+        logoutUser
+    );
+
+}
+
+async function logoutUser(event) {
+
+    event.preventDefault();
 
     try {
 
         const response =
             await fetch("/api/logout", {
-
                 method: "POST"
-
             });
 
-        if (response.ok)
-            window.location.href = "/login";
-        else
-            alert("Logout failed.");
+        if (!response.ok) {
+            throw new Error(
+                `Logout failed: HTTP ${response.status}`
+            );
+        }
 
-    }
-    catch {
+        window.location.href =
+            "/login";
+
+    } catch (error) {
+
+        console.error(
+            "Unable to log out:",
+            error
+        );
 
         alert("Logout failed.");
 

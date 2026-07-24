@@ -1,9 +1,5 @@
 <nav class="navbar">
 
-    <div class="logo">
-        Ref Ledger
-    </div>
-
     <div class="nav-links">
 
         <a href="/" data-page="home">
@@ -13,7 +9,7 @@
 
         <a href="/dashboard" data-page="dashboard">
             <i class="fa-solid fa-chart-column"></i>
-            <span>DASHBOARDS</span>
+            <span>Dashboard</span>
         </a>
 
         <a href="/reports" data-page="reports">
@@ -51,7 +47,7 @@
             <span>Payments</span>
         </a>
 
-        <a href="/gameStatus" data-page="status">
+        <a href="/gameStatus" data-page="gameStatus">
             <i class="fa-solid fa-rotate"></i>
             <span>Status</span>
         </a>
@@ -61,84 +57,27 @@
             <span>Contact</span>
         </a>
 
+        <a href="#" id="logoutBtn">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Logout</span>
+        </a>
+
     </div>
 
     <div class="user-profile">
 
-        <button
-            id="userMenuButton"
-            class="user-button"
-            type="button"
-            aria-expanded="false"
-        >
+        <div id="userAvatar" class="user-avatar">
+            <i class="fa-solid fa-user"></i>
+        </div>
 
-            <div class="user-avatar">
-                <i class="fa-solid fa-user-tie"></i>
+        <div class="user-details">
+
+            <div id="userName" class="user-name">
+                Loading...
             </div>
 
-            <div class="user-text">
-
-                <div id="userName" class="user-name">
-                    Loading...
-                </div>
-
-                <div id="userRole" class="user-role">
-                    User
-                </div>
-
+            <div id="userRole" class="user-role">
             </div>
-
-            <i class="fa-solid fa-chevron-down"></i>
-
-        </button>
-
-        <div
-            id="userDropdown"
-            class="user-dropdown"
-            hidden
-        >
-
-            <a
-                href="/games?today=true"
-                class="games-today"
-            >
-
-                <div class="games-icon">
-                    <i class="fa-solid fa-calendar-day"></i>
-                </div>
-
-                <div class="games-info">
-
-                    <div class="games-title">
-                        Games Today
-                    </div>
-
-                    <div
-                        id="gamesTodayCount"
-                        class="games-count"
-                    >
-                        0
-                    </div>
-
-                    <div class="games-label">
-                        Scheduled
-                    </div>
-
-                </div>
-
-            </a>
-
-            <button
-                id="logoutBtn"
-                class="logout-button"
-                type="button"
-            >
-
-                <i class="fa-solid fa-right-from-bracket"></i>
-
-                Logout
-
-            </button>
 
         </div>
 
