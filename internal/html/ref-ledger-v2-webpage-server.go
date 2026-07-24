@@ -4960,6 +4960,17 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if len(games) == 0 {
+       w.Header().Set("Content-Type", "application/json")
+       w.WriteHeader(http.StatusNotFound)
+
+       json.NewEncoder(w).Encode(map[string]string{
+           "message": "No games were found matching your search criteria.",
+       })
+
+       return
+    }
+	
 	for _, game := range games {
 
 		gameRec := model.GameDescriptor{

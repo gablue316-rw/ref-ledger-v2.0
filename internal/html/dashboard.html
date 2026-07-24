@@ -171,6 +171,26 @@ body {
     background-color: #f8fafc;
 }
 
+.dashboard-message {
+    margin-bottom: 15px;
+    padding: 15px;
+    border-radius: 8px;
+    font-weight: bold;
+    display: none;
+}
+
+.dashboard-message.info {
+    background: #e0f2fe;
+    color: #075985;
+    border: 1px solid #7dd3fc;
+}
+
+.dashboard-message.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
 .status {
     padding: 5px 10px;
     border-radius: 20px;
@@ -425,6 +445,14 @@ body {
         </button>
     </div>
 
+    <div
+        id="dashboardMessage"
+        class="dashboard-message"
+        role="status"
+        aria-live="polite"
+        style="display:none;">
+    </div>
+
     <table class="games-table">
         <thead>
             <tr>
@@ -490,38 +518,68 @@ function getStatusClass(status) {
     return "pending";
 }
 
-function renderGames(games) {
+function showMessage(message, type = "info") {
+    const div = document.getElementById("dashboardMessage");
+
+    div.className = `dashboard-message ${type}`;
+    div.textContent = message;
+    div.style.display = "block";
+}
+
+function hideMessage() {
+    const div = document.getElementById("dashboardMessage");
+
+    div.textContent = "";
+    div.className = "dashboard-message";
+    div.style.display = "none";
+}
+
+function renderGames(
+    games,
+    emptyMessage = "No games were found matching your search criteria.",
+    messageType = "info"
+) {
     const tbody = document.getElementById("gamesBody");
-
     tbody.innerHTML = "";
-    document.getElementById("selectAll").checked = false;
-    
-    games.forEach(game => {
-        const statusClass = getStatusClass(game.Status);
 
-        tbody.innerHTML += `
-            <tr>
-                <td>
-                    <input type="checkbox" class="game-check" value="${game.GameId}">
-                </td>
-                <td>${game.GameId}</td>
-                <td>${game.Date}</td>
-                <td>${game.Time}</td>
-                <td>${game.Sport}</td>
-                <td>${game.Site}</td>
-                <td>${game.Field}</td>
-                <td>${game.NumOfGames}</td>
-                <td>${game.Level}</td>
-                <td>${game.GameFee}</td>
-                <td>${game.Association}</td>
-                <td>
-                    <span class="status ${statusClass}">
-                        ${game.Status}
-                    </span>
-                </td>
-                <td>${game.Officials}</td>
-            </tr>
+    document.getElementById("selectAll").checked = false;
+
+    if (!games || games.length === 0) {
+        showMessage(emptyMessage, messageType);
+        return;
+    }
+
+    hideMessage();
+
+    games.forEach(game => {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>
+                <input
+                    type="checkbox"
+                    class="game-check"
+                    value="${game.gameId}">
+            </td>
+            <td>${game.gameId || ""}</td>
+            <td>${game.date || ""}</td>
+            <td>${game.time || ""}</td>
+            <td>${game.sport || ""}</td>
+            <td>${game.site || ""}</td>
+            <td>${game.field || ""}</td>
+            <td>${game.numberOfGames || ""}</td>
+            <td>${game.level || ""}</td>
+            <td>${game.gameFee || ""}</td>
+            <td>${game.association || ""}</td>
+            <td>
+                <span class="status ${getStatusClass(game.status)}">
+                    ${game.status || ""}
+                </span>
+            </td>
+            <td>${game.officials || ""}</td>
         `;
+
+        tbody.appendChild(row);
     });
 }
 
@@ -585,7 +643,10 @@ async function loadPendingGames() {
     const params = new URLSearchParams();
     params.append("status", "Pending");
 
-    await fetchGames(params);
+    await fetchGames(
+        params,
+        "There are currently no games in Pending status."
+    );
 }
 
 async function loadGames() {
@@ -614,28 +675,68 @@ async function loadGames() {
     await fetchGames(params);
 }
 
-async function fetchGames(params) {
+async function fetchGames(
+    params,
+    emptyMessage = "No games were found matching your search criteria."
+) {
+
+    hideMessage();
+
     try {
-        const response = await fetch(`/api/dashboard?${params.toString()}`);
+        const response = await fetch(
+            `/api/dashboard?${params.toString()}`
+        );
 
         console.log("Status:", response.status);
-        console.log("Content-Type:", response.headers.get("content-type"));
+        console.log(
+            "Content-Type:",
+            response.headers.get("content-type")
+        );
+
+
+        if (response.status === 404) {
+           let message = emptyMessage;
+
+           try {
+               const errorData = await response.json();
+
+               if (errorData.message) {
+                   message = errorData.message;
+               }
+            } catch {
+                // Use emptyMessage if the response is not JSON.
+            }
+
+            renderGames([], message, "info");
+            return;
+        }
 
         if (!response.ok) {
             const text = await response.text();
             console.error("Server returned:", text);
-            throw new Error(`HTTP ${response.status}`);
+
+            renderGames(
+                [],
+                "Unable to retrieve games from the server.",
+                "error"
+            );
+            return;
         }
 
         const games = await response.json();
 
         console.log("Games:", games);
 
-        renderGames(games);
+       renderGames(games, emptyMessage);
 
     } catch (err) {
-        console.error(err);
-        alert("Failed to load games.");
+        console.error("Failed to load games:", err);
+
+        renderGames(
+            [],
+            "Unable to connect to the server.",
+            "error"
+        );
     }
 }
 
