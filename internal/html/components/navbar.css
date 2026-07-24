@@ -2,6 +2,10 @@
     Ref Ledger shared navbar
 */
 
+.navbar,
+.navbar * {
+    box-sizing: border-box;
+}
 .navbar {
     position: relative;
     z-index: 100;
@@ -314,7 +318,7 @@
     Tablet and smaller desktop layout
 */
 
-@media (max-width: 1400px) {
+@media (max-width: 1550px) {
     .navbar {
         align-items: center;
         flex-wrap: wrap;
@@ -342,21 +346,11 @@
 */
 
 @media (max-width: 700px) {
-.navbar {
-    position: relative;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    box-sizing: border-box;
-    width: 100%;
-    padding: 14px 24px;
-    margin-bottom: 20px;
-    color: #ffffff;
-    background: #082b4f;
-    border-radius: 10px;
-    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
-}
+    .navbar {
+        align-items: center;
+        gap: 10px;
+        padding: 13px;
+    }
 
     .logo {
         margin: 0;
