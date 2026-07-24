@@ -310,26 +310,30 @@
     Tablet layout
 */
 
-@media (max-width: 1150px) {
+/*
+    Tablet and smaller desktop layout
+*/
+
+@media (max-width: 1400px) {
     .navbar {
-        align-items: flex-start;
+        align-items: center;
         flex-wrap: wrap;
     }
 
     .logo {
-        margin-top: 13px;
-    }
-
-    .nav-links {
-        order: 3;
-        width: 100%;
-        flex-basis: 100%;
-        justify-content: center;
-        flex-wrap: wrap;
+        margin: 0;
     }
 
     .user-profile {
         margin-left: auto;
+    }
+
+    .nav-links {
+        order: 3;
+        flex: 0 0 100%;
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
     }
 }
 
@@ -338,11 +342,21 @@
 */
 
 @media (max-width: 700px) {
-    .navbar {
-        align-items: center;
-        gap: 10px;
-        padding: 13px;
-    }
+.navbar {
+    position: relative;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px 24px;
+    margin-bottom: 20px;
+    color: #ffffff;
+    background: #082b4f;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
+}
 
     .logo {
         margin: 0;
