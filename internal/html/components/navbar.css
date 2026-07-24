@@ -2,32 +2,30 @@
     Ref Ledger shared navbar
 */
 
-.navbar,
-.navbar * {
-    box-sizing: border-box;
-}
 .navbar {
     position: relative;
     z-index: 100;
+
     display: flex;
     align-items: center;
-    gap: 20px;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+
+    box-sizing: border-box;
     width: 100%;
     padding: 14px 24px;
     margin-bottom: 20px;
+
     color: #ffffff;
     background: #082b4f;
     border-radius: 10px;
     box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
 }
 
-/*
-    Logo
-*/
-
 .logo {
     flex-shrink: 0;
-    margin-right: 10px;
+    margin: 0;
+
     color: #ffffff;
     font-size: 25px;
     font-weight: 700;
@@ -35,29 +33,42 @@
     white-space: nowrap;
 }
 
-/*
-    Main navigation links
-*/
+.user-profile {
+    position: relative;
+    flex-shrink: 0;
+    margin-left: auto;
+}
 
 .nav-links {
+    order: 3;
+
     display: flex;
-    flex: 1;
+    flex: 0 0 100%;
     align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
     gap: 5px;
+
+    width: 100%;
     min-width: 0;
 }
 
 .nav-links a {
     display: flex;
+    flex: 0 0 74px;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+
+    width: 74px;
     min-width: 74px;
     min-height: 62px;
     padding: 8px 9px;
+
     color: #ffffff;
     text-decoration: none;
     border-radius: 7px;
+
     transition:
         background-color 0.2s ease,
         transform 0.2s ease;
@@ -86,16 +97,6 @@
     font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
-}
-
-/*
-    User profile area
-*/
-
-.user-profile {
-    position: relative;
-    flex-shrink: 0;
-    margin-left: auto;
 }
 
 .user-button {
@@ -310,36 +311,6 @@
     font-size: 20px;
 }
 
-/*
-    Tablet layout
-*/
-
-/*
-    Tablet and smaller desktop layout
-*/
-
-@media (max-width: 1550px) {
-    .navbar {
-        align-items: center;
-        flex-wrap: wrap;
-    }
-
-    .logo {
-        margin: 0;
-    }
-
-    .user-profile {
-        margin-left: auto;
-    }
-
-    .nav-links {
-        order: 3;
-        flex: 0 0 100%;
-        width: 100%;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-}
 
 /*
     Mobile layout
@@ -375,6 +346,8 @@
     }
 
     .nav-links a {
+        flex: 0 0 68px;
+        width: 68px;
         min-width: 68px;
         min-height: 58px;
         padding: 7px;
@@ -413,6 +386,7 @@
     }
 
     .nav-links a {
+        flex: 0 0 calc(33.333% - 4px);
         width: calc(33.333% - 4px);
         min-width: 0;
     }
