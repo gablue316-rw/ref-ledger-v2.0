@@ -1,0 +1,147 @@
+<nav class="navbar">
+
+    <div class="logo">
+        Ref Ledger
+    </div>
+
+    <div class="nav-links">
+
+        <a href="/" data-page="home">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+
+        <a href="/dashboard" data-page="dashboard">
+            <i class="fa-solid fa-chart-column"></i>
+            <span>Dashboard</span>
+        </a>
+
+        <a href="/reports" data-page="reports">
+            <i class="fa-solid fa-file-lines"></i>
+            <span>Reports</span>
+        </a>
+
+        <a href="/games" data-page="games">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Games</span>
+        </a>
+
+        <a href="/officials" data-page="officials">
+            <i class="fa-solid fa-users"></i>
+            <span>Officials</span>
+        </a>
+
+        <a href="/associations" data-page="associations">
+            <i class="fa-solid fa-building-columns"></i>
+            <span>Associations</span>
+        </a>
+
+        <a href="/sites" data-page="sites">
+            <i class="fa-solid fa-location-dot"></i>
+            <span>Sites</span>
+        </a>
+
+        <a href="/expenses" data-page="expenses">
+            <i class="fa-solid fa-receipt"></i>
+            <span>Expenses</span>
+        </a>
+
+        <a href="/payments" data-page="payments">
+            <i class="fa-solid fa-dollar-sign"></i>
+            <span>Payments</span>
+        </a>
+
+        <a href="/gameStatus" data-page="status">
+            <i class="fa-solid fa-rotate"></i>
+            <span>Status</span>
+        </a>
+
+        <a href="/contact" data-page="contact">
+            <i class="fa-solid fa-envelope"></i>
+            <span>Contact</span>
+        </a>
+
+    </div>
+
+    <div class="user-profile">
+
+        <button
+            id="userMenuButton"
+            class="user-button"
+            type="button"
+            aria-expanded="false"
+        >
+
+            <div class="user-avatar">
+                <i class="fa-solid fa-user-tie"></i>
+            </div>
+
+            <div class="user-text">
+
+                <div id="userName" class="user-name">
+                    Loading...
+                </div>
+
+                <div id="userRole" class="user-role">
+                    User
+                </div>
+
+            </div>
+
+            <i class="fa-solid fa-chevron-down"></i>
+
+        </button>
+
+        <div
+            id="userDropdown"
+            class="user-dropdown"
+            hidden
+        >
+
+            <a
+                href="/games?today=true"
+                class="games-today"
+            >
+
+                <div class="games-icon">
+                    <i class="fa-solid fa-calendar-day"></i>
+                </div>
+
+                <div class="games-info">
+
+                    <div class="games-title">
+                        Games Today
+                    </div>
+
+                    <div
+                        id="gamesTodayCount"
+                        class="games-count"
+                    >
+                        0
+                    </div>
+
+                    <div class="games-label">
+                        Scheduled
+                    </div>
+
+                </div>
+
+            </a>
+
+            <button
+                id="logoutBtn"
+                class="logout-button"
+                type="button"
+            >
+
+                <i class="fa-solid fa-right-from-bracket"></i>
+
+                Logout
+
+            </button>
+
+        </div>
+
+    </div>
+
+</nav>

@@ -1,0 +1,419 @@
+/*
+    Ref Ledger shared navbar
+*/
+
+.navbar {
+    position: relative;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    padding: 14px 24px;
+    margin-bottom: 20px;
+    color: #ffffff;
+    background: #082b4f;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.18);
+}
+
+/*
+    Logo
+*/
+
+.logo {
+    flex-shrink: 0;
+    margin-right: 10px;
+    color: #ffffff;
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+}
+
+/*
+    Main navigation links
+*/
+
+.nav-links {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+}
+
+.nav-links a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 74px;
+    min-height: 62px;
+    padding: 8px 9px;
+    color: #ffffff;
+    text-decoration: none;
+    border-radius: 7px;
+    transition:
+        background-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.nav-links a:hover {
+    background: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+}
+
+.nav-links a.active {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.nav-links a:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+.nav-links i {
+    margin-bottom: 6px;
+    font-size: 21px;
+}
+
+.nav-links span {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/*
+    User profile area
+*/
+
+.user-profile {
+    position: relative;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+.user-button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 215px;
+    padding: 7px 10px;
+    color: #ffffff;
+    background: transparent;
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s ease;
+}
+
+.user-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.user-button:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+/*
+    User avatar
+*/
+
+.user-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    color: #ffffff;
+    background: linear-gradient(145deg, #1597c5, #2563eb);
+    border: 3px solid #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 3px 9px rgba(0, 0, 0, 0.25);
+}
+
+.user-avatar i {
+    font-size: 23px;
+}
+
+/*
+    User name and role
+*/
+
+.user-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.user-name {
+    max-width: 145px;
+    overflow: hidden;
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-role {
+    max-width: 145px;
+    margin-top: 3px;
+    overflow: hidden;
+    color: #cbd5e1;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+/*
+    Dropdown arrow
+*/
+
+.user-button > .fa-chevron-down {
+    color: #cbd5e1;
+    font-size: 12px;
+    transition: transform 0.2s ease;
+}
+
+.user-button[aria-expanded="true"] > .fa-chevron-down {
+    transform: rotate(180deg);
+}
+
+/*
+    User dropdown
+*/
+
+.user-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 1000;
+    width: 275px;
+    overflow: hidden;
+    color: #1e293b;
+    background: #ffffff;
+    border: 1px solid #dbe3ec;
+    border-radius: 13px;
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.28);
+}
+
+.user-dropdown[hidden] {
+    display: none;
+}
+
+/*
+    Games Today section
+*/
+
+.games-today {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 22px;
+    color: #1e293b;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+
+.games-today:hover {
+    background: #f8fafc;
+}
+
+.games-today:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: -3px;
+}
+
+.games-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    color: #2563eb;
+    background: #dbeafe;
+    border-radius: 50%;
+}
+
+.games-icon i {
+    font-size: 28px;
+}
+
+.games-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.games-title {
+    color: #334155;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.games-count {
+    margin: 3px 0;
+    color: #2563eb;
+    font-size: 35px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.games-label {
+    color: #64748b;
+    font-size: 13px;
+}
+
+/*
+    Logout button
+*/
+
+.logout-button {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 18px 22px;
+    color: #b91c1c;
+    background: #ffffff;
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 700;
+    text-align: left;
+    transition: background-color 0.2s ease;
+}
+
+.logout-button:hover {
+    background: #fef2f2;
+}
+
+.logout-button:focus-visible {
+    outline: 2px solid #dc2626;
+    outline-offset: -3px;
+}
+
+.logout-button i {
+    width: 24px;
+    font-size: 20px;
+}
+
+/*
+    Tablet layout
+*/
+
+@media (max-width: 1150px) {
+    .navbar {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .logo {
+        margin-top: 13px;
+    }
+
+    .nav-links {
+        order: 3;
+        width: 100%;
+        flex-basis: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .user-profile {
+        margin-left: auto;
+    }
+}
+
+/*
+    Mobile layout
+*/
+
+@media (max-width: 700px) {
+    .navbar {
+        align-items: center;
+        gap: 10px;
+        padding: 13px;
+    }
+
+    .logo {
+        margin: 0;
+        font-size: 21px;
+    }
+
+    .user-button {
+        min-width: auto;
+        padding: 5px;
+    }
+
+    .user-text {
+        display: none;
+    }
+
+    .user-button > .fa-chevron-down {
+        display: none;
+    }
+
+    .nav-links {
+        gap: 4px;
+    }
+
+    .nav-links a {
+        min-width: 68px;
+        min-height: 58px;
+        padding: 7px;
+    }
+
+    .nav-links i {
+        font-size: 19px;
+    }
+
+    .nav-links span {
+        font-size: 11px;
+    }
+
+    .user-avatar {
+        width: 44px;
+        height: 44px;
+    }
+
+    .user-dropdown {
+        right: 0;
+        width: 255px;
+    }
+}
+
+/*
+    Very small screens
+*/
+
+@media (max-width: 430px) {
+    .navbar {
+        justify-content: space-between;
+    }
+
+    .nav-links {
+        justify-content: flex-start;
+    }
+
+    .nav-links a {
+        width: calc(33.333% - 4px);
+        min-width: 0;
+    }
+
+    .user-dropdown {
+        position: fixed;
+        top: 75px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+    }
+}
