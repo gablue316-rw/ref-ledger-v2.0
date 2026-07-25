@@ -399,6 +399,11 @@ document.getElementById("deleteBtn").addEventListener("click", async function ()
             response.ok
                 ? message || "Game deleted successfully."
                 : message || "Error deleting game.";
+
+        // Reload the navbar count after a successful delete.
+        if (response.ok && typeof loadPendingGamesToday === "function") {
+            await loadPendingGamesToday();
+}
     
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
