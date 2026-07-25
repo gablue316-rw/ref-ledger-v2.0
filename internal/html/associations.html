@@ -6,6 +6,7 @@
     <title>Ref Ledger V2.0 Associations</title>
     <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">    
+    <link rel="stylesheet" href="/components/navbar.css"> 
 
     <style>
 
@@ -17,14 +18,14 @@
         }
 
         body {
-            background-color: #f4f6f9;
-            padding: 20px;
-            color: #333;
+           background-color: #f4f6f9;
+           color: #333;
         }
 
         .container {
-            max-width: 1000px;
-            margin: auto;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
         }
 
         .header {
@@ -38,62 +39,6 @@
         .header h1 {
             margin-bottom: 10px;
         }
-
- .navbar {
-    background: #082b4f;
-    color: white;
-    display: flex;
-    align-items: center;
-    padding: 15px 30px;
-}
-
-.logo {
-    font-size: 28px;
-    font-weight: bold;
-    margin-right: 40px;
-    white-space: nowrap;
-}
-
-.nav-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.nav-links a {
-    color: white;
-    text-decoration: none;
-
-    display: flex;
-    flex-direction: column;
-
-    align-items: center;
-    justify-content: center;
-
-    min-width: 90px;
-    padding: 10px;
-
-    border-radius: 6px;
-
-    transition: .2s;
-}
-
-.nav-links a:hover {
-    background: rgba(255,255,255,.10);
-}
-
-.nav-links a.active {
-    background: rgba(255,255,255,.15);
-}
-
-.nav-links i {
-    font-size: 22px;
-    margin-bottom: 6px;
-}
-
-.nav-links span {
-    font-size: 13px;
-}
 
         .form-card {
             background-color: white;
@@ -280,82 +225,14 @@
 
 <body>
 
+<div id="navbar-container"></div>   
+
 <div class="container">
 
     <div class="header">
         <h1>Ref Ledger V2.0 Associations</h1>
         <p>Manage your Associations</p>
     </div>
-
-
-
-<nav class="navbar">
-
-    <div class="nav-links">
-
-        <a href="/">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
-
-        <a href="/dashboard">
-            <i class="fa-solid fa-chart-column"></i>
-            <span>Dashboard</span>
-        </a>
-
-        <a href="/reports">
-            <i class="fa-solid fa-file-lines"></i>
-            <span>Reports</span>
-        </a>
-
-        <a  href="/games">
-            <i class="fa-solid fa-calendar-days"></i>
-            <span>Games</span>
-        </a>
-
-        <a href="/officials">
-            <i class="fa-solid fa-users"></i>
-            <span>Officials</span>
-        </a>
-
-        <a class="active" href="/associations">
-            <i class="fa-solid fa-building-columns"></i>
-            <span>Associations</span>
-        </a>
-
-        <a href="/sites">
-            <i class="fa-solid fa-location-dot"></i>
-            <span>Sites</span>
-        </a>
-
-        <a href="/expenses">
-            <i class="fa-solid fa-receipt"></i>
-            <span>Expenses</span>
-        </a>
-
-        <a href="/payments">
-            <i class="fa-solid fa-dollar-sign"></i>
-            <span>Payments</span>
-        </a>
-
-        <a href="/gameStatus">
-            <i class="fa-solid fa-rotate"></i>
-            <span>Status</span>
-        </a>
-
-        <a href="/contact">
-            <i class="fa-solid fa-envelope"></i>
-            <span>Contact</span>
-        </a>   
-
-        <a href="#" id="logoutBtn">
-            <i class="fa-solid fa-right-from-bracket"></i>
-            <span>Logout</span>
-        </a>        
-        
-    </div>
-
-</nav>
 
 
     <div class="form-card">
@@ -475,6 +352,8 @@
 
 </div>
 
+<script src="/components/navbar.js"></script>
+
 <script>
 
 document
@@ -483,25 +362,6 @@ document
         window.location.href = "/importAssociations";
     });
 
-document.getElementById("logoutBtn").addEventListener("click", async () => {
-
-    try {
-
-        const response = await fetch("/api/logout", {
-            method: "POST"
-        });
-
-        if (response.ok) {
-            window.location.href = "/login";
-        } else {
-            alert("Logout failed");
-        }
-
-    } catch(err) {
-        alert("Logout failed");
-    }
-
-});        
 
 document.getElementById("clearAssocBtn").addEventListener("click", function () {
     document.getElementById("associationForm").reset();
