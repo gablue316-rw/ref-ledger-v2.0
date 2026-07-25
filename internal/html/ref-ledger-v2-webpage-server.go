@@ -4833,12 +4833,12 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func GetTodaysPendingGameCount(w http.ResponseWriter, r *http.Request) {
+func GetPendingGamesCount(w http.ResponseWriter, r *http.Request) {
 
 	var tId string = database.TenantId
 	var err error
 	
-	fmt.Println("GetTodaysPendingGameCount has been called")
+	fmt.Println("GetPendingGamesCount has been called")
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -4853,7 +4853,7 @@ func GetTodaysPendingGameCount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, count, err := gc.GetTodaysPendingGames(tId)
+	_, oneDayCount, err := gc.GetTodaysPendingGames(tId)
 
 	if err != nil {
 		http.Error(
@@ -4864,15 +4864,29 @@ func GetTodaysPendingGameCount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	_, sevenDayCount, err := gc.Get7DayPendingGames(tId)
+
+	if err != nil {
+		http.Error(
+			w,
+			`{"success":false,"message":"Failed to retrieve next 7 day's pending games"}`,
+			http.StatusInternalServerError,
+		)
+		return
+	}
+	
+
 	response := struct {
 		Success bool `json:"success"`
-		Count   int  `json:"count"`
+		OneDayCount   int  `json:"oneDayCount"`
+		SevenDayCount int `json:"sevenDayCount"`
 	}{
 		Success: true,
-		Count:   count,
+		OneDayCount:   oneDayCount,
+        SevenDayCount: sevenDayCount,
 	}
 
-	fmt.Println("Response Success:",response.Success,"Count:",response.Count)
+	fmt.Println("Response Success:",response.Success,"One Day Count:",response.OneDayCount, "Seven Day Count:",response.SevenDayCount)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		fmt.Printf("Failed to encode pending game count: %v\n", err)
 	}
@@ -5396,7 +5410,7 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/login.html")
 	})
 
-	mux.HandleFunc("/api/games/pending-today/count",GetTodaysPendingGameCount)
+	mux.HandleFunc("/api/games/pending-games/count",GetPendingGamesCount)
 
 	mux.HandleFunc("/api/session", getCurrentSession)
 	mux.HandleFunc("/api/pod", PodInfoHandler)

@@ -2735,6 +2735,45 @@ func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
 }
 
+func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int, error) {
+
+	// Beginning of today (local time)
+	now := time.Now()
+	start := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day(),
+		0, 0, 0, 0,
+		now.Location(),
+	)
+
+	// Beginning of 7 days from now
+	end := start.Add(7 * 24 * time.Hour)
+
+	filter := bson.M{
+		"tenantId": tId,
+		"status":   "Pending",
+		"gameDateTime": bson.M{
+			"$gte": start,
+			"$lt":  end,
+		},
+	}
+
+	cursor, err := gc.Coll.Find(context.TODO(), filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	
+	var games []model.GameDoc
+	if err := cursor.All(context.TODO(), &games); err != nil {
+		return nil, 0, err
+	}
+
+	fmt.Println("database/Get7DayPendingGames returning ",len(games), "games")
+	return games, len(games), nil
+
+}
+
 func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, int, error) {
 
 	// Beginning of today (local time)

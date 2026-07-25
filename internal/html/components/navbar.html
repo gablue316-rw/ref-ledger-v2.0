@@ -17,18 +17,20 @@
             <span>Reports</span>
         </a>
 
-<a href="/games" data-page="games">
-    <i class="fa-solid fa-calendar-days"></i>
-    <span>Games</span>
+        <a href="/games" data-page="games">
+            <i class="fa-solid fa-calendar-days"></i>
+            <span>Games</span>
 
-    <span
-        id="pendingGamesToday"
-        class="nav-count-badge"
-        aria-label="Pending games today"
-    >
-        0
-    </span>
-</a>
+            <span
+                id="pendingGames"
+                class="nav-count-badge"
+                aria-live="polite"
+                aria-label="0 pending games today and 0 pending games in the next 7 days"
+                title="Pending games: Today / Next 7 Days"
+            >
+                0/0
+            </span>
+        </a>
 
         <a href="/officials" data-page="officials">
             <i class="fa-solid fa-users"></i>

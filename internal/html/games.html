@@ -401,8 +401,8 @@ document.getElementById("deleteBtn").addEventListener("click", async function ()
                 : message || "Error deleting game.";
 
         // Reload the navbar count after a successful delete.
-        if (response.ok && typeof loadPendingGamesToday === "function") {
-            await loadPendingGamesToday();
+        if (response.ok && typeof loadPendingGames === "function") {
+            await loadPendingGames();
 }
     
     } catch(err) {
@@ -527,8 +527,8 @@ document.getElementById("gameForm").addEventListener("submit", async function(e)
             message || "Game saved successfully.";
 
         // Reload the navbar count after a successful save.
-        if (typeof loadPendingGamesToday === "function") {
-            await loadPendingGamesToday();
+        if (typeof loadPendingGames === "function") {
+            await loadPendingGames();
         }
 
     } catch (err) {

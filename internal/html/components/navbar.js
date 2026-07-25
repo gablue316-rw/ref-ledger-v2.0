@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         initializeLogout();
 
         await loadCurrentUser();
-        await loadPendingGamesToday();
+        await loadPendingGames();
 
     } catch (error) {
 
@@ -133,13 +133,13 @@ async function loadCurrentUser() {
 }
 
 //
-// Load today's pending game count
+// Load  pending game counts
 //
 
-async function loadPendingGamesToday() {
+async function loadPendingGames() {
 
     const badge =
-        document.getElementById("pendingGamesToday");
+        document.getElementById("pendingGames");
 
     if (!badge) {
         return;
@@ -148,7 +148,7 @@ async function loadPendingGamesToday() {
     try {
 
         const response =
-            await fetch("/api/games/pending-today/count");
+            await fetch("/api/games/pending-games/count");
 
         if (!response.ok) {
             throw new Error(
@@ -159,14 +159,18 @@ async function loadPendingGamesToday() {
         const result =
             await response.json();
 
-        const count =
-            result.count ?? 0;
+        const oneDayCount =
+            result.oneDayCount ?? 0;
+
+        const sevenDayCount = 
+            result.sevenDayCount ?? 0;
 
         badge.textContent =
-            count;
-
+            `${oneDayCount}/${sevenDayCount}`;
+        
         badge.title =
-            `${count} pending game${count === 1 ? "" : "s"} today`;
+            `${oneDayCount} pending game${oneDayCount === 1 ? "" : "s"} today / ` +
+            `${sevenDayCount} total pending game${sevenDayCount === 1 ? "" : "s"} through the next 7 days`;
 
         badge.setAttribute(
             "aria-label",
@@ -176,7 +180,7 @@ async function loadPendingGamesToday() {
     } catch (error) {
 
         console.error(
-            "Unable to load today's pending game count:",
+            "Unable to load pending games count:",
             error
         );
 
@@ -186,6 +190,11 @@ async function loadPendingGamesToday() {
         badge.title =
             "Unable to load pending games";
 
+        badge.setAttribute(
+            "aria-label",
+            badge.title
+        );
+    
     }
 
 }
