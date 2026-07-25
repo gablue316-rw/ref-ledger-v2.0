@@ -4804,9 +4804,7 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//
-	// Replace Site Id with Site Name
-	//
+	
 	if tId == "na" {
 		fmt.Println("Invalid Tenant Id")
 		tId, err = getTenantId(r)
@@ -4817,6 +4815,9 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	//
+	// Replace Site Id with Site Name
+	//
 	siteName, err := sc.GetSiteName(game.Site, tId)
 
 	if err == nil {
@@ -4830,6 +4831,50 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(game)
 
+}
+
+func GetTodaysPendingGameCount(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+	
+	fmt.Println("GetTodaysPendingGameCount has been called")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Use your application's tenant ID.
+	if tId == "na" {
+		fmt.Println("Invalid Tenant Id")
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	_, count, err := gc.GetTodaysPendingGames(tId)
+
+	if err != nil {
+		http.Error(
+			w,
+			`{"success":false,"message":"Failed to retrieve today's pending games"}`,
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	response := struct {
+		Success bool `json:"success"`
+		Count   int  `json:"count"`
+	}{
+		Success: true,
+		Count:   count,
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("Failed to encode pending game count: %v\n", err)
+	}
 }
 
 func GetGames(w http.ResponseWriter, r *http.Request) {
@@ -5349,6 +5394,8 @@ func main() {
 	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/login.html")
 	})
+
+	mux.HandleFunc("/api/games/pending-today/count",GetTodaysPendingGameCount)
 
 	mux.HandleFunc("/api/session", getCurrentSession)
 	mux.HandleFunc("/api/pod", PodInfoHandler)

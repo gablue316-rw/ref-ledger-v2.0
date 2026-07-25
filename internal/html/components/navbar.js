@@ -30,6 +30,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         initializeLogout();
 
         await loadCurrentUser();
+        await loadPendingGamesToday();
 
     } catch (error) {
 
@@ -126,6 +127,64 @@ async function loadCurrentUser() {
 
         userRole.textContent =
             "";
+
+    }
+
+}
+
+//
+// Load today's pending game count
+//
+
+async function loadPendingGamesToday() {
+
+    const badge =
+        document.getElementById("pendingGamesToday");
+
+    if (!badge) {
+        return;
+    }
+
+    try {
+
+        const response =
+            await fetch("/api/games/pending-today/count");
+
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load pending game count: HTTP ${response.status}`
+            );
+        }
+
+        const result =
+            await response.json();
+
+        const count =
+            result.count ?? 0;
+
+        badge.textContent =
+            count;
+
+        badge.title =
+            `${count} pending game${count === 1 ? "" : "s"} today`;
+
+        badge.setAttribute(
+            "aria-label",
+            badge.title
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Unable to load today's pending game count:",
+            error
+        );
+
+        badge.textContent =
+            "—";
+
+        badge.title =
+            "Unable to load pending games";
 
     }
 
