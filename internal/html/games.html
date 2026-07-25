@@ -491,32 +491,46 @@ document.getElementById("gameForm").addEventListener("submit", async function(e)
         assignor: document.getElementById("assignor").value
     };
 
-    if (game.status == "Cancelled") {
+    if (game.status === "Cancelled") {
         game.gameFee = 0;
         game.travelPay = 0;
         game.assignorFee = 0;
         game.deductions = 0;
+
         document.getElementById("message").innerText =
-            "Clearing Game Financials";       
+            "Clearing Game Financials";
     }
 
     try {
         const response = await fetch("/api/game-update", {
             method: "POST",
-            headers: {"Content-Type":"application/json"},
+            headers: {
+                "Content-Type": "application/json"
+            },
             body: JSON.stringify(game)
         });
 
         const message = await response.text();
 
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Game saved successfully."
-                : message || "Error saving game.";
+        if (!response.ok) {
+            document.getElementById("message").innerText =
+                message || "Error saving game.";
+            return;
+        }
 
-            
-    } catch(err) {
-        document.getElementById("message").innerText = "Server unavailable.";
+        document.getElementById("message").innerText =
+            message || "Game saved successfully.";
+
+        // Reload the navbar count after a successful save.
+        if (typeof loadPendingGamesToday === "function") {
+            await loadPendingGamesToday();
+        }
+
+    } catch (err) {
+        console.error("Unable to save game:", err);
+
+        document.getElementById("message").innerText =
+            "Server unavailable.";
     }
 });
 </script>
