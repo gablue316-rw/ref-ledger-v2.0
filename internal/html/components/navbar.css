@@ -279,3 +279,22 @@
         height: 40px;
     }
 }
+
+/* Temporary navbar diagnostic */
+
+#navbar-container nav.navbar {
+    background-color: #082b4f !important;
+    min-height: 90px !important;
+}
+
+#navbar-container .nav-links a {
+    color: #ffffff !important;
+}
+
+#navbar-container .nav-links a i {
+    display: inline-block !important;
+    color: #ffcc00 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    font-size: 24px !important;
+}
