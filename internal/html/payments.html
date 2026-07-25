@@ -538,33 +538,34 @@ function renderGames(games) {
 }
 
 async function loadCompletedGames() {
-    
+
     const params = new URLSearchParams();
     params.append("status", "Completed");
 
-       try {
+    try {
         const response = await fetch(`/api/dashboard?${params.toString()}`);
 
-        console.log("Status:", response.status);
-        console.log("Content-Type:", response.headers.get("content-type"));
+        // No completed games found
+        if (response.status === 404) {
+            messageBox.innerText = "No games are currently in Completed status.";
+            renderGames([]);
+            return;
+        }
 
         if (!response.ok) {
-            const text = await response.text();
-            console.error("Server returned:", text);
             throw new Error(`HTTP ${response.status}`);
         }
 
         const games = await response.json();
 
-        console.log("Completed Games:", games);
+        messageBox.innerText = `${games.length} completed game(s) available for payment.`;
 
         renderGames(games);
 
     } catch (err) {
         console.error(err);
-        alert("Failed to load completed games.");
+        messageBox.innerText = "Unable to load completed games.";
     }
-
 }
 </script>
 
