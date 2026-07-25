@@ -2769,6 +2769,7 @@ func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, in
 		return nil, 0, err
 	}
 
+	fmt.Println("database/GetTodaysPendingGames returning ",len(games), "games")
 	return games, len(games), nil
 
 }

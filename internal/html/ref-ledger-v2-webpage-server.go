@@ -4872,6 +4872,7 @@ func GetTodaysPendingGameCount(w http.ResponseWriter, r *http.Request) {
 		Count:   count,
 	}
 
+	fmt.Println("Response Success:",response.Success,"Count:",response.Count)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		fmt.Printf("Failed to encode pending game count: %v\n", err)
 	}
