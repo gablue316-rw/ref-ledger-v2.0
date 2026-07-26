@@ -486,7 +486,7 @@ async function loadAssociations() {
     }
 }
 
-async function loadPendingGames() {
+async function loadPendingGamesTable() {
     const params = new URLSearchParams();
     params.append("status", "Pending");
 
@@ -663,8 +663,8 @@ async function loadOfficials() {
 document.addEventListener("DOMContentLoaded", function() {
     loadSites();  
     loadAssociations();
-    loadPendingGames();
     loadOfficials();
+    loadPendingGamesTable();    
 })
 
 async function updateSelectedStatus() {
@@ -706,7 +706,12 @@ async function updateSelectedStatus() {
 
         document.getElementById("bulkStatus").value = "";
 
-        loadPendingGames();
+        await loadPendingGamesTable();
+
+        // Refresh navbar counts.
+        if (typeof loadPendingGames === "function") {
+           await loadPendingGames();
+        }
 
     } catch (err) {
         console.error(err);
@@ -725,7 +730,7 @@ function clearFilters() {
     document.getElementById("sport").value = "";
     document.getElementById("official").value = "";
 
-    loadPendingGames();
+    loadPendingGamesTable();
 }
 
 </script>
