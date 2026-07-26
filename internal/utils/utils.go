@@ -29,11 +29,24 @@ func GetLogFilePath() string {
 	fmt.Println("Getting log file path from environment variable LOG_FILE_PATH...")
 	logFilePath := os.Getenv("LOG_FILE_PATH")
 	if logFilePath == "" {
-		log.Fatal("LOG_FILE_PATH environment variable is not set")
+		logFilePath = "./logs/ref-ledgerV2-webServer.log"
 	}
 
 	fmt.Println("Log file path:", logFilePath)
 	return logFilePath
+}
+
+func GetMongoDbName() string {
+
+	fmt.Println("Getting MongoDB Name from environment variable MONGODB_NAME...")
+	dbName := os.Getenv("MONGODB_NAME")
+	if dbName == "" {
+		dbName = "refLedger_v2"
+	}
+
+	fmt.Println("MongoDB Name:", dbName)
+	return dbName
+
 }
 
 func GetMongoURI() string {
@@ -41,7 +54,7 @@ func GetMongoURI() string {
 	fmt.Println("Getting MongoDB URI from environment variable MONGODB_URI...")
 	uri := os.Getenv("MONGODB_URI")
 	if uri == "" {
-		log.Fatal("MONGODB_URI environment variable is not set")
+		uri = "mongodb://localhost:27017/?replicaSet=refLedgerRS"
 	}
 
 	fmt.Println("MongoDB URI:", uri)

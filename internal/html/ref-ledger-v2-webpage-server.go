@@ -46,6 +46,7 @@ import (
 
 var Client *mongo.Client
 var uri string
+var dbName string
 
 /* July 18, 2026 */
 type Game struct {
@@ -4804,7 +4805,6 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	
 	if tId == "na" {
 		fmt.Println("Invalid Tenant Id")
 		tId, err = getTenantId(r)
@@ -4837,7 +4837,7 @@ func GetPendingGamesCount(w http.ResponseWriter, r *http.Request) {
 
 	var tId string = database.TenantId
 	var err error
-	
+
 	fmt.Println("GetPendingGamesCount has been called")
 
 	w.Header().Set("Content-Type", "application/json")
@@ -4874,19 +4874,18 @@ func GetPendingGamesCount(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	
 
 	response := struct {
-		Success bool `json:"success"`
+		Success       bool `json:"success"`
 		OneDayCount   int  `json:"oneDayCount"`
-		SevenDayCount int `json:"sevenDayCount"`
+		SevenDayCount int  `json:"sevenDayCount"`
 	}{
-		Success: true,
+		Success:       true,
 		OneDayCount:   oneDayCount,
-        SevenDayCount: sevenDayCount,
+		SevenDayCount: sevenDayCount,
 	}
 
-	fmt.Println("Response Success:",response.Success,"One Day Count:",response.OneDayCount, "Seven Day Count:",response.SevenDayCount)
+	fmt.Println("Response Success:", response.Success, "One Day Count:", response.OneDayCount, "Seven Day Count:", response.SevenDayCount)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		fmt.Printf("Failed to encode pending game count: %v\n", err)
 	}
@@ -4993,8 +4992,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Game Filters",gameFilters)
-	
+	fmt.Println("Game Filters", gameFilters)
+
 	// 2. Query MongoDB
 
 	opts := options.Find().
@@ -5023,16 +5022,16 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(games) == 0 {
-       w.Header().Set("Content-Type", "application/json")
-       w.WriteHeader(http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
 
-       json.NewEncoder(w).Encode(map[string]string{
-           "message": "No games were found matching your search criteria.",
-       })
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "No games were found matching your search criteria.",
+		})
 
-       return
-    }
-	
+		return
+	}
+
 	for _, game := range games {
 
 		gameRec := model.GameDescriptor{
@@ -5075,7 +5074,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 	*/
 
-	fmt.Println("Returning the following",gameView)
+	fmt.Println("Returning the following", gameView)
 
 	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
@@ -5262,6 +5261,8 @@ func main() {
 		panic(err)
 	}
 
+	dbName = utils.GetMongoDbName()
+
 	podName := os.Getenv("POD_NAME")
 	if podName == "" {
 		podName = "local-dev"
@@ -5271,7 +5272,7 @@ func main() {
 
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	utils.AuditLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
-	database.InitDbase("refLedger_v2", uri)
+	database.InitDbase(dbName, uri)
 
 	err = database.Connect()
 	if err != nil {
@@ -5410,7 +5411,7 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/login.html")
 	})
 
-	mux.HandleFunc("/api/games/pending-games/count",GetPendingGamesCount)
+	mux.HandleFunc("/api/games/pending-games/count", GetPendingGamesCount)
 
 	mux.HandleFunc("/api/session", getCurrentSession)
 	mux.HandleFunc("/api/pod", PodInfoHandler)
