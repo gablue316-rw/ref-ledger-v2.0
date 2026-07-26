@@ -17,9 +17,26 @@
             <span>Reports</span>
         </a>
 
-        <a href="/games" data-page="games">
-            <i class="fa-solid fa-calendar-days"></i>
+        <a href="/games" data-page="games" class="games-nav-link">
+
+            <span class="nav-icon-wrapper">
+
+                <i class="fa-solid fa-calendar-days"></i>
+
+                <span
+                    id="pendingGames"
+                    class="nav-count-badge"
+                    aria-live="polite"
+                    aria-label="0 pending games today and 0 pending games in the next 7 days"
+                    title="Pending games: Today / Next 7 Days"
+                >
+                    0/0
+                </span>
+
+            </span>
+
             <span>Games</span>
+
         </a>
 
         <a href="/officials" data-page="officials">
@@ -66,25 +83,15 @@
 
     <div class="user-profile">
 
-    <div id="userAvatar" class="user-avatar">
+        <div id="userAvatar" class="user-avatar">
 
-        <img
-            src="/images/official-avatar.png?v=2"
-            alt="Referee avatar"
-            class="avatar-image"
-        >
+            <img
+                src="/images/official-avatar.png?v=2"
+                alt="Referee avatar"
+                class="avatar-image"
+            >
 
-        <span
-            id="pendingGames"
-            class="nav-count-badge avatar-count-badge"
-            aria-live="polite"
-            aria-label="0 pending games today and 0 pending games in the next 7 days"
-            title="Pending games: Today / Next 7 Days"
-        >
-            0/0
-        </span>
-
-    </div>
+        </div>
 
         <div class="user-details">
 

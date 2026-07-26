@@ -2,7 +2,13 @@
 // Ref Ledger shared navbar
 //
 
-document.addEventListener("DOMContentLoaded", async function () {
+document.addEventListener("DOMContentLoaded", initializeNavbar);
+
+//
+// Load and initialize the shared navbar
+//
+
+async function initializeNavbar() {
 
     const container =
         document.getElementById("navbar-container");
@@ -14,7 +20,9 @@ document.addEventListener("DOMContentLoaded", async function () {
     try {
 
         const response =
-            await fetch("/components/navbar.html");
+            await fetch("/components/navbar.html", {
+                cache: "no-cache"
+            });
 
         if (!response.ok) {
             throw new Error(
@@ -26,11 +34,12 @@ document.addEventListener("DOMContentLoaded", async function () {
             await response.text();
 
         highlightCurrentPage();
-
         initializeLogout();
 
-        await loadCurrentUser();
-        await loadPendingGames();
+        await Promise.all([
+            loadCurrentUser(),
+            loadPendingGames()
+        ]);
 
     } catch (error) {
 
@@ -41,38 +50,52 @@ document.addEventListener("DOMContentLoaded", async function () {
 
     }
 
-});
+}
 
 //
-// Highlight the current page
+// Highlight the current navigation link
 //
 
 function highlightCurrentPage() {
 
-    let page =
+    const pathname =
         window.location.pathname;
 
-    if (page === "/") {
+    let page;
+
+    if (pathname === "/") {
+
         page = "home";
+
     } else {
-        page = page
+
+        page = pathname
             .replace(/^\/+/, "")
             .replace(/\/+$/, "");
+
     }
 
-    const activeLink =
-        document.querySelector(
-            `.nav-links a[data-page="${page}"]`
+    const navigationLinks =
+        document.querySelectorAll(
+            ".nav-links a[data-page]"
         );
 
-    if (activeLink) {
-        activeLink.classList.add("active");
-    }
+    navigationLinks.forEach(function (link) {
+
+        const linkPage =
+            link.getAttribute("data-page");
+
+        link.classList.toggle(
+            "active",
+            linkPage === page
+        );
+
+    });
 
 }
 
 //
-// Load logged-in user
+// Load the logged-in user
 //
 
 async function loadCurrentUser() {
@@ -90,11 +113,17 @@ async function loadCurrentUser() {
     try {
 
         const response =
-            await fetch("/api/session");
+            await fetch("/api/session", {
+                cache: "no-cache"
+            });
 
         if (response.status === 401) {
-            window.location.href = "/login";
+
+            window.location.href =
+                "/login";
+
             return;
+
         }
 
         if (!response.ok) {
@@ -133,7 +162,15 @@ async function loadCurrentUser() {
 }
 
 //
-// Load  pending game counts
+// Load pending-game counts
+//
+// Display format:
+//
+//     today / next 7 days
+//
+// Example:
+//
+//     2/8
 //
 
 async function loadPendingGames() {
@@ -148,11 +185,16 @@ async function loadPendingGames() {
     try {
 
         const response =
-            await fetch("/api/games/pending-games/count");
+            await fetch(
+                "/api/games/pending-games/count",
+                {
+                    cache: "no-cache"
+                }
+            );
 
         if (!response.ok) {
             throw new Error(
-                `Unable to load pending game count: HTTP ${response.status}`
+                `Unable to load pending-game counts: HTTP ${response.status}`
             );
         }
 
@@ -160,17 +202,25 @@ async function loadPendingGames() {
             await response.json();
 
         const oneDayCount =
-            result.oneDayCount ?? 0;
+            Number(result.oneDayCount ?? 0);
 
-        const sevenDayCount = 
-            result.sevenDayCount ?? 0;
+        const sevenDayCount =
+            Number(result.sevenDayCount ?? 0);
+
+        const todayText =
+            `${oneDayCount} pending ` +
+            `game${oneDayCount === 1 ? "" : "s"} today`;
+
+        const sevenDayText =
+            `${sevenDayCount} total pending ` +
+            `game${sevenDayCount === 1 ? "" : "s"} ` +
+            `through the next 7 days`;
 
         badge.textContent =
             `${oneDayCount}/${sevenDayCount}`;
-        
+
         badge.title =
-            `${oneDayCount} pending game${oneDayCount === 1 ? "" : "s"} today / ` +
-            `${sevenDayCount} total pending game${sevenDayCount === 1 ? "" : "s"} through the next 7 days`;
+            `${todayText} / ${sevenDayText}`;
 
         badge.setAttribute(
             "aria-label",
@@ -180,7 +230,7 @@ async function loadPendingGames() {
     } catch (error) {
 
         console.error(
-            "Unable to load pending games count:",
+            "Unable to load pending-game counts:",
             error
         );
 
@@ -188,19 +238,34 @@ async function loadPendingGames() {
             "—";
 
         badge.title =
-            "Unable to load pending games";
+            "Unable to load pending-game counts";
 
         badge.setAttribute(
             "aria-label",
             badge.title
         );
-    
+
     }
 
 }
 
 //
-// Format roles such as site_admin
+// Make the pending-games function available to other pages.
+//
+// A page can refresh the navbar count after adding,
+// updating, or deleting a game by calling:
+//
+//     await loadPendingGames();
+//
+
+window.loadPendingGames =
+    loadPendingGames;
+
+//
+// Format roles such as:
+//
+//     site_admin  -> Site Admin
+//     head-admin  -> Head Admin
 //
 
 function formatRole(role) {
@@ -209,18 +274,20 @@ function formatRole(role) {
         return "";
     }
 
-    return role
+    return String(role)
         .replaceAll("_", " ")
         .replaceAll("-", " ")
         .replace(
             /\b\w/g,
-            character => character.toUpperCase()
+            function (character) {
+                return character.toUpperCase();
+            }
         );
 
 }
 
 //
-// Logout
+// Initialize logout
 //
 
 function initializeLogout() {
@@ -238,6 +305,10 @@ function initializeLogout() {
     );
 
 }
+
+//
+// Log out the current user
+//
 
 async function logoutUser(event) {
 
@@ -266,7 +337,7 @@ async function logoutUser(event) {
             error
         );
 
-        alert("Logout failed.");
+        alert("Logout failed. Please try again.");
 
     }
 
