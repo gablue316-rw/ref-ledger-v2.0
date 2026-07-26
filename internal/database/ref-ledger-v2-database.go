@@ -2737,6 +2737,8 @@ func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 
 func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int, error) {
 
+	ctx := context.Background()
+
 	// Beginning of today (local time)
 	now := time.Now()
 	start := time.Date(
@@ -2759,22 +2761,41 @@ func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int,
 		},
 	}
 
-	cursor, err := gc.Coll.Find(context.TODO(), filter)
+	cursor, err := gc.Coll.Find(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	
+
 	var games []model.GameDoc
-	if err := cursor.All(context.TODO(), &games); err != nil {
+	var game model.GameDoc
+	var totalGames int64 = 0
+
+	if err := cursor.All(ctx, &games); err != nil {
 		return nil, 0, err
 	}
 
-	fmt.Println("database/Get7DayPendingGames returning ",len(games), "games")
-	return games, len(games), nil
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+
+		err := cursor.Decode(&game)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		totalGames = totalGames + game.NumOfGames
+		games = append(games, game)
+
+	}
+
+	fmt.Println("database/Get7DayPendingGames returning ", totalGames, "games")
+	return games, int(totalGames), nil
 
 }
 
 func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, int, error) {
+
+	ctx := context.Background()
 
 	// Beginning of today (local time)
 	now := time.Now()
@@ -2798,21 +2819,37 @@ func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, in
 		},
 	}
 
-	cursor, err := gc.Coll.Find(context.TODO(), filter)
+	cursor, err := gc.Coll.Find(ctx, filter)
 	if err != nil {
 		return nil, 0, err
 	}
-	
+
 	var games []model.GameDoc
-	if err := cursor.All(context.TODO(), &games); err != nil {
+	var game model.GameDoc
+	var totalGames int64 = 0
+
+	if err := cursor.All(ctx, &games); err != nil {
 		return nil, 0, err
 	}
 
-	fmt.Println("database/GetTodaysPendingGames returning ",len(games), "games")
-	return games, len(games), nil
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+
+		err := cursor.Decode(&game)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		totalGames = totalGames + game.NumOfGames
+		games = append(games, game)
+
+	}
+
+	fmt.Println("database/GetTodaysPendingGames returning ", totalGames, "games")
+	return games, int(totalGames), nil
 
 }
-
 
 // Official Collection, Documents and API Code
 type OfficialJson struct {
