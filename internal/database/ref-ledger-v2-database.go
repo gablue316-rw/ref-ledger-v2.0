@@ -2766,15 +2766,11 @@ func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int,
 		return nil, 0, err
 	}
 
+	defer cursor.Close(ctx)
+
 	var games []model.GameDoc
 	var game model.GameDoc
 	var totalGames int64 = 0
-
-	if err := cursor.All(ctx, &games); err != nil {
-		return nil, 0, err
-	}
-
-	defer cursor.Close(ctx)
 
 	for cursor.Next(ctx) {
 
@@ -2824,15 +2820,11 @@ func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, in
 		return nil, 0, err
 	}
 
+	defer cursor.Close(ctx)
+
 	var games []model.GameDoc
 	var game model.GameDoc
 	var totalGames int64 = 0
-
-	if err := cursor.All(ctx, &games); err != nil {
-		return nil, 0, err
-	}
-
-	defer cursor.Close(ctx)
 
 	for cursor.Next(ctx) {
 
