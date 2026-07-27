@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+import pytest
 from playwright.sync_api import (
     Page,
     TimeoutError as PlaywrightTimeoutError,
@@ -51,6 +52,7 @@ DATABASE_NAME = os.getenv(
 
 
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
+REPORT_DIRECTORY = SCRIPT_DIRECTORY / "reports"
 
 officials_file_value = os.getenv(
     "REF_LEDGER_OFFICIALS_FILE",
@@ -542,32 +544,43 @@ def handle_request_failed(request) -> None:
     )
 
 
-def run_test() -> None:
-    """Run the officials import end-to-end test."""
+@pytest.fixture(scope="session", autouse=True)
+def validate_test_configuration() -> None:
+    """Validate the test configuration once per pytest session."""
 
     validate_configuration()
+    REPORT_DIRECTORY.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    count_before = get_official_count()
 
-    print(
-        "Officials before import:",
-        count_before,
+@pytest.fixture()
+def page() -> Page:
+    """Create a fresh Playwright page for each test."""
+
+    headless = (
+        os.getenv(
+            "REF_LEDGER_HEADLESS",
+            "false",
+        ).strip().lower()
+        in {"1", "true", "yes", "on"}
     )
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
-            headless=False,
+            headless=headless,
         )
 
         context = browser.new_context()
 
-        page = context.new_page()
+        test_page = context.new_page()
 
-        page.set_default_timeout(
+        test_page.set_default_timeout(
             15_000
         )
 
-        page.on(
+        test_page.on(
             "console",
             lambda message: print(
                 f"Browser console "
@@ -576,106 +589,112 @@ def run_test() -> None:
             ),
         )
 
-        page.on(
+        test_page.on(
             "requestfailed",
             handle_request_failed,
         )
 
         try:
-            login(page)
-
-            import_result = import_officials(
-                page
-            )
-
-            count_after = get_official_count()
-
-            print(
-                "Officials after import:",
-                count_after,
-            )
-
-            database_count_change = (
-                count_after - count_before
-            )
-
-            endpoint_added_count = int(
-                import_result.get(
-                    "added",
-                    0,
-                )
-                or 0
-            )
-
-            skipped_count = int(
-                import_result.get(
-                    "skipped",
-                    0,
-                )
-                or 0
-            )
-
-            failed_count = int(
-                import_result.get(
-                    "failed",
-                    0,
-                )
-                or 0
-            )
-
-            print(
-                "Database count increase:",
-                database_count_change,
-            )
-
-            if failed_count > 0:
-                raise AssertionError(
-                    "The import endpoint reported "
-                    f"{failed_count} failed row(s)."
-                )
-
-            if endpoint_added_count > 0:
-                assert (
-                    database_count_change
-                    == endpoint_added_count
-                ), (
-                    "The import endpoint reported "
-                    f"{endpoint_added_count} added "
-                    "official(s), but the database "
-                    "count changed by "
-                    f"{database_count_change}."
-                )
-
-            elif skipped_count > 0:
-                print(
-                    "No officials were added because "
-                    "the test officials already exist."
-                )
-
-            else:
-                raise AssertionError(
-                    "The import completed but reported "
-                    "zero added, zero skipped, and "
-                    "zero failed officials."
-                )
-
-            print("TEST PASSED")
-
-        except Exception:
-            page.screenshot(
-                path=str(
-                    SCRIPT_DIRECTORY
-                    / "import-officials-failure.png"
-                ),
-                full_page=True,
-            )
-
-            raise
-
+            yield test_page
         finally:
             context.close()
             browser.close()
 
 
-if __name__ == "__main__":
-    run_test()
+def test_import_officials(page: Page) -> None:
+    """Verify that importing officials updates MongoDB correctly."""
+
+    count_before = get_official_count()
+
+    print(
+        "Officials before import:",
+        count_before,
+    )
+
+    try:
+        login(page)
+
+        import_result = import_officials(
+            page
+        )
+
+        count_after = get_official_count()
+
+        print(
+            "Officials after import:",
+            count_after,
+        )
+
+        database_count_change = (
+            count_after - count_before
+        )
+
+        endpoint_added_count = int(
+            import_result.get(
+                "added",
+                0,
+            )
+            or 0
+        )
+
+        skipped_count = int(
+            import_result.get(
+                "skipped",
+                0,
+            )
+            or 0
+        )
+
+        failed_count = int(
+            import_result.get(
+                "failed",
+                0,
+            )
+            or 0
+        )
+
+        print(
+            "Database count increase:",
+            database_count_change,
+        )
+
+        assert failed_count == 0, (
+            "The import endpoint reported "
+            f"{failed_count} failed row(s)."
+        )
+
+        if endpoint_added_count > 0:
+            assert (
+                database_count_change
+                == endpoint_added_count
+            ), (
+                "The import endpoint reported "
+                f"{endpoint_added_count} added "
+                "official(s), but the database "
+                "count changed by "
+                f"{database_count_change}."
+            )
+
+        elif skipped_count > 0:
+            print(
+                "No officials were added because "
+                "the test officials already exist."
+            )
+
+        else:
+            pytest.fail(
+                "The import completed but reported "
+                "zero added, zero skipped, and "
+                "zero failed officials."
+            )
+
+    except Exception:
+        page.screenshot(
+            path=str(
+                REPORT_DIRECTORY
+                / "import-officials-failure.png"
+            ),
+            full_page=True,
+        )
+
+        raise
