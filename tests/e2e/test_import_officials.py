@@ -33,6 +33,11 @@ BASE_URL = os.getenv(
 USERNAME = os.getenv("REF_LEDGER_TEST_USERNAME")
 PASSWORD = os.getenv("REF_LEDGER_TEST_PASSWORD")
 
+TENANT_ID = os.getenv(
+    "REF_LEDGER_TEST_TENANT_ID",
+    "6a408f87ece367df4a66b262",
+)
+
 MONGODB_URI = os.getenv(
     "MONGODB_URI",
     "mongodb://localhost:27017/?replicaSet=refLedgerRS",
@@ -43,10 +48,6 @@ DATABASE_NAME = os.getenv(
     "refLedger_v2",
 )
 
-TENANT_ID = os.getenv(
-    "REF_LEDGER_TEST_TENANT_ID",
-    "6a408f87ece367df4a66b262",
-)
 
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 
