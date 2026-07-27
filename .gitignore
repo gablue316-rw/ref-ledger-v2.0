@@ -6,3 +6,6 @@ secrets/sealed-secrets-cert.pem
 
 # Token
 ref-ledger-docker/.env
+
+# Reports 
+tests/reports
