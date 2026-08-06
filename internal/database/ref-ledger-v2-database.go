@@ -2795,7 +2795,7 @@ func (gc *GameCollection) GetTomorrowsPendingGames(tId string) ([]model.GameDoc,
 
 	// Beginning of today (local time)
 	now := time.Now()
-	start := time.Date(
+	today := time.Date(
 		now.Year(),
 		now.Month(),
 		now.Day(),
@@ -2803,8 +2803,11 @@ func (gc *GameCollection) GetTomorrowsPendingGames(tId string) ([]model.GameDoc,
 		now.Location(),
 	)
 
+	// Beginning of tomorrow
+	start := today.Add(24 * time.Hour)
+
 	// Beginning of the day after tomorrow
-	end := start.Add(2 * 24 * time.Hour)
+	end := start.Add(1 * 24 * time.Hour)
 
 	filter := bson.M{
 		"tenantId": tId,
