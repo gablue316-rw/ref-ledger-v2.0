@@ -2789,6 +2789,60 @@ func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int,
 
 }
 
+func (gc *GameCollection) GetTomorrowsPendingGames(tId string) ([]model.GameDoc, int, error) {
+
+	ctx := context.Background()
+
+	// Beginning of today (local time)
+	now := time.Now()
+	start := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day(),
+		0, 0, 0, 0,
+		now.Location(),
+	)
+
+	// Beginning of the day after tomorrow
+	end := start.Add(2 * 24 * time.Hour)
+
+	filter := bson.M{
+		"tenantId": tId,
+		"status":   "Pending",
+		"gameDateTime": bson.M{
+			"$gte": start,
+			"$lt":  end,
+		},
+	}
+
+	cursor, err := gc.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer cursor.Close(ctx)
+
+	var games []model.GameDoc
+	var game model.GameDoc
+	var totalGames int64 = 0
+
+	for cursor.Next(ctx) {
+
+		err := cursor.Decode(&game)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		totalGames = totalGames + game.NumOfGames
+		games = append(games, game)
+
+	}
+
+	fmt.Println("database/GetTomorrowsPendingGames returning ", totalGames, "games")
+	return games, int(totalGames), nil
+
+}
+
 func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, int, error) {
 
 	ctx := context.Background()

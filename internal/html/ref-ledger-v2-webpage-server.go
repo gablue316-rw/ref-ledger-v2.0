@@ -4853,12 +4853,23 @@ func GetPendingGamesCount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, oneDayCount, err := gc.GetTodaysPendingGames(tId)
+	_, todaysCount, err := gc.GetTodaysPendingGames(tId)
 
 	if err != nil {
 		http.Error(
 			w,
 			`{"success":false,"message":"Failed to retrieve today's pending games"}`,
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	_, tomorrowsCount, err := gc.GetTomorrowsPendingGames(tId)
+
+	if err != nil {
+		http.Error(
+			w,
+			`{"success":false,"message":"Failed to retrieve tomorrow's pending games"}`,
 			http.StatusInternalServerError,
 		)
 		return
@@ -4876,16 +4887,18 @@ func GetPendingGamesCount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := struct {
-		Success       bool `json:"success"`
-		OneDayCount   int  `json:"oneDayCount"`
-		SevenDayCount int  `json:"sevenDayCount"`
+		Success        bool `json:"success"`
+		TodaysCount    int  `json:"todaysCount"`
+		TomorrowsCount int  `json:"tomorrowsCount"`
+		SevenDayCount  int  `json:"sevenDayCount"`
 	}{
-		Success:       true,
-		OneDayCount:   oneDayCount,
-		SevenDayCount: sevenDayCount,
+		Success:        true,
+		TodaysCount:    todaysCount,
+		TomorrowsCount: tomorrowsCount,
+		SevenDayCount:  sevenDayCount,
 	}
 
-	fmt.Println("Response Success:", response.Success, "One Day Count:", response.OneDayCount, "Seven Day Count:", response.SevenDayCount)
+	fmt.Println("Response Success:", response.Success, "Todays Count:", response.TodaysCount, "Tomorrows Count:", response.TomorrowsCount, "Seven Day Count:", response.SevenDayCount)
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		fmt.Printf("Failed to encode pending game count: %v\n", err)
 	}

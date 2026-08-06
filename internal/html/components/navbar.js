@@ -201,15 +201,22 @@ async function loadPendingGames() {
         const result =
             await response.json();
 
-        const oneDayCount =
-            Number(result.oneDayCount ?? 0);
+        const todaysCount =
+            Number(result.todaysCount ?? 0);
+        
+        const tomorrowsCount =
+            Number(result.tomorrowsCount ?? 0);
 
         const sevenDayCount =
             Number(result.sevenDayCount ?? 0);
 
         const todayText =
-            `${oneDayCount} pending ` +
-            `game${oneDayCount === 1 ? "" : "s"} today`;
+            `${todaysCount} pending ` +
+            `game${todaysCount === 1 ? "" : "s"} today`;
+
+       const tomorrowText =
+            `${tomorrowsCount} pending ` +
+            `game${tomorrowsCount === 1 ? "" : "s"} tomorrow`;
 
         const sevenDayText =
             `${sevenDayCount} total pending ` +
@@ -217,10 +224,11 @@ async function loadPendingGames() {
             `through the next 7 days`;
 
         badge.textContent =
-            `${oneDayCount}/${sevenDayCount}`;
+            `${todaysCount}/${tomorrowsCount}/${sevenDayCount}`;
 
+ 
         badge.title =
-            `${todayText} / ${sevenDayText}`;
+            `${todayText} / ${tomorrowText} / ${sevenDayText}`;
 
         badge.setAttribute(
             "aria-label",
