@@ -4080,10 +4080,10 @@ func generateReconciliationReport(assoc string) []string {
 	return rept
 }
 
-func generateAccountsReceivableReport(assoc string) []string {
+func generateAccountsReceivableReport(assoc, tid string) []string {
 
 	var rept []string = []string{}
-	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc)
+	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc, tid)
 	return rept
 }
 
@@ -4206,7 +4206,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	case "Reconciliation":
 		rept = generateReconciliationReport(rAssoc)
 	case "Accounts Receivable":
-		rept = generateAccountsReceivableReport(rAssoc)
+		rept = generateAccountsReceivableReport(rAssoc, tId)
 	default:
 		w.Header().Set("Content-Type", "text/plain")
 		fmt.Fprint(w, "Invalid Report Type")
