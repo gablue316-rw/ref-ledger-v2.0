@@ -2671,12 +2671,13 @@ func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 	db := Client.Database(Database)
 	coll := db.Collection("games")
 	collectionName := coll.Name()
-	fmt.Println("Updating Games Status to", status, "for game ids:", gameIds)
+	fmt.Println("##### Updating Games Status to", status, "for game ids:", gameIds, "#####")
 
 	recordsUpdated := 0
 	totalErrors := 0
 
 	if status == "Cancelled" {
+		fmt.Println("##### Cancelling game....setting financials to 0.00 #####")
 		update = bson.M{
 			"$set": bson.M{
 				"gameFee":     int64(0),
@@ -2689,7 +2690,7 @@ func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 	} else {
 		update = bson.M{
 			"$set": bson.M{
-				"status": "Cancelled",
+				"status": status,
 			},
 		}
 	}

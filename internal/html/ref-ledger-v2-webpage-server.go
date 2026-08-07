@@ -4330,6 +4330,8 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 	var tId string = database.TenantId
 	var err error
 
+	fmt.Println("##### Updating Game Status #####")
+
 	LogVisitor(r)
 
 	if r.Method != http.MethodPost {
@@ -4351,6 +4353,7 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("##### Game Status to be set to:", gameUpdate.Status, "#####")
 	var gameIds []int64
 
 	// Supports dashboard JSON:
@@ -4380,6 +4383,8 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no game IDs supplied", http.StatusBadRequest)
 		return
 	}
+
+	fmt.Println("##### Game Ids selected", gameIds, "#####")
 
 	if tId == "na" {
 		tId, err = getTenantId(r)
