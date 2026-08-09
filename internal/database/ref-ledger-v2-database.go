@@ -488,6 +488,19 @@ func GetGameByGameIdAndOrAssoc(assoc string, gameId string) (model.GameDescripto
 	return gameRecord, nil
 }
 
+func CalcSingleGameFee(game model.GameDescriptor) (int64, error) {
+
+	numOfGames, _ := utils.ConvertStrToInt64(game.NumOfGames)
+	gameFee, _ := utils.ConvertAmtStrToInt64(game.GameFee)
+	travelPay, _ := utils.ConvertAmtStrToInt64(game.TravelPay)
+	assignorFee, _ := utils.ConvertAmtStrToInt64(game.AssignorFee)
+	deductions, _ := utils.ConvertAmtStrToInt64(game.Deductions)
+
+	totalGameFee := numOfGames*gameFee + travelPay - assignorFee - deductions
+	return totalGameFee, nil
+
+}
+
 func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)

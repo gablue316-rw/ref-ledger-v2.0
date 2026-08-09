@@ -574,7 +574,7 @@ func GenerateAcctsRecvReport(parentCtx context.Context, associations, tid string
 			}
 
 			gameIds = append(gameIds, g)
-			gFee, _ := utils.ConvertAmtStrToInt64(r.GameFee)
+			gFee, _ := database.CalcSingleGameFee(r)
 			acctsRecv += gFee
 		}
 
