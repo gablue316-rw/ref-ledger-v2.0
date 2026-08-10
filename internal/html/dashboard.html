@@ -400,6 +400,13 @@ function renderGames(
     games.forEach(game => {
         const row = document.createElement("tr");
 
+        const officials = Array.isArray(game.Officials)
+            ? game.Officials
+                .map(official => official.Name)
+                .filter(Boolean)
+                .join(", ")
+            : "";
+            
         row.innerHTML = `
             <td>
                 <input
