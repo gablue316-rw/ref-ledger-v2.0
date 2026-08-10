@@ -2925,13 +2925,14 @@ type OfficialJson struct {
 }
 
 type OfficialDoc struct {
-	Id        int64  `bson:"id,omitempty"`
-	FirstName string `bson:"firstName,omitempty"`
-	LastName  string `bson:"lastName,omitempty"`
-	Phone     string `bson:"phone,omitempty"`
-	Email     string `bson:"email,omitempty"`
-	Address   string `bson:"address,omitempty"`
-	TenantId  string `bson:"tenantId"`
+	Id         int64  `bson:"id,omitempty"`
+	OfficialId int64  `bson:"officialId,omitempty"`
+	FirstName  string `bson:"firstName,omitempty"`
+	LastName   string `bson:"lastName,omitempty"`
+	Phone      string `bson:"phone,omitempty"`
+	Email      string `bson:"email,omitempty"`
+	Address    string `bson:"address,omitempty"`
+	TenantId   string `bson:"tenantId"`
 }
 
 type Official struct {
@@ -3001,8 +3002,15 @@ func (oc *OfficialCollection) convOfficialToDoc(official Official) (OfficialDoc,
 }
 
 func (oc *OfficialCollection) convDocToOfficial(doc OfficialDoc) Official {
+
+	officialId := doc.OfficialId
+
+	if officialId == 0 {
+		officialId = doc.Id
+	}
+
 	return Official{
-		Id:        doc.Id,
+		Id:        officialId,
 		FirstName: doc.FirstName,
 		LastName:  doc.LastName,
 		Phone:     doc.Phone,
@@ -3137,7 +3145,7 @@ func (oc *OfficialCollection) Get(firstName, lastName, tenantId string) (Officia
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return Official{}, fmt.Errorf("official not found")
 		}
-		return Official{}, fmt.Errorf("Failed to get official.  Reason: %v", err)
+		return Official{}, fmt.Errorf("Failed to get official.  Reason: %w", err)
 	}
 
 	official := oc.convDocToOfficial(doc)
