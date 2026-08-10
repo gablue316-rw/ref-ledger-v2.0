@@ -5080,8 +5080,34 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		abbrev := utils.DayOfWeekAbbreviation(game.Date)
 		view.Date = fmt.Sprintf("%s (%s)", game.Date, abbrev)
 
-		view.Officials = reports.FormatOfficialString(game.Referee, game.U1, game.U2)
+		if game.Referee != "" && game.Referee != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(game.Referee, tId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		if game.U1 != "" && game.U1 != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(game.U1, tId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		if game.U1 != "" && game.U2 != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(game.U2, tId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		//view.Officials = reports.FormatOfficialString(game.Referee, game.U1, game.U2)
+
 		gameView = append(gameView, view)
+		fmt.Println("view ", view)
 	}
 
 	/*

@@ -2935,6 +2935,7 @@ type OfficialDoc struct {
 }
 
 type Official struct {
+	Id        int64
 	FirstName string
 	LastName  string
 	Phone     string
@@ -3068,6 +3069,31 @@ func (oc *OfficialCollection) Init(client *mongo.Client) error {
 
 	fmt.Println("Successfully initialized Official Collection")
 	return nil
+}
+
+func (oc *OfficialCollection) GetOfficialView(official, tenantId string) (model.OfficialView, error) {
+
+	var err error
+
+	parts := strings.Fields(official)
+
+	if len(parts) < 2 {
+		return model.OfficialView{}, fmt.Errorf("Invalid name")
+	}
+
+	firstName := parts[0]
+	lastName := parts[len(parts)-1]
+
+	o, err := oc.Get(firstName, lastName, tenantId)
+
+	if err != nil {
+		return model.OfficialView{}, err
+	}
+
+	return model.OfficialView{
+		OfficialId: o.Id,
+		Name:       o.FirstName + " " + o.LastName,
+	}, nil
 }
 
 func (oc *OfficialCollection) Add(official Official, tenantId string) error {
