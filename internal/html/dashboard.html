@@ -406,7 +406,7 @@ function renderGames(
                 .filter(Boolean)
                 .join(", ")
             : "";
-            
+
         row.innerHTML = `
             <td>
                 <input
@@ -429,7 +429,7 @@ function renderGames(
                    ${game.Status || ""}
                </span>
             </td>
-            <td>${game.Officials || ""}</td>
+            <td>${officials || ""}</td>
         `;
 
         tbody.appendChild(row);

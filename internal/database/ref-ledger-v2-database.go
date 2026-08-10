@@ -3002,6 +3002,7 @@ func (oc *OfficialCollection) convOfficialToDoc(official Official) (OfficialDoc,
 
 func (oc *OfficialCollection) convDocToOfficial(doc OfficialDoc) Official {
 	return Official{
+		Id:        doc.Id,
 		FirstName: doc.FirstName,
 		LastName:  doc.LastName,
 		Phone:     doc.Phone,
