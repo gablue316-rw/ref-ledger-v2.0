@@ -1,0 +1,80 @@
+$ python test_import_officials.py
+Officials before import: 0
+Before login: https://ref-ledger.com/login
+Browser console [verbose]: [DOM] Password field is not contained in a form: (More info: https://goo.gl/9p2vKq) %o
+Login response status: 200
+Login response URL: https://ref-ledger.com/api/login
+Browser console [log]: Response
+Request failed: POST https://ref-ledger.com/api/login net::ERR_ABORTED
+After login: https://ref-ledger.com/
+Page title: Ref Ledger V2.0
+Officials page: https://ref-ledger.com/officials
+Import page: https://ref-ledger.com/importOfficials
+Selected file: C:\Users\gablu\OneDrive\Documents\GitHub\ref-ledger-v2.0\tests\e2e\test-data\officials-test.csv
+Selected file message: officials-test.csv (211 bytes)
+Preview response status: 200
+Preview response URL: https://ref-ledger.com/api/import/officials/preview
+Preview response: {
+  "previewToken": "94ad8400dc1d33da28c21b205983269e4abd80ec582e1b7f2cdbfd8993a9be91",
+  "totalRows": 2,
+  "validRows": 2,
+  "invalidRows": 0,
+  "rows": [
+    {
+      "rowNumber": 2,
+      "valid": true,
+      "data": {
+        "firstName": "Russell",
+        "lastName": "West",
+        "phone": "706 555-1212",
+        "email": "russell.west@gmail.com",
+        "address": "123 Main Street, Boulder, CO. 32453"
+      },
+      "errors": []
+    },
+    {
+      "rowNumber": 3,
+      "valid": true,
+      "data": {
+        "firstName": "Natalie",
+        "lastName": "West",
+        "phone": "706 555-1213",
+        "email": "sassynat@gmail.com",
+        "address": "675 Maple Street, Houston, TX. 34567"
+      },
+      "errors": []
+    }
+  ]
+}
+Preview total rows: 2
+Preview valid rows: 2
+Preview invalid rows: 0
+Import response status: 200
+Import response URL: https://ref-ledger.com/api/import/officials/commit
+Import response: {
+  "added": 2,
+  "skipped": 0,
+  "failed": 0,
+  "message": "Officials import completed.",
+  "rows": [
+    {
+      "rowNumber": 2,
+      "status": "added",
+      "message": "Russell West was added."
+    },
+    {
+      "rowNumber": 3,
+      "status": "added",
+      "message": "Natalie West was added."
+    }
+  ]
+}
+Officials added by endpoint: 2
+Officials skipped: 0
+Officials failed: 0
+Page result message: Import complete. Added: 2, skipped: 0, failed: 0.
+Officials import request completed.
+Officials after import: 2
+Database count increase: 2
+TEST PASSED
+

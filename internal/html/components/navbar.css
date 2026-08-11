@@ -1,0 +1,347 @@
+/*
+    Ref Ledger shared navbar
+*/
+
+.navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+
+    box-sizing: border-box;
+    width: 100%;
+    padding: 15px 30px;
+    margin-bottom: 20px;
+
+    color: #ffffff;
+    background-color: #082b4f;
+    border-radius: 10px;
+}
+
+/*
+    Navigation links
+*/
+
+.nav-links {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    min-width: 0;
+}
+
+.nav-links a {
+    position: relative;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 82px;
+    min-height: 64px;
+    padding: 10px;
+
+    color: #ffffff;
+    text-decoration: none;
+    border-radius: 6px;
+
+    transition:
+        background-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.nav-links a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+}
+
+.nav-links a.active {
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.nav-links a:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+/*
+    Standard navigation icons
+*/
+
+.nav-links a > i {
+    margin-bottom: 6px;
+    font-size: 22px;
+    color: #f4c542;      /* Gold */
+}
+
+/*
+    Navigation labels
+*/
+
+.nav-links a > span:not(.nav-icon-wrapper):not(.nav-count-badge) {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/*
+    Games navigation icon wrapper
+
+    The wrapper provides the positioning area for the
+    pending-games badge.
+*/
+
+.nav-icon-wrapper {
+    position: relative;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-bottom: 6px;
+}
+
+.nav-icon-wrapper > i {
+    margin: 0;
+    font-size: 22px;
+    color: #f4c542;      /* Gold */
+}
+
+/*
+    Pending-games badge on the Games icon
+
+    First number: pending games today
+    Second number: pending games in the next 7 days
+*/
+
+.nav-count-badge {
+    position: absolute;
+    top: -11px;
+    right: -18px;
+    z-index: 10;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 34px;
+    height: 20px;
+    padding: 0 6px;
+
+    color: #ffffff;
+    background-color: #dc2626;
+    border: 2px solid #082b4f;
+    border-radius: 999px;
+
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+/*
+    Logged-in user
+*/
+
+.user-profile {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 12px;
+
+    padding: 8px 10px;
+
+    color: #ffffff;
+    border-radius: 8px;
+}
+
+.user-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    min-height: 52px;
+
+    overflow: hidden;
+
+    background-color: #ffffff;
+    border-radius: 50%;
+}
+
+.avatar-image {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: contain;
+    object-position: center;
+
+    border-radius: 50%;
+}
+
+/*
+    Logged-in user details
+*/
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+
+    min-width: 0;
+}
+
+.user-name {
+    max-width: 150px;
+    overflow: hidden;
+
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-role {
+    max-width: 150px;
+    margin-top: 3px;
+    overflow: hidden;
+
+    color: #cbd5e1;
+    font-size: 12px;
+
+    text-overflow: ellipsis;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+.nav-links a:hover > i,
+.nav-links a.active > i,
+.nav-links a:hover .nav-icon-wrapper > i,
+.nav-links a.active .nav-icon-wrapper > i {
+    color: #ffd54f;
+}
+
+/*
+    Tablet layout
+*/
+
+@media (max-width: 1100px) {
+    .navbar {
+        align-items: flex-start;
+        padding: 15px 20px;
+    }
+
+    .nav-links a {
+        min-width: 74px;
+        padding: 8px;
+    }
+
+    .nav-links a > span:not(.nav-icon-wrapper):not(.nav-count-badge) {
+        font-size: 12px;
+    }
+}
+
+/*
+    Mobile layout
+*/
+
+@media (max-width: 700px) {
+    .navbar {
+        align-items: center;
+        gap: 10px;
+        padding: 13px;
+    }
+
+    .nav-links {
+        gap: 4px;
+    }
+
+    .nav-links a {
+        flex: 0 0 68px;
+
+        min-width: 68px;
+        min-height: 58px;
+        padding: 7px;
+    }
+
+    .nav-links a > i,
+    .nav-icon-wrapper > i {
+        font-size: 19px;
+    }
+
+    .nav-links a > span:not(.nav-icon-wrapper):not(.nav-count-badge) {
+        font-size: 11px;
+    }
+
+    .nav-count-badge {
+        top: -9px;
+        right: -16px;
+
+        min-width: 30px;
+        height: 18px;
+        padding: 0 5px;
+
+        font-size: 9px;
+    }
+
+    .user-profile {
+        padding: 4px;
+    }
+
+    .user-details {
+        display: none;
+    }
+
+    .user-avatar {
+        width: 42px;
+        height: 42px;
+        min-width: 42px;
+        min-height: 42px;
+    }
+}
+
+/*
+    Very small screens
+*/
+
+@media (max-width: 430px) {
+    .navbar {
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .nav-links {
+        width: calc(100% - 52px);
+    }
+
+    .nav-links a {
+        flex: 0 0 calc(33.333% - 4px);
+        min-width: 0;
+    }
+
+    .nav-count-badge {
+        top: -8px;
+        right: -14px;
+
+        min-width: 28px;
+        height: 17px;
+        padding: 0 4px;
+
+        font-size: 8px;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+}

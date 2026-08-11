@@ -46,6 +46,7 @@ import (
 
 var Client *mongo.Client
 var uri string
+var dbName string
 
 /* July 18, 2026 */
 type Game struct {
@@ -98,6 +99,7 @@ var gc database.GameCollection
 var oc database.OfficialCollection
 var ec database.ExpensesCollection
 var se database.SessionsCollection
+var uc database.UsersCollection
 
 var AuditLog *log.Logger = nil
 
@@ -268,6 +270,54 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 		GameId:      strconv.Itoa(e.GameID),
 		Description: e.Description,
 	}
+
+}
+
+type UserSessionResponse struct {
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	Name     string `json:"name"`
+}
+
+func getCurrentSession(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+
+	fmt.Println("getCurrentSession")
+	var tId string = database.TenantId
+	var err error
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	session, err := database.GetSession(r)
+
+	if err != nil {
+		http.Error(w, "Session not found", http.StatusUnauthorized)
+		return
+	}
+
+	name, err := uc.GetName(session.TenantID, session.Username)
+
+	if err != nil {
+		http.Error(w, "User  not found", http.StatusUnauthorized)
+		return
+	}
+
+	response := UserSessionResponse{
+		Username: session.Username,
+		Role:     session.Role,
+		Name:     name,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 
 }
 
@@ -1723,6 +1773,15 @@ func deleteOfficialsPreview(token string) {
 
 }
 
+func deleteGamesPreview(token string) {
+
+	gamesPreviewStore.Lock()
+	defer gamesPreviewStore.Unlock()
+
+	delete(gamesPreviewStore.items, token)
+
+}
+
 func deleteSitesPreview(token string) {
 
 	sitesPreviewStore.Lock()
@@ -1830,6 +1889,25 @@ func getSitesPreview(token string) (SitesImportPreview, bool) {
 	// Treat expired previews as missing.
 	if time.Now().After(preview.ExpiresAt) {
 		return SitesImportPreview{}, false
+	}
+
+	return preview, true
+}
+
+func getGamesPreview(token string) (GamesImportPreview, bool) {
+
+	gamesPreviewStore.RLock()
+	defer gamesPreviewStore.RUnlock()
+
+	preview, found := gamesPreviewStore.items[token]
+
+	if !found {
+		return GamesImportPreview{}, false
+	}
+
+	// Treat expired previews as missing.
+	if time.Now().After(preview.ExpiresAt) {
+		return GamesImportPreview{}, false
 	}
 
 	return preview, true
@@ -2402,6 +2480,291 @@ func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 			Skipped: skipped,
 			Failed:  failed,
 			Message: "Officials import completed.",
+			Rows:    rowResults,
+		},
+	)
+}
+
+func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	if r.Method != http.MethodPost {
+		writeJSONError(
+			w,
+			http.StatusMethodNotAllowed,
+			"Method not allowed.",
+		)
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	var request struct {
+		PreviewToken    string `json:"previewToken"`
+		DuplicateAction string `json:"duplicateAction"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&request); err != nil {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Invalid request body.",
+		)
+		return
+	}
+
+	request.PreviewToken = strings.TrimSpace(request.PreviewToken)
+	request.DuplicateAction = strings.ToLower(strings.TrimSpace(request.DuplicateAction))
+
+	if request.PreviewToken == "" {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Preview token is required.",
+		)
+		return
+	}
+
+	if request.DuplicateAction == "" {
+		request.DuplicateAction = "skip"
+	}
+
+	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			`Duplicate action must be "skip" or "stop".`,
+		)
+		return
+	}
+
+	preview, found := getGamesPreview(request.PreviewToken)
+	if !found {
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The import preview was not found or has expired.",
+		)
+		return
+	}
+
+	if preview.TenantID != tId {
+		writeJSONError(
+			w,
+			http.StatusForbidden,
+			"The import preview does not belong to the current tenant.",
+		)
+		return
+	}
+
+	if time.Now().After(preview.ExpiresAt) {
+		deleteGamesPreview(request.PreviewToken)
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The import preview has expired. Preview the CSV file again.",
+		)
+		return
+	}
+
+	if oc.Coll == nil {
+		log.Printf("CommitGamesImportHandler: games collection is nil")
+		writeJSONError(
+			w,
+			http.StatusInternalServerError,
+			"Games collection is not available.",
+		)
+		return
+	}
+
+	added := 0
+	skipped := 0
+	failed := 0
+	rowResults := make([]GamesCommitRowResult, 0)
+
+	for _, previewRow := range preview.Rows {
+		if !previewRow.Valid {
+			continue
+		}
+		data := previewRow.Data
+
+		exists, err := gc.Exists(data.Association, utils.ConvertInt64ToStr(data.GameId), tId)
+
+		if err != nil {
+			log.Printf(
+				"CommitGamesImportHandler: "+"duplicate lookup failed: tenant=%s row=%d game=%d error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.GameId,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				GamesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message:   "Unable to check whether the game already exists.",
+				},
+			)
+			continue
+		}
+
+		if exists {
+			if request.DuplicateAction == "stop" {
+				writeJSON(
+					w,
+					http.StatusConflict,
+					GamesCommitResponse{
+						Added:   added,
+						Skipped: skipped,
+						Failed:  failed,
+						Message: fmt.Sprintf(
+							"Import stopped because game %d already exists.",
+							data.GameId,
+						),
+						Rows: rowResults,
+					},
+				)
+
+				return
+			}
+
+			skipped++
+
+			rowResults = append(
+				rowResults,
+				GamesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "skipped",
+					Message: fmt.Sprintf(
+						"Game %d already exists.",
+						data.GameId,
+					),
+				},
+			)
+
+			continue
+
+		}
+
+		game := model.GameDescriptor{
+			GameId:      utils.ConvertInt64ToStr(data.GameId),
+			Date:        data.Date,
+			Time:        data.Time,
+			Sport:       data.Sport,
+			Site:        data.Site,
+			Field:       data.Field,
+			NumOfGames:  utils.ConvertInt64ToStr(data.NumOfGames),
+			Level:       data.Level,
+			GameFee:     data.GameFee,
+			TravelPay:   data.TravelPay,
+			AssignorFee: data.AssignorFee,
+			Deductions:  data.Deductions,
+			Association: data.Association,
+			Status:      data.Status,
+			Referee:     data.Referee,
+			U1:          data.U1,
+			U2:          data.U2,
+			ECO:         data.ECO,
+			Assignor:    data.Assignor,
+		}
+
+		err = gc.Add(tId, game)
+		if err != nil {
+			if mongo.IsDuplicateKeyError(err) {
+				if request.DuplicateAction == "stop" {
+					writeJSON(
+						w,
+						http.StatusConflict,
+						GamesCommitResponse{
+							Added:   added,
+							Skipped: skipped,
+							Failed:  failed,
+							Message: fmt.Sprintf(
+								"Import stopped because game %d already exists.",
+								data.GameId,
+							),
+							Rows: rowResults,
+						},
+					)
+					return
+				}
+
+				skipped++
+
+				rowResults = append(
+					rowResults,
+					GamesCommitRowResult{
+						RowNumber: previewRow.RowNumber,
+						Status:    "skipped",
+						Message: fmt.Sprintf(
+							"Game %d already exists.",
+							data.GameId,
+						),
+					},
+				)
+
+				continue
+
+			}
+
+			log.Printf(
+				"CommitGamesImportHandler: "+"insert failed: tenant=%s row=%d game=%d error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.GameId,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				GamesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message:   "Unable to insert game.",
+				},
+			)
+
+			continue
+		}
+		added++
+		rowResults = append(
+			rowResults,
+			GamesCommitRowResult{
+				RowNumber: previewRow.RowNumber,
+				Status:    "added",
+				Message:   fmt.Sprintf("Game %d was added.", data.GameId),
+			},
+		)
+	}
+
+	deleteGamesPreview(request.PreviewToken)
+
+	writeJSON(
+		w,
+		http.StatusOK,
+		GamesCommitResponse{
+			Added:   added,
+			Skipped: skipped,
+			Failed:  failed,
+			Message: "Games import completed.",
 			Rows:    rowResults,
 		},
 	)
@@ -3263,14 +3626,13 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/* Check MongoDB for officials that already exist. This only runs for rows that passed the basic CSV validation. */
+	/* Check MongoDB for games that already exist. This only runs for rows that passed the basic CSV validation. */
 
 	for i := range rows {
 		if !rows[i].Valid {
 			continue
 		}
 
-		fmt.Println("Checking if game exists in database: ", rows[i].Data.GameId)
 		exists, err := gc.Exists(rows[i].Data.Association, utils.ConvertInt64ToStr(rows[i].Data.GameId), tId)
 		if err != nil {
 			log.Printf(
@@ -3284,7 +3646,6 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 				http.StatusInternalServerError,
 				"Unable to validate games against the database.",
 			)
-			fmt.Println("Error occurred while checking game existence: ", err)
 		}
 
 		if exists {
@@ -3719,10 +4080,10 @@ func generateReconciliationReport(assoc string) []string {
 	return rept
 }
 
-func generateAccountsReceivableReport(assoc string) []string {
+func generateAccountsReceivableReport(assoc, tid string) []string {
 
 	var rept []string = []string{}
-	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc)
+	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc, tid)
 	return rept
 }
 
@@ -3845,7 +4206,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	case "Reconciliation":
 		rept = generateReconciliationReport(rAssoc)
 	case "Accounts Receivable":
-		rept = generateAccountsReceivableReport(rAssoc)
+		rept = generateAccountsReceivableReport(rAssoc, tId)
 	default:
 		w.Header().Set("Content-Type", "text/plain")
 		fmt.Fprint(w, "Invalid Report Type")
@@ -3969,6 +4330,8 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 	var tId string = database.TenantId
 	var err error
 
+	fmt.Println("##### Updating Game Status #####")
+
 	LogVisitor(r)
 
 	if r.Method != http.MethodPost {
@@ -3990,6 +4353,7 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("##### Game Status to be set to:", gameUpdate.Status, "#####")
 	var gameIds []int64
 
 	// Supports dashboard JSON:
@@ -4019,6 +4383,8 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no game IDs supplied", http.StatusBadRequest)
 		return
 	}
+
+	fmt.Println("##### Game Ids selected", gameIds, "#####")
 
 	if tId == "na" {
 		tId, err = getTenantId(r)
@@ -4345,6 +4711,52 @@ func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func OfficialsDetailHandler(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	officialId := r.PathValue("officialId")
+
+	fmt.Println("Retrieving Official Details for official id", officialId)
+	id, err := utils.ConvertStrToInt64(officialId)
+
+	if err != nil {
+		http.Error(w, "Invalid request data", http.StatusBadRequest)
+		return
+	}
+	official, err := oc.GetById(id, database.TenantId)
+
+	if err != nil {
+		http.Error(w, "Invalid request data", http.StatusBadRequest)
+		return
+	}
+
+	officialDetails := model.OfficialDetailsView{
+		OfficialId: official.Id,
+		Name:       official.FirstName + " " + official.LastName,
+		Phone:      official.Phone,
+		Email:      official.Email,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	err = json.NewEncoder(w).Encode(officialDetails)
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to encode official details",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+}
+
 func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
@@ -4444,9 +4856,6 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//
-	// Replace Site Id with Site Name
-	//
 	if tId == "na" {
 		fmt.Println("Invalid Tenant Id")
 		tId, err = getTenantId(r)
@@ -4457,6 +4866,9 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	//
+	// Replace Site Id with Site Name
+	//
 	siteName, err := sc.GetSiteName(game.Site, tId)
 
 	if err == nil {
@@ -4470,6 +4882,77 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(game)
 
+}
+
+func GetPendingGamesCount(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	fmt.Println("GetPendingGamesCount has been called")
+
+	w.Header().Set("Content-Type", "application/json")
+
+	// Use your application's tenant ID.
+	if tId == "na" {
+		fmt.Println("Invalid Tenant Id")
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	_, todaysCount, err := gc.GetTodaysPendingGames(tId)
+
+	if err != nil {
+		http.Error(
+			w,
+			`{"success":false,"message":"Failed to retrieve today's pending games"}`,
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	_, tomorrowsCount, err := gc.GetTomorrowsPendingGames(tId)
+
+	if err != nil {
+		http.Error(
+			w,
+			`{"success":false,"message":"Failed to retrieve tomorrow's pending games"}`,
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	_, sevenDayCount, err := gc.Get7DayPendingGames(tId)
+
+	if err != nil {
+		http.Error(
+			w,
+			`{"success":false,"message":"Failed to retrieve next 7 day's pending games"}`,
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	response := struct {
+		Success        bool `json:"success"`
+		TodaysCount    int  `json:"todaysCount"`
+		TomorrowsCount int  `json:"tomorrowsCount"`
+		SevenDayCount  int  `json:"sevenDayCount"`
+	}{
+		Success:        true,
+		TodaysCount:    todaysCount,
+		TomorrowsCount: tomorrowsCount,
+		SevenDayCount:  sevenDayCount,
+	}
+
+	fmt.Println("Response Success:", response.Success, "Todays Count:", response.TodaysCount, "Tomorrows Count:", response.TomorrowsCount, "Seven Day Count:", response.SevenDayCount)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("Failed to encode pending game count: %v\n", err)
+	}
 }
 
 func GetGames(w http.ResponseWriter, r *http.Request) {
@@ -4573,6 +5056,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("Game Filters", gameFilters)
+
 	// 2. Query MongoDB
 
 	opts := options.Find().
@@ -4597,6 +5082,17 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("Decoding failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if len(games) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "No games were found matching your search criteria.",
+		})
+
 		return
 	}
 
@@ -4625,13 +5121,39 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Association: game.Association,
 		}
 
-		view.GameFee = fmt.Sprintf("$%.2f", float64(game.GameFee)/100)
+		view.GameFee = fmt.Sprintf("$%.2f", float64(gameFee)/100)
 
 		abbrev := utils.DayOfWeekAbbreviation(game.Date)
 		view.Date = fmt.Sprintf("%s (%s)", game.Date, abbrev)
 
-		view.Officials = reports.FormatOfficialString(game.Referee, game.U1, game.U2)
+		if game.Referee != "" && game.Referee != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(game.Referee, tId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		if game.U1 != "" && game.U1 != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(game.U1, tId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		if game.U1 != "" && game.U2 != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(game.U2, tId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		//view.Officials = reports.FormatOfficialString(game.Referee, game.U1, game.U2)
+
 		gameView = append(gameView, view)
+		fmt.Println("view ", view)
 	}
 
 	/*
@@ -4641,6 +5163,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(reptLines)
 		}
 	*/
+
+	fmt.Println("Returning the following", gameView)
 
 	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
@@ -4731,6 +5255,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Name     string `json:"name"`
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -4797,6 +5322,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		TenantID:     tenantID,
 		Role:         role,
 		CreatedAt:    time.Now(),
+		Name:         req.Name,
 	}
 
 	_, err = usersCollection.InsertOne(r.Context(), user)
@@ -4825,6 +5351,8 @@ func main() {
 		panic(err)
 	}
 
+	dbName = utils.GetMongoDbName()
+
 	podName := os.Getenv("POD_NAME")
 	if podName == "" {
 		podName = "local-dev"
@@ -4834,7 +5362,7 @@ func main() {
 
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	utils.AuditLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
-	database.InitDbase("refLedger_v2", uri)
+	database.InitDbase(dbName, uri)
 
 	err = database.Connect()
 	if err != nil {
@@ -4914,6 +5442,12 @@ func main() {
 		return
 	}
 
+	err = uc.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize users collection.")
+		utils.AuditLog.Println("Failed to initialize users collection.")
+		return
+	}
 	utils.AuditLog.Println("All collections initialized successfully.")
 
 	fmt.Println("Registering routes...")
@@ -4967,6 +5501,9 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/login.html")
 	})
 
+	mux.HandleFunc("/api/games/pending-games/count", GetPendingGamesCount)
+
+	mux.HandleFunc("/api/session", getCurrentSession)
 	mux.HandleFunc("/api/pod", PodInfoHandler)
 
 	mux.HandleFunc("/api/import/officials/preview", authRequired(readOnlyForbidden(PreviewOfficialsImportHandler)))
@@ -4979,7 +5516,7 @@ func main() {
 	mux.HandleFunc("/api/import/sites/commit", authRequired(readOnlyForbidden(CommitSitesImportHandler)))
 
 	mux.HandleFunc("/api/import/games/preview", authRequired(readOnlyForbidden(PreviewGamesImportHandler)))
-	//mux.HandleFunc("/api/import/games/commit", authRequired(readOnlyForbidden(CommitGamesImportHandler)))
+	mux.HandleFunc("/api/import/games/commit", authRequired(readOnlyForbidden(CommitGamesImportHandler)))
 
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
@@ -5005,6 +5542,8 @@ func main() {
 	mux.HandleFunc("/api/deleteSite/{siteId}", authRequired(readOnlyForbidden(DeleteSite)))
 	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", authRequired(readOnlyForbidden(DeleteGame)))
 	mux.HandleFunc("/api/deleteOfficial/{firstName}/{lastName}", authRequired(readOnlyForbidden(DeleteOfficial)))
+	mux.HandleFunc("/api/officials/{officialId}", authRequired(readOnlyForbidden(OfficialsDetailHandler)))
+
 	mux.HandleFunc("/importOfficials", authRequired(readOnlyForbidden(ImportOfficialsPageHandler)))
 	mux.HandleFunc("/importAssociations", authRequired(readOnlyForbidden(ImportAssociationsPageHandler)))
 	mux.HandleFunc("/importGames", authRequired(readOnlyForbidden(ImportGamesPageHandler)))
@@ -5041,15 +5580,35 @@ func main() {
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
 	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
 
-	/*
-		mux.Handle("/images/", http.StripPrefix("/images/",
-			http.FileServer(http.Dir("internal/html/images"))))
+	mux.HandleFunc("/components-test", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "NEW BINARY IS RUNNING")
+	})
 
+	mux.HandleFunc("/debug/components", func(w http.ResponseWriter, r *http.Request) {
 
-			mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
-				http.ServeFile(w, r, "./internal/html/index.html")
-			}))
-	*/
+		fmt.Fprintln(w, "components route is active")
+
+	})
+
+	mux.Handle(
+		"/components/",
+		http.StripPrefix(
+			"/components/",
+			http.FileServer(
+				http.Dir("./internal/html/components"),
+			),
+		),
+	)
+
+	mux.Handle(
+		"/css/",
+		http.StripPrefix(
+			"/css/",
+			http.FileServer(
+				http.Dir("./internal/html/css"),
+			),
+		),
+	)
 
 	mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/index.html")

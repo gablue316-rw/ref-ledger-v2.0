@@ -488,6 +488,19 @@ func GetGameByGameIdAndOrAssoc(assoc string, gameId string) (model.GameDescripto
 	return gameRecord, nil
 }
 
+func CalcSingleGameFee(game model.GameDescriptor) (int64, error) {
+
+	numOfGames, _ := utils.ConvertStrToInt64(game.NumOfGames)
+	gameFee, _ := utils.ConvertAmtStrToInt64(game.GameFee)
+	travelPay, _ := utils.ConvertAmtStrToInt64(game.TravelPay)
+	assignorFee, _ := utils.ConvertAmtStrToInt64(game.AssignorFee)
+	deductions, _ := utils.ConvertAmtStrToInt64(game.Deductions)
+
+	totalGameFee := numOfGames*gameFee + travelPay - assignorFee - deductions
+	return totalGameFee, nil
+
+}
+
 func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -2642,6 +2655,24 @@ func (gc *GameCollection) Exists(association string, gameId string, tenantId str
 	return true, nil
 }
 
+func (gc *GameCollection) Add(tenantId string, game model.GameDescriptor) error {
+
+	var result *mongo.InsertOneResult
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	doc := utils.ConvertGameDescrToGameDoc(game)
+	doc.TenantId = tenantId
+
+	result, gc.LastError = gc.Coll.InsertOne(ctx, doc)
+	if gc.LastError != nil {
+		return fmt.Errorf("Insert failed.  Reason: %v", gc.LastError)
+	}
+	fmt.Println("Inserted ID:", result.InsertedID)
+
+	return nil
+}
+
 func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
@@ -2653,12 +2684,13 @@ func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 	db := Client.Database(Database)
 	coll := db.Collection("games")
 	collectionName := coll.Name()
-	fmt.Println("Updating Games Status to", status, "for game ids:", gameIds)
+	fmt.Println("##### Updating Games Status to", status, "for game ids:", gameIds, "#####")
 
 	recordsUpdated := 0
 	totalErrors := 0
 
 	if status == "Cancelled" {
+		fmt.Println("##### Cancelling game....setting financials to 0.00 #####")
 		update = bson.M{
 			"$set": bson.M{
 				"gameFee":     int64(0),
@@ -2671,7 +2703,7 @@ func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 	} else {
 		update = bson.M{
 			"$set": bson.M{
-				"status": "Cancelled",
+				"status": status,
 			},
 		}
 	}
@@ -2717,6 +2749,171 @@ func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
 }
 
+func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int, error) {
+
+	ctx := context.Background()
+
+	// Beginning of today (local time)
+	now := time.Now()
+	start := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day(),
+		0, 0, 0, 0,
+		now.Location(),
+	)
+
+	// Beginning of 7 days from now
+	end := start.Add(7 * 24 * time.Hour)
+
+	filter := bson.M{
+		"tenantId": tId,
+		"status":   "Pending",
+		"gameDateTime": bson.M{
+			"$gte": start,
+			"$lt":  end,
+		},
+	}
+
+	cursor, err := gc.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer cursor.Close(ctx)
+
+	var games []model.GameDoc
+	var game model.GameDoc
+	var totalGames int64 = 0
+
+	for cursor.Next(ctx) {
+
+		err := cursor.Decode(&game)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		totalGames = totalGames + game.NumOfGames
+		games = append(games, game)
+
+	}
+
+	fmt.Println("database/Get7DayPendingGames returning ", totalGames, "games")
+	return games, int(totalGames), nil
+
+}
+
+func (gc *GameCollection) GetTomorrowsPendingGames(tId string) ([]model.GameDoc, int, error) {
+
+	ctx := context.Background()
+
+	// Beginning of today (local time)
+	now := time.Now()
+	today := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day(),
+		0, 0, 0, 0,
+		now.Location(),
+	)
+
+	// Beginning of tomorrow
+	start := today.Add(24 * time.Hour)
+
+	// Beginning of the day after tomorrow
+	end := start.Add(1 * 24 * time.Hour)
+
+	filter := bson.M{
+		"tenantId": tId,
+		"status":   "Pending",
+		"gameDateTime": bson.M{
+			"$gte": start,
+			"$lt":  end,
+		},
+	}
+
+	cursor, err := gc.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer cursor.Close(ctx)
+
+	var games []model.GameDoc
+	var game model.GameDoc
+	var totalGames int64 = 0
+
+	for cursor.Next(ctx) {
+
+		err := cursor.Decode(&game)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		totalGames = totalGames + game.NumOfGames
+		games = append(games, game)
+
+	}
+
+	fmt.Println("database/GetTomorrowsPendingGames returning ", totalGames, "games")
+	return games, int(totalGames), nil
+
+}
+
+func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, int, error) {
+
+	ctx := context.Background()
+
+	// Beginning of today (local time)
+	now := time.Now()
+	start := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day(),
+		0, 0, 0, 0,
+		now.Location(),
+	)
+
+	// Beginning of tomorrow
+	end := start.Add(24 * time.Hour)
+
+	filter := bson.M{
+		"tenantId": tId,
+		"status":   "Pending",
+		"gameDateTime": bson.M{
+			"$gte": start,
+			"$lt":  end,
+		},
+	}
+
+	cursor, err := gc.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	defer cursor.Close(ctx)
+
+	var games []model.GameDoc
+	var game model.GameDoc
+	var totalGames int64 = 0
+
+	for cursor.Next(ctx) {
+
+		err := cursor.Decode(&game)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		totalGames = totalGames + game.NumOfGames
+		games = append(games, game)
+
+	}
+
+	fmt.Println("database/GetTodaysPendingGames returning ", totalGames, "games")
+	return games, int(totalGames), nil
+
+}
+
 // Official Collection, Documents and API Code
 type OfficialJson struct {
 	FirstName string `json:"firstName"`
@@ -2728,16 +2925,18 @@ type OfficialJson struct {
 }
 
 type OfficialDoc struct {
-	Id        int64  `bson:"id,omitempty"`
-	FirstName string `bson:"firstName,omitempty"`
-	LastName  string `bson:"lastName,omitempty"`
-	Phone     string `bson:"phone,omitempty"`
-	Email     string `bson:"email,omitempty"`
-	Address   string `bson:"address,omitempty"`
-	TenantId  string `bson:"tenantId"`
+	Id         int64  `bson:"id,omitempty"`
+	OfficialId int64  `bson:"officialId,omitempty"`
+	FirstName  string `bson:"firstName,omitempty"`
+	LastName   string `bson:"lastName,omitempty"`
+	Phone      string `bson:"phone,omitempty"`
+	Email      string `bson:"email,omitempty"`
+	Address    string `bson:"address,omitempty"`
+	TenantId   string `bson:"tenantId"`
 }
 
 type Official struct {
+	Id        int64
 	FirstName string
 	LastName  string
 	Phone     string
@@ -2803,7 +3002,15 @@ func (oc *OfficialCollection) convOfficialToDoc(official Official) (OfficialDoc,
 }
 
 func (oc *OfficialCollection) convDocToOfficial(doc OfficialDoc) Official {
+
+	officialId := doc.OfficialId
+
+	if officialId == 0 {
+		officialId = doc.Id
+	}
+
 	return Official{
+		Id:        officialId,
 		FirstName: doc.FirstName,
 		LastName:  doc.LastName,
 		Phone:     doc.Phone,
@@ -2873,6 +3080,31 @@ func (oc *OfficialCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
+func (oc *OfficialCollection) GetOfficialView(official, tenantId string) (model.OfficialView, error) {
+
+	var err error
+
+	parts := strings.Fields(official)
+
+	if len(parts) < 2 {
+		return model.OfficialView{}, fmt.Errorf("Invalid name")
+	}
+
+	firstName := parts[0]
+	lastName := parts[len(parts)-1]
+
+	o, err := oc.Get(firstName, lastName, tenantId)
+
+	if err != nil {
+		return model.OfficialView{}, err
+	}
+
+	return model.OfficialView{
+		OfficialId: o.Id,
+		Name:       o.FirstName + " " + o.LastName,
+	}, nil
+}
+
 func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 
 	var result *mongo.InsertOneResult
@@ -2895,6 +3127,42 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 	return nil
 }
 
+func (oc *OfficialCollection) GetById(officialId int64, tenantId string) (Official, error) {
+
+	//
+	// Currently the Officials Collection has some documents with id and officialId.
+	// So we need to look using both fields.
+	//
+	// This needs to be fixed by removing id and only use officialId.  However, until then
+	// we will use both.
+	//
+
+	var filter bson.M
+	var doc OfficialDoc
+
+	filter = bson.M{
+		"tenantId": tenantId,
+		"$or": bson.A{
+			bson.M{"officialId": officialId},
+			bson.M{"id": officialId},
+		},
+	}
+
+	err := oc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return Official{}, fmt.Errorf(
+				"official %d not found",
+				officialId,
+			)
+		}
+		return Official{}, err
+	}
+
+	official := oc.convDocToOfficial(doc)
+	return official, nil
+}
+
 func (oc *OfficialCollection) Get(firstName, lastName, tenantId string) (Official, error) {
 
 	var filter bson.M
@@ -2913,7 +3181,7 @@ func (oc *OfficialCollection) Get(firstName, lastName, tenantId string) (Officia
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return Official{}, fmt.Errorf("official not found")
 		}
-		return Official{}, fmt.Errorf("Failed to get official.  Reason: %v", err)
+		return Official{}, fmt.Errorf("Failed to get official.  Reason: %w", err)
 	}
 
 	official := oc.convDocToOfficial(doc)
@@ -3379,4 +3647,37 @@ func (sc *SessionsCollection) GetTenantID(sessionID string) (string, error) {
 	}
 
 	return session.TenantID, nil
+}
+
+type UsersCollection struct {
+	DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+func (uc *UsersCollection) Init(client *mongo.Client) error {
+
+	uc.DB = client.Database(Database)
+	uc.Coll = uc.DB.Collection("users")
+
+	fmt.Println("Successfully initialized Users Collection")
+	return nil
+}
+
+func (uc *UsersCollection) GetName(tenantId, username string) (string, error) {
+
+	filter := bson.M{
+		"tenantId": tenantId,
+		"username": username,
+	}
+
+	var user model.User
+
+	// Query to find all documents
+	err := uc.Coll.FindOne(context.TODO(), filter).Decode(&user)
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve user: %v", err)
+	}
+
+	return user.Name, nil
 }

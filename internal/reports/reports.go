@@ -505,7 +505,7 @@ func GenerateOfficialsReport(records []model.OfficialDescriptor) []string {
 	return rept
 }
 
-func GenerateAcctsRecvReport(parentCtx context.Context, associations string) []string {
+func GenerateAcctsRecvReport(parentCtx context.Context, associations, tid string) []string {
 
 	fmt.Println("Generating Accounts Receivable Report")
 	rept := make([]string, 10, 20)
@@ -544,6 +544,7 @@ func GenerateAcctsRecvReport(parentCtx context.Context, associations string) []s
 		gFilter := model.GFilters{
 			Status:      "Completed",
 			Association: assoc,
+			TenantId:    tid,
 		}
 
 		gFilters, err := utils.ConvertGameFiltersToJsonFile(gFilter)
@@ -573,7 +574,7 @@ func GenerateAcctsRecvReport(parentCtx context.Context, associations string) []s
 			}
 
 			gameIds = append(gameIds, g)
-			gFee, _ := utils.ConvertAmtStrToInt64(r.GameFee)
+			gFee, _ := database.CalcSingleGameFee(r)
 			acctsRecv += gFee
 		}
 

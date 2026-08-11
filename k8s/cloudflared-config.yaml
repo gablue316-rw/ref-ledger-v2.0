@@ -5,7 +5,7 @@ metadata:
 
 data:
   config.yaml: |
-    tunnel: 4299fc7a-3088-406e-99bb-6d36c35258e2
+    tunnel: 00629144-3807-4593-ac77-24698d2d12cd
 
     credentials-file: /creds/credentials.json
 

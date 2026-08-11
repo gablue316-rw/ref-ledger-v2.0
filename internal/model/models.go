@@ -10,6 +10,7 @@ type User struct {
 	TenantID     string    `bson:"tenantId" json:"tenantId"`
 	Role         string    `bson:"role" json:"role"`
 	CreatedAt    time.Time `bson:"createdAt" json:"createdAt"`
+	Name         string    `bson:"name" json:"name"`
 }
 
 type Session struct {
@@ -229,17 +230,29 @@ type HtmlResponse struct {
 	Assignor    string `json:"assignor" bson:"assignor,omitempty"`
 }
 
+type OfficialDetailsView struct {
+	OfficialId int64  `json:"OfficialId"`
+	Name       string `json:"Name"`
+	Phone      string `json:"Phone"`
+	Email      string `json:"Email"`
+}
+
+type OfficialView struct {
+	OfficialId int64  `json:"OfficialId"`
+	Name       string `json:"Name"`
+}
+
 type GameView struct {
-	GameId      int64  `json:"GameId"`
-	Date        string `json:"Date"`
-	Time        string `json:"Time"`
-	Sport       string `json:"Sport"`
-	Site        string `json:"Site"`
-	Field       string `json:"Field"`
-	NumOfGames  int64  `json:"NumOfGames"`
-	Level       string `json:"Level"`
-	GameFee     string `json:"GameFee"`
-	Association string `json:"Association"`
-	Status      string `json:"Status"`
-	Officials   string `json:"Officials"`
+	GameId      int64          `json:"GameId"`
+	Date        string         `json:"Date"`
+	Time        string         `json:"Time"`
+	Sport       string         `json:"Sport"`
+	Site        string         `json:"Site"`
+	Field       string         `json:"Field"`
+	NumOfGames  int64          `json:"NumOfGames"`
+	Level       string         `json:"Level"`
+	GameFee     string         `json:"GameFee"`
+	Association string         `json:"Association"`
+	Status      string         `json:"Status"`
+	Officials   []OfficialView `json:"Officials"`
 }

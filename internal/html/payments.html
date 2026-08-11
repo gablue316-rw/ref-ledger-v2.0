@@ -6,7 +6,7 @@
     <title>Ref Ledger V2.0 Payments</title>
     <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">    
-
+    <link rel="stylesheet" href="/components/navbar.css?v=12"> 
 
     <style>
 
@@ -18,14 +18,14 @@
         }
 
         body {
-            background-color: #f4f6f9;
-            padding: 20px;
-            color: #333;
+           background-color: #f4f6f9;
+           color: #333;
         }
 
         .container {
-            max-width: 1000px;
-            margin: auto;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 20px;
         }
 
         .header {
@@ -40,61 +40,6 @@
             margin-bottom: 10px;
         }
 
-.navbar {
-    background: #082b4f;
-    color: white;
-    display: flex;
-    align-items: center;
-    padding: 15px 30px;
-}
-
-.logo {
-    font-size: 28px;
-    font-weight: bold;
-    margin-right: 40px;
-    white-space: nowrap;
-}
-
-.nav-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.nav-links a {
-    color: white;
-    text-decoration: none;
-
-    display: flex;
-    flex-direction: column;
-
-    align-items: center;
-    justify-content: center;
-
-    min-width: 90px;
-    padding: 10px;
-
-    border-radius: 6px;
-
-    transition: .2s;
-}
-
-.nav-links a:hover {
-    background: rgba(255,255,255,.10);
-}
-
-.nav-links a.active {
-    background: rgba(255,255,255,.15);
-}
-
-.nav-links i {
-    font-size: 22px;
-    margin-bottom: 6px;
-}
-
-.nav-links span {
-    font-size: 13px;
-}
 
         .form-card {
             background-color: white;
@@ -213,6 +158,41 @@
     gap: 10px;
 }
 
+.official-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.55);
+}
+
+.official-modal-content {
+    position: relative;
+    width: 90%;
+    max-width: 400px;
+    padding: 24px;
+    border-radius: 8px;
+    background-color: white;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.official-modal-content h2 {
+    margin-top: 0;
+    color: #082b4f;
+}
+
+.official-modal-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    border: none;
+    background: none;
+    font-size: 28px;
+    cursor: pointer;
+}
+
 
         @media (max-width: 768px) {
 
@@ -238,81 +218,14 @@
 
 <body>
 
+<div id="navbar-container"></div>
+
 <div class="container">
 
     <div class="header">
         <h1>Ref Ledger V2.0 Payments</h1>
         <p>Record and track your received payments.</p>
     </div>
-
-
-<nav class="navbar">
-
-    <div class="nav-links">
-
-        <a href="/">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
-        <a href="/dashboard">
-            <i class="fa-solid fa-chart-column"></i>
-            <span>Dashboard</span>
-        </a>
-
-        <a href="/reports">
-            <i class="fa-solid fa-file-lines"></i>
-            <span>Reports</span>
-        </a>
-
-        <a href="/games">
-            <i class="fa-solid fa-calendar-days"></i>
-            <span>Games</span>
-        </a>
-
-        <a href="/officials">
-            <i class="fa-solid fa-users"></i>
-            <span>Officials</span>
-        </a>
-
-        <a href="/associations">
-            <i class="fa-solid fa-building-columns"></i>
-            <span>Associations</span>
-        </a>
-
-        <a href="/sites">
-            <i class="fa-solid fa-location-dot"></i>
-            <span>Sites</span>
-        </a>
-
-        <a href="/expenses">
-            <i class="fa-solid fa-receipt"></i>
-            <span>Expenses</span>
-        </a>
-
-        <a class="active" href="/payments">
-            <i class="fa-solid fa-dollar-sign"></i>
-            <span>Payments</span>
-        </a>
-
-        <a href="/gameStatus">
-            <i class="fa-solid fa-rotate"></i>
-            <span>Status</span>
-        </a>
-
-        <a href="/contact">
-            <i class="fa-solid fa-envelope"></i>
-            <span>Contact</span>
-        </a>          
-    
-        <a href="#" id="logoutBtn">
-            <i class="fa-solid fa-right-from-bracket"></i>
-            <span>Logout</span>
-        </a>        
-
-    </div>
-
-</nav>
-
 
     <div class="form-card">
 
@@ -417,31 +330,13 @@
 
 </div>
 
+<script src="/components/navbar.js?v=12"></script>
+
 <script>
 
 document.addEventListener("DOMContentLoaded", function() { 
     loadCompletedGames();
 })
-
-document.getElementById("logoutBtn").addEventListener("click", async () => {
-
-    try {
-
-        const response = await fetch("/api/logout", {
-            method: "POST"
-        });
-
-        if (response.ok) {
-            window.location.href = "/login";
-        } else {
-            alert("Logout failed");
-        }
-
-    } catch(err) {
-        alert("Logout failed");
-    }
-
-});
 
 
 const paymentForm = document.getElementById("paymentForm");
@@ -646,6 +541,19 @@ function renderGames(games) {
     const rows = games.map(game => {
         const statusClass = getStatusClass(game.Status);
 
+        const officialsHtml = Array.isArray(game.Officials)
+            ? game.Officials
+                .map(official => `
+                    <a
+                        href="#"
+                        class="official-link"
+                        data-official-id="${official.OfficialId}">
+                        ${official.Name}
+                    </a>
+                `)
+                .join(", ")
+            : "";
+
         return `
             <tr>
                 <td>
@@ -669,7 +577,7 @@ function renderGames(games) {
                         ${game.Status}
                     </span>
                 </td>
-                <td>${game.Officials || ""}</td>
+                <td>${officialsHtml}</td>
             </tr>
         `;
     }).join("");
@@ -678,35 +586,138 @@ function renderGames(games) {
 }
 
 async function loadCompletedGames() {
-    
+
     const params = new URLSearchParams();
     params.append("status", "Completed");
 
-       try {
+    try {
         const response = await fetch(`/api/dashboard?${params.toString()}`);
 
-        console.log("Status:", response.status);
-        console.log("Content-Type:", response.headers.get("content-type"));
+        // No completed games found
+        if (response.status === 404) {
+            //messageBox.innerText = "No games are currently in Completed status.";
+            renderGames([]);
+            return;
+        }
 
         if (!response.ok) {
-            const text = await response.text();
-            console.error("Server returned:", text);
             throw new Error(`HTTP ${response.status}`);
         }
 
         const games = await response.json();
 
-        console.log("Completed Games:", games);
+        messageBox.innerText = `${games.length} completed game(s) available for payment.`;
 
         renderGames(games);
 
     } catch (err) {
         console.error(err);
-        alert("Failed to load completed games.");
+        messageBox.innerText = "Unable to load completed games.";
+    }
+}
+
+async function loadOfficialDetails(officialId) {
+    try {
+        const response = await fetch(
+            `/api/officials/${encodeURIComponent(officialId)}`
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(
+                `Unable to load official: ${response.status} ${errorText}`
+            );
+        }
+
+        const official = await response.json();
+
+        document.getElementById("officialDetailsName").textContent =
+            official.Name || "Unknown";
+
+        const phoneLink = document.getElementById("officialDetailsPhone");
+        const phoneNumber = (official.Phone || "").trim();
+
+        if (phoneNumber) {
+            const smsNumber = phoneNumber.replace(/[^\d+]/g, "");
+
+            phoneLink.textContent = phoneNumber;
+            phoneLink.href = `sms:${smsNumber}`;
+            phoneLink.setAttribute(
+                "aria-label",
+                `Send a text message to ${official.Name || phoneNumber}`
+            );
+        } else {
+            phoneLink.textContent = "Not available";
+            phoneLink.removeAttribute("href");
+            phoneLink.removeAttribute("aria-label");
+        }
+
+        document.getElementById("officialDetailsEmail").textContent =
+            official.Email || "Not available";
+
+        document.getElementById("officialDetailsModal").style.display =
+            "flex";
+
+    } catch (error) {
+        console.error("Error loading official details:", error);
+        alert("Unable to load the official's contact information.");
+    }
+}
+
+function closeOfficialDetails() {
+    document.getElementById("officialDetailsModal").style.display = "none";
+}
+
+document.addEventListener("click", event => {
+    const link = event.target.closest(".official-link");
+
+    if (!link) {
+        return;
     }
 
-}
+    event.preventDefault();
+    loadOfficialDetails(link.dataset.officialId);
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("officialDetailsModal")
+    .addEventListener("click", event => {
+        if (event.target.id === "officialDetailsModal") {
+            closeOfficialDetails();
+        }
+    });
+});
 </script>
+
+<div id="officialDetailsModal" class="official-modal">
+    <div class="official-modal-content">
+        <button
+            type="button"
+            class="official-modal-close"
+            onclick="closeOfficialDetails()">
+            &times;
+        </button>
+
+        <h2 id="officialDetailsName">Official Details</h2>
+
+        <p>
+            <strong>Phone:</strong>
+            <a id="officialDetailsPhone"></a>
+        </p>
+
+        <p>
+            <strong>Email:</strong>
+            <span id="officialDetailsEmail"></span>
+        </p>
+
+        <button
+            type="button"
+            class="btn btn-clear"
+            onclick="closeOfficialDetails()">
+            Close
+        </button>
+    </div>
+</div>
 
 </body>
 </html>
