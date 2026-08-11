@@ -505,8 +505,24 @@ async function loadOfficialDetails(officialId) {
         document.getElementById("officialDetailsName").textContent =
             official.Name || "Unknown";
 
-        document.getElementById("officialDetailsPhone").textContent =
-            official.Phone || "Not available";
+        const phoneLink = document.getElementById("officialDetailsPhone");
+        const phoneNumber = (official.Phone || "").trim();
+
+        if (phoneNumber) {
+            // Keep only characters that are valid/useful in an SMS phone URI.
+            const smsNumber = phoneNumber.replace(/[^\d+]/g, "");
+
+            phoneLink.textContent = phoneNumber;
+            phoneLink.href = `sms:${smsNumber}`;
+            phoneLink.setAttribute(
+                "aria-label",
+                `Send a text message to ${official.Name || phoneNumber}`
+            );
+        } else {
+            phoneLink.textContent = "Not available";
+            phoneLink.removeAttribute("href");
+            phoneLink.removeAttribute("aria-label");
+        }
 
         document.getElementById("officialDetailsEmail").textContent =
             official.Email || "Not available";
@@ -861,7 +877,7 @@ function clearFilters() {
 
         <p>
             <strong>Phone:</strong>
-            <span id="officialDetailsPhone"></span>
+            <a id="officialDetailsPhone"></a>
         </p>
 
         <p>
