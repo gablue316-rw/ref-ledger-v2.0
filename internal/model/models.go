@@ -230,6 +230,13 @@ type HtmlResponse struct {
 	Assignor    string `json:"assignor" bson:"assignor,omitempty"`
 }
 
+type OfficialDetailsView struct {
+	OfficialId int64  `json:"OfficialId"`
+	Name       string `json:"Name"`
+	Phone      string `json:"Phone"`
+	Email      string `json:"Email"`
+}
+
 type OfficialView struct {
 	OfficialId int64  `json:"OfficialId"`
 	Name       string `json:"Name"`

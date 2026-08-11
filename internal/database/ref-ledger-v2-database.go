@@ -3127,6 +3127,42 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 	return nil
 }
 
+func (oc *OfficialCollection) GetById(officialId int64, tenantId string) (Official, error) {
+
+	//
+	// Currently the Officials Collection has some documents with id and officialId.
+	// So we need to look using both fields.
+	//
+	// This needs to be fixed by removing id and only use officialId.  However, until then
+	// we will use both.
+	//
+
+	var filter bson.M
+	var doc OfficialDoc
+
+	filter = bson.M{
+		"tenantId": tenantId,
+		"$or": bson.A{
+			bson.M{"officialId": officialId},
+			bson.M{"id": officialId},
+		},
+	}
+
+	err := oc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return Official{}, fmt.Errorf(
+				"official %d not found",
+				officialId,
+			)
+		}
+		return Official{}, err
+	}
+
+	official := oc.convDocToOfficial(doc)
+	return official, nil
+}
+
 func (oc *OfficialCollection) Get(firstName, lastName, tenantId string) (Official, error) {
 
 	var filter bson.M

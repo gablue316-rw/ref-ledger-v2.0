@@ -4711,6 +4711,52 @@ func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func OfficialsDetailHandler(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	officialId := r.PathValue("officialId")
+
+	fmt.Println("Retrieving Official Details for official id", officialId)
+	id, err := utils.ConvertStrToInt64(officialId)
+
+	if err != nil {
+		http.Error(w, "Invalid request data", http.StatusBadRequest)
+		return
+	}
+	official, err := oc.GetById(id, database.TenantId)
+
+	if err != nil {
+		http.Error(w, "Invalid request data", http.StatusBadRequest)
+		return
+	}
+
+	officialDetails := model.OfficialDetailsView{
+		OfficialId: official.Id,
+		Name:       official.FirstName + " " + official.LastName,
+		Phone:      official.Phone,
+		Email:      official.Email,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	err = json.NewEncoder(w).Encode(officialDetails)
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to encode official details",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+}
+
 func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
@@ -5496,6 +5542,8 @@ func main() {
 	mux.HandleFunc("/api/deleteSite/{siteId}", authRequired(readOnlyForbidden(DeleteSite)))
 	mux.HandleFunc("/api/deleteGame/{association}/{gameId}", authRequired(readOnlyForbidden(DeleteGame)))
 	mux.HandleFunc("/api/deleteOfficial/{firstName}/{lastName}", authRequired(readOnlyForbidden(DeleteOfficial)))
+	mux.HandleFunc("/api/officials/{officialId}", authRequired(readOnlyForbidden(OfficialsDetailHandler)))
+
 	mux.HandleFunc("/importOfficials", authRequired(readOnlyForbidden(ImportOfficialsPageHandler)))
 	mux.HandleFunc("/importAssociations", authRequired(readOnlyForbidden(ImportAssociationsPageHandler)))
 	mux.HandleFunc("/importGames", authRequired(readOnlyForbidden(ImportGamesPageHandler)))
