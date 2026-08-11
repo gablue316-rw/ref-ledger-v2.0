@@ -158,6 +158,41 @@
     gap: 10px;
 }
 
+.official-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.55);
+}
+
+.official-modal-content {
+    position: relative;
+    width: 90%;
+    max-width: 400px;
+    padding: 24px;
+    border-radius: 8px;
+    background-color: white;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.official-modal-content h2 {
+    margin-top: 0;
+    color: #082b4f;
+}
+
+.official-modal-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    border: none;
+    background: none;
+    font-size: 28px;
+    cursor: pointer;
+}
+
 
         @media (max-width: 768px) {
 
@@ -506,6 +541,19 @@ function renderGames(games) {
     const rows = games.map(game => {
         const statusClass = getStatusClass(game.Status);
 
+        const officialsHtml = Array.isArray(game.Officials)
+            ? game.Officials
+                .map(official => `
+                    <a
+                        href="#"
+                        class="official-link"
+                        data-official-id="${official.OfficialId}">
+                        ${official.Name}
+                    </a>
+                `)
+                .join(", ")
+            : "";
+
         return `
             <tr>
                 <td>
@@ -529,7 +577,7 @@ function renderGames(games) {
                         ${game.Status}
                     </span>
                 </td>
-                <td>${game.Officials || ""}</td>
+                <td>${officialsHtml}</td>
             </tr>
         `;
     }).join("");
@@ -567,7 +615,109 @@ async function loadCompletedGames() {
         messageBox.innerText = "Unable to load completed games.";
     }
 }
+
+async function loadOfficialDetails(officialId) {
+    try {
+        const response = await fetch(
+            `/api/officials/${encodeURIComponent(officialId)}`
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(
+                `Unable to load official: ${response.status} ${errorText}`
+            );
+        }
+
+        const official = await response.json();
+
+        document.getElementById("officialDetailsName").textContent =
+            official.Name || "Unknown";
+
+        const phoneLink = document.getElementById("officialDetailsPhone");
+        const phoneNumber = (official.Phone || "").trim();
+
+        if (phoneNumber) {
+            const smsNumber = phoneNumber.replace(/[^\d+]/g, "");
+
+            phoneLink.textContent = phoneNumber;
+            phoneLink.href = `sms:${smsNumber}`;
+            phoneLink.setAttribute(
+                "aria-label",
+                `Send a text message to ${official.Name || phoneNumber}`
+            );
+        } else {
+            phoneLink.textContent = "Not available";
+            phoneLink.removeAttribute("href");
+            phoneLink.removeAttribute("aria-label");
+        }
+
+        document.getElementById("officialDetailsEmail").textContent =
+            official.Email || "Not available";
+
+        document.getElementById("officialDetailsModal").style.display =
+            "flex";
+
+    } catch (error) {
+        console.error("Error loading official details:", error);
+        alert("Unable to load the official's contact information.");
+    }
+}
+
+function closeOfficialDetails() {
+    document.getElementById("officialDetailsModal").style.display = "none";
+}
+
+document.addEventListener("click", event => {
+    const link = event.target.closest(".official-link");
+
+    if (!link) {
+        return;
+    }
+
+    event.preventDefault();
+    loadOfficialDetails(link.dataset.officialId);
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("officialDetailsModal")
+    .addEventListener("click", event => {
+        if (event.target.id === "officialDetailsModal") {
+            closeOfficialDetails();
+        }
+    });
+});
 </script>
+
+<div id="officialDetailsModal" class="official-modal">
+    <div class="official-modal-content">
+        <button
+            type="button"
+            class="official-modal-close"
+            onclick="closeOfficialDetails()">
+            &times;
+        </button>
+
+        <h2 id="officialDetailsName">Official Details</h2>
+
+        <p>
+            <strong>Phone:</strong>
+            <a id="officialDetailsPhone"></a>
+        </p>
+
+        <p>
+            <strong>Email:</strong>
+            <span id="officialDetailsEmail"></span>
+        </p>
+
+        <button
+            type="button"
+            class="btn btn-clear"
+            onclick="closeOfficialDetails()">
+            Close
+        </button>
+    </div>
+</div>
 
 </body>
 </html>
