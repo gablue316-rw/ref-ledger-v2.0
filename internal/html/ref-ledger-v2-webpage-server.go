@@ -4987,6 +4987,10 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Begin Date:", begindate, "End Date:", enddate)
 
+	if begindate == "today" && enddate == "" {
+		enddate = begindate
+	}
+
 	if len(status) > 0 {
 		runes := []rune(status)
 		runes[0] = unicode.ToUpper(runes[0])

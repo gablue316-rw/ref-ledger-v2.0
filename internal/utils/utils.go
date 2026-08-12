@@ -196,6 +196,18 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 	var bDate string = ""
 	var eDate string = ""
 
+	if begin == "today" && end == "" {
+		bDate = time.Now().Format(layout)
+		eDate = bDate
+		return bDate, eDate, nil
+	}
+
+	if begin == "tomorrow" && end == "" {
+		bDate = time.Now().AddDate(0, 0, 1).Format(layout)
+		eDate = bDate
+		return bDate, eDate, nil
+	}
+
 	if end != "" {
 		switch end {
 		case "today":
