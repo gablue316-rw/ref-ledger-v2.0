@@ -842,6 +842,65 @@ func GenerateIncomeReport(assoc string) []string {
 	return rept
 }
 
+func GenerateExpenseReportv2(records []model.ExpenseDescriptor) model.ExpenseReportData {
+
+	fmt.Println("Generating Expense Report v2")
+
+	expenseReport := model.ExpenseReportData{
+		Title:    "Expense Report",
+		SubTitle: getReportGeneratedDate(),
+	}
+
+	expenseRow := model.ExpenseReportRow{}
+
+	var totalMileage int64 = 0
+	var totalExpenses int64 = 0
+
+	for _, rec := range records {
+
+		expenseRow.Date = rec.Date
+		expenseRow.ExpenseId = rec.ExpenseId
+		expenseRow.Association = rec.Association
+		expenseRow.Type = rec.Type
+		expenseRow.Description = rec.Description
+
+		if rec.Type == "Mileage" {
+			expenseRow.Mileage = rec.Amount
+			expenseRow.Amount = "0.00"
+			miles, err := utils.ConvertStrToInt64(TrimMileageStr(rec.Amount))
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+
+			totalMileage += miles
+			expenseReport.Rows = append(expenseReport.Rows, expenseRow)
+			continue
+		}
+
+		expenseRow.Amount = "$" + rec.Amount
+		expenseRow.Mileage = "0"
+		expense, err := utils.ConvertAmtStrToInt64(rec.Amount)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		totalExpenses += expense
+
+		expenseReport.Rows = append(expenseReport.Rows, expenseRow)
+
+	}
+
+	expenseReport.TotalMileage = utils.ConvertInt64ToStr(totalMileage)
+	expenseReport.TotalExpenses = utils.ConvertInt64ToAmtStr((totalExpenses))
+
+	fmt.Println(expenseReport)
+
+	return expenseReport
+
+}
+
 func GenerateExpenseReport(records []model.ExpenseDescriptor) []string {
 
 	fmt.Println("Generating Expense Report")

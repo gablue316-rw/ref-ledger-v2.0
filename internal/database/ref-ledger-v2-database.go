@@ -2596,6 +2596,61 @@ func (gc *GameCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
+func (gc *GameCollection) ConvDocToGame(doc model.GameDoc) model.GameDescriptor {
+
+	return model.GameDescriptor{
+		GameId:      utils.ConvertInt64ToStr(doc.GameId),
+		Date:        doc.Date,
+		Time:        doc.Time,
+		Sport:       doc.Sport,
+		Site:        doc.Site,
+		Field:       doc.Field,
+		NumOfGames:  utils.ConvertInt64ToStr(doc.NumOfGames),
+		Level:       doc.Level,
+		GameFee:     utils.ConvertInt64ToAmtStr(doc.GameFee),
+		TravelPay:   utils.ConvertInt64ToAmtStr(doc.TravelPay),
+		AssignorFee: utils.ConvertInt64ToAmtStr(doc.AssignorFee),
+		Deductions:  utils.ConvertInt64ToAmtStr(doc.Deductions),
+		Association: doc.Association,
+		Status:      doc.Status,
+		Referee:     doc.Referee,
+		U1:          doc.U1,
+		U2:          doc.U2,
+		ECO:         doc.ECO,
+		Assignor:    doc.Assignor,
+	}
+}
+
+func (gc *GameCollection) Get(association string, gameId string, tenantId string) (model.GameDescriptor, error) {
+
+	var filter bson.M
+	var doc model.GameDoc
+
+	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
+	if err != nil {
+		return model.GameDescriptor{}, fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
+	}
+
+	filter = bson.M{
+		"gameId":      gameIdInt64,
+		"association": association,
+		"tenantId":    tenantId,
+	}
+
+	err = gc.Coll.FindOne(context.TODO(), filter).Decode(doc)
+
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return model.GameDescriptor{}, fmt.Errorf("Game with game id %s for association %s not found", gameId, association)
+		}
+		return model.GameDescriptor{}, err
+	}
+
+	game := gc.ConvDocToGame(doc)
+	return game, nil
+
+}
+
 func (gc *GameCollection) Delete(association string, gameId string) error {
 
 	var filter bson.M

@@ -256,3 +256,21 @@ type GameView struct {
 	Status      string         `json:"Status"`
 	Officials   []OfficialView `json:"Officials"`
 }
+
+type ExpenseReportRow struct {
+	Date        string
+	ExpenseId   string
+	Association string
+	Type        string
+	Mileage     string
+	Amount      string
+	Description string
+}
+
+type ExpenseReportData struct {
+	Title         string
+	SubTitle      string
+	Rows          []ExpenseReportRow
+	TotalMileage  string
+	TotalExpenses string
+}

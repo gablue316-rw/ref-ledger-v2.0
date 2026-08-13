@@ -21,9 +21,11 @@ import (
 var ApiVersion string = "ref-ledger-api-v2.1.0"
 var oc database.OfficialCollection
 var ac database.AssociationCollection
+var gc database.GameCollection
 
 var OcInitialized bool = false
 var AcInitialized bool = false
+var GcInitialized bool = false
 
 func GetAssociations(parentCtx context.Context) (string, error) {
 	fmt.Println("Getting Associations")
@@ -359,6 +361,15 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 	var errorFormat string = "%s %s not found!  Record Dropped!"
 	var tId string = database.TenantId
 
+	if !GcInitialized {
+		err := gc.Init(database.Client)
+		if err != nil {
+			fmt.Println("Games Collection is not initialized")
+			return fmt.Errorf("Games Collection is not initialized")
+		}
+		GcInitialized = true
+	}
+
 	if !OcInitialized {
 		err := oc.Init(database.Client)
 		if err != nil {
@@ -382,6 +393,17 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 	var u2 string = strings.TrimSpace(g.U2)
 	var eco string = strings.TrimSpace(g.ECO)
 	var assignor string = strings.TrimSpace(g.Assignor)
+	var gameid string = strings.TrimSpace(g.GameId)
+	var assoc string = strings.TrimSpace(g.Association)
+
+	fmt.Println("Game Id=", gameid)
+
+	if gameid == "" {
+		results, err := gc.Exists(assoc, gameid, tId)
+		if !results || err != nil {
+			return fmt.Errorf("Game with game id %s already exists", gameid)
+		}
+	}
 
 	fmt.Println("Referee=", ref)
 	if ref != "Unassigned" {
