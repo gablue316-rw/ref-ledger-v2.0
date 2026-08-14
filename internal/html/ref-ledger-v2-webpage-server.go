@@ -4300,11 +4300,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc)
 	if err != nil {
 		fmt.Println(err)
-<<<<<<< HEAD
 		http.Error(w, "Invalid Game", http.StatusBadRequest)
-=======
-		http.Error(w, err.Error(), http.StatusBadRequest)
->>>>>>> development
 		return
 	}
 
