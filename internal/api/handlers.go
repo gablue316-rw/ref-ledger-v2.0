@@ -403,7 +403,7 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 	if checkForDup {
 		exists, _ := gc.Exists(assoc, gameid, tId)
 		if exists {
-			return fmt.Errorf("Game already exists")
+			return fmt.Errorf("Duplicate Game")
 		}
 	}
 

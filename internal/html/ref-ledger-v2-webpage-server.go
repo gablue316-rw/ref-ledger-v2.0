@@ -4399,7 +4399,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup)
 	if err != nil {
 		fmt.Println(err)
-		http.Error(w, "Invalid Game", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
