@@ -4257,6 +4257,13 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	singleGameDesc, err = gc.Get(game.Association, utils.ConvertIntToStr(game.GameId), tId)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Game Not Found", http.StatusBadRequest)
+		return
+	}
+
 	fmt.Println("UpdateGame: Game Fee:", game.GameFee)
 	if tId == "na" {
 		tId, err = getTenantId(r)
@@ -4291,13 +4298,99 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("UpdateGame: Single Game Descriptor:", singleGameDesc)
+	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
 	var gDoc model.GameDoc = model.GameDoc{}
 
 	gDoc.GameId = int64(game.GameId)
 	gDoc.Association = game.Association
 
-	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc)
+	checkForDup := false
+	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Invalid Game", http.StatusBadRequest)
+		return
+	}
+
+	gameExists, err := database.GameExists(gDoc)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if gameExists {
+		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games", tId)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		return
+	}
+
+	gameDesc = append(gameDesc, singleGameDesc)
+	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games", tId)
+
+}
+
+func SaveGame(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+	var game Game
+	var tId string = database.TenantId
+	var err error
+	var siteId string
+	var gameDesc []model.GameDescriptor
+	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
+
+	err = json.NewDecoder(r.Body).Decode(&game)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("UpdateGame: Game Fee:", game.GameFee)
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// The HTML uses the site name, so we need to convert it to an ID
+	siteId, err = sc.GetSiteId(game.Site, tId)
+	if err != nil {
+		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+		return
+	}
+
+	game.Site = siteId
+
+	if game.Status == "Cancelled" {
+		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
+		game.GameFee = float64(0)
+		game.TravelPay = float64(0)
+		game.AssignorFee = float64(0)
+		game.Deductions = float64(0)
+	}
+
+	singleGameDesc = GameDocToGameDescr(game)
+	if game.Status == "Delete" {
+		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
+		api.DelGame(context.TODO(), singleGameDesc.GameId)
+		return
+	}
+
+	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
+	var gDoc model.GameDoc = model.GameDoc{}
+
+	gDoc.GameId = int64(game.GameId)
+	gDoc.Association = game.Association
+
+	checkForDup := true
+	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, "Invalid Game", http.StatusBadRequest)
@@ -5580,7 +5673,7 @@ func main() {
 	mux.HandleFunc("/api/sites", authRequired(readOnlyForbidden(CreateSite)))
 	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))
 	mux.HandleFunc("/api/reports", GenerateReport)
-	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
+	mux.HandleFunc("/api/game-save", authRequired(readOnlyForbidden(SaveGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
 	mux.HandleFunc("/api/login", ValidateLogin)

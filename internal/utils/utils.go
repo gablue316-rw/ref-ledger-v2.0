@@ -632,6 +632,12 @@ func ConvertMilesToStr(miles int64) string {
 	return str
 }
 
+func ConvertIntToStr(num int) string {
+
+	str := strconv.Itoa(num)
+	return str
+}
+
 func ConvertInt64ToStr(num int64) string {
 
 	str := strconv.FormatInt(num, 10) // Convert to string with base 10
