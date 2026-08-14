@@ -4300,7 +4300,11 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc)
 	if err != nil {
 		fmt.Println(err)
+<<<<<<< HEAD
 		http.Error(w, "Invalid Game", http.StatusBadRequest)
+=======
+		http.Error(w, err.Error(), http.StatusBadRequest)
+>>>>>>> development
 		return
 	}
 
@@ -4985,6 +4989,12 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	site := r.URL.Query().Get("site")
 	official := r.URL.Query().Get("official")
 
+	fmt.Println("Begin Date:", begindate, "End Date:", enddate)
+
+	if begindate == "today" && enddate == "" {
+		enddate = begindate
+	}
+
 	if len(status) > 0 {
 		runes := []rune(status)
 		runes[0] = unicode.ToUpper(runes[0])
@@ -5000,6 +5010,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 
+	fmt.Println("bDate: ", bDate, "eDate:", eDate)
 	if len(gameId) > 0 {
 		ids, err := utils.ConvertGameIdStrToInt(gameId)
 		if err != nil {
@@ -5065,6 +5076,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			{Key: "gameDateTime", Value: 1},
 		})
 
+	fmt.Println("opts:", opts, "filter:", mongoDbFilter)
 	cursor, err := coll.Find(context.TODO(), mongoDbFilter, opts)
 
 	if err != nil {
