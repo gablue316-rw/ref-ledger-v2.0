@@ -4251,6 +4251,8 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
+	fmt.Println("##### UpdateGame Enpoint Called #####")
+
 	err = json.NewDecoder(r.Body).Decode(&game)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -4344,6 +4346,8 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	var siteId string
 	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
+
+	fmt.Println("##### SaveGame Enpoint Called #####")
 
 	err = json.NewDecoder(r.Body).Decode(&game)
 	if err != nil {
