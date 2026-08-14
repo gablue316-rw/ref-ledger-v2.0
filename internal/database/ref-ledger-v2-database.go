@@ -2626,6 +2626,8 @@ func (gc *GameCollection) Get(association string, gameId string, tenantId string
 	var filter bson.M
 	var doc model.GameDoc
 
+	fmt.Println("Getting game with game id", gameId, "for association", association, "and tenant id", tenantId)
+
 	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
 	if err != nil {
 		return model.GameDescriptor{}, fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
@@ -2637,7 +2639,7 @@ func (gc *GameCollection) Get(association string, gameId string, tenantId string
 		"tenantId":    tenantId,
 	}
 
-	err = gc.Coll.FindOne(context.TODO(), filter).Decode(doc)
+	err = gc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
 
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
