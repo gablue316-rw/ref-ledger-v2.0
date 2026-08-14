@@ -9,3 +9,9 @@ ref-ledger-docker/.env
 
 # Reports 
 tests/reports
+
+# Backups
+mongodb-backup
+
+# Sandbox
+sandbox

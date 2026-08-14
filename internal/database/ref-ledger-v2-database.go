@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -1170,6 +1171,112 @@ func GetSession(r *http.Request) (*model.Session, error) {
 	}
 
 	return &session, nil
+}
+
+func getEnv(name string, defaultValue string) string {
+	value := os.Getenv(name)
+
+	if value == "" {
+		return defaultValue
+	}
+
+	return value
+}
+
+func BuildAtlasURI() (string, bool, error) {
+	username := os.Getenv("MONGODB_USERNAME")
+	password := os.Getenv("MONGODB_PASSWORD")
+
+	if username == "" {
+		return "", true, errors.New("MONGODB_USERNAME is not set")
+	}
+
+	if password == "" {
+		return "", true, errors.New("MONGODB_PASSWORD is not set")
+	}
+
+	host := getEnv(
+		"MONGODB_HOST",
+		"ref-ledger-cluster.2hni1bk.mongodb.net",
+	)
+
+	appName := getEnv(
+		"MONGODB_APP_NAME",
+		"ref-ledger-cluster",
+	)
+
+	database := getEnv(
+		"MONGODB_NAME",
+		"refLedger_v2",
+	)
+
+	mongoURL := &url.URL{
+		Scheme: "mongodb+srv",
+		User:   url.UserPassword(username, password),
+		Host:   host,
+		Path:   "/" + database,
+	}
+
+	query := url.Values{}
+	query.Set("appName", appName)
+
+	mongoURL.RawQuery = query.Encode()
+
+	return mongoURL.String(), true, nil
+}
+
+func BuildLocalURI() (string, bool, error) {
+	host := getEnv(
+		"MONGODB_HOST",
+		"localhost:27017",
+	)
+
+	database := getEnv(
+		"MONGODB_NAME",
+		"refLedger_v2",
+	)
+
+	replicaSet := getEnv(
+		"MONGODB_REPLICA_SET",
+		"refLedgerRS",
+	)
+
+	mongoURL := &url.URL{
+		Scheme: "mongodb",
+		Host:   host,
+		Path:   "/" + database,
+	}
+
+	query := url.Values{}
+
+	if replicaSet != "" {
+		query.Set("replicaSet", replicaSet)
+	}
+
+	if os.Getenv("MONGODB_DIRECT_CONNECTION") == "true" {
+		query.Set("directConnection", "true")
+	}
+
+	mongoURL.RawQuery = query.Encode()
+
+	return mongoURL.String(), false, nil
+}
+
+func BuildMongoURI() (mongoURI string, isAtlas bool, err error) {
+	mongoEnvironment := os.Getenv("MONGODB_ENV")
+
+	switch mongoEnvironment {
+	case "atlas":
+		return BuildAtlasURI()
+
+	case "local":
+		return BuildLocalURI()
+
+	default:
+		return "", false, fmt.Errorf(
+			`MONGODB_ENV must be set to "atlas" or "local"`,
+		)
+	}
 }
 
 func Connect() error {
