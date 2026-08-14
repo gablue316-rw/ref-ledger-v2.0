@@ -400,7 +400,8 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 
 	if gameid == "" {
 		results, err := gc.Exists(assoc, gameid, tId)
-		if !results || err != nil {
+
+		if results && err == nil {
 			return fmt.Errorf("Game with game id %s already exists", gameid)
 		}
 	}
