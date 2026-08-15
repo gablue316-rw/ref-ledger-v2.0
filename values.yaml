@@ -54,6 +54,10 @@ mongodb:
   port: 27017
   database: refLedger_v2
 
+  existingSecret: mongodb-credentials
+  usernameKey: username
+  passwordKey: password
+  
 logging:
   level: info
 
