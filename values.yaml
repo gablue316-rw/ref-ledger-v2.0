@@ -9,7 +9,7 @@ autoscaling:
   
 image:
   repository: gablue316/ref-ledger
-  tag: dev-v1.196
+  tag: dev-v1.190
   pullPolicy: Always
 
 service:
@@ -29,8 +29,8 @@ resources:
 
 env:
   TZ: America/New_York
-  MONGODB_HOST: "ref-ledger-cluster.2hni1bk.mongodb.net"
-  MONGODB_ENV: "atlas"
+  MONGODB_HOST: "host.docker.internal:27017"
+  MONGODB_ENV: "local"
   MONGODB_DIRECT_CONNECTION: "true"
   MONGODB_APP_NAME: "ref-ledger-cluster"
   MONGODB_NAME: "refLedger_v2"
@@ -54,10 +54,6 @@ mongodb:
   port: 27017
   database: refLedger_v2
 
-  existingSecret: mongodb-credentials
-  usernameKey: username
-  passwordKey: password
-  
 logging:
   level: info
 
