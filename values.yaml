@@ -32,8 +32,10 @@ env:
   MONGODB_HOST: "host.docker.internal:27017"
   MONGODB_ENV: "local"
   MONGODB_DIRECT_CONNECTION: "true"
-  LOG_FILE_PATH: "/root/logs/ref-ledgerV2-webServer.log"
+  MONGODB_APP_NAME: "ref-ledger-cluster"
   MONGODB_NAME: "refLedger_v2"
+  MONGODB_REPLICA_SET: "refLedgerRS"
+  LOG_FILE_PATH: "/root/logs/ref-ledgerV2-webServer.log"
 
 cloudflare:
   enabled: true
@@ -51,6 +53,10 @@ mongodb:
   host: mongodb
   port: 27017
   database: refLedger_v2
+
+  existingSecret: mongodb-credentials
+  usernameKey: username
+  passwordKey: password
 
 logging:
   level: info
