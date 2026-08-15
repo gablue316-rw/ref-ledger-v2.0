@@ -22,6 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 var Client *mongo.Client
@@ -1283,6 +1284,30 @@ func BuildMongoURI() (mongoURI string, isAtlas bool, err error) {
 	default:
 		return BuildLocalURI()
 	}
+}
+
+func VerifyMongoConnection(client *mongo.Client) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	message := ""
+
+	if err := client.Ping(ctx, readpref.Primary()); err != nil {
+		return message, fmt.Errorf("MongoDB ping failed: %w", err)
+	}
+
+	mongoURI := URI
+	parsedURI, err := url.Parse(mongoURI)
+	if err != nil {
+		return message, fmt.Errorf("invalid MongoDB URI: %w", err)
+	}
+
+	message = fmt.Sprintf(
+		"Successfully connected to MongoDB: host=%s database=%s",
+		parsedURI.Hostname(),
+		os.Getenv("MONGODB_NAME"))
+
+	return message, nil
 }
 
 func Connect() error {

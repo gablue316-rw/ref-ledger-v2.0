@@ -5482,7 +5482,14 @@ func main() {
 		return
 	}
 
-	utils.AuditLog.Println("Database connection established successfully")
+	message, err := database.VerifyMongoConnection(database.Client)
+	if err != nil {
+		fmt.Println(message)
+		utils.AuditLog.Println(message)
+		utils.AuditLog.Println("Database connection established successfully")
+	} else {
+		return
+	}
 
 	err = ac.Init(database.Client)
 	if err != nil {
