@@ -1188,6 +1188,9 @@ func getEnv(name string, defaultValue string) string {
 }
 
 func BuildAtlasURI() (string, bool, error) {
+
+	fmt.Println("Building Atlas URI")
+
 	username := os.Getenv("MONGODB_USERNAME")
 	password := os.Getenv("MONGODB_PASSWORD")
 
@@ -1230,6 +1233,8 @@ func BuildAtlasURI() (string, bool, error) {
 }
 
 func BuildLocalURI() (string, bool, error) {
+
+	fmt.Println("Building Local URI")
 	host := getEnv(
 		"MONGODB_HOST",
 		"localhost:27017",
@@ -1267,6 +1272,8 @@ func BuildLocalURI() (string, bool, error) {
 }
 
 func BuildMongoURI() (mongoURI string, isAtlas bool, err error) {
+
+	fmt.Println("Building MONGO URI")
 	mongoEnvironment := os.Getenv("MONGODB_ENV")
 
 	switch mongoEnvironment {
@@ -1290,6 +1297,11 @@ func Connect() error {
 	}
 
 	uri, _, err := BuildMongoURI()
+
+	if err != nil {
+		fmt.Println("Failed to Build URI.  Reason:", err)
+		return err
+	}
 
 	fmt.Println("Connecting to URI", uri)
 
