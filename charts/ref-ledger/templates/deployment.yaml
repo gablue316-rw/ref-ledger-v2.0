@@ -30,6 +30,10 @@ spec:
             - name: MONGODB_URI
               value: {{ .Values.env.MONGODB_URI | quote }}
 
+            
+            - name: MONGODB_DIRECT_CONNECTION
+              value: {{ .Values.env.MONGODB_DIRECT_CONNECTION | quote }}
+
             - name: LOG_FILE_PATH
               value: {{ .Values.env.LOG_FILE_PATH | quote }}
 

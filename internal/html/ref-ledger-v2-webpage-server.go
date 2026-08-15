@@ -5467,9 +5467,18 @@ func main() {
 	utils.AuditLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 
 	err = database.Connect()
+
 	if err != nil {
-		fmt.Println("Failed to init database.  Terminating web page server.")
-		utils.AuditLog.Println("Failed to init database.  Terminating web page server.")
+		fmt.Println(
+			"Failed to init database. Terminating web page server. Reason:",
+			err,
+		)
+
+		utils.AuditLog.Println(
+			"Failed to init database. Terminating web page server. Reason:",
+			err,
+		)
+
 		return
 	}
 
