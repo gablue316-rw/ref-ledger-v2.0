@@ -82,13 +82,17 @@ func foundAssociation(assoc string) bool {
 	return false
 }
 
-func InitDbase(dbName, uri string) {
-	Database = dbName
-	URI = uri
-}
+func GetMongoDbName() string {
 
-func SetURI(uri string) {
-	URI = uri
+	fmt.Println("Getting MongoDB Name from environment variable MONGODB_NAME...")
+	dbName := os.Getenv("MONGODB_NAME")
+	if dbName == "" {
+		dbName = "refLedger_v2"
+	}
+
+	fmt.Println("MongoDB Name:", dbName)
+	return dbName
+
 }
 
 func ClearGames(parentCtx context.Context, gameIds []int64) {
@@ -1284,6 +1288,13 @@ func Connect() error {
 	if Client != nil {
 		return nil
 	}
+
+	uri, _, err := BuildMongoURI()
+
+	fmt.Println("Connecting to URI", uri)
+
+	Database = GetMongoDbName()
+	URI = uri
 
 	IsConnected = false
 

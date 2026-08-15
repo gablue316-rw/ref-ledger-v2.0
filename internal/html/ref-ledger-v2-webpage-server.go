@@ -5452,13 +5452,9 @@ func main() {
 
 	var err error
 
-	uri = utils.GetMongoURI()
-
 	if err = utils.InitLogging(); err != nil {
 		panic(err)
 	}
-
-	dbName = utils.GetMongoDbName()
 
 	podName := os.Getenv("POD_NAME")
 	if podName == "" {
@@ -5469,7 +5465,6 @@ func main() {
 
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	utils.AuditLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
-	database.InitDbase(dbName, uri)
 
 	err = database.Connect()
 	if err != nil {
