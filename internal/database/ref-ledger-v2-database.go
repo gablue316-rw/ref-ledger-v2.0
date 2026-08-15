@@ -1280,13 +1280,8 @@ func BuildMongoURI() (mongoURI string, isAtlas bool, err error) {
 	case "atlas":
 		return BuildAtlasURI()
 
-	case "local":
-		return BuildLocalURI()
-
 	default:
-		return "", false, fmt.Errorf(
-			`MONGODB_ENV must be set to "atlas" or "local"`,
-		)
+		return BuildLocalURI()
 	}
 }
 
