@@ -30,6 +30,7 @@ resources:
 env:
   TZ: America/New_York
   MONGODB_URI: "mongodb://host.docker.internal:27017/?replicaSet=refLedgerRS&directConnection=true"
+  MONGODB_HOST: "host.docker.internal:27017"
   LOG_FILE_PATH: "/root/logs/ref-ledgerV2-webServer.log"
   MONGODB_NAME: "refLedger_v2"
 

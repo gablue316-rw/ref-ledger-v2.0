@@ -24,6 +24,9 @@ spec:
             - name: TZ
               value: {{ .Values.env.TZ | quote }}
 
+            - name: MONGODB_HOST
+              value: {{ .Values.env.MONGODB_HOST | quote }}
+            
             - name: MONGODB_URI
               value: {{ .Values.env.MONGODB_URI | quote }}
 
