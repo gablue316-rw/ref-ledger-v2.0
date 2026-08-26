@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o webpage-server ./internal/html
 
 FROM alpine:latest
 
-RUN apk add --no-cache tzdata
+RUN apk add --no-cache tzdata ca-certificates
 
 WORKDIR /root
 

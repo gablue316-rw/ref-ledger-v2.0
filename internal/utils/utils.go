@@ -36,31 +36,6 @@ func GetLogFilePath() string {
 	return logFilePath
 }
 
-func GetMongoDbName() string {
-
-	fmt.Println("Getting MongoDB Name from environment variable MONGODB_NAME...")
-	dbName := os.Getenv("MONGODB_NAME")
-	if dbName == "" {
-		dbName = "refLedger_v2"
-	}
-
-	fmt.Println("MongoDB Name:", dbName)
-	return dbName
-
-}
-
-func GetMongoURI() string {
-
-	fmt.Println("Getting MongoDB URI from environment variable MONGODB_URI...")
-	uri := os.Getenv("MONGODB_URI")
-	if uri == "" {
-		uri = "mongodb://localhost:27017/?replicaSet=refLedgerRS"
-	}
-
-	fmt.Println("MongoDB URI:", uri)
-	return uri
-}
-
 func InitLogging() error {
 
 	if AuditLog != nil {
@@ -629,6 +604,12 @@ func ConvertGameIdStrToInt(g string) ([]int64, error) {
 func ConvertMilesToStr(miles int64) string {
 
 	str := strconv.FormatInt((miles / 100), 10) // Convert to string with base 10
+	return str
+}
+
+func ConvertIntToStr(num int) string {
+
+	str := strconv.Itoa(num)
 	return str
 }
 

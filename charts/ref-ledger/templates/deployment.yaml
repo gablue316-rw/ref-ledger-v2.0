@@ -24,9 +24,36 @@ spec:
             - name: TZ
               value: {{ .Values.env.TZ | quote }}
 
-            - name: MONGODB_URI
-              value: {{ .Values.env.MONGODB_URI | quote }}
+            - name: MONGODB_ENV
+              value: {{ .Values.env.MONGODB_ENV | quote }}
+              
+            - name: MONGODB_HOST
+              value: {{ .Values.env.MONGODB_HOST | quote }}
 
+            - name: MONGODB_NAME
+              value: {{ .Values.env.MONGODB_NAME | quote }}
+            
+            - name: MONGODB_REPLICA_SET
+              value: {{ .Values.env.MONGODB_REPLICA_SET | quote }}
+
+            - name: MONGODB_DIRECT_CONNECTION
+              value: {{ .Values.env.MONGODB_DIRECT_CONNECTION | quote }}
+
+            - name: MONGODB_APP_NAME
+              value: {{ .Values.env.MONGODB_APP_NAME | quote }}  
+              
+            - name: MONGODB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mongodb.existingSecret }}
+                  key: {{ .Values.mongodb.usernameKey }}
+
+            - name: MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.mongodb.existingSecret }}
+                  key: {{ .Values.mongodb.passwordKey }}
+           
             - name: LOG_FILE_PATH
               value: {{ .Values.env.LOG_FILE_PATH | quote }}
 

@@ -4251,6 +4251,104 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
+	fmt.Println("##### UpdateGame Enpoint Called #####")
+
+	err = json.NewDecoder(r.Body).Decode(&game)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("Updating game with game id", utils.ConvertIntToStr(game.GameId), "for association", game.Association)
+
+	singleGameDesc, err = gc.Get(game.Association, utils.ConvertIntToStr(game.GameId), tId)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Game Not Found", http.StatusBadRequest)
+		return
+	}
+
+	fmt.Println("UpdateGame: Game Fee:", game.GameFee)
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// The HTML uses the site name, so we need to convert it to an ID
+	siteId, err = sc.GetSiteId(game.Site, tId)
+	if err != nil {
+		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+		return
+	}
+
+	game.Site = siteId
+
+	if game.Status == "Cancelled" {
+		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
+		game.GameFee = float64(0)
+		game.TravelPay = float64(0)
+		game.AssignorFee = float64(0)
+		game.Deductions = float64(0)
+	}
+
+	singleGameDesc = GameDocToGameDescr(game)
+	if game.Status == "Delete" {
+		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
+		api.DelGame(context.TODO(), singleGameDesc.GameId)
+		return
+	}
+
+	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
+	var gDoc model.GameDoc = model.GameDoc{}
+
+	gDoc.GameId = int64(game.GameId)
+	gDoc.Association = game.Association
+
+	checkForDup := false
+	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, "Invalid Game", http.StatusBadRequest)
+		return
+	}
+
+	gameExists, err := database.GameExists(gDoc)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if gameExists {
+		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games", tId)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		return
+	}
+
+	gameDesc = append(gameDesc, singleGameDesc)
+	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games", tId)
+
+}
+
+func SaveGame(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+	var game Game
+	var tId string = database.TenantId
+	var err error
+	var siteId string
+	var gameDesc []model.GameDescriptor
+	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
+
+	fmt.Println("##### SaveGame Enpoint Called #####")
+
 	err = json.NewDecoder(r.Body).Decode(&game)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
@@ -4291,16 +4389,17 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("UpdateGame: Single Game Descriptor:", singleGameDesc)
+	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
 	var gDoc model.GameDoc = model.GameDoc{}
 
 	gDoc.GameId = int64(game.GameId)
 	gDoc.Association = game.Association
 
-	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc)
+	checkForDup := true
+	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup)
 	if err != nil {
 		fmt.Println(err)
-		http.Error(w, "Invalid Game", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -5353,13 +5452,9 @@ func main() {
 
 	var err error
 
-	uri = utils.GetMongoURI()
-
 	if err = utils.InitLogging(); err != nil {
 		panic(err)
 	}
-
-	dbName = utils.GetMongoDbName()
 
 	podName := os.Getenv("POD_NAME")
 	if podName == "" {
@@ -5370,16 +5465,31 @@ func main() {
 
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	utils.AuditLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
-	database.InitDbase(dbName, uri)
 
 	err = database.Connect()
+
 	if err != nil {
-		fmt.Println("Failed to init database.  Terminating web page server.")
-		utils.AuditLog.Println("Failed to init database.  Terminating web page server.")
+		fmt.Println(
+			"Failed to init database. Terminating web page server. Reason:",
+			err,
+		)
+
+		utils.AuditLog.Println(
+			"Failed to init database. Terminating web page server. Reason:",
+			err,
+		)
+
 		return
 	}
 
-	utils.AuditLog.Println("Database connection established successfully")
+	message, err := database.VerifyMongoConnection(database.Client)
+	if err == nil {
+		fmt.Println(message)
+		utils.AuditLog.Println(message)
+		utils.AuditLog.Println("Database connection established successfully")
+	} else {
+		return
+	}
 
 	err = ac.Init(database.Client)
 	if err != nil {
@@ -5580,6 +5690,7 @@ func main() {
 	mux.HandleFunc("/api/sites", authRequired(readOnlyForbidden(CreateSite)))
 	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))
 	mux.HandleFunc("/api/reports", GenerateReport)
+	mux.HandleFunc("/api/game-save", authRequired(readOnlyForbidden(SaveGame)))
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
@@ -5623,15 +5734,19 @@ func main() {
 	}))
 
 	fmt.Println("Routes successfully registered")
-	utils.AuditLog.Println("Server running on port 8080")
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	address := ":" + port
+
+	fmt.Printf("Ref Ledger listening on %s\n", address)
 	loggedMux := LogRequest(mux)
 
-	err = http.ListenAndServe(":8080", loggedMux)
-
-	if err != nil {
-		fmt.Println("HTTP Error", err)
-		return
+	if err := http.ListenAndServe(address, loggedMux); err != nil {
+		log.Fatal(err)
 	}
 
 }

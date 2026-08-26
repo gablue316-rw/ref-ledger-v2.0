@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -21,6 +22,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 var Client *mongo.Client
@@ -81,13 +83,17 @@ func foundAssociation(assoc string) bool {
 	return false
 }
 
-func InitDbase(dbName, uri string) {
-	Database = dbName
-	URI = uri
-}
+func GetMongoDbName() string {
 
-func SetURI(uri string) {
-	URI = uri
+	fmt.Println("Getting MongoDB Name from environment variable MONGODB_NAME...")
+	dbName := os.Getenv("MONGODB_NAME")
+	if dbName == "" {
+		dbName = "refLedger_v2"
+	}
+
+	fmt.Println("MongoDB Name:", dbName)
+	return dbName
+
 }
 
 func ClearGames(parentCtx context.Context, gameIds []int64) {
@@ -1172,11 +1178,155 @@ func GetSession(r *http.Request) (*model.Session, error) {
 	return &session, nil
 }
 
+func getEnv(name string, defaultValue string) string {
+	value := os.Getenv(name)
+
+	if value == "" {
+		return defaultValue
+	}
+
+	return value
+}
+
+func BuildAtlasURI() (string, bool, error) {
+
+	fmt.Println("Building Atlas URI")
+
+	username := os.Getenv("MONGODB_USERNAME")
+	password := os.Getenv("MONGODB_PASSWORD")
+
+	if username == "" {
+		return "", true, errors.New("MONGODB_USERNAME is not set")
+	}
+
+	if password == "" {
+		return "", true, errors.New("MONGODB_PASSWORD is not set")
+	}
+
+	host := getEnv(
+		"MONGODB_HOST",
+		"ref-ledger-cluster.2hni1bk.mongodb.net",
+	)
+
+	appName := getEnv(
+		"MONGODB_APP_NAME",
+		"ref-ledger-cluster",
+	)
+
+	database := getEnv(
+		"MONGODB_NAME",
+		"refLedger_v2",
+	)
+
+	mongoURL := &url.URL{
+		Scheme: "mongodb+srv",
+		User:   url.UserPassword(username, password),
+		Host:   host,
+		Path:   "/" + database,
+	}
+
+	query := url.Values{}
+	query.Set("appName", appName)
+
+	mongoURL.RawQuery = query.Encode()
+
+	return mongoURL.String(), true, nil
+}
+
+func BuildLocalURI() (string, bool, error) {
+
+	fmt.Println("Building Local URI")
+	host := getEnv(
+		"MONGODB_HOST",
+		"localhost:27017",
+	)
+
+	database := getEnv(
+		"MONGODB_NAME",
+		"refLedger_v2",
+	)
+
+	replicaSet := getEnv(
+		"MONGODB_REPLICA_SET",
+		"refLedgerRS",
+	)
+
+	mongoURL := &url.URL{
+		Scheme: "mongodb",
+		Host:   host,
+		Path:   "/" + database,
+	}
+
+	query := url.Values{}
+
+	if replicaSet != "" {
+		query.Set("replicaSet", replicaSet)
+	}
+
+	if os.Getenv("MONGODB_DIRECT_CONNECTION") == "true" {
+		query.Set("directConnection", "true")
+	}
+
+	mongoURL.RawQuery = query.Encode()
+
+	return mongoURL.String(), false, nil
+}
+
+func BuildMongoURI() (mongoURI string, isAtlas bool, err error) {
+
+	fmt.Println("Building MONGO URI")
+	mongoEnvironment := os.Getenv("MONGODB_ENV")
+
+	switch mongoEnvironment {
+	case "atlas":
+		return BuildAtlasURI()
+
+	default:
+		return BuildLocalURI()
+	}
+}
+
+func VerifyMongoConnection(client *mongo.Client) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	message := ""
+
+	if err := client.Ping(ctx, readpref.Primary()); err != nil {
+		return message, fmt.Errorf("MongoDB ping failed: %w", err)
+	}
+
+	mongoURI := URI
+	parsedURI, err := url.Parse(mongoURI)
+	if err != nil {
+		return message, fmt.Errorf("invalid MongoDB URI: %w", err)
+	}
+
+	message = fmt.Sprintf(
+		"Successfully connected to MongoDB: host=%s database=%s",
+		parsedURI.Hostname(),
+		os.Getenv("MONGODB_NAME"))
+
+	return message, nil
+}
+
 func Connect() error {
 
 	if Client != nil {
 		return nil
 	}
+
+	uri, _, err := BuildMongoURI()
+
+	if err != nil {
+		fmt.Println("Failed to Build URI.  Reason:", err)
+		return err
+	}
+
+	fmt.Println("Connecting to URI", uri)
+
+	Database = GetMongoDbName()
+	URI = uri
 
 	IsConnected = false
 
@@ -2626,6 +2776,8 @@ func (gc *GameCollection) Get(association string, gameId string, tenantId string
 	var filter bson.M
 	var doc model.GameDoc
 
+	fmt.Println("Getting game with game id", gameId, "for association", association, "and tenant id", tenantId)
+
 	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
 	if err != nil {
 		return model.GameDescriptor{}, fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
@@ -2637,7 +2789,7 @@ func (gc *GameCollection) Get(association string, gameId string, tenantId string
 		"tenantId":    tenantId,
 	}
 
-	err = gc.Coll.FindOne(context.TODO(), filter).Decode(doc)
+	err = gc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
 
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {

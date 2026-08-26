@@ -252,7 +252,8 @@ func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
 			continue
 		}
 
-		err = ValidateGameDescriptor(parentCtx, g)
+		checkForDup := true
+		err = ValidateGameDescriptor(parentCtx, g, checkForDup)
 		if err != nil {
 			fmt.Println(err)
 			validationErrors++
@@ -326,7 +327,8 @@ func UpdateGames(parentCtx context.Context, file string) error {
 			continue
 		}
 
-		err = ValidateGameDescriptor(parentCtx, game)
+		checkForDup := true
+		err = ValidateGameDescriptor(parentCtx, game, checkForDup)
 		if err != nil {
 			fmt.Println(err)
 			validationErrors++
@@ -356,7 +358,7 @@ func ValidateOfficialDescriptor(parentCtx context.Context, p model.OfficialDescr
 	return nil
 }
 
-func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) error {
+func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, checkForDup bool) error {
 
 	var errorFormat string = "%s %s not found!  Record Dropped!"
 	var tId string = database.TenantId
@@ -396,12 +398,12 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor) e
 	var gameid string = strings.TrimSpace(g.GameId)
 	var assoc string = strings.TrimSpace(g.Association)
 
-	fmt.Println("Game Id=", gameid)
+	fmt.Println("Validating Game with game id", gameid, "for association", assoc)
 
-	if gameid == "" {
-		results, err := gc.Exists(assoc, gameid, tId)
-		if !results || err != nil {
-			return fmt.Errorf("Game with game id %s already exists", gameid)
+	if checkForDup {
+		exists, _ := gc.Exists(assoc, gameid, tId)
+		if exists {
+			return fmt.Errorf("Duplicate Game")
 		}
 	}
 
@@ -951,7 +953,8 @@ func BulkAddGames(parentCtx context.Context, file string) {
 			Assignor:    fields[16],
 		}
 
-		err = ValidateGameDescriptor(parentCtx, game)
+		checkForDup := true
+		err = ValidateGameDescriptor(parentCtx, game, checkForDup)
 		if err != nil {
 			fmt.Println(err)
 			validationErrors++
