@@ -5734,15 +5734,19 @@ func main() {
 	}))
 
 	fmt.Println("Routes successfully registered")
-	utils.AuditLog.Println("Server running on port 8080")
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	address := ":" + port
+
+	fmt.Printf("Ref Ledger listening on %s\n", address)
 	loggedMux := LogRequest(mux)
 
-	err = http.ListenAndServe(":8080", loggedMux)
-
-	if err != nil {
-		fmt.Println("HTTP Error", err)
-		return
+	if err := http.ListenAndServe(address, loggedMux); err != nil {
+		log.Fatal(err)
 	}
 
 }
