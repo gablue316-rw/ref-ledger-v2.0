@@ -8,4 +8,7 @@ spec:
   ports:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.container.port }}
+{{ if eq .Values.service.type "NodePort" }}
+      nodePort: {{ .Values.service.nodePort }}
+{{ end }}
   type: {{ .Values.service.type }}
