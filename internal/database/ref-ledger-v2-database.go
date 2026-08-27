@@ -91,11 +91,26 @@ func foundAssociation(assoc string) bool {
 
 func GetEnvironment() EnvironmentInfo {
 
-	return EnvironmentInfo{
+	fmt.Println("Getting Environment Info...")
+	envInfo := EnvironmentInfo{
 		Environment: os.Getenv("APP_ENV"),
 		HostLabel:   os.Getenv("APP_HOST_LABEL"),
 		Database:    os.Getenv("DATABASE_LABEL"),
 	}
+
+	if envInfo.Environment == "" {
+		envInfo.Environment = "development"
+	}
+
+	if envInfo.HostLabel == "" {
+		envInfo.HostLabel = "Local"
+	}
+
+	if envInfo.Database == "" {
+		envInfo.Database = "refledger_v2_dev"
+	}
+
+	return envInfo
 }
 
 func GetMongoDbName() string {
