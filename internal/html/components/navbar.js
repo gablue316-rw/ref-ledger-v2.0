@@ -38,7 +38,8 @@ async function initializeNavbar() {
 
         await Promise.all([
             loadCurrentUser(),
-            loadPendingGames()
+            loadPendingGames(),
+            loadEnvironment()
         ]);
 
     } catch (error) {
@@ -159,6 +160,65 @@ async function loadCurrentUser() {
 
     }
 
+}
+
+//
+// Load environment information
+//
+async function loadEnvironment() {
+    const navbar =
+        document.getElementById("main-navbar");
+
+    const environmentLabel =
+        document.getElementById("environment-label");
+
+    if (!navbar || !environmentLabel) {
+        return;
+    }
+
+    try {
+        const response =
+            await fetch("/api/environment", {
+                cache: "no-cache"
+            });
+
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load environment: HTTP ${response.status}`
+            );
+        }
+
+        const environmentInfo =
+            await response.json();
+
+        const environment =
+            String(environmentInfo.environment || "")
+                .toLowerCase();
+
+        if (environment === "development") {
+            navbar.classList.add(
+                "navbar-development"
+            );
+        } else {
+            navbar.classList.remove(
+                "navbar-development"
+            );
+        }
+
+        environmentLabel.textContent =
+            `${environmentInfo.environment || "Unknown"} | ` +
+            `${environmentInfo.hostLabel || "Unknown Host"} | ` +
+            `${environmentInfo.database || "Unknown Database"}`;
+
+    } catch (error) {
+        console.error(
+            "Unable to load environment information:",
+            error
+        );
+
+        environmentLabel.textContent =
+            "Environment Unknown";
+    }
 }
 
 //

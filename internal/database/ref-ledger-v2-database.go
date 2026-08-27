@@ -40,6 +40,12 @@ var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed
 
 var TenantId string = "na"
 
+type EnvironmentInfo struct {
+	Environment string `json:"environment"`
+	HostLabel   string `json:"hostLabel"`
+	Database    string `json:"database"`
+}
+
 type OfficialName struct {
 	Name string `json:"name"`
 }
@@ -81,6 +87,15 @@ func foundAssociation(assoc string) bool {
 		}
 	}
 	return false
+}
+
+func GetEnvironment() EnvironmentInfo {
+
+	return EnvironmentInfo{
+		Environment: os.Getenv("APP_ENV"),
+		HostLabel:   os.Getenv("APP_HOST_LABEL"),
+		Database:    os.Getenv("DATABASE_LABEL"),
+	}
 }
 
 func GetMongoDbName() string {

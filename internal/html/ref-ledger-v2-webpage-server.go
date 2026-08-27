@@ -321,6 +321,26 @@ func getCurrentSession(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func GetEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	environmentInfo := database.GetEnvironment()
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(environmentInfo); err != nil {
+		http.Error(
+			w,
+			"Unable to return environment information",
+			http.StatusInternalServerError,
+		)
+	}
+}
+
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
@@ -5574,6 +5594,8 @@ func main() {
 
 	mux.Handle("/images/", http.StripPrefix("/images/",
 		http.FileServer(http.Dir("./internal/html/images"))))
+
+	mux.HandleFunc("/api/environment", GetEnvironmentHandler)
 
 	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")

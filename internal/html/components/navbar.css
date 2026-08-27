@@ -230,6 +230,31 @@
 }
 
 /*
+    Environment display
+*/
+
+.navbar-development {
+    background-color: #b45309;
+}
+
+.navbar-development .nav-count-badge {
+    border-color: #b45309;
+}
+
+.environment-label {
+    max-width: 170px;
+    margin-top: 3px;
+    overflow: hidden;
+
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/*
     Tablet layout
 */
 
