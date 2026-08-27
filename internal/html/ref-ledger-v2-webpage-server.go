@@ -5483,6 +5483,9 @@ func main() {
 
 	log.Printf("Ref Ledger running on pod: %s", podName)
 
+	environMentInfo := database.GetEnvironment()
+
+	fmt.Println("Ref Ledger V2.1 Web Page Server Environment:", environMentInfo.Environment)
 	fmt.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 	utils.AuditLog.Println("Ref Ledger V2.1 Web Page Server Establing database connection...")
 
