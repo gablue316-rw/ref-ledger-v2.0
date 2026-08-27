@@ -15,3 +15,20 @@ mongodb-backup
 
 # Sandbox
 sandbox
+
+# Port Forwarding log
+port-forward.log
+
+# Backup Files
+*.go.old
+*.go.save
+
+# Logs
+logs/
+
+# Tests
+tests/
+
+# values.yaml.atlas and values.yaml.local
+values.yaml.atlas
+values.yaml.local

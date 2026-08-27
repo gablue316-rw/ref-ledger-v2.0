@@ -24,20 +24,35 @@ do
     sleep 5
 done
 
-kubectl rollout status deployment/ref-ledger -n default --timeout=180s
-
-echo "Waiting for cloudflared deployment..."
-until kubectl get deployment cloudflared -n default >/dev/null 2>&1
-do
-    sleep 5
-done
-
-kubectl rollout status deployment/cloudflared -n default --timeout=180s
-
 echo "Current ArgoCD pods:"
 kubectl get pods -n argocd
 
 echo "Current application pods:"
 kubectl get pods -n default
 
+echo "Starting Ref Ledger port forwarding..."
+
+# Avoid starting a second port-forward process.
+if pgrep -f "kubectl port-forward.*service/ref-ledger.*8080:8080" >/dev/null 2>&1; then
+    echo "Port forwarding is already running."
+else
+    nohup kubectl port-forward \
+        service/ref-ledger \
+        8080:8080 \
+        --address=127.0.0.1 \
+        > port-forward.log 2>&1 &
+
+    PORT_FORWARD_PID=$!
+
+    sleep 3
+
+    if kill -0 "$PORT_FORWARD_PID" >/dev/null 2>&1; then
+        echo "Port forwarding started with PID $PORT_FORWARD_PID"
+    else
+        echo "Port forwarding failed. Check port-forward.log."
+        exit 1
+    fi
+fi
+
+echo "Ref Ledger is available at http://127.0.0.1:8080"
 echo "Cluster started successfully."
