@@ -90,8 +90,6 @@ func foundAssociation(assoc string) bool {
 }
 
 func GetEnvironment() EnvironmentInfo {
-
-	fmt.Println("Getting Environment Info...")
 	envInfo := EnvironmentInfo{
 		Environment: os.Getenv("APP_ENV"),
 		HostLabel:   os.Getenv("APP_HOST_LABEL"),
@@ -110,6 +108,7 @@ func GetEnvironment() EnvironmentInfo {
 		envInfo.Database = "refledger_v2_dev"
 	}
 
+	fmt.Printf("Returning environment info: %+v\n", envInfo)
 	return envInfo
 }
 
