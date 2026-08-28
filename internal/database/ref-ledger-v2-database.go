@@ -92,8 +92,8 @@ func foundAssociation(assoc string) bool {
 func GetEnvironment() EnvironmentInfo {
 	envInfo := EnvironmentInfo{
 		Environment: os.Getenv("APP_ENV"),
-		HostLabel:   os.Getenv("APP_HOST_LABEL"),
-		Database:    os.Getenv("DATABASE_LABEL"),
+		HostLabel:   os.Getenv("MONGODB_ENV"),
+		Database:    os.Getenv("MONGODB_NAME"),
 	}
 
 	if envInfo.Environment == "" {
@@ -101,7 +101,7 @@ func GetEnvironment() EnvironmentInfo {
 	}
 
 	if envInfo.HostLabel == "" {
-		envInfo.HostLabel = "Local"
+		envInfo.HostLabel = "local"
 	}
 
 	if envInfo.Database == "" {
@@ -1272,7 +1272,7 @@ func BuildLocalURI() (string, bool, error) {
 
 	database := getEnv(
 		"MONGODB_NAME",
-		"refLedger_v2",
+		"refLedger_v2_dev",
 	)
 
 	replicaSet := getEnv(

@@ -34,9 +34,10 @@ env:
   MONGODB_ENV: "local"
   MONGODB_DIRECT_CONNECTION: "true"
   MONGODB_APP_NAME: "ref-ledger-cluster"
-  MONGODB_NAME: "refLedger_v2"
+  MONGODB_NAME: "refLedger_v2_dev"
   MONGODB_REPLICA_SET: "refLedgerRS"
   LOG_FILE_PATH: "/root/logs/ref-ledgerV2-webServer.log"
+  APP_ENV: "development"
 
 cloudflare:
   enabled: false

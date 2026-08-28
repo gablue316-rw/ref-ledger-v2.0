@@ -40,8 +40,11 @@ spec:
               value: {{ .Values.env.MONGODB_DIRECT_CONNECTION | quote }}
 
             - name: MONGODB_APP_NAME
-              value: {{ .Values.env.MONGODB_APP_NAME | quote }}  
-              
+              value: {{ .Values.env.MONGODB_APP_NAME | quote }}              
+
+            - name: APP_ENV
+              value: {{ .Values.env.APP_ENV | quote }}
+ 
             - name: MONGODB_USERNAME
               valueFrom:
                 secretKeyRef:
