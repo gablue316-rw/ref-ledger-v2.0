@@ -205,10 +205,17 @@ async function loadEnvironment() {
             );
         }
 
-        environmentLabel.textContent =
-            `${environmentInfo.environment || "Unknown"} | ` +
-            `${environmentInfo.hostLabel || "Unknown Host"} | ` +
-            `${environmentInfo.database || "Unknown Database"}`;
+        environmentLabel.replaceChildren();
+
+        [
+           environmentInfo.environment || "Unknown",
+           environmentInfo.hostLabel || "Unknown Host",
+           environmentInfo.database || "Unknown Database"
+        ].forEach(value => {
+            const line = document.createElement("div");
+            line.textContent = value;
+            environmentLabel.appendChild(line);
+        });
 
     } catch (error) {
         console.error(
