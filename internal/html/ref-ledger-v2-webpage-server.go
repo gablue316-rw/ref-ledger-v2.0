@@ -4077,7 +4077,7 @@ func LogVisitor(r *http.Request) {
 func generatePaymentsReport(assoc string) []string {
 
 	var rept []string = []string{}
-	paymentRecords, err := database.QueryPayments(context.TODO(), "refLedger_v2", "payments", assoc)
+	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
 	if err != nil {
 		rept = append(rept, "Error generating payment report.  Failed to retrieve payment records.")
 		return rept
@@ -4090,7 +4090,7 @@ func generateReconciliationReport(assoc string) []string {
 
 	var rept []string = []string{}
 
-	paymentRecords, err := database.QueryPayments(context.TODO(), "refLedger_v2", "payments", assoc)
+	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
 	if err != nil {
 		rept = append(rept, "Error generating reconciliation report.  Failed to retrieve payment records.")
 		return rept
@@ -4124,7 +4124,7 @@ func generateExpenseReport(expenseFilters model.EFilters) []string {
 		return []string{}
 	}
 
-	expenseRecords, err := database.QueryExpenses(context.TODO(), "refLedger_v2", "expenses", efilter)
+	expenseRecords, err := database.QueryExpenses(context.TODO(), database.GetMongoDbName(), "expenses", efilter)
 	if err != nil {
 		fmt.Println(err)
 		return []string{}
@@ -4143,7 +4143,7 @@ func generateGamesReport(gameFilters model.GFilters) []string {
 		return []string{}
 	}
 
-	gameRecords, err := database.QueryAggregatedGames(context.TODO(), "refLedger_v2", "games", gFilter)
+	gameRecords, err := database.QueryAggregatedGames(context.TODO(), database.GetMongoDbName(), "games", gFilter)
 	if err != nil {
 		fmt.Println("Failed to query aggregated games")
 		return []string{}
@@ -4561,7 +4561,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	usersCollection := database.Client.
-		Database("refLedger_v2").
+		Database(database.GetMongoDbName()).
 		Collection("users")
 
 	err = usersCollection.FindOne(
@@ -4611,7 +4611,7 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 
 	// 4. Store in MongoDB
 	_, err = database.Client.
-		Database("refLedger_v2").
+		Database(database.GetMongoDbName()).
 		Collection("sessions").
 		InsertOne(r.Context(), session)
 
@@ -5310,7 +5310,7 @@ func isAuthenticated(r *http.Request) bool {
 	sessionID := cookie.Value
 
 	collection := database.Client.
-		Database("refLedger_v2").
+		Database(database.GetMongoDbName()).
 		Collection("sessions")
 
 	var session model.Session
@@ -5353,7 +5353,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 
 		database.Client.
-			Database("refLedger_v2").
+			Database(database.GetMongoDbName()).
 			Collection("sessions").
 			DeleteOne(r.Context(),
 				bson.M{"sessionId": cookie.Value})
@@ -5410,7 +5410,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 
 	usersCollection := database.Client.
-		Database("refLedger_v2").
+		Database(database.GetMongoDbName()).
 		Collection("users")
 
 	var existingUser model.User

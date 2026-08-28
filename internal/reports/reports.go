@@ -554,7 +554,7 @@ func GenerateAcctsRecvReport(parentCtx context.Context, associations, tid string
 		}
 		fmt.Println("gFilters", gFilters)
 
-		gameRecords, err := database.QueryAggregatedGames(parentCtx, "refLedger_v2", "games", gFilters)
+		gameRecords, err := database.QueryAggregatedGames(parentCtx, database.GetMongoDbName(), "games", gFilters)
 
 		if err != nil {
 			fmt.Println("Error:", err)

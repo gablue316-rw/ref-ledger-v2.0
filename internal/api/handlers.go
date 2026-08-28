@@ -109,7 +109,7 @@ func DelGame(parentCtx context.Context, gameId string) {
 	gId, _ := utils.ConvertStrToInt64(gameId)
 	filter := bson.M{"gameId": gId}
 
-	database.DeleteOneDoc(parentCtx, filter, "refLedger_v2", "games")
+	database.DeleteOneDoc(parentCtx, filter, database.GetMongoDbName(), "games")
 
 }
 

@@ -117,7 +117,7 @@ func GetMongoDbName() string {
 	fmt.Println("Getting MongoDB Name from environment variable MONGODB_NAME...")
 	dbName := os.Getenv("MONGODB_NAME")
 	if dbName == "" {
-		dbName = "refLedger_v2"
+		dbName = "refLedger_v2_dev"
 	}
 
 	fmt.Println("MongoDB Name:", dbName)
@@ -1187,7 +1187,7 @@ func GetSession(r *http.Request) (*model.Session, error) {
 	var session model.Session
 
 	err = Client.
-		Database("refLedger_v2").
+		Database(GetMongoDbName()).
 		Collection("sessions").
 		FindOne(
 			r.Context(),
