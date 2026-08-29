@@ -321,6 +321,34 @@ func getCurrentSession(w http.ResponseWriter, r *http.Request) {
 
 }
 
+type AboutInfo struct {
+	Application string `json:"application"`
+	Release     string `json:"release"`
+}
+
+func AboutHandler(w http.ResponseWriter, r *http.Request) {
+	release := os.Getenv("APP_RELEASE")
+
+	if release == "" {
+		release = "development"
+	}
+
+	info := AboutInfo{
+		Application: "Ref Ledger",
+		Release:     release,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(info); err != nil {
+		http.Error(
+			w,
+			"Unable to create about response",
+			http.StatusInternalServerError,
+		)
+	}
+}
+
 func GetEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -5599,9 +5627,14 @@ func main() {
 		http.FileServer(http.Dir("./internal/html/images"))))
 
 	mux.HandleFunc("/api/environment", GetEnvironmentHandler)
+	mux.HandleFunc("/api/about", AboutHandler)
 
 	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
+	}))
+
+	mux.HandleFunc("/about", authRequired(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/about.html")
 	}))
 
 	mux.HandleFunc("/gameStatus", authRequired(func(w http.ResponseWriter, r *http.Request) {

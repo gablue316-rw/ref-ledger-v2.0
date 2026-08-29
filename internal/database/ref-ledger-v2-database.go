@@ -44,6 +44,7 @@ type EnvironmentInfo struct {
 	Environment string `json:"environment"`
 	HostLabel   string `json:"hostLabel"`
 	Database    string `json:"database"`
+	Release     string `json:"release"`
 }
 
 type OfficialName struct {
@@ -94,6 +95,7 @@ func GetEnvironment() EnvironmentInfo {
 		Environment: os.Getenv("APP_ENV"),
 		HostLabel:   os.Getenv("MONGODB_ENV"),
 		Database:    os.Getenv("MONGODB_NAME"),
+		Release:     os.Getenv("APP_RELEASE"),
 	}
 
 	if envInfo.Environment == "" {
@@ -106,6 +108,10 @@ func GetEnvironment() EnvironmentInfo {
 
 	if envInfo.Database == "" {
 		envInfo.Database = "refledger_v2_dev"
+	}
+
+	if envInfo.Release == "" {
+		envInfo.Release = "unknown"
 	}
 
 	fmt.Printf("Returning environment info: %+v\n", envInfo)
