@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+    <title>About Ref Ledger</title>
+</head>
+
+<body>
+    <div id="navbarContainer"></div>
+
+    <main class="about-container">
+        <h1>About Ref Ledger</h1>
+
+        <dl class="about-details">
+            <dt>Application</dt>
+            <dd id="applicationName">Ref Ledger</dd>
+
+            <dt>Release</dt>
+            <dd id="releaseNumber">Loading...</dd>
+        </dl>
+    </main>
+
+    <script>
+        async function loadAboutInformation() {
+            const releaseElement =
+                document.getElementById("releaseNumber");
+
+            try {
+                const response = await fetch("/api/about");
+
+                if (!response.ok) {
+                    throw new Error(
+                        `Request failed: ${response.status}`
+                    );
+                }
+
+                const about = await response.json();
+
+                document.getElementById(
+                    "applicationName"
+                ).textContent = about.application;
+
+                releaseElement.textContent = about.release;
+            } catch (error) {
+                console.error(
+                    "Unable to load about information:",
+                    error
+                );
+
+                releaseElement.textContent = "Unavailable";
+            }
+        }
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            loadAboutInformation
+        );
+    </script>
+</body>
+</html>

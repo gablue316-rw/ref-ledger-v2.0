@@ -45,6 +45,9 @@ spec:
             - name: APP_ENV
               value: {{ .Values.env.APP_ENV | quote }}
  
+            - name: APP_RELEASE
+              value: {{ .Values.image.tag | quote }}
+            
             - name: MONGODB_USERNAME
               valueFrom:
                 secretKeyRef:
