@@ -193,26 +193,35 @@ async function loadEnvironment() {
 
         const environment =
             String(environmentInfo.environment || "")
+                .trim()
                 .toLowerCase();
 
-        if (environment === "development") {
-            navbar.classList.add(
-                "navbar-development"
-            );
-        } else {
+        if (environment !== "development") {
             navbar.classList.remove(
                 "navbar-development"
             );
+
+            environmentLabel.replaceChildren();
+            environmentLabel.hidden = true;
+            return;
         }
 
+        navbar.classList.add(
+            "navbar-development"
+        );
+
+        environmentLabel.hidden = false;
         environmentLabel.replaceChildren();
 
         [
-           environmentInfo.environment || "Unknown",
-           environmentInfo.hostLabel || "Unknown Host",
-           environmentInfo.database || "Unknown Database"
-        ].forEach(value => {
-            const line = document.createElement("div");
+            environmentInfo.environment || "Unknown",
+            environmentInfo.hostLabel || "Unknown Host",
+            environmentInfo.database || "Unknown Database",
+            environmentInfo.release || "Unknown Release"
+        ].forEach(function (value) {
+            const line =
+                document.createElement("div");
+
             line.textContent = value;
             environmentLabel.appendChild(line);
         });
@@ -223,8 +232,8 @@ async function loadEnvironment() {
             error
         );
 
-        environmentLabel.textContent =
-            "Environment Unknown";
+        environmentLabel.replaceChildren();
+        environmentLabel.hidden = true;
     }
 }
 
