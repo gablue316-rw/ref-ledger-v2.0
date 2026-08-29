@@ -2,35 +2,290 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
     >
+
     <title>About Ref Ledger</title>
+
+    <link
+        rel="stylesheet"
+        href="/css/navbar.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    >
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+
+            color: #1f2937;
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #f3f7fb,
+                    #e4edf6
+                );
+        }
+
+        .about-page {
+            display: flex;
+            justify-content: center;
+
+            padding: 55px 20px;
+        }
+
+        .about-card {
+            position: relative;
+
+            width: min(100%, 540px);
+            padding: 50px 42px;
+
+            overflow: hidden;
+            color: #ffffff;
+            text-align: center;
+
+            background:
+                radial-gradient(
+                    circle at top right,
+                    rgba(255, 166, 0, 0.38),
+                    transparent 42%
+                ),
+                linear-gradient(
+                    145deg,
+                    #082b4f,
+                    #0d477b
+                );
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.15);
+
+            border-radius: 24px;
+
+            box-shadow:
+                0 24px 50px
+                rgba(8, 43, 79, 0.25);
+        }
+
+        .about-card::before {
+            position: absolute;
+            top: -80px;
+            left: -80px;
+
+            width: 190px;
+            height: 190px;
+
+            content: "";
+
+            background:
+                rgba(255, 255, 255, 0.05);
+
+            border-radius: 50%;
+        }
+
+        .about-icon {
+            position: relative;
+
+            display: grid;
+            place-items: center;
+
+            width: 78px;
+            height: 78px;
+            margin: 0 auto 24px;
+
+            color: #082b4f;
+            font-size: 32px;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    #ffc15a,
+                    #ff8c00
+                );
+
+            border-radius: 22px;
+
+            box-shadow:
+                0 12px 28px
+                rgba(255, 140, 0, 0.35);
+
+            transform: rotate(-4deg);
+        }
+
+        .about-eyebrow {
+            margin: 0 0 8px;
+
+            color: #ffb347;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .about-title {
+            margin: 0;
+
+            font-size: clamp(38px, 8vw, 56px);
+            line-height: 1;
+            letter-spacing: -2px;
+        }
+
+        .about-description {
+            max-width: 400px;
+            margin: 20px auto 32px;
+
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 17px;
+            line-height: 1.6;
+        }
+
+        .release-panel {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+
+            padding: 17px 20px;
+
+            background:
+                rgba(255, 255, 255, 0.1);
+
+            border:
+                1px solid
+                rgba(255, 255, 255, 0.16);
+
+            border-radius: 14px;
+
+            backdrop-filter: blur(8px);
+        }
+
+        .release-label {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .release-number {
+            padding: 8px 13px;
+
+            color: #082b4f;
+            font-family:
+                "Courier New",
+                monospace;
+            font-size: 14px;
+            font-weight: 800;
+
+            background: #ffb347;
+            border-radius: 999px;
+        }
+
+        .release-number.loading {
+            opacity: 0.75;
+        }
+
+        @media (max-width: 600px) {
+            .about-page {
+                padding: 30px 15px;
+            }
+
+            .about-card {
+                padding: 40px 24px;
+            }
+
+            .release-panel {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <div id="navbarContainer"></div>
+    <div id="navbar-container"></div>
 
-    <main class="about-container">
-        <h1>About Ref Ledger</h1>
+    <main class="about-page">
+        <section class="about-card">
+            <div class="about-icon">
+                <i
+                    class="fa-solid fa-book-open"
+                    aria-hidden="true"
+                ></i>
+            </div>
 
-        <dl class="about-details">
-            <dt>Application</dt>
-            <dd id="applicationName">Ref Ledger</dd>
+            <p class="about-eyebrow">
+                About
+            </p>
 
-            <dt>Release</dt>
-            <dd id="releaseNumber">Loading...</dd>
-        </dl>
+            <h1
+                id="applicationName"
+                class="about-title"
+            >
+                Ref Ledger
+            </h1>
+
+            <p class="about-description">
+                Game assignments, payments, and expenses—all in one place.
+            </p>
+
+            <div class="release-panel">
+                <span class="release-label">
+                    <i
+                        class="fa-solid fa-code-branch"
+                        aria-hidden="true"
+                    ></i>
+
+                    Current Release
+                </span>
+
+                <span
+                    id="releaseNumber"
+                    class="release-number loading"
+                    aria-live="polite"
+                >
+                    Loading...
+                </span>
+            </div>
+        </section>
     </main>
+
+    <script src="/js/navbar.js"></script>
 
     <script>
         async function loadAboutInformation() {
+            const applicationElement =
+                document.getElementById(
+                    "applicationName"
+                );
+
             const releaseElement =
-                document.getElementById("releaseNumber");
+                document.getElementById(
+                    "releaseNumber"
+                );
 
             try {
-                const response = await fetch("/api/about");
+                const response =
+                    await fetch("/api/about", {
+                        cache: "no-cache"
+                    });
 
                 if (!response.ok) {
                     throw new Error(
@@ -38,20 +293,30 @@
                     );
                 }
 
-                const about = await response.json();
+                const about =
+                    await response.json();
 
-                document.getElementById(
-                    "applicationName"
-                ).textContent = about.application;
+                applicationElement.textContent =
+                    about.application ||
+                    "Ref Ledger";
 
-                releaseElement.textContent = about.release;
+                releaseElement.textContent =
+                    about.release ||
+                    "Unknown";
+
             } catch (error) {
                 console.error(
                     "Unable to load about information:",
                     error
                 );
 
-                releaseElement.textContent = "Unavailable";
+                releaseElement.textContent =
+                    "Unavailable";
+
+            } finally {
+                releaseElement.classList.remove(
+                    "loading"
+                );
             }
         }
 
