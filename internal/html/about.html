@@ -43,6 +43,37 @@
                 );
         }
 
+        .home-button {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            z-index: 10;
+
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+
+            padding: 11px 18px;
+
+            color: #ffffff;
+            background-color: #0d4779;
+            border-radius: 8px;
+
+            font-weight: 700;
+            text-decoration: none;
+
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+
+            transition:
+                background-color 0.2s,
+                transform 0.2s;
+        }
+
+        .home-button:hover {
+            background-color: #ff9f1c;
+            transform: translateY(-2px);
+        }
+
         .about-page {
             display: flex;
             justify-content: center;
@@ -221,6 +252,11 @@
 
 <body>
     <div id="navbar-container"></div>
+
+    <a href="/" class="home-button">
+        <i class="fa-solid fa-house"></i>
+        <span>Home</span>
+    </a>
 
     <main class="about-page">
         <section class="about-card">
