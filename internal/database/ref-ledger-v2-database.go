@@ -3500,9 +3500,12 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 	}
 
 	doc, err := oc.convOfficialToDoc(official)
+
 	if err != nil {
 		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
 	}
+
+	doc.TenantId = tenantId
 
 	result, oc.LastError = oc.Coll.ReplaceOne(context.TODO(), filter, doc)
 	if oc.LastError != nil {
