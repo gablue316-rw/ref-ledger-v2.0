@@ -4733,6 +4733,8 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 
 func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
+
+	fmt.Println("Updating Official")
 	var officialJson database.OfficialJson
 	err := json.NewDecoder(r.Body).Decode(&officialJson)
 	if err != nil {
@@ -4752,6 +4754,9 @@ func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 
 func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
+
+	fmt.Println("Adding Official")
+
 	var officialJson database.OfficialJson
 	err := json.NewDecoder(r.Body).Decode(&officialJson)
 	if err != nil {

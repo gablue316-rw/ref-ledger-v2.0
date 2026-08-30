@@ -255,10 +255,10 @@ tr:nth-child(even) {
                     Save Official
                 </button>
 
-                <button type="update" class="btn btn-update">
+                <button type="button" id="updateOfficialBtn" class="btn btn-update">
                     Update Official
                 </button>
-                
+               
                 <button type="button" id="clearBtn" class="btn btn-clear">
                     Clear Form
                 </button>
@@ -369,7 +369,7 @@ document.getElementById("officialsForm").addEventListener("submit", async functi
 });
 
 
-document.getElementById("officialsForm").addEventListener("update", async function (e) {
+document.getElementById("updateOfficialBtn").addEventListener("click", async function(e) {
     e.preventDefault();
 
     const official = {
