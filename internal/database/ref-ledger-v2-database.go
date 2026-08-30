@@ -3487,7 +3487,7 @@ func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantI
 	return officials, nil
 }
 
-func (oc *OfficialCollection) Update(id, tenantId string, official Official) error {
+func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 
 	var filter bson.M
 	var doc OfficialDoc

@@ -4731,6 +4731,25 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Site updated successfully"))
 }
 
+func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(r)
+	var officialJson database.OfficialJson
+	err := json.NewDecoder(r.Body).Decode(&officialJson)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	err = oc.Update(database.TenantId, oc.ConvJsonToOfficial(officialJson))
+	if err != nil {
+		fmt.Println("Failed to update official")
+		http.Error(w, "Failed to update official", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("Official updated successfully"))
+}
+
 func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 	var officialJson database.OfficialJson
@@ -4746,7 +4765,7 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Official updated successfully"))
+	w.Write([]byte("Official created successfully"))
 }
 
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
@@ -5726,6 +5745,7 @@ func main() {
 	mux.HandleFunc("/importSites", authRequired(readOnlyForbidden(ImportSitesPageHandler)))
 
 	mux.HandleFunc("/api/officials", authRequired(readOnlyForbidden(CreateOfficial)))
+	mux.HandleFunc("/api/officials-update", authRequired(readOnlyForbidden(UpdateOfficial)))
 	mux.HandleFunc("/api/expenses", authRequired(readOnlyForbidden(CreateExpense)))
 	//mux.HandleFunc("/api/associations", CreateAssociation)
 

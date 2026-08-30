@@ -109,6 +109,14 @@ input {
     background-color: #15803d;
 }
 
+.btn-update {
+    background-color: #5f16a3;
+}
+
+.btn-update:hover {
+    background-color: #291580;
+}
+
 .btn-clear {
     background-color: #dc2626;
 }
@@ -247,6 +255,10 @@ tr:nth-child(even) {
                     Save Official
                 </button>
 
+                <button type="update" class="btn btn-update">
+                    Update Official
+                </button>
+                
                 <button type="button" id="clearBtn" class="btn btn-clear">
                     Clear Form
                 </button>
@@ -340,7 +352,7 @@ document.getElementById("officialsForm").addEventListener("submit", async functi
 
         if (response.status === 403) {
             document.getElementById("message").innerText =
-                "Permission denied. Read-only users cannot add or update officials.";
+                "Permission denied. Read-only users cannot add officials.";
             return;
         }
 
@@ -350,6 +362,50 @@ document.getElementById("officialsForm").addEventListener("submit", async functi
             response.ok
                 ? message || "Official saved successfully."
                 : message || "Error saving official.";
+
+    } catch (err) {
+        document.getElementById("message").innerText = "Server unavailable.";
+    }
+});
+
+
+document.getElementById("officialsForm").addEventListener("update", async function (e) {
+    e.preventDefault();
+
+    const official = {
+        firstName: document.getElementById("firstname").value.trim(),
+        lastName: document.getElementById("lastname").value.trim(),
+        phone: document.getElementById("phone").value.trim(),
+        email: document.getElementById("email").value.trim(),
+        address: document.getElementById("address").value.trim()
+    };
+
+    try {
+        const response = await fetch("/api/officials-update", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(official)
+        });
+
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            document.getElementById("message").innerText =
+                "Permission denied. Read-only users cannot update officials.";
+            return;
+        }
+
+        const message = await response.text();
+
+        document.getElementById("message").innerText =
+            response.ok
+                ? message || "Official updated successfully."
+                : message || "Error updating official.";
 
     } catch (err) {
         document.getElementById("message").innerText = "Server unavailable.";
