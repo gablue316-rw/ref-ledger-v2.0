@@ -2207,18 +2207,19 @@ func (ac *AssociationCollection) GetAssociationsDirectory(tenantId string) ([]As
 
 }
 
-func (ac *AssociationCollection) Update(id string, association Association, tenantId string) error {
+func (ac *AssociationCollection) Update(association Association, tenantId string) error {
 
 	var filter bson.M
 	var doc AssociationDoc
 	var result *mongo.UpdateResult
 
 	filter = bson.M{
-		"id":       id,
+		"id":       association.Id,
 		"tenantId": tenantId,
 	}
 
 	doc = ac.convAssocToDoc(association)
+	doc.TenantId = tenantId
 
 	result, ac.LastError = ac.Coll.ReplaceOne(context.TODO(), filter, doc)
 	if ac.LastError != nil {

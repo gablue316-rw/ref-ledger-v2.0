@@ -4662,6 +4662,42 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	LogVisitor(r)
+	var assocJson database.AssociationJson
+
+	err = json.NewDecoder(r.Body).Decode(&assocJson)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	err = ac.Update(ac.ConvAssocJsonToAssoc(assocJson), tId)
+	if err != nil {
+		fmt.Println("Failed to update association")
+		http.Error(w, "Failed to update association", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("Association updated successfully"))
+
+}
+
 func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 
 	var tId string = database.TenantId
@@ -4694,7 +4730,7 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Association updated successfully"))
+	w.Write([]byte("Association added successfully"))
 }
 
 func CreateSite(w http.ResponseWriter, r *http.Request) {
@@ -5752,10 +5788,12 @@ func main() {
 	mux.HandleFunc("/api/officials", authRequired(readOnlyForbidden(CreateOfficial)))
 	mux.HandleFunc("/api/officials-update", authRequired(readOnlyForbidden(UpdateOfficial)))
 	mux.HandleFunc("/api/expenses", authRequired(readOnlyForbidden(CreateExpense)))
-	//mux.HandleFunc("/api/associations", CreateAssociation)
 
 	mux.HandleFunc("/api/associations",
 		authRequired(readOnlyForbidden(CreateAssociation)))
+
+	mux.HandleFunc("/api/associations-update",
+		authRequired(readOnlyForbidden(UpdateAssociation)))
 
 	mux.HandleFunc("/createAccount", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/createAccount.html")

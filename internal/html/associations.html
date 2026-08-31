@@ -100,11 +100,11 @@
             font-size: 14px;
         }
 
-        .btn-update {
+        .btn-add {
             background-color: #16a34a;
         }
 
-        .btn-update:hover {
+        .btn-add:hover {
             background-color: #15803d;
         }
 
@@ -125,6 +125,14 @@
             background:#1d4ed8;
         }        
 
+        .btn-edit{
+            background:#2616a3;
+        }
+        
+        .btn-edit:hover{
+            background:#251580;
+        }
+        
         .btn-delete {
             background-color: #dc2626;
         }
@@ -287,38 +295,55 @@
                     type="button"
                     id="getAssocBtn"
                     class="btn btn-get">
-                    Get Association
+                    <i class="fa-solid fa-magnifying-glass"></i>                    
+                    Get
                 </button>
-                
+                 
                 <button
                     type="submit"
-                    class="btn btn-update">
-                    Update Association
-                </button>
-
+                    class="btn btn-add">
+                    <i class="fa-solid fa-plus"></i>     
+                    Add               
+                </button>          
+                
                 <button
-                    type="button"
-                    id="clearAssocBtn"
-                    class="btn btn-clear">
-                    Clear Association
+                   type="button"
+                   id="editBtn"
+                   class="btn btn-edit">
+                   <i class="fa-solid fa-pen"></i>                   
+                   Edit
                 </button>                
                 
                 <button
                    type="button"
                    id="deleteBtn"
                    class="btn btn-delete">
-                   Delete Association
+                   <i class="fa-solid fa-trash"></i>                   
+                   Delete
                 </button>
+
+                <button
+                    type="button"
+                    id="clearAssocBtn"
+                    class="btn btn-clear">
+                    <i class="fa-solid fa-eraser"></i>                    
+                    Clear 
+                </button>      
 
                 <button
                    type="button"
                    id="directoryBtn"
                    class="btn btn-directory">
-                   Association Directory
+                   <i class="fa-solid fa-folder"></i>
+                   Directory
                 </button>
 
-                <button type="button" id="importAssociationsBtn" class="btn btn-import"> <i class="fa-solid fa-file-import"></i>
-                    Import Associations
+                <button 
+                   type="button" 
+                   id="importAssociationsBtn" 
+                   class="btn btn-import"> 
+                   <i class="fa-solid fa-file-import"></i>
+                   Import
                 </button>
 
 
@@ -461,6 +486,40 @@ document.getElementById("associationForm").addEventListener("submit", async func
         document.getElementById("message").innerText = "Server unavailable.";
     }
 });
+
+document
+    .getElementById("editBtn")
+    .addEventListener("click", async function (e) {
+        e.preventDefault();
+
+    const association = {
+       id: document.getElementById("assocId").value,
+       name: document.getElementById("assocName").value,
+       contact: document.getElementById("contactName").value,
+       phone: document.getElementById("contactNumber").value,
+       email: document.getElementById("contactEmail").value,
+       assignors: document.getElementById("assignors").value
+    };
+
+    try {
+        const response = await fetch("/api/associations-update", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(association)
+        });
+
+        const message = await response.text();
+
+        document.getElementById("message").innerText =
+            response.ok
+                ? message || "Association updated successfully."
+                : message || "Error updating association.";
+
+    } catch(err) {
+        document.getElementById("message").innerText = "Server unavailable.";
+    }
+});
+
 
 document.getElementById("directoryBtn").addEventListener("click", async function () {
     try {
