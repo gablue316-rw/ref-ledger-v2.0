@@ -311,7 +311,7 @@
                    id="editBtn"
                    class="btn btn-edit">
                    <i class="fa-solid fa-pen"></i>                   
-                   Edit
+                   Save
                 </button>                
                 
                 <button
@@ -380,6 +380,10 @@
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
+
+function clearAssociationsForm() {
+    document.getElementById("associationForm").reset();
+}
 
 document
     .getElementById("importAssociationsBtn")
@@ -451,6 +455,10 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
                 ? message || "Association deleted successfully."
                 : message || "Error deleting association.";
     
+        if (response.ok) {
+           clearAssociationsForm();
+        }
+
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }
@@ -481,6 +489,10 @@ document.getElementById("associationForm").addEventListener("submit", async func
             response.ok
                 ? message || "Association saved successfully."
                 : message || "Error saving association.";
+
+        if (response.ok) {
+           clearAssociationsForm();
+        }
 
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
