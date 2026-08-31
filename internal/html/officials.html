@@ -393,6 +393,7 @@ document
                 .trim()
         };
 
+        document.getElementById("message").innerText = "Saving Official";
         try {
             const response = await fetch("/api/officials", {
                 method: "POST",
@@ -464,6 +465,7 @@ document
                 .trim()
         };
 
+        document.getElementById("message").innerText = "Updating Official";
         try {
             const response = await fetch("/api/officials-update", {
                 method: "POST",
@@ -519,6 +521,7 @@ document
             return;
         }
 
+        document.getElementById("message").innerText = "Loading Official";
         try {
             const response = await fetch(
                 `/api/officials/${encodeURIComponent(
@@ -580,6 +583,8 @@ document
             return;
         }
 
+        document.getElementById("message").innerText = "Deleting Official";
+
         try {
             const response = await fetch(
                 `/api/deleteOfficial/${encodeURIComponent(
@@ -630,7 +635,8 @@ document
         }
 
         params.append("t", Date.now());
-
+        document.getElementById("message").innerText = "Loading Directory";
+        
         try {
             const response = await fetch(
                 `/api/officialsDirectory?${params.toString()}`
