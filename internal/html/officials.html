@@ -93,27 +93,27 @@ input {
     font-size: 14px;
 }
 
-.btn-get {
+.btn-find {
     background: #2563eb;
 }
 
-.btn-get:hover {
+.btn-find:hover {
     background: #1d4ed8;
 }
 
-.btn-save {
+.btn-add {
     background-color: #16a34a;
 }
 
-.btn-save:hover {
+.btn-add:hover {
     background-color: #15803d;
 }
 
-.btn-update {
+.btn-save {
     background-color: #5f16a3;
 }
 
-.btn-update:hover {
+.btn-save:hover {
     background-color: #291580;
 }
 
@@ -250,54 +250,56 @@ tr:nth-child(even) {
                 <button
                     type="button"
                     id="getOfficialBtn"
-                    class="btn btn-get"
-                >
-                    Get Official
+                    class="btn btn-find">
+                    <i class="fa-solid fa-magnifying-glass"></i>                    
+                    Find
                 </button>
 
-                <button type="submit" class="btn btn-save">
-                    Save Official
+                <button
+                    type="submit"
+                    class="btn btn-add">
+                    <i class="fa-solid fa-plus"></i>     
+                    Add               
                 </button>
 
                 <button
                     type="button"
                     id="updateOfficialBtn"
-                    class="btn btn-update"
-                >
-                    Update Official
-                </button>
-
-                <button
-                    type="button"
-                    id="clearBtn"
-                    class="btn btn-clear"
-                >
-                    Clear Form
+                    class="btn btn-save">
+                    <i class="fa-solid fa-pen"></i>                   
+                    Save
                 </button>
 
                 <button
                     type="button"
                     id="deleteOfficialBtn"
-                    class="btn btn-delete"
-                >
-                    Delete Official
+                    class="btn btn-delete">
+                    <i class="fa-solid fa-trash"></i>                   
+                    Delete
+                </button>
+                
+                <button
+                    type="button"
+                    id="clearBtn"
+                    class="btn btn-clear"> 
+                    <i class="fa-solid fa-eraser"></i>                   
+                    Clear
                 </button>
 
                 <button
                     type="button"
                     id="directoryBtn"
-                    class="btn btn-directory"
-                >
-                    Official Directory
+                    class="btn btn-directory">
+                    <i class="fa-solid fa-address-book"></i>                   
+                    Directory
                 </button>
 
                 <button
                     type="button"
                     id="importOfficialsBtn"
-                    class="btn btn-import"
-                >
+                    class="btn btn-import">            
                     <i class="fa-solid fa-file-import"></i>
-                    Import Officials
+                    Import
                 </button>
             </div>
 
