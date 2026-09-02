@@ -1,10 +1,9 @@
-name: Build and Push ref-ledger
+name: Build and Push ref-ledger Main
 
 on:
   push:
     branches:
       - main
-      - development
 
 permissions:
   contents: write
@@ -14,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout triggering branch
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
@@ -22,15 +21,10 @@ jobs:
       - name: Set image tag
         shell: bash
         run: |
-          MAJOR=1
+          MAJOR=2
 
-          if [[ "${GITHUB_REF_NAME}" == "development" ]]; then
-            echo "IMAGE_TAG=dev-v${MAJOR}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-            echo "ROLLING_TAG=dev-latest" >> "$GITHUB_ENV"
-          else
-            echo "IMAGE_TAG=v${MAJOR}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-            echo "ROLLING_TAG=latest" >> "$GITHUB_ENV"
-          fi
+          echo "IMAGE_TAG=v${MAJOR}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "ROLLING_TAG=latest" >> "$GITHUB_ENV"
 
       - name: Display build information
         run: |
