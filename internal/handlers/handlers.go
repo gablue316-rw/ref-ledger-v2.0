@@ -160,7 +160,7 @@ func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	db := database.Client.Database("refLedger_v2")
+	db := database.Client.Database(database.GetMongoDbName())
 	users := db.Collection("users")
 	resets := db.Collection("passwordResets")
 
