@@ -70,6 +70,7 @@ type PaymentDoc struct {
 	PaymentAmt  int64   `bson:"paymentAmt,omitempty"`
 	Association string  `bson:"association,omitempty"`
 	GameIds     []int64 `bson:"gameIds,omitempty"`
+	TenantId    string  `bson:"tenantId,omitempty"`
 }
 
 type OfficialDescriptor struct {

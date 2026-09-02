@@ -1762,7 +1762,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 	for _, v := range payment {
 
 		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-
+		doc.TenantId = TenantId
 		paymentExists, err := PaymentExists(doc)
 
 		if paymentExists || err != nil {
