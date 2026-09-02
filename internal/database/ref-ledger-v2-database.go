@@ -724,6 +724,7 @@ func PaymentExists(doc model.PaymentDoc) (bool, error) {
 
 	filter = bson.M{
 		"paymentId": doc.PaymentId,
+		"tenantId":  TenantId,
 	}
 
 	// Query to find all documents
@@ -733,7 +734,7 @@ func PaymentExists(doc model.PaymentDoc) (bool, error) {
 	}
 
 	if count > 0 {
-		fmt.Println("Game exists!")
+		fmt.Println("Payment exists!")
 		paymentExists = true
 	}
 
