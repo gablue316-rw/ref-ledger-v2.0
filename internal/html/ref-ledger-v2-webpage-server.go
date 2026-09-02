@@ -4767,6 +4767,41 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Site updated successfully"))
 }
 
+func UpdateSite(w http.ResponseWriter, r *http.Request) {
+
+	var tId string = database.TenantId
+	var err error
+
+	LogVisitor(r)
+	var siteJson database.SiteJson
+
+	err = json.NewDecoder(r.Body).Decode(&siteJson)
+	if err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// err = sc.Update(sc.ConvJsonToSite(siteJson), tId)
+	// if err != nil {
+	// 	fmt.Println("Failed to update site")
+	// 	http.Error(w, "Failed to update site", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// w.Header().Set("Content-Type", "text/plain")
+
+	w.Write([]byte("Site updated successfully"))
+}
+
 func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
@@ -5809,6 +5844,7 @@ func main() {
 
 	mux.HandleFunc("/api/createAccount", CreateAccount)
 	mux.HandleFunc("/api/sites", authRequired(readOnlyForbidden(CreateSite)))
+	mux.HandleFunc("/api/sites-update", authRequired(readOnlyForbidden(UpdateSite)))
 	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))
 	mux.HandleFunc("/api/reports", GenerateReport)
 	mux.HandleFunc("/api/game-save", authRequired(readOnlyForbidden(SaveGame)))

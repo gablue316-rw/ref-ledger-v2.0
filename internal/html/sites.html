@@ -102,11 +102,11 @@
             font-size: 14px;
         }
 
-        .btn-update {
+        .btn-add {
             background-color: #16a34a;
         }
 
-        .btn-update:hover {
+        .btn-add:hover {
             background-color: #15803d;
         }
 
@@ -119,14 +119,22 @@
             background-color: #ca8a04; /* darker yellow */
         }
 
-        .btn-get{
+        .btn-find{
             background:#2563eb;
         }
 
-        .btn-get:hover{
+        .btn-find:hover{
             background:#1d4ed8;
         }        
 
+        .btn-save {
+            background-color: #5f16a3;
+        }
+
+        .btn-save:hover {
+            background-color: #291580;
+        }        
+        
         .btn-delete {
             background-color: #dc2626;
         }
@@ -261,40 +269,58 @@
                 <button
                     type="button"
                     id="getSiteBtn"
-                    class="btn btn-get">
-                    Get Site
+                    class="btn btn-find">
+
+                    
+                    <i class="fa-solid fa-magnifying-glass"></i>                    
+                    Find
                 </button>
                 
                 <button
                     type="submit"
-                    class="btn btn-update">
-                    Update Site
+                    class="btn btn-add">
+                    <i class="fa-solid fa-plus"></i>     
+                    Add                        
+                </button>
+
+                <button
+                    type="button"
+                    id="saveSiteBtn"
+                    class="btn btn-save">
+                    <i class="fa-solid fa-pen"></i>                   
+                    Save
+                </button>
+
+                <button
+                   type="button"
+                   id="deleteBtn"
+                   class="btn btn-delete">
+                   <i class="fa-solid fa-trash"></i>                   
+                   Delete                   
                 </button>
 
                 <button
                     type="button"
                     id="clearSiteBtn"
                     class="btn btn-clear">
-                    Clear Site
-                </button>                
-                
-                <button
-                   type="button"
-                   id="deleteBtn"
-                   class="btn btn-delete">
-                   Delete Site
-                </button>
+                    <i class="fa-solid fa-eraser"></i>                   
+                    Clear      
+                </button>    
 
                 <button
                     type="button"
                     id="directoryBtn"
                     class="btn btn-directory">
-                    Site Directory
+                    <i class="fa-solid fa-address-book"></i>                   
+                    Directory
                 </button>                       
 
-                <button type="button" id="importSitesBtn" class="btn btn-import"> 
+                <button 
+                    type="button" 
+                    id="importSitesBtn" 
+                    class="btn btn-import"> 
                     <i class="fa-solid fa-file-import"></i>
-                    Import Sites
+                    Import
                 </button>
 
             </div>
@@ -466,6 +492,50 @@ document.getElementById("sitesForm").addEventListener("submit", async function(e
         document.getElementById("message").innerText = "Server unavailable.";
     }
 });
+
+document
+    .getElementById("saveSiteBtn")
+    .addEventListener("click", async function (e) {
+        e.preventDefault();
+
+    const site = {
+       id: document.getElementById("siteId").value,
+       name: document.getElementById("siteName").value,
+       contact: document.getElementById("contactName").value,
+       phone: document.getElementById("contactNumber").value,
+       email: document.getElementById("contactEmail").value,
+    };
+
+    try {
+        const response = await fetch("/api/sites-update", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify(site)
+        });
+
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            messageBox.innerText =
+                "Permission denied. Read-only users cannot enter sites.";
+            return;
+        }
+
+        const message = await response.text();
+
+        document.getElementById("message").innerText =
+            response.ok
+                ? message || "Site updated successfully."
+                : message || "Error updating site.";
+                
+    } catch(err) {
+        document.getElementById("message").innerText = "Server unavailable.";
+    }
+});
+
 
 document.getElementById("directoryBtn")
 .addEventListener("click", async function () {
