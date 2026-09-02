@@ -2207,18 +2207,19 @@ func (ac *AssociationCollection) GetAssociationsDirectory(tenantId string) ([]As
 
 }
 
-func (ac *AssociationCollection) Update(id string, association Association, tenantId string) error {
+func (ac *AssociationCollection) Update(association Association, tenantId string) error {
 
 	var filter bson.M
 	var doc AssociationDoc
 	var result *mongo.UpdateResult
 
 	filter = bson.M{
-		"id":       id,
+		"id":       association.Id,
 		"tenantId": tenantId,
 	}
 
 	doc = ac.convAssocToDoc(association)
+	doc.TenantId = tenantId
 
 	result, ac.LastError = ac.Coll.ReplaceOne(context.TODO(), filter, doc)
 	if ac.LastError != nil {
@@ -2660,7 +2661,7 @@ func (sc *SiteCollection) GetSitesDirectory(tenantId string) ([]Site, error) {
 	return sites, nil
 }
 
-func (sc *SiteCollection) Update(id, tenantId string, site Site) error {
+func (sc *SiteCollection) Update(site Site, tenantId string) error {
 
 	var filter bson.M
 	var doc SiteDoc
@@ -3487,7 +3488,7 @@ func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantI
 	return officials, nil
 }
 
-func (oc *OfficialCollection) Update(id, tenantId string, official Official) error {
+func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 
 	var filter bson.M
 	var doc OfficialDoc
@@ -3500,9 +3501,12 @@ func (oc *OfficialCollection) Update(id, tenantId string, official Official) err
 	}
 
 	doc, err := oc.convOfficialToDoc(official)
+
 	if err != nil {
 		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
 	}
+
+	doc.TenantId = tenantId
 
 	result, oc.LastError = oc.Coll.ReplaceOne(context.TODO(), filter, doc)
 	if oc.LastError != nil {

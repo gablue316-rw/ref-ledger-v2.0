@@ -6,9 +6,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ref Ledger V2.0 Officials Entry</title>
 
-<link rel="stylesheet"
-href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-<link rel="stylesheet" href="/components/navbar.css?v=12"> 
+<link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+>
+<link rel="stylesheet" href="/components/navbar.css?v=12">
 
 <style>
 * {
@@ -19,8 +21,8 @@ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
 }
 
 body {
-   background-color: #f4f6f9;
-   color: #333;
+    background-color: #f4f6f9;
+    color: #333;
 }
 
 .container {
@@ -28,7 +30,6 @@ body {
     margin: 20px auto;
     padding: 0 20px;
 }
-
 
 .header {
     background-color: #1e293b;
@@ -42,12 +43,11 @@ body {
     margin-bottom: 10px;
 }
 
-
 .form-card {
     background-color: white;
     padding: 25px;
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     margin-bottom: 20px;
 }
 
@@ -70,10 +70,10 @@ label {
 }
 
 input {
+    width: 100%;
     padding: 10px;
     border: 1px solid #ccc;
     border-radius: 5px;
-    width: 100%;
 }
 
 .button-row {
@@ -93,20 +93,28 @@ input {
     font-size: 14px;
 }
 
-.btn-get {
+.btn-find {
     background: #2563eb;
 }
 
-.btn-get:hover {
+.btn-find:hover {
     background: #1d4ed8;
 }
 
-.btn-save {
+.btn-add {
     background-color: #16a34a;
 }
 
-.btn-save:hover {
+.btn-add:hover {
     background-color: #15803d;
+}
+
+.btn-save {
+    background-color: #5f16a3;
+}
+
+.btn-save:hover {
+    background-color: #291580;
 }
 
 .btn-clear {
@@ -149,7 +157,7 @@ input {
     background-color: white;
     padding: 15px 20px;
     border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     font-weight: bold;
     min-height: 60px;
     margin-bottom: 20px;
@@ -197,7 +205,7 @@ tr:nth-child(even) {
 
 <body>
 
-<div id="navbar-container"></div>   
+<div id="navbar-container"></div>
 
 <div class="container">
 
@@ -239,31 +247,60 @@ tr:nth-child(even) {
             </div>
 
             <div class="button-row">
-                <button type="button" id="getOfficialBtn" class="btn btn-get">
-                    Get Official
+                <button
+                    type="button"
+                    id="getOfficialBtn"
+                    class="btn btn-find">
+                    <i class="fa-solid fa-magnifying-glass"></i>                    
+                    Find
                 </button>
 
-                <button type="submit" class="btn btn-save">
-                    Save Official
+                <button
+                    type="submit"
+                    class="btn btn-add">
+                    <i class="fa-solid fa-plus"></i>     
+                    Add               
                 </button>
 
-                <button type="button" id="clearBtn" class="btn btn-clear">
-                    Clear Form
+                <button
+                    type="button"
+                    id="updateOfficialBtn"
+                    class="btn btn-save">
+                    <i class="fa-solid fa-pen"></i>                   
+                    Save
                 </button>
 
-                <button type="button" id="deleteOfficialBtn" class="btn btn-delete">
-                    Delete Official
+                <button
+                    type="button"
+                    id="deleteOfficialBtn"
+                    class="btn btn-delete">
+                    <i class="fa-solid fa-trash"></i>                   
+                    Delete
+                </button>
+                
+                <button
+                    type="button"
+                    id="clearBtn"
+                    class="btn btn-clear"> 
+                    <i class="fa-solid fa-eraser"></i>                   
+                    Clear
                 </button>
 
-                <button type="button" id="directoryBtn" class="btn btn-directory">
-                    Official Directory
+                <button
+                    type="button"
+                    id="directoryBtn"
+                    class="btn btn-directory">
+                    <i class="fa-solid fa-address-book"></i>                   
+                    Directory
                 </button>
 
-                <button type="button" id="importOfficialsBtn" class="btn btn-import">
+                <button
+                    type="button"
+                    id="importOfficialsBtn"
+                    class="btn btn-import">            
                     <i class="fa-solid fa-file-import"></i>
-                    Import Officials
+                    Import
                 </button>
-
             </div>
 
         </form>
@@ -273,11 +310,17 @@ tr:nth-child(even) {
         Ready to enter officials.
     </div>
 
-    <div class="form-card" id="directorySection" style="display:none;">
+    <div
+        class="form-card"
+        id="directorySection"
+        style="display: none;"
+    >
         <h2>Officials Directory</h2>
+
         <p class="directory-note">
-            Directory is filtered by First Name and/or Last Name when those fields are filled in.
-            Leave both blank to show all officials.
+            Directory is filtered by First Name and/or Last Name when
+            those fields are filled in. Leave both blank to show all
+            officials.
         </p>
 
         <table id="officialsTable">
@@ -300,6 +343,10 @@ tr:nth-child(even) {
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
+function clearOfficialForm() {
+    document.getElementById("officialsForm").reset();
+    document.getElementById("firstname").focus();
+}
 
 document
     .getElementById("importOfficialsBtn")
@@ -307,181 +354,346 @@ document
         window.location.href = "/importOfficials";
     });
 
-
-document.getElementById("clearBtn").addEventListener("click", function () {
-    document.getElementById("officialsForm").reset();
-    document.getElementById("message").innerText = "Form cleared.";
-});
-
-document.getElementById("officialsForm").addEventListener("submit", async function (e) {
-    e.preventDefault();
-
-    const official = {
-        firstName: document.getElementById("firstname").value.trim(),
-        lastName: document.getElementById("lastname").value.trim(),
-        phone: document.getElementById("phone").value.trim(),
-        email: document.getElementById("email").value.trim(),
-        address: document.getElementById("address").value.trim()
-    };
-
-    try {
-        const response = await fetch("/api/officials", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(official)
-        });
-
-        if (response.status === 401 || response.redirected) {
-            window.location.href = "/login";
-            return;
-        }
-
-        if (response.status === 403) {
-            document.getElementById("message").innerText =
-                "Permission denied. Read-only users cannot add or update officials.";
-            return;
-        }
-
-        const message = await response.text();
+document
+    .getElementById("clearBtn")
+    .addEventListener("click", function () {
+        clearOfficialForm();
 
         document.getElementById("message").innerText =
-            response.ok
-                ? message || "Official saved successfully."
-                : message || "Error saving official.";
+            "Form cleared.";
+    });
 
-    } catch (err) {
-        document.getElementById("message").innerText = "Server unavailable.";
-    }
-});
+document
+    .getElementById("officialsForm")
+    .addEventListener("submit", async function (e) {
+        e.preventDefault();
 
-document.getElementById("getOfficialBtn").addEventListener("click", async function () {
-    const firstName = document.getElementById("firstname").value.trim();
-    const lastName = document.getElementById("lastname").value.trim();
+        const official = {
+            firstName: document
+                .getElementById("firstname")
+                .value
+                .trim(),
 
-    if (!firstName || !lastName) {
-        document.getElementById("message").innerText =
-            "Enter both First Name and Last Name first.";
-        return;
-    }
+            lastName: document
+                .getElementById("lastname")
+                .value
+                .trim(),
 
-    try {
-        const response = await fetch(
-            `/api/officials/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}?t=${Date.now()}`
-        );
+            phone: document
+                .getElementById("phone")
+                .value
+                .trim(),
 
-        if (!response.ok) {
-            document.getElementById("message").innerText = "Official not found.";
-            return;
-        }
+            email: document
+                .getElementById("email")
+                .value
+                .trim(),
 
-        const official = await response.json();
+            address: document
+                .getElementById("address")
+                .value
+                .trim()
+        };
 
-        document.getElementById("firstname").value = official.FirstName || "";
-        document.getElementById("lastname").value = official.LastName || "";
-        document.getElementById("phone").value = official.Phone || "";
-        document.getElementById("email").value = official.Email || "";
-        document.getElementById("address").value = official.Address || "";
+        document.getElementById("message").innerText = "Saving Official";
+        try {
+            const response = await fetch("/api/officials", {
+                method: "POST",
 
-        document.getElementById("message").innerText =
-            "Official loaded successfully.";
+                headers: {
+                    "Content-Type": "application/json"
+                },
 
-    } catch (err) {
-        document.getElementById("message").innerText = "Server unavailable.";
-    }
-});
+                body: JSON.stringify(official)
+            });
 
-document.getElementById("deleteOfficialBtn").addEventListener("click", async function () {
-    const firstName = document.getElementById("firstname").value.trim();
-    const lastName = document.getElementById("lastname").value.trim();
-
-    if (!firstName || !lastName) {
-        document.getElementById("message").innerText =
-            "Enter both First Name and Last Name first.";
-        return;
-    }
-
-    try {
-        const response = await fetch(
-            `/api/deleteOfficial/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}`,
-            {
-                method: "DELETE"
+            if (response.status === 401 || response.redirected) {
+                window.location.href = "/login";
+                return;
             }
-        );
 
-        const message = await response.text();
+            if (response.status === 403) {
+                document.getElementById("message").innerText =
+                    "Permission denied. Read-only users cannot add officials.";
 
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Official deleted successfully."
-                : message || "Error deleting official.";
+                return;
+            }
 
-    } catch (err) {
-        document.getElementById("message").innerText = "Server unavailable.";
-    }
-});
+            const message = await response.text();
 
-document.getElementById("directoryBtn").addEventListener("click", async function () {
-    const firstName = document.getElementById("firstname").value.trim();
-    const lastName = document.getElementById("lastname").value.trim();
-
-    const params = new URLSearchParams();
-
-    if (firstName !== "") {
-        params.append("firstname", firstName);
-    }
-
-    if (lastName !== "") {
-        params.append("lastname", lastName);
-    }
-
-    params.append("t", Date.now());
-
-    try {
-        const response = await fetch(`/api/officialsDirectory?${params.toString()}`);
-
-        if (!response.ok) {
             document.getElementById("message").innerText =
-                "Unable to load directory.";
+                response.ok
+                    ? message || "Official saved successfully."
+                    : message || "Error saving official.";
+
+            if (response.ok) {
+                clearOfficialForm();
+            }
+        } catch (err) {
+            document.getElementById("message").innerText =
+                "Server unavailable.";
+        }
+    });
+
+document
+    .getElementById("updateOfficialBtn")
+    .addEventListener("click", async function (e) {
+        e.preventDefault();
+
+        const official = {
+            firstName: document
+                .getElementById("firstname")
+                .value
+                .trim(),
+
+            lastName: document
+                .getElementById("lastname")
+                .value
+                .trim(),
+
+            phone: document
+                .getElementById("phone")
+                .value
+                .trim(),
+
+            email: document
+                .getElementById("email")
+                .value
+                .trim(),
+
+            address: document
+                .getElementById("address")
+                .value
+                .trim()
+        };
+
+        document.getElementById("message").innerText = "Updating Official";
+        try {
+            const response = await fetch("/api/officials-update", {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify(official)
+            });
+
+            if (response.status === 401 || response.redirected) {
+                window.location.href = "/login";
+                return;
+            }
+
+            if (response.status === 403) {
+                document.getElementById("message").innerText =
+                    "Permission denied. Read-only users cannot update officials.";
+
+                return;
+            }
+
+            const message = await response.text();
+
+            document.getElementById("message").innerText =
+                response.ok
+                    ? message || "Official updated successfully."
+                    : message || "Error updating official.";
+        } catch (err) {
+            document.getElementById("message").innerText =
+                "Server unavailable.";
+        }
+    });
+
+document
+    .getElementById("getOfficialBtn")
+    .addEventListener("click", async function () {
+        const firstName = document
+            .getElementById("firstname")
+            .value
+            .trim();
+
+        const lastName = document
+            .getElementById("lastname")
+            .value
+            .trim();
+
+        if (!firstName || !lastName) {
+            document.getElementById("message").innerText =
+                "Enter both First Name and Last Name first.";
+
             return;
         }
 
-        const officials = await response.json();
+        document.getElementById("message").innerText = "Loading Official";
+        try {
+            const response = await fetch(
+                `/api/officials/${encodeURIComponent(
+                    firstName
+                )}/${encodeURIComponent(
+                    lastName
+                )}?t=${Date.now()}`
+            );
 
-        const tbody = document.querySelector("#officialsTable tbody");
-        tbody.innerHTML = "";
+            if (!response.ok) {
+                document.getElementById("message").innerText =
+                    "Official not found.";
 
-        if (!officials || officials.length === 0) {
-            document.getElementById("directorySection").style.display = "block";
+                return;
+            }
+
+            const official = await response.json();
+
+            document.getElementById("firstname").value =
+                official.FirstName || "";
+
+            document.getElementById("lastname").value =
+                official.LastName || "";
+
+            document.getElementById("phone").value =
+                official.Phone || "";
+
+            document.getElementById("email").value =
+                official.Email || "";
+
+            document.getElementById("address").value =
+                official.Address || "";
+
             document.getElementById("message").innerText =
-                "No officials found for the selected filter.";
+                "Official loaded successfully.";
+        } catch (err) {
+            document.getElementById("message").innerText =
+                "Server unavailable.";
+        }
+    });
+
+document
+    .getElementById("deleteOfficialBtn")
+    .addEventListener("click", async function () {
+        const firstName = document
+            .getElementById("firstname")
+            .value
+            .trim();
+
+        const lastName = document
+            .getElementById("lastname")
+            .value
+            .trim();
+
+        if (!firstName || !lastName) {
+            document.getElementById("message").innerText =
+                "Enter both First Name and Last Name first.";
+
             return;
         }
 
-        officials.forEach(function (official) {
-            const row = document.createElement("tr");
+        document.getElementById("message").innerText = "Deleting Official";
 
-            row.innerHTML = `
-                <td>${official.FirstName || ""}</td>
-                <td>${official.LastName || ""}</td>
-                <td>${official.Phone || ""}</td>
-                <td>${official.Email || ""}</td>
-                <td>${official.Address || ""}</td>
-            `;
+        try {
+            const response = await fetch(
+                `/api/deleteOfficial/${encodeURIComponent(
+                    firstName
+                )}/${encodeURIComponent(lastName)}`,
+                {
+                    method: "DELETE"
+                }
+            );
 
-            tbody.appendChild(row);
-        });
+            const message = await response.text();
 
-        document.getElementById("directorySection").style.display = "block";
+            document.getElementById("message").innerText =
+                response.ok
+                    ? message || "Official deleted successfully."
+                    : message || "Error deleting official.";
 
-        document.getElementById("message").innerText =
-            `${officials.length} officials loaded.`;
+            if (response.ok) {
+                clearOfficialForm();
+            }
+        } catch (err) {
+            document.getElementById("message").innerText =
+                "Server unavailable.";
+        }
+    });
 
-    } catch (err) {
-        document.getElementById("message").innerText = "Server unavailable.";
-    }
-});
+document
+    .getElementById("directoryBtn")
+    .addEventListener("click", async function () {
+        const firstName = document
+            .getElementById("firstname")
+            .value
+            .trim();
+
+        const lastName = document
+            .getElementById("lastname")
+            .value
+            .trim();
+
+        const params = new URLSearchParams();
+
+        if (firstName !== "") {
+            params.append("firstname", firstName);
+        }
+
+        if (lastName !== "") {
+            params.append("lastname", lastName);
+        }
+
+        params.append("t", Date.now());
+        document.getElementById("message").innerText = "Loading Directory";
+        
+        try {
+            const response = await fetch(
+                `/api/officialsDirectory?${params.toString()}`
+            );
+
+            if (!response.ok) {
+                document.getElementById("message").innerText =
+                    "Unable to load directory.";
+
+                return;
+            }
+
+            const officials = await response.json();
+            const tbody = document.querySelector(
+                "#officialsTable tbody"
+            );
+
+            tbody.innerHTML = "";
+
+            if (!officials || officials.length === 0) {
+                document.getElementById(
+                    "directorySection"
+                ).style.display = "block";
+
+                document.getElementById("message").innerText =
+                    "No officials found for the selected filter.";
+
+                return;
+            }
+
+            officials.forEach(function (official) {
+                const row = document.createElement("tr");
+
+                row.innerHTML = `
+                    <td>${official.FirstName || ""}</td>
+                    <td>${official.LastName || ""}</td>
+                    <td>${official.Phone || ""}</td>
+                    <td>${official.Email || ""}</td>
+                    <td>${official.Address || ""}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+
+            document.getElementById(
+                "directorySection"
+            ).style.display = "block";
+
+            document.getElementById("message").innerText =
+                `${officials.length} officials loaded.`;
+        } catch (err) {
+            document.getElementById("message").innerText =
+                "Server unavailable.";
+        }
+    });
 </script>
 
 </body>

@@ -33,19 +33,19 @@ body {
 .form-group input,.form-group select{padding:10px;border:1px solid #ccc;border-radius:5px;}
 .button-row{background:#fff;padding:15px 20px;border-radius:10px;margin-bottom:20px;display:flex;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
 .btn{border:none;color:white;padding:12px 20px;border-radius:5px;cursor:pointer;font-weight:bold;}
-.btn-save{background:#16a34a;}
-.btn-save:hover{background:#15803d;}
-.btn-update{background:#2616a3;}
-.btn-update:hover{background:#251580;}
+.btn-add{background:#16a34a;}
+.btn-add:hover{background:#15803d;}
+.btn-save{background:#2616a3;}
+.btn-save:hover{background:#251580;}
 .btn-clear{background:#dc2626;}
 .btn-clear:hover{background:#b91c1c;}
 .btn-delete{background:#ffff00;color:black;}
 .btn-delete:hover{background:#ffc000;color: black;}
-.btn-get{
+.btn-find{
     background:#2563eb;
 }
 
-.btn-get:hover{
+.btn-find:hover{
     background:#1d4ed8;
 }
 
@@ -170,16 +170,56 @@ body{padding:10px;}
 </div> 
 </div> 
 
-
+   
 <div class="button-row">
-    <button type="button" id="getGameBtn" class="btn btn-get">Get Game</button>
-    <button type="button" id="saveGameBtn" class="btn btn-save">Save Game</button>
-    <button type="button" id="updateGameBtn" class="btn btn-update">Update Game</button>
-    <button type="button" id="clearBtn" class="btn btn-clear">Clear Form</button>
-    <button type="button" id="deleteBtn" class="btn btn-delete">Delete Game</button> 
-    <button type="button" id="importGamesBtn" class="btn btn-import"> <i class="fa-solid fa-file-import"></i>
-          Import Games
-    </button>
+   <button
+       type="button"
+       id="getGameBtn"
+       class="btn btn-find">
+       <i class="fa-solid fa-magnifying-glass"></i>                    
+       Find
+   </button>
+
+   <button
+       type="button"
+       id="addGameBtn"
+       class="btn btn-add">
+       <i class="fa-solid fa-plus"></i>     
+       Add               
+   </button>
+
+   <button
+       type="button"
+       id="updateGameBtn"
+       class="btn btn-save">
+       <i class="fa-solid fa-pen"></i>                   
+       Save
+   </button>
+
+   <button
+       type="button"
+       id="deleteBtn"
+       class="btn btn-delete">
+       <i class="fa-solid fa-trash"></i>                   
+       Delete
+   </button>
+                    
+   <button
+       type="button"
+       id="clearBtn"
+       class="btn btn-clear"> 
+       <i class="fa-solid fa-eraser"></i>                   
+       Clear
+   </button>
+
+   <button 
+       type="button" 
+       id="importGamesBtn" 
+       class="btn btn-import"> 
+       <i class="fa-solid fa-file-import"></i>
+       Import
+   </button>   
+      
 
 </div>
 
@@ -200,7 +240,7 @@ function setUpdateMode(isUpdate) {
     gameId.readOnly = isUpdate;
     association.disabled = isUpdate;
 
-    document.getElementById("saveGameBtn").disabled = isUpdate;
+    document.getElementById("addGameBtn").disabled = isUpdate;
     document.getElementById("updateGameBtn").disabled = !isUpdate;
 }
 
@@ -569,7 +609,7 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
     }
 });
 
-document.getElementById("saveGameBtn").addEventListener("click", async function(e) {
+document.getElementById("addGameBtn").addEventListener("click", async function(e) {
     e.preventDefault();
 
     const game = {
