@@ -413,24 +413,33 @@ paymentForm.addEventListener("submit", async function(e) {
             return;
         }
 
-        const message = await response.text();
+        const result = await response.json();
 
         if (response.status === 403) {
             messageBox.innerText =
-                message ||
+                result.errors?.join(", ") ||
                 "Permission denied. Read-only users cannot enter payments.";
             return;
         }
 
-        if (!response.ok) {
+        if (!response.ok || result.totalErrors > 0) {
+            const errorMessage =
+                result.errors?.length > 0
+                    ? result.errors.join(", ")
+                    : "Error saving payment.";
+
             messageBox.innerText =
-                message || "Error saving payment.";
+                `Added: ${result.totalAdded}. ` +
+                `Errors: ${result.totalErrors}. ` +
+                errorMessage;
+
             return;
         }
 
         messageBox.innerText =
-            message ||
-            `Payment saved. ${selectedGameIds.length} game(s) marked as Paid.`;
+            `Payment saved successfully. ` +
+            `${result.totalAdded} payment(s) added. ` +
+            `${selectedGameIds.length} game(s) marked as Paid.`;
 
         paymentForm.reset();
         selectAllCheckbox.checked = false;
@@ -440,7 +449,8 @@ paymentForm.addEventListener("submit", async function(e) {
 
     } catch (err) {
         console.error(err);
-        messageBox.innerText = "Server unavailable.";
+        messageBox.innerText =
+            "The server returned an invalid response or is unavailable.";
     }
 });
 
