@@ -4790,15 +4790,14 @@ func UpdateSite(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// err = sc.Update(sc.ConvJsonToSite(siteJson), tId)
-	// if err != nil {
-	// 	fmt.Println("Failed to update site")
-	// 	http.Error(w, "Failed to update site", http.StatusInternalServerError)
-	// 	return
-	// }
+	err = sc.Update(sc.ConvJsonToSite(siteJson), tId)
+	if err != nil {
+		fmt.Println("Failed to update site")
+		http.Error(w, "Failed to update site", http.StatusInternalServerError)
+		return
+	}
 
-	// w.Header().Set("Content-Type", "text/plain")
-
+	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte("Site updated successfully"))
 }
 

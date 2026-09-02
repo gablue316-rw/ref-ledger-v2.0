@@ -2661,7 +2661,7 @@ func (sc *SiteCollection) GetSitesDirectory(tenantId string) ([]Site, error) {
 	return sites, nil
 }
 
-func (sc *SiteCollection) Update(id, tenantId string, site Site) error {
+func (sc *SiteCollection) Update(site Site, tenantId string) error {
 
 	var filter bson.M
 	var doc SiteDoc
