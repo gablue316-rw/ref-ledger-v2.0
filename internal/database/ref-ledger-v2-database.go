@@ -3189,16 +3189,6 @@ func (gc *GameCollection) GetGameIdsByDateTime(tId, date, timeStamp string) ([]i
 
 	ctx := context.Background()
 
-	// Parse the date and time strings into a time.Time value
-	const layout = "1/2/2006 3:04 PM"
-	gameDateTime, err := time.Parse(layout, date+" "+timeStamp)
-
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println("database/GetGameIdsByDateTime gameDateTime:", gameDateTime)
-
 	filter := bson.M{
 		"tenantId": tId,
 		"date":     date,
