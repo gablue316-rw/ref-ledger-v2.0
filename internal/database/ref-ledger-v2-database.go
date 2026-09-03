@@ -3185,6 +3185,43 @@ func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, in
 
 }
 
+func (gc *GameCollection) GetGameIdsByDateTime(tId, date, timeStamp string) ([]int64, error) {
+
+	ctx := context.Background()
+
+	// Parse the date and time strings into a time.Time value
+	gameDateTime, err := time.Parse("2006-01-02 15:04:05", date+" "+timeStamp)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := bson.M{
+		"tenantId":     tId,
+		"gameDateTime": gameDateTime,
+	}
+
+	cursor, err := gc.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var gameIds []int64
+	for cursor.Next(ctx) {
+		var game model.GameDoc
+		if err := cursor.Decode(&game); err != nil {
+			return nil, err
+		}
+		gameIds = append(gameIds, game.GameId)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return gameIds, nil
+}
+
 // Official Collection, Documents and API Code
 type OfficialJson struct {
 	FirstName string `json:"firstName"`

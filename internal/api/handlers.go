@@ -407,6 +407,26 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 		}
 	}
 
+	// Retrieve game IDs by date and time to check for duplicates based on date and time
+	//
+	gameIds, err := gc.GetGameIdsByDateTime(tId, g.Date, g.Time)
+
+	if err != nil {
+		return fmt.Errorf("error retrieving game IDs by date and time: %s", err.Error())
+	}
+
+	gameId, err := strconv.ParseInt(g.GameId, 10, 64)
+
+	if err != nil {
+		return fmt.Errorf("invalid game ID: %s", g.GameId)
+	}
+
+	for _, existingGameId := range gameIds {
+		if existingGameId == gameId {
+			return fmt.Errorf("duplicate game found for the same date and time")
+		}
+	}
+
 	fmt.Println("Referee=", ref)
 	if ref != "Unassigned" {
 		results, err := oc.Exists(ref, tId)
