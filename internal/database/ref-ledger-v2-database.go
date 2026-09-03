@@ -2659,31 +2659,55 @@ func (sc *SiteCollection) GetSiteNames(tenantId string) ([]SiteName, error) {
 
 func (sc *SiteCollection) GetSitesDirectory(tenantId string) ([]Site, error) {
 
-	var filter bson.M
-	var sites []Site
+	// Ensures empty results encode as [] instead of null.
+	sites := make([]Site, 0)
 
-	filter = bson.M{
+	if tenantId == "" {
+		return sites, fmt.Errorf("tenant ID is empty")
+	}
+
+	filter := bson.M{
 		"tenantId": tenantId,
 	}
 
-	opts := options.Find().
-		SetSort(bson.D{
+	opts := options.Find().SetSort(
+		bson.D{
 			{Key: "id", Value: 1},
-		})
+		},
+	)
 
-	cursor, err := sc.Coll.Find(context.TODO(), filter, opts)
+	ctx := context.TODO()
+
+	cursor, err := sc.Coll.Find(ctx, filter, opts)
 	if err != nil {
-		fmt.Println("Error:", err)
-		return []Site{}, fmt.Errorf("Failed to query sites.  Reason: %v", err)
+		return sites, fmt.Errorf(
+			"failed to query sites: %w",
+			err,
+		)
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var doc SiteDoc
+
+		if err := cursor.Decode(&doc); err != nil {
+			return sites, fmt.Errorf(
+				"failed to decode site document: %w",
+				err,
+			)
+		}
+
+		sites = append(
+			sites,
+			sc.convDocToSite(doc),
+		)
 	}
 
-	for cursor.Next(context.TODO()) {
-		var doc SiteDoc
-		if err := cursor.Decode(&doc); err != nil {
-			fmt.Println("Error:", err)
-			return []Site{}, fmt.Errorf("Failed to decode site document.  Reason: %v", err)
-		}
-		sites = append(sites, sc.convDocToSite(doc))
+	if err := cursor.Err(); err != nil {
+		return sites, fmt.Errorf(
+			"error reading site results: %w",
+			err,
+		)
 	}
 
 	return sites, nil

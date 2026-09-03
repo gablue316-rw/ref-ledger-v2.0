@@ -394,16 +394,45 @@ func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(assignors)
 }
 
-func GetSitesDirectoryHandler(w http.ResponseWriter, r *http.Request) {
+func GetSitesDirectoryHandler(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	LogVisitor(r)
-	sites, err := sc.GetSitesDirectory(database.TenantId)
+
+	tenantId := database.TenantId
+
+	fmt.Printf(
+		"GetSitesDirectoryHandler tenantId=%q\n",
+		tenantId,
+	)
+
+	sites, err := sc.GetSitesDirectory(tenantId)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		fmt.Println(
+			"GetSitesDirectory error:",
+			err,
+		)
+
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sites)
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	if err := json.NewEncoder(w).Encode(sites); err != nil {
+		fmt.Println(
+			"Failed to encode sites:",
+			err,
+		)
+	}
 }
 
 func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {

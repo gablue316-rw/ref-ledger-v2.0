@@ -541,12 +541,20 @@ document.getElementById("directoryBtn")
 .addEventListener("click", async function () {
 
     try {
-
         const response = await fetch("/api/sitesDirectory");
 
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
+
         if (!response.ok) {
+            const errorMessage = await response.text();
+
             document.getElementById("message").innerText =
-                "Unable to load directory.";
+                errorMessage ||
+                `Unable to load directory. HTTP ${response.status}`;
+
             return;
         }
 
@@ -557,11 +565,20 @@ document.getElementById("directoryBtn")
 
         tbody.innerHTML = "";
 
-        sites.forEach(site => {
+        if (sites.length === 0) {
+            document.getElementById(
+                "directorySection"
+            ).style.display = "none";
 
+            document.getElementById("message").innerText =
+                "The site directory is empty.";
+
+            return;
+        }
+
+        sites.forEach(site => {
             const row = document.createElement("tr");
 
-                
             row.innerHTML = `
                 <td>${site.Id}</td>
                 <td>${site.Name}</td>
@@ -573,15 +590,16 @@ document.getElementById("directoryBtn")
             tbody.appendChild(row);
         });
 
-        document.getElementById("directorySection").style.display = "block";
+        document.getElementById(
+            "directorySection"
+        ).style.display = "block";
 
         document.getElementById("message").innerText =
             `${sites.length} sites loaded.`;
 
     } catch (err) {
-
         document.getElementById("message").innerText =
-            "Server unavailable.";
+            `Unable to load directory: ${err.message}`;
     }
 });
 
