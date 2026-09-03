@@ -409,7 +409,10 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 
 	// Retrieve game IDs by date and time to check for duplicates based on date and time
 	//
+	fmt.Println("Verifying that there are no duplicate games for the same date and time")
+	fmt.Println("Getting game IDs by date and time")
 	gameIds, err := gc.GetGameIdsByDateTime(tId, g.Date, g.Time)
+	fmt.Println("Game IDs retrieved:", gameIds)
 
 	if err != nil {
 		return fmt.Errorf("error retrieving game IDs by date and time: %s", err.Error())
@@ -421,8 +424,9 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 		return fmt.Errorf("invalid game ID: %s", g.GameId)
 	}
 
+	fmt.Println("Checking for Game Ids with duplicate date and time")
 	for _, existingGameId := range gameIds {
-		if existingGameId == gameId {
+		if existingGameId != gameId {
 			return fmt.Errorf("duplicate game found for the same date and time")
 		}
 	}
