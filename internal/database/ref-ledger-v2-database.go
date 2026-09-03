@@ -3190,7 +3190,8 @@ func (gc *GameCollection) GetGameIdsByDateTime(tId, date, timeStamp string) ([]i
 	ctx := context.Background()
 
 	// Parse the date and time strings into a time.Time value
-	gameDateTime, err := time.Parse("2006-01-02 15:04:05", date+" "+timeStamp)
+	const layout = "1/2/2006 3:04 PM"
+	gameDateTime, err := time.Parse(layout, date+" "+timeStamp)
 	if err != nil {
 		return nil, err
 	}
