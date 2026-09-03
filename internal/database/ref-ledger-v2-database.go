@@ -1778,6 +1778,32 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			continue
 		}
 
+		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
+
+		if err != nil {
+			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
+			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
+			errors = append(errors, err)
+			continue
+		}
+
+		totalGameFee, err := GetGameFee(gameIds)
+		if err != nil {
+			utils.AuditLog.Printf("Failed to get game fee for Game Ids %v.  Reason: %v", gameIds, err)
+			fmt.Println("Failed to get game fee.  Reason:", err)
+			errors = append(errors, err)
+			continue
+		}
+
+		if totalGameFee != doc.PaymentAmt {
+			errStr := fmt.Sprintf("Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s", doc.PaymentId, utils.ConvertInt64ToAmtStr(totalGameFee), utils.ConvertInt64ToAmtStr(doc.PaymentAmt))
+			utils.AuditLog.Println(errStr)
+			fmt.Println(errStr)
+			totalErrors++
+			errors = append(errors, fmt.Errorf("%s", errStr))
+			continue
+		}
+
 		_, err = coll.InsertOne(ctx, doc)
 		if err != nil {
 			utils.AuditLog.Printf("Failed to insert payment record for PaymentId %s.  Reason: %v", doc.PaymentId, err)
@@ -1789,16 +1815,9 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 
 		recordsInserted++
 
-		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
-
-		if err != nil {
-			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
-			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
-			errors = append(errors, err)
-		} else {
-			gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
-		}
+		gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
 	}
+
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors, "Games Updated to Paid:", gamesUpdatedToPaid)
 	return recordsInserted, totalErrors, gamesUpdatedToPaid, errors
 
@@ -2640,31 +2659,55 @@ func (sc *SiteCollection) GetSiteNames(tenantId string) ([]SiteName, error) {
 
 func (sc *SiteCollection) GetSitesDirectory(tenantId string) ([]Site, error) {
 
-	var filter bson.M
-	var sites []Site
+	// Ensures empty results encode as [] instead of null.
+	sites := make([]Site, 0)
 
-	filter = bson.M{
+	if tenantId == "" {
+		return sites, fmt.Errorf("tenant ID is empty")
+	}
+
+	filter := bson.M{
 		"tenantId": tenantId,
 	}
 
-	opts := options.Find().
-		SetSort(bson.D{
+	opts := options.Find().SetSort(
+		bson.D{
 			{Key: "id", Value: 1},
-		})
+		},
+	)
 
-	cursor, err := sc.Coll.Find(context.TODO(), filter, opts)
+	ctx := context.TODO()
+
+	cursor, err := sc.Coll.Find(ctx, filter, opts)
 	if err != nil {
-		fmt.Println("Error:", err)
-		return []Site{}, fmt.Errorf("Failed to query sites.  Reason: %v", err)
+		return sites, fmt.Errorf(
+			"failed to query sites: %w",
+			err,
+		)
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var doc SiteDoc
+
+		if err := cursor.Decode(&doc); err != nil {
+			return sites, fmt.Errorf(
+				"failed to decode site document: %w",
+				err,
+			)
+		}
+
+		sites = append(
+			sites,
+			sc.convDocToSite(doc),
+		)
 	}
 
-	for cursor.Next(context.TODO()) {
-		var doc SiteDoc
-		if err := cursor.Decode(&doc); err != nil {
-			fmt.Println("Error:", err)
-			return []Site{}, fmt.Errorf("Failed to decode site document.  Reason: %v", err)
-		}
-		sites = append(sites, sc.convDocToSite(doc))
+	if err := cursor.Err(); err != nil {
+		return sites, fmt.Errorf(
+			"error reading site results: %w",
+			err,
+		)
 	}
 
 	return sites, nil
@@ -3164,6 +3207,38 @@ func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, in
 	fmt.Println("database/GetTodaysPendingGames returning ", totalGames, "games")
 	return games, int(totalGames), nil
 
+}
+
+func (gc *GameCollection) GetGameIdsByDateTime(tId, date, timeStamp string) ([]int64, error) {
+
+	ctx := context.Background()
+
+	filter := bson.M{
+		"tenantId": tId,
+		"date":     date,
+		"time":     timeStamp,
+	}
+
+	cursor, err := gc.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var gameIds []int64
+	for cursor.Next(ctx) {
+		var game model.GameDoc
+		if err := cursor.Decode(&game); err != nil {
+			return nil, err
+		}
+		gameIds = append(gameIds, game.GameId)
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return gameIds, nil
 }
 
 // Official Collection, Documents and API Code
