@@ -947,8 +947,6 @@ async function updateSelectedStatus() {
         }
 
 
-        showMessage("Game status updated successfully", "info");
-        
         document.getElementById("bulkStatus").value =
             "";
 
@@ -957,6 +955,13 @@ async function updateSelectedStatus() {
         if (typeof loadPendingGames === "function") {
             await loadPendingGames();
         }
+
+        showMessage(
+            selectedGames.length === 1
+                ? "Game status updated successfully."
+                : `${selectedGames.length} game statuses updated successfully.`,
+            "info"
+        );
 
     } catch (err) {
         console.error(err);
