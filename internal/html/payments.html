@@ -395,7 +395,6 @@ paymentForm.addEventListener(
         if (selectedGameIds.length === 0) {
             messageBox.innerText =
                 "Select at least one completed game before saving the payment.";
-
             return;
         }
 
@@ -419,28 +418,24 @@ paymentForm.addEventListener(
         if (paymentId === "") {
             messageBox.innerText =
                 "Enter a Payment ID.";
-
             return;
         }
 
         if (paymentDate === "") {
             messageBox.innerText =
                 "Enter a payment date.";
-
             return;
         }
 
         if (association === "") {
             messageBox.innerText =
                 "Select an association.";
-
             return;
         }
 
         if (Number.isNaN(amount) || amount <= 0) {
             messageBox.innerText =
                 "Enter a valid payment amount greater than zero.";
-
             return;
         }
 
@@ -475,14 +470,12 @@ paymentForm.addEventListener(
                 return;
             }
 
-            const result =
-                await response.json();
+            const result = await response.json();
 
             if (response.status === 403) {
                 messageBox.innerText =
                     result.errors?.join(", ") ||
                     "Permission denied. Read-only users cannot enter payments.";
-
                 return;
             }
 
@@ -503,6 +496,15 @@ paymentForm.addEventListener(
                 return;
             }
 
+            if (result.totalAdded === 0) {
+                messageBox.innerText =
+                    "Payment not saved. " +
+                    `${result.totalAdded} payment(s) added. ` +
+                    `${result.totalUpdatedToPaid} game(s) marked as Paid.`;
+
+                return;
+            }
+
             resetAfterSuccessfulSave = true;
             paymentForm.reset();
             resetAfterSuccessfulSave = false;
@@ -515,8 +517,7 @@ paymentForm.addEventListener(
             messageBox.innerText =
                 "Payment saved successfully. " +
                 `${result.totalAdded} payment(s) added. ` +
-                `${selectedGameIds.length} game(s) marked as Paid.`;
-
+                `${result.totalUpdatedToPaid} game(s) marked as Paid.`;
         } catch (error) {
             console.error(error);
 

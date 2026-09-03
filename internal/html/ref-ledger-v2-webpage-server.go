@@ -4580,7 +4580,7 @@ func CreatePayment(
 		singlePayment,
 	)
 
-	totalAdded, totalErrors, insertErrors :=
+	totalAdded, totalErrors, totalUpdatedToPaid, insertErrors :=
 		database.InsertPaymentDocs(
 			r.Context(),
 			paymentDescr,
@@ -4599,9 +4599,10 @@ func CreatePayment(
 	}
 
 	response := map[string]interface{}{
-		"totalAdded":  totalAdded,
-		"totalErrors": totalErrors,
-		"errors":      errorMessages,
+		"totalAdded":         totalAdded,
+		"totalErrors":        totalErrors,
+		"totalUpdatedToPaid": totalUpdatedToPaid,
+		"errors":             errorMessages,
 	}
 
 	w.Header().Set(
