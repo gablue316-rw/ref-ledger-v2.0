@@ -1778,6 +1778,32 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			continue
 		}
 
+		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
+
+		if err != nil {
+			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
+			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
+			errors = append(errors, err)
+			continue
+		}
+
+		totalGameFee, err := GetGameFee(gameIds)
+		if err != nil {
+			utils.AuditLog.Printf("Failed to get game fee for Game Ids %v.  Reason: %v", gameIds, err)
+			fmt.Println("Failed to get game fee.  Reason:", err)
+			errors = append(errors, err)
+			continue
+		}
+
+		if totalGameFee != doc.PaymentAmt {
+			errStr := fmt.Sprintf("Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s", doc.PaymentId, utils.ConvertInt64ToAmtStr(totalGameFee), utils.ConvertInt64ToAmtStr(doc.PaymentAmt))
+			utils.AuditLog.Println(errStr)
+			fmt.Println(errStr)
+			totalErrors++
+			errors = append(errors, fmt.Errorf("%s", errStr))
+			continue
+		}
+
 		_, err = coll.InsertOne(ctx, doc)
 		if err != nil {
 			utils.AuditLog.Printf("Failed to insert payment record for PaymentId %s.  Reason: %v", doc.PaymentId, err)
@@ -1789,16 +1815,9 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 
 		recordsInserted++
 
-		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
-
-		if err != nil {
-			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
-			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
-			errors = append(errors, err)
-		} else {
-			gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
-		}
+		gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
 	}
+
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors, "Games Updated to Paid:", gamesUpdatedToPaid)
 	return recordsInserted, totalErrors, gamesUpdatedToPaid, errors
 
