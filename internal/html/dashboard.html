@@ -578,9 +578,7 @@ async function loadOfficialDetails(officialId) {
             error
         );
 
-        alert(
-            "Unable to load the official's contact information."
-        );
+        showMessage("Unable to load the official's contact information.", "error");
     }
 }
 
@@ -828,11 +826,12 @@ async function loadSites() {
                 text
             );
 
-            alert(
+            showMessage(
                 "loadSites failed: " +
                 response.status +
                 "\n" +
-                text
+                text,
+                "error"
             );
 
             return;
@@ -907,7 +906,7 @@ async function updateSelectedStatus() {
         document.getElementById("bulkStatus").value;
 
     if (!newStatus) {
-        alert("Please select a status.");
+        showMessage("Please select a status.", "info");
         return;
     }
 
@@ -918,7 +917,7 @@ async function updateSelectedStatus() {
     ).map(cb => Number(cb.value));
 
     if (selectedGames.length === 0) {
-        alert("Please select at least one game.");
+        showMessage("Please select at least one game.", "info");
         return;
     }
 
@@ -947,8 +946,9 @@ async function updateSelectedStatus() {
             );
         }
 
-        alert("Game status updated successfully.");
 
+        showMessage("Game status updated successfully", "info");
+        
         document.getElementById("bulkStatus").value =
             "";
 
@@ -960,7 +960,7 @@ async function updateSelectedStatus() {
 
     } catch (err) {
         console.error(err);
-        alert("Failed to update game status.");
+        showMessage("Failed to update game status.", "error");
     }
 }
 
