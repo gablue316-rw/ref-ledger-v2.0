@@ -93,6 +93,13 @@ body {
     background-color: #166534;
 }
 
+.games-count {
+    margin-bottom: 10px;
+    color: #475569;
+    font-size: 16px;
+    font-weight: bold;
+}
+
 .games-table {
     width: 100%;
     border-collapse: collapse;
@@ -208,7 +215,6 @@ body {
     cursor: pointer;
 }
 
-
 @media (max-width: 768px) {
     .filters,
     .bulk-update {
@@ -259,7 +265,10 @@ body {
 
         <div class="filter-group">
             <label for="begindate">Begin Date</label>
-            <input type="text" id="begindate" placeholder="m/d/yyyy, today, this week">
+            <input
+                type="text"
+                id="begindate"
+                placeholder="m/d/yyyy, today, this week">
         </div>
 
         <div class="filter-group">
@@ -268,10 +277,10 @@ body {
         </div>
 
         <div class="filter-group">
-             <label for="association">Association</label>
-             <select id="association">
-                 <option value="">Select Association</option>
-             </select>
+            <label for="association">Association</label>
+            <select id="association">
+                <option value="">Select Association</option>
+            </select>
         </div>        
 
         <div class="filter-group">
@@ -284,17 +293,17 @@ body {
         </div>
 
         <div class="filter-group">
-             <label for="official">Official</label>
-             <select id="official">
-                 <option value="">Select Official</option>
-             </select>
+            <label for="official">Official</label>
+            <select id="official">
+                <option value="">Select Official</option>
+            </select>
         </div>    
         
         <div class="filter-group">
-             <label for="site">Site</label>
-             <select id="site">
-                 <option value="">Select Site</option>
-             </select>
+            <label for="site">Site</label>
+            <select id="site">
+                <option value="">Select Site</option>
+            </select>
         </div>
         
         <div class="filter-group">
@@ -320,7 +329,10 @@ body {
 
     <div class="bulk-update">
         <div class="filter-group">
-            <label for="bulkStatus">Update Selected Games To</label>
+            <label for="bulkStatus">
+                Update Selected Games To
+            </label>
+
             <select id="bulkStatus">
                 <option value="">Select Status</option>
                 <option value="Pending">Pending</option>
@@ -332,12 +344,14 @@ body {
         
         <div class="bulk-controls">
             <label>
-               <input type="checkbox" id="selectAll">
-               <strong>Select All</strong>
+                <input type="checkbox" id="selectAll">
+                <strong>Select All</strong>
             </label>
         </div>
         
-        <button class="btn update-btn" onclick="updateSelectedStatus()">
+        <button
+            class="btn update-btn"
+            onclick="updateSelectedStatus()">
             Update Status
         </button>
     </div>
@@ -348,6 +362,13 @@ body {
         role="status"
         aria-live="polite"
         style="display:none;">
+    </div>
+
+    <div
+        id="gamesCount"
+        class="games-count"
+        aria-live="polite">
+        0 games displayed
     </div>
 
     <table class="games-table">
@@ -377,9 +398,7 @@ body {
 
 <script src="/components/navbar.js?v=12"></script>
 
-
 <script>
-
 function getStatusClass(status) {
     if (status === "Completed") {
         return "completed";
@@ -416,17 +435,29 @@ function hideMessage() {
     div.style.display = "none";
 }
 
+function updateGamesCount(count) {
+    const gamesCount = document.getElementById("gamesCount");
+
+    gamesCount.textContent =
+        `${count} ${count === 1 ? "game" : "games"} displayed`;
+}
+
 function renderGames(
     games,
     emptyMessage = "No games were found matching your search criteria.",
     messageType = "info"
 ) {
     const tbody = document.getElementById("gamesBody");
+    const displayedGameCount =
+        Array.isArray(games) ? games.length : 0;
+
     tbody.innerHTML = "";
+
+    updateGamesCount(displayedGameCount);
 
     document.getElementById("selectAll").checked = false;
 
-    if (!games || games.length === 0) {
+    if (displayedGameCount === 0) {
         showMessage(emptyMessage, messageType);
         return;
     }
@@ -436,18 +467,18 @@ function renderGames(
     games.forEach(game => {
         const row = document.createElement("tr");
 
-    const officialsHtml = Array.isArray(game.Officials)
-        ? game.Officials
-            .map(official => `
-                <a
-                    href="#"
-                    class="official-link"
-                    data-official-id="${official.OfficialId}">
-                    ${official.Name}
-                </a>
-            `)
-            .join(", ")
-        : "";
+        const officialsHtml = Array.isArray(game.Officials)
+            ? game.Officials
+                .map(official => `
+                    <a
+                        href="#"
+                        class="official-link"
+                        data-official-id="${official.OfficialId}">
+                        ${official.Name}
+                    </a>
+                `)
+                .join(", ")
+            : "";
 
         row.innerHTML = `
             <td>
@@ -467,25 +498,27 @@ function renderGames(
             <td>${game.GameFee || ""}</td>
             <td>${game.Association || ""}</td>
             <td>
-               <span class="status ${getStatusClass(game.Status)}">
-                   ${game.Status || ""}
-               </span>
+                <span
+                    class="status ${getStatusClass(game.Status)}">
+                    ${game.Status || ""}
+                </span>
             </td>
             <td>${officialsHtml}</td>
         `;
 
         tbody.appendChild(row);
-    });    
-
+    });
 }
 
-document.getElementById("selectAll").addEventListener("change", function () {
-    const checked = this.checked;
+document
+    .getElementById("selectAll")
+    .addEventListener("change", function () {
+        const checked = this.checked;
 
-    document.querySelectorAll(".game-check").forEach(cb => {
-        cb.checked = checked;
+        document.querySelectorAll(".game-check").forEach(cb => {
+            cb.checked = checked;
+        });
     });
-});
 
 async function loadOfficialDetails(officialId) {
     try {
@@ -495,28 +528,35 @@ async function loadOfficialDetails(officialId) {
 
         if (!response.ok) {
             const errorText = await response.text();
+
             throw new Error(
-                `Unable to load official: ${response.status} ${errorText}`
+                `Unable to load official: ` +
+                `${response.status} ${errorText}`
             );
         }
 
         const official = await response.json();
 
-        document.getElementById("officialDetailsName").textContent =
-            official.Name || "Unknown";
+        document
+            .getElementById("officialDetailsName")
+            .textContent = official.Name || "Unknown";
 
-        const phoneLink = document.getElementById("officialDetailsPhone");
+        const phoneLink =
+            document.getElementById("officialDetailsPhone");
+
         const phoneNumber = (official.Phone || "").trim();
 
         if (phoneNumber) {
-            // Keep only characters that are valid/useful in an SMS phone URI.
-            const smsNumber = phoneNumber.replace(/[^\d+]/g, "");
+            const smsNumber =
+                phoneNumber.replace(/[^\d+]/g, "");
 
             phoneLink.textContent = phoneNumber;
             phoneLink.href = `sms:${smsNumber}`;
+
             phoneLink.setAttribute(
                 "aria-label",
-                `Send a text message to ${official.Name || phoneNumber}`
+                `Send a text message to ` +
+                `${official.Name || phoneNumber}`
             );
         } else {
             phoneLink.textContent = "Not available";
@@ -524,20 +564,30 @@ async function loadOfficialDetails(officialId) {
             phoneLink.removeAttribute("aria-label");
         }
 
-        document.getElementById("officialDetailsEmail").textContent =
-            official.Email || "Not available";
+        document
+            .getElementById("officialDetailsEmail")
+            .textContent = official.Email || "Not available";
 
-        document.getElementById("officialDetailsModal").style.display =
-            "flex";
+        document
+            .getElementById("officialDetailsModal")
+            .style.display = "flex";
 
     } catch (error) {
-        console.error("Error loading official details:", error);
-        alert("Unable to load the official's contact information.");
+        console.error(
+            "Error loading official details:",
+            error
+        );
+
+        alert(
+            "Unable to load the official's contact information."
+        );
     }
 }
 
 function closeOfficialDetails() {
-    document.getElementById("officialDetailsModal").style.display = "none";
+    document
+        .getElementById("officialDetailsModal")
+        .style.display = "none";
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -549,31 +599,31 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
 });
-    
+
 document.addEventListener("click", event => {
-   
-   const link = event.target.closest(".official-link");
+    const link = event.target.closest(".official-link");
 
-   if (!link) {
-       return;
-   }
-
-   event.preventDefault();
-
-   const officialId = link.dataset.officialId;
-
-   // Use officialId to request the official's contact information.
-   loadOfficialDetails(officialId);
-
-});
-
-document.addEventListener("change", function (e) {
-    if (!e.target.classList.contains("game-check")) {
+    if (!link) {
         return;
     }
 
-    const allCheckboxes = document.querySelectorAll(".game-check");
-    const checkedCheckboxes = document.querySelectorAll(".game-check:checked");
+    event.preventDefault();
+
+    const officialId = link.dataset.officialId;
+
+    loadOfficialDetails(officialId);
+});
+
+document.addEventListener("change", function (event) {
+    if (!event.target.classList.contains("game-check")) {
+        return;
+    }
+
+    const allCheckboxes =
+        document.querySelectorAll(".game-check");
+
+    const checkedCheckboxes =
+        document.querySelectorAll(".game-check:checked");
 
     document.getElementById("selectAll").checked =
         allCheckboxes.length > 0 &&
@@ -582,41 +632,45 @@ document.addEventListener("change", function (e) {
 
 async function loadAssociations() {
     try {
-        const response = await fetch("/api/loadAssociations");
+        const response =
+            await fetch("/api/loadAssociations");
 
         if (!response.ok) {
-            throw new Error("Failed to load associations");
+            throw new Error(
+                "Failed to load associations"
+            );
         }
 
         const associations = await response.json();
-        console.log(associations);
-    
-        const dropdowns = [
-            "association"
-        ];
+        const select =
+            document.getElementById("association");
 
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
+        select.innerHTML =
+            '<option value="">' +
+            'Select Association' +
+            '</option>';
 
-            // Keep the first option
-            select.innerHTML =
-                '<option value="">Select Association</option>';
+        associations.forEach(assoc => {
+            const option =
+                document.createElement("option");
 
-            associations.forEach(assoc => {
-               const option = document.createElement("option");
-               option.value = assoc.id;
-               option.textContent = assoc.id;
-               select.appendChild(option);
-            });
+            option.value = assoc.id;
+            option.textContent = assoc.id;
+
+            select.appendChild(option);
         });
 
     } catch (err) {
-        console.error("Error loading associations:", err);
+        console.error(
+            "Error loading associations:",
+            err
+        );
     }
 }
 
 async function loadPendingGamesTable() {
     const params = new URLSearchParams();
+
     params.append("status", "Pending");
 
     await fetchGames(
@@ -626,36 +680,79 @@ async function loadPendingGamesTable() {
 }
 
 async function loadGames() {
-    const gameId = document.getElementById("gameId").value;
-    const status = document.getElementById("status").value;
-    const begindate = document.getElementById("begindate").value;
-    const enddate = document.getElementById("enddate").value;
-    const site = document.getElementById("site").value;
-    const association = document.getElementById("association").value;
-    const level = document.getElementById("level").value;
-    const sport = document.getElementById("sport").value;
-    const official = document.getElementById("official").value;
+    const gameId =
+        document.getElementById("gameId").value;
+
+    const status =
+        document.getElementById("status").value;
+
+    const begindate =
+        document.getElementById("begindate").value;
+
+    const enddate =
+        document.getElementById("enddate").value;
+
+    const site =
+        document.getElementById("site").value;
+
+    const association =
+        document.getElementById("association").value;
+
+    const level =
+        document.getElementById("level").value;
+
+    const sport =
+        document.getElementById("sport").value;
+
+    const official =
+        document.getElementById("official").value;
 
     const params = new URLSearchParams();
 
-    if (gameId) params.append("gameId", gameId);
-    if (status) params.append("status", status);
-    if (begindate) params.append("begindate", begindate);
-    if (enddate) params.append("enddate", enddate);
-    if (site) params.append("site", site);
-    if (association) params.append("association", association);
-    if (level) params.append("level", level);
-    if (sport) params.append("sport", sport);
-    if (official) params.append("official", official);
+    if (gameId) {
+        params.append("gameId", gameId);
+    }
+
+    if (status) {
+        params.append("status", status);
+    }
+
+    if (begindate) {
+        params.append("begindate", begindate);
+    }
+
+    if (enddate) {
+        params.append("enddate", enddate);
+    }
+
+    if (site) {
+        params.append("site", site);
+    }
+
+    if (association) {
+        params.append("association", association);
+    }
+
+    if (level) {
+        params.append("level", level);
+    }
+
+    if (sport) {
+        params.append("sport", sport);
+    }
+
+    if (official) {
+        params.append("official", official);
+    }
 
     await fetchGames(params);
 }
 
 async function fetchGames(
     params,
-    emptyMessage = "No games were found matching your search criteria."
+    emptyMessage =
+        "No games were found matching your search criteria."
 ) {
-
     hideMessage();
 
     try {
@@ -664,23 +761,23 @@ async function fetchGames(
         );
 
         console.log("Status:", response.status);
+
         console.log(
             "Content-Type:",
             response.headers.get("content-type")
         );
 
-
         if (response.status === 404) {
-           let message = emptyMessage;
+            let message = emptyMessage;
 
-           try {
-               const errorData = await response.json();
+            try {
+                const errorData = await response.json();
 
-               if (errorData.message) {
-                   message = errorData.message;
-               }
+                if (errorData.message) {
+                    message = errorData.message;
+                }
             } catch {
-                // Use emptyMessage if the response is not JSON.
+                // Use emptyMessage when response is not JSON.
             }
 
             renderGames([], message, "info");
@@ -689,6 +786,7 @@ async function fetchGames(
 
         if (!response.ok) {
             const text = await response.text();
+
             console.error("Server returned:", text);
 
             renderGames(
@@ -696,6 +794,7 @@ async function fetchGames(
                 "Unable to retrieve games from the server.",
                 "error"
             );
+
             return;
         }
 
@@ -703,7 +802,7 @@ async function fetchGames(
 
         console.log("Games:", games);
 
-       renderGames(games, emptyMessage);
+        renderGames(games, emptyMessage);
 
     } catch (err) {
         console.error("Failed to load games:", err);
@@ -718,35 +817,41 @@ async function fetchGames(
 
 async function loadSites() {
     try {
-
         const response = await fetch("/api/loadSites");
 
         if (!response.ok) {
-           const text = await response.text();
-           console.error("loadSites failed:", response.status, text);
-           alert("loadSites failed: " + response.status + "\n" + text);
-           return;
+            const text = await response.text();
+
+            console.error(
+                "loadSites failed:",
+                response.status,
+                text
+            );
+
+            alert(
+                "loadSites failed: " +
+                response.status +
+                "\n" +
+                text
+            );
+
+            return;
         }
 
         const sites = await response.json();
- 
-        const dropdowns = [
-            "site"
-        ];
+        const select = document.getElementById("site");
 
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
+        select.innerHTML =
+            '<option value="">Select Site</option>';
 
-            // Keep the first option
-            select.innerHTML =
-                '<option value="">Select Site</option>';
+        sites.forEach(site => {
+            const option =
+                document.createElement("option");
 
-            sites.forEach(site => {
-               const option = document.createElement("option");
-               option.value = site.name;
-               option.textContent = site.name;
-               select.appendChild(option);
-            });
+            option.value = site.name;
+            option.textContent = site.name;
+
+            select.appendChild(option);
         });
 
     } catch (err) {
@@ -756,48 +861,50 @@ async function loadSites() {
 
 async function loadOfficials() {
     try {
-        const response = await fetch("/api/loadOfficials");
+        const response =
+            await fetch("/api/loadOfficials");
 
         if (!response.ok) {
-            throw new Error("Failed to load officials");
+            throw new Error(
+                "Failed to load officials"
+            );
         }
 
         const officials = await response.json();
-        console.log(officials);
-    
-        const dropdowns = [
-            "official"
-        ];
+        const select =
+            document.getElementById("official");
 
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
+        select.innerHTML =
+            '<option value="">Select Official</option>';
 
-            // Keep the first option
-            select.innerHTML =
-                '<option value="">Select Official</option>';
+        officials.forEach(official => {
+            const option =
+                document.createElement("option");
 
-            officials.forEach(official => {
-               const option = document.createElement("option");
-               option.value = official.name;
-               option.textContent = official.name;
-               select.appendChild(option);
-            });
+            option.value = official.name;
+            option.textContent = official.name;
+
+            select.appendChild(option);
         });
 
     } catch (err) {
-        console.error("Error loading officials:", err);
+        console.error(
+            "Error loading officials:",
+            err
+        );
     }
 }
 
-document.addEventListener("DOMContentLoaded", function() {
-    loadSites();  
+document.addEventListener("DOMContentLoaded", function () {
+    loadSites();
     loadAssociations();
     loadOfficials();
-    loadPendingGamesTable();    
-})
+    loadPendingGamesTable();
+});
 
 async function updateSelectedStatus() {
-    const newStatus = document.getElementById("bulkStatus").value;
+    const newStatus =
+        document.getElementById("bulkStatus").value;
 
     if (!newStatus) {
         alert("Please select a status.");
@@ -805,7 +912,9 @@ async function updateSelectedStatus() {
     }
 
     const selectedGames = Array.from(
-        document.querySelectorAll(".game-check:checked")
+        document.querySelectorAll(
+            ".game-check:checked"
+        )
     ).map(cb => Number(cb.value));
 
     if (selectedGames.length === 0) {
@@ -814,32 +923,39 @@ async function updateSelectedStatus() {
     }
 
     try {
-        const response = await fetch("/api/games/status", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                gameIds: selectedGames,
-                status: newStatus
-            })
-        });
+        const response = await fetch(
+            "/api/games/status",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    gameIds: selectedGames,
+                    status: newStatus
+                })
+            }
+        );
 
         if (!response.ok) {
             const text = await response.text();
+
             console.error("Update failed:", text);
-            throw new Error(`HTTP ${response.status}`);
+
+            throw new Error(
+                `HTTP ${response.status}`
+            );
         }
 
         alert("Game status updated successfully.");
 
-        document.getElementById("bulkStatus").value = "";
+        document.getElementById("bulkStatus").value =
+            "";
 
         await loadPendingGamesTable();
 
-        // Refresh navbar counts.
         if (typeof loadPendingGames === "function") {
-           await loadPendingGames();
+            await loadPendingGames();
         }
 
     } catch (err) {
@@ -861,7 +977,6 @@ function clearFilters() {
 
     loadPendingGamesTable();
 }
-
 </script>
 
 <div id="officialDetailsModal" class="official-modal">
@@ -873,7 +988,9 @@ function clearFilters() {
             &times;
         </button>
 
-        <h2 id="officialDetailsName">Official Details</h2>
+        <h2 id="officialDetailsName">
+            Official Details
+        </h2>
 
         <p>
             <strong>Phone:</strong>

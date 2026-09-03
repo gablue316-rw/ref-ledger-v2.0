@@ -724,6 +724,7 @@ func PaymentExists(doc model.PaymentDoc) (bool, error) {
 
 	filter = bson.M{
 		"paymentId": doc.PaymentId,
+		"tenantId":  TenantId,
 	}
 
 	// Query to find all documents
@@ -733,7 +734,7 @@ func PaymentExists(doc model.PaymentDoc) (bool, error) {
 	}
 
 	if count > 0 {
-		fmt.Println("Game exists!")
+		fmt.Println("Payment exists!")
 		paymentExists = true
 	}
 
@@ -1688,7 +1689,7 @@ func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescript
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
 }
 
-func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
+func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) int {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -1742,9 +1743,10 @@ func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) {
 	}
 
 	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
+	return recordsUpdated
 }
 
-func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection string) {
+func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection string) (int, int, int, []error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -1758,17 +1760,20 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 	recordsInserted := 0
 	totalErrors := 0
 	var gameIds []int64
+	var errors []error
+	var gamesUpdatedToPaid int = 0
 
 	for _, v := range payment {
 
 		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-
+		doc.TenantId = TenantId
 		paymentExists, err := PaymentExists(doc)
 
 		if paymentExists || err != nil {
 			if err != nil {
 				totalErrors++
 				fmt.Println(err)
+				errors = append(errors, err)
 			}
 			continue
 		}
@@ -1778,6 +1783,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			utils.AuditLog.Printf("Failed to insert payment record for PaymentId %s.  Reason: %v", doc.PaymentId, err)
 			fmt.Println("Insert failed.  Reason:", err)
 			totalErrors++
+			errors = append(errors, err)
 			continue
 		}
 
@@ -1788,11 +1794,14 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 		if err != nil {
 			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
 			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
+			errors = append(errors, err)
 		} else {
-			UpdateGameStatusToPaid(ctx, gameIds)
+			gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
 		}
 	}
-	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors)
+	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors, "Games Updated to Paid:", gamesUpdatedToPaid)
+	return recordsInserted, totalErrors, gamesUpdatedToPaid, errors
+
 }
 
 func InsertExpenseDocs(parentCtx context.Context, expense []model.ExpenseDescriptor, dbase, collection string) {

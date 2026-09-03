@@ -2,14 +2,24 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
+
     <title>Ref Ledger V2.0 Payments</title>
-    <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">    
-    <link rel="stylesheet" href="/components/navbar.css?v=12"> 
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/components/navbar.css?v=12"
+    >
 
     <style>
-
         * {
             box-sizing: border-box;
             margin: 0;
@@ -18,8 +28,8 @@
         }
 
         body {
-           background-color: #f4f6f9;
-           color: #333;
+            background-color: #f4f6f9;
+            color: #333;
         }
 
         .container {
@@ -40,12 +50,11 @@
             margin-bottom: 10px;
         }
 
-
         .form-card {
             background-color: white;
             padding: 25px;
             border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
         }
 
@@ -121,81 +130,79 @@
             background-color: white;
             padding: 15px 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             font-weight: bold;
             min-height: 60px;
         }
 
-.games-table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: white;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
+        .games-table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
 
-.games-table th {
-    background-color: #0f172a;
-    color: white;
-    text-align: left;
-    padding: 14px;
-}
+        .games-table th {
+            background-color: #0f172a;
+            color: white;
+            text-align: left;
+            padding: 14px;
+        }
 
-.games-table td {
-    padding: 14px;
-    border-bottom: 1px solid #eee;
-}
+        .games-table td {
+            padding: 14px;
+            border-bottom: 1px solid #eee;
+        }
 
-.games-table tr:hover {
-    background-color: #f8fafc;
-}
+        .games-table tr:hover {
+            background-color: #f8fafc;
+        }
 
-.bulk-controls {
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+        .bulk-controls {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-.official-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(0, 0, 0, 0.55);
-}
+        .official-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(0, 0, 0, 0.55);
+        }
 
-.official-modal-content {
-    position: relative;
-    width: 90%;
-    max-width: 400px;
-    padding: 24px;
-    border-radius: 8px;
-    background-color: white;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-}
+        .official-modal-content {
+            position: relative;
+            width: 90%;
+            max-width: 400px;
+            padding: 24px;
+            border-radius: 8px;
+            background-color: white;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
 
-.official-modal-content h2 {
-    margin-top: 0;
-    color: #082b4f;
-}
+        .official-modal-content h2 {
+            margin-top: 0;
+            color: #082b4f;
+        }
 
-.official-modal-close {
-    position: absolute;
-    top: 8px;
-    right: 12px;
-    border: none;
-    background: none;
-    font-size: 28px;
-    cursor: pointer;
-}
-
+        .official-modal-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            border: none;
+            background: none;
+            font-size: 28px;
+            cursor: pointer;
+        }
 
         @media (max-width: 768px) {
-
             .row {
                 flex-direction: column;
             }
@@ -207,12 +214,11 @@
             .btn {
                 width: 100%;
             }
-        
+
             .games-table {
-                 font-size: 14px;
+                font-size: 14px;
             }
         }
-
     </style>
 </head>
 
@@ -235,22 +241,32 @@
 
                 <div class="col">
                     <label for="paymentid">Payment ID</label>
+
                     <input
-                        type="text" 
-                        id="paymentid" 
-                        placeholder="Enter Payment ID" 
+                        type="text"
+                        id="paymentid"
+                        placeholder="Enter Payment ID"
                     >
                 </div>
 
                 <div class="col">
                     <label for="date">Date</label>
-                    <input type="date" id="date" required>
+
+                    <input
+                        type="date"
+                        id="date"
+                        required
+                    >
                 </div>
 
                 <div class="col">
                     <label for="association">Association</label>
+
                     <select id="association">
-                        <option value="">Select Association</option>
+                        <option value="">
+                            Select Association
+                        </option>
+
                         <option value="GOLLC">GOLLC</option>
                         <option value="MCBOA">MCBOA</option>
                         <option value="MSO">MSO</option>
@@ -261,16 +277,19 @@
 
             <div class="row">
 
-              <div class="col">
-                 <label for="amount">Payment Amount</label>
-                 <input
-                     type="number"
-                     id="amount"
-                     step="0.01"
-                     min="0"
-                     required
-                 >
-              </div>
+                <div class="col">
+                    <label for="amount">
+                        Payment Amount
+                    </label>
+
+                    <input
+                        type="number"
+                        id="amount"
+                        step="0.01"
+                        min="0"
+                        required
+                    >
+                </div>
 
             </div>
 
@@ -278,30 +297,39 @@
 
                 <button
                     type="submit"
-                    class="btn btn-save">
+                    class="btn btn-save"
+                >
                     Save Payment and Mark Selected Games Paid
                 </button>
 
                 <button
                     type="reset"
-                    class="btn btn-clear">
+                    class="btn btn-clear"
+                >
                     Clear Form
                 </button>
 
                 <div class="bulk-controls">
                     <label>
-                        <input type="checkbox" id="selectAll">
+                        <input
+                            type="checkbox"
+                            id="selectAll"
+                        >
+
                         <strong>Select All Games</strong>
-                    </label>                
+                    </label>
                 </div>
-         
+
             </div>
 
         </form>
 
     </div>
 
-    <div class="message-box" id="message">
+    <div
+        class="message-box"
+        id="message"
+    >
         Ready to enter payments.
     </div>
 
@@ -333,171 +361,242 @@
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
-
-document.addEventListener("DOMContentLoaded", function() { 
-    loadCompletedGames();
-})
-
-
-const paymentForm = document.getElementById("paymentForm");
-const messageBox = document.getElementById("message");
-const selectAllCheckbox = document.getElementById("selectAll");
-
-paymentForm.addEventListener("submit", async function(e) {
-    e.preventDefault();
-
-    const selectedGameIds = Array.from(
-        document.querySelectorAll(".game-check:checked")
-    ).map(checkbox => Number(checkbox.value));
-
-    if (selectedGameIds.length === 0) {
-        messageBox.innerText =
-            "Select at least one completed game before saving the payment.";
-        return;
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+        loadCompletedGames();
     }
+);
 
-    const paymentId =
-        document.getElementById("paymentid").value.trim();
+const paymentForm =
+    document.getElementById("paymentForm");
 
-    const paymentDate =
-        document.getElementById("date").value;
+const messageBox =
+    document.getElementById("message");
 
-    const association =
-        document.getElementById("association").value;
+const selectAllCheckbox =
+    document.getElementById("selectAll");
 
-    const amount =
-        parseFloat(document.getElementById("amount").value);
+let resetAfterSuccessfulSave = false;
 
-    if (paymentId === "") {
-        messageBox.innerText = "Enter a Payment ID.";
-        return;
+paymentForm.addEventListener(
+    "submit",
+    async function(event) {
+        event.preventDefault();
+
+        const selectedGameIds = Array.from(
+            document.querySelectorAll(
+                ".game-check:checked"
+            )
+        ).map(
+            checkbox => Number(checkbox.value)
+        );
+
+        if (selectedGameIds.length === 0) {
+            messageBox.innerText =
+                "Select at least one completed game before saving the payment.";
+            return;
+        }
+
+        const paymentId =
+            document
+                .getElementById("paymentid")
+                .value
+                .trim();
+
+        const paymentDate =
+            document.getElementById("date").value;
+
+        const association =
+            document.getElementById("association").value;
+
+        const amount =
+            parseFloat(
+                document.getElementById("amount").value
+            );
+
+        if (paymentId === "") {
+            messageBox.innerText =
+                "Enter a Payment ID.";
+            return;
+        }
+
+        if (paymentDate === "") {
+            messageBox.innerText =
+                "Enter a payment date.";
+            return;
+        }
+
+        if (association === "") {
+            messageBox.innerText =
+                "Select an association.";
+            return;
+        }
+
+        if (Number.isNaN(amount) || amount <= 0) {
+            messageBox.innerText =
+                "Enter a valid payment amount greater than zero.";
+            return;
+        }
+
+        const payment = {
+            date: paymentDate,
+            paymentid: paymentId,
+            amount: amount,
+            association: association,
+            gameids: selectedGameIds
+        };
+
+        try {
+            messageBox.innerText =
+                "Saving payment...";
+
+            const response = await fetch(
+                "/api/payments",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payment)
+                }
+            );
+
+            if (
+                response.status === 401 ||
+                response.redirected
+            ) {
+                window.location.href = "/login";
+                return;
+            }
+
+            const result = await response.json();
+
+            if (response.status === 403) {
+                messageBox.innerText =
+                    result.errors?.join(", ") ||
+                    "Permission denied. Read-only users cannot enter payments.";
+                return;
+            }
+
+            if (
+                !response.ok ||
+                result.totalErrors > 0
+            ) {
+                const errorMessage =
+                    result.errors?.length > 0
+                        ? result.errors.join(", ")
+                        : "Error saving payment.";
+
+                messageBox.innerText =
+                    `Added: ${result.totalAdded}. ` +
+                    `Errors: ${result.totalErrors}. ` +
+                    errorMessage;
+
+                return;
+            }
+
+            if (result.totalAdded === 0) {
+                messageBox.innerText =
+                    "Payment not saved. " +
+                    `${result.totalAdded} payment(s) added. ` +
+                    `${result.totalUpdatedToPaid} game(s) marked as Paid.`;
+
+                return;
+            }
+
+            resetAfterSuccessfulSave = true;
+            paymentForm.reset();
+            resetAfterSuccessfulSave = false;
+
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+
+            await loadCompletedGames(false);
+
+            messageBox.innerText =
+                "Payment saved successfully. " +
+                `${result.totalAdded} payment(s) added. ` +
+                `${result.totalUpdatedToPaid} game(s) marked as Paid.`;
+        } catch (error) {
+            console.error(error);
+
+            messageBox.innerText =
+                "The server returned an invalid response or is unavailable.";
+        }
     }
+);
 
-    if (paymentDate === "") {
-        messageBox.innerText = "Enter a payment date.";
-        return;
-    }
+selectAllCheckbox.addEventListener(
+    "change",
+    function() {
+        const gameCheckboxes =
+            document.querySelectorAll(".game-check");
 
-    if (association === "") {
-        messageBox.innerText = "Select an association.";
-        return;
-    }
-
-    if (Number.isNaN(amount) || amount <= 0) {
-        messageBox.innerText =
-            "Enter a valid payment amount greater than zero.";
-        return;
-    }
-
-    const payment = {
-        date: paymentDate,
-        paymentid: paymentId,
-        amount: amount,
-        association: association,
-        gameids: selectedGameIds
-    };
-
-    try {
-        messageBox.innerText = "Saving payment...";
-
-        const response = await fetch("/api/payments", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payment)
+        gameCheckboxes.forEach(checkbox => {
+            checkbox.checked =
+                selectAllCheckbox.checked;
         });
-
-        if (response.status === 401 || response.redirected) {
-            window.location.href = "/login";
-            return;
-        }
-
-        const message = await response.text();
-
-        if (response.status === 403) {
-            messageBox.innerText =
-                message ||
-                "Permission denied. Read-only users cannot enter payments.";
-            return;
-        }
-
-        if (!response.ok) {
-            messageBox.innerText =
-                message || "Error saving payment.";
-            return;
-        }
-
-        messageBox.innerText =
-            message ||
-            `Payment saved. ${selectedGameIds.length} game(s) marked as Paid.`;
-
-        paymentForm.reset();
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
-
-        await loadCompletedGames();
-
-    } catch (err) {
-        console.error(err);
-        messageBox.innerText = "Server unavailable.";
     }
-});
+);
 
+document
+    .getElementById("gamesBody")
+    .addEventListener(
+        "change",
+        function(event) {
+            if (
+                !event.target.classList.contains(
+                    "game-check"
+                )
+            ) {
+                return;
+            }
 
-selectAllCheckbox.addEventListener("change", function() {
-    const gameCheckboxes =
-        document.querySelectorAll(".game-check");
+            const gameCheckboxes = Array.from(
+                document.querySelectorAll(".game-check")
+            );
 
-    gameCheckboxes.forEach(checkbox => {
-        checkbox.checked = selectAllCheckbox.checked;
-    });
-});
+            const checkedCheckboxes =
+                gameCheckboxes.filter(
+                    checkbox => checkbox.checked
+                );
 
-document.getElementById("gamesBody")
-.addEventListener("change", function(event) {
-    if (!event.target.classList.contains("game-check")) {
-        return;
-    }
+            selectAllCheckbox.checked =
+                gameCheckboxes.length > 0 &&
+                checkedCheckboxes.length ===
+                    gameCheckboxes.length;
 
-    const gameCheckboxes = Array.from(
-        document.querySelectorAll(".game-check")
+            selectAllCheckbox.indeterminate =
+                checkedCheckboxes.length > 0 &&
+                checkedCheckboxes.length <
+                    gameCheckboxes.length;
+        }
     );
 
-    const checkedCheckboxes = gameCheckboxes.filter(
-        checkbox => checkbox.checked
-    );
+paymentForm.addEventListener(
+    "reset",
+    function() {
+        const showResetMessage =
+            !resetAfterSuccessfulSave;
 
-    selectAllCheckbox.checked =
-        gameCheckboxes.length > 0 &&
-        checkedCheckboxes.length === gameCheckboxes.length;
+        setTimeout(() => {
+            document
+                .querySelectorAll(".game-check")
+                .forEach(checkbox => {
+                    checkbox.checked = false;
+                });
 
-    selectAllCheckbox.indeterminate =
-        checkedCheckboxes.length > 0 &&
-        checkedCheckboxes.length < gameCheckboxes.length;
-});
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
 
-document.getElementById("paymentForm")
-.addEventListener("reset", function() {
-
-    setTimeout(() => {
-
-        document.querySelectorAll(".game-check")
-        .forEach(checkbox => {
-            checkbox.checked = false;
-        });
-
-        const selectAll =
-            document.getElementById("selectAll");
-
-        selectAll.checked = false;
-        selectAll.indeterminate = false;
-
-        document.getElementById("message").innerText =
-            "Payment form cleared.";
-
-    }, 0);
-});
+            if (showResetMessage) {
+                messageBox.innerText =
+                    "Payment form cleared.";
+            }
+        }, 0);
+    }
+);
 
 function getStatusClass(status) {
     if (status === "Completed") {
@@ -520,9 +619,11 @@ function getStatusClass(status) {
 }
 
 function renderGames(games) {
-    const tbody = document.getElementById("gamesBody");
+    const tbody =
+        document.getElementById("gamesBody");
 
     tbody.innerHTML = "";
+
     selectAllCheckbox.checked = false;
     selectAllCheckbox.indeterminate = false;
 
@@ -539,20 +640,23 @@ function renderGames(games) {
     }
 
     const rows = games.map(game => {
-        const statusClass = getStatusClass(game.Status);
+        const statusClass =
+            getStatusClass(game.Status);
 
-        const officialsHtml = Array.isArray(game.Officials)
-            ? game.Officials
-                .map(official => `
-                    <a
-                        href="#"
-                        class="official-link"
-                        data-official-id="${official.OfficialId}">
-                        ${official.Name}
-                    </a>
-                `)
-                .join(", ")
-            : "";
+        const officialsHtml =
+            Array.isArray(game.Officials)
+                ? game.Officials
+                    .map(official => `
+                        <a
+                            href="#"
+                            class="official-link"
+                            data-official-id="${official.OfficialId}"
+                        >
+                            ${official.Name}
+                        </a>
+                    `)
+                    .join(", ")
+                : "";
 
         return `
             <tr>
@@ -560,8 +664,10 @@ function renderGames(games) {
                     <input
                         type="checkbox"
                         class="game-check"
-                        value="${game.GameId}">
+                        value="${game.GameId}"
+                    >
                 </td>
+
                 <td>${game.GameId}</td>
                 <td>${game.Date}</td>
                 <td>${game.Time}</td>
@@ -572,11 +678,13 @@ function renderGames(games) {
                 <td>${game.Level}</td>
                 <td>${game.GameFee}</td>
                 <td>${game.Association}</td>
+
                 <td>
                     <span class="status ${statusClass}">
                         ${game.Status}
                     </span>
                 </td>
+
                 <td>${officialsHtml}</td>
             </tr>
         `;
@@ -585,34 +693,48 @@ function renderGames(games) {
     tbody.innerHTML = rows;
 }
 
-async function loadCompletedGames() {
+async function loadCompletedGames(
+    displayCountMessage = true
+) {
+    const params =
+        new URLSearchParams();
 
-    const params = new URLSearchParams();
-    params.append("status", "Completed");
+    params.append(
+        "status",
+        "Completed"
+    );
 
     try {
-        const response = await fetch(`/api/dashboard?${params.toString()}`);
+        const response = await fetch(
+            `/api/dashboard?${params.toString()}`
+        );
 
-        // No completed games found
         if (response.status === 404) {
-            //messageBox.innerText = "No games are currently in Completed status.";
             renderGames([]);
             return;
         }
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            throw new Error(
+                `HTTP ${response.status}`
+            );
         }
 
-        const games = await response.json();
+        const games =
+            await response.json();
 
-        messageBox.innerText = `${games.length} completed game(s) available for payment.`;
+        if (displayCountMessage) {
+            messageBox.innerText =
+                `${games.length} completed game(s) available for payment.`;
+        }
 
         renderGames(games);
 
-    } catch (err) {
-        console.error(err);
-        messageBox.innerText = "Unable to load completed games.";
+    } catch (error) {
+        console.error(error);
+
+        messageBox.innerText =
+            "Unable to load completed games.";
     }
 }
 
@@ -623,82 +745,136 @@ async function loadOfficialDetails(officialId) {
         );
 
         if (!response.ok) {
-            const errorText = await response.text();
+            const errorText =
+                await response.text();
+
             throw new Error(
-                `Unable to load official: ${response.status} ${errorText}`
+                "Unable to load official: " +
+                `${response.status} ${errorText}`
             );
         }
 
-        const official = await response.json();
+        const official =
+            await response.json();
 
-        document.getElementById("officialDetailsName").textContent =
-            official.Name || "Unknown";
+        document
+            .getElementById("officialDetailsName")
+            .textContent =
+                official.Name || "Unknown";
 
-        const phoneLink = document.getElementById("officialDetailsPhone");
-        const phoneNumber = (official.Phone || "").trim();
+        const phoneLink =
+            document.getElementById(
+                "officialDetailsPhone"
+            );
+
+        const phoneNumber =
+            (official.Phone || "").trim();
 
         if (phoneNumber) {
-            const smsNumber = phoneNumber.replace(/[^\d+]/g, "");
+            const smsNumber =
+                phoneNumber.replace(/[^\d+]/g, "");
 
             phoneLink.textContent = phoneNumber;
             phoneLink.href = `sms:${smsNumber}`;
+
             phoneLink.setAttribute(
                 "aria-label",
-                `Send a text message to ${official.Name || phoneNumber}`
+                `Send a text message to ${
+                    official.Name || phoneNumber
+                }`
             );
         } else {
-            phoneLink.textContent = "Not available";
+            phoneLink.textContent =
+                "Not available";
+
             phoneLink.removeAttribute("href");
-            phoneLink.removeAttribute("aria-label");
+            phoneLink.removeAttribute(
+                "aria-label"
+            );
         }
 
-        document.getElementById("officialDetailsEmail").textContent =
-            official.Email || "Not available";
+        document
+            .getElementById("officialDetailsEmail")
+            .textContent =
+                official.Email || "Not available";
 
-        document.getElementById("officialDetailsModal").style.display =
-            "flex";
+        document
+            .getElementById("officialDetailsModal")
+            .style.display = "flex";
 
     } catch (error) {
-        console.error("Error loading official details:", error);
-        alert("Unable to load the official's contact information.");
+        console.error(
+            "Error loading official details:",
+            error
+        );
+
+        alert(
+            "Unable to load the official's contact information."
+        );
     }
 }
 
 function closeOfficialDetails() {
-    document.getElementById("officialDetailsModal").style.display = "none";
+    document
+        .getElementById("officialDetailsModal")
+        .style.display = "none";
 }
 
-document.addEventListener("click", event => {
-    const link = event.target.closest(".official-link");
+document.addEventListener(
+    "click",
+    event => {
+        const link =
+            event.target.closest(".official-link");
 
-    if (!link) {
-        return;
-    }
-
-    event.preventDefault();
-    loadOfficialDetails(link.dataset.officialId);
-});
-
-document.addEventListener("DOMContentLoaded", function () {
-    document.getElementById("officialDetailsModal")
-    .addEventListener("click", event => {
-        if (event.target.id === "officialDetailsModal") {
-            closeOfficialDetails();
+        if (!link) {
+            return;
         }
-    });
-});
+
+        event.preventDefault();
+
+        loadOfficialDetails(
+            link.dataset.officialId
+        );
+    }
+);
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+        document
+            .getElementById("officialDetailsModal")
+            .addEventListener(
+                "click",
+                event => {
+                    if (
+                        event.target.id ===
+                        "officialDetailsModal"
+                    ) {
+                        closeOfficialDetails();
+                    }
+                }
+            );
+    }
+);
 </script>
 
-<div id="officialDetailsModal" class="official-modal">
+<div
+    id="officialDetailsModal"
+    class="official-modal"
+>
     <div class="official-modal-content">
+
         <button
             type="button"
             class="official-modal-close"
-            onclick="closeOfficialDetails()">
+            onclick="closeOfficialDetails()"
+        >
             &times;
         </button>
 
-        <h2 id="officialDetailsName">Official Details</h2>
+        <h2 id="officialDetailsName">
+            Official Details
+        </h2>
 
         <p>
             <strong>Phone:</strong>
@@ -713,9 +889,11 @@ document.addEventListener("DOMContentLoaded", function () {
         <button
             type="button"
             class="btn btn-clear"
-            onclick="closeOfficialDetails()">
+            onclick="closeOfficialDetails()"
+        >
             Close
         </button>
+
     </div>
 </div>
 

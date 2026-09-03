@@ -4549,27 +4549,80 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Game status updated successfully"))
 }
 
-func CreatePayment(w http.ResponseWriter, r *http.Request) {
-
+func CreatePayment(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
 	var payment Payment
-	var singlePayment model.PaymentDescriptor
-	var paymentDescr []model.PaymentDescriptor
 
 	err := json.NewDecoder(r.Body).Decode(&payment)
 	if err != nil {
-		fmt.Println("Invalid JSON.  Error:", err)
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		fmt.Println("Invalid JSON. Error:", err)
+
+		http.Error(
+			w,
+			"invalid JSON",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
-	singlePayment = PaymentDocToPaymentDescr(payment)
-	paymentDescr = append(paymentDescr, singlePayment)
+	singlePayment :=
+		PaymentDocToPaymentDescr(payment)
 
-	//fmt.Println("Payment in json: ", payment)
-	fmt.Println("Payment Descr: ", singlePayment)
-	//fmt.Println("Payments:", paymentDescr)
+	paymentDescr :=
+		[]model.PaymentDescriptor{
+			singlePayment,
+		}
 
-	database.InsertPaymentDocs(context.TODO(), paymentDescr, database.Database, "payments")
+	fmt.Println(
+		"Payment Descr:",
+		singlePayment,
+	)
+
+	totalAdded, totalErrors, totalUpdatedToPaid, insertErrors :=
+		database.InsertPaymentDocs(
+			r.Context(),
+			paymentDescr,
+			database.Database,
+			"payments",
+		)
+
+	errorMessages :=
+		make([]string, 0, len(insertErrors))
+
+	for _, insertError := range insertErrors {
+		errorMessages = append(
+			errorMessages,
+			insertError.Error(),
+		)
+	}
+
+	response := map[string]interface{}{
+		"totalAdded":         totalAdded,
+		"totalErrors":        totalErrors,
+		"totalUpdatedToPaid": totalUpdatedToPaid,
+		"errors":             errorMessages,
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	if totalErrors > 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
+
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
+		fmt.Println(
+			"Unable to encode payment response. Error:",
+			err,
+		)
+	}
 }
 
 func ValidateLogin(w http.ResponseWriter, r *http.Request) {
