@@ -111,12 +111,12 @@
         }
 
         .btn-clear {
-            background-color: #eab308; /* yellow */
-            color: #000;              /* black text for contrast */
+            background-color: #dc2626;
+            color: white;
         }
 
         .btn-clear:hover {
-            background-color: #ca8a04; /* darker yellow */
+            background-color: #b91c1c;
         }
 
         .btn-find{
@@ -136,11 +136,12 @@
         }        
         
         .btn-delete {
-            background-color: #dc2626;
+            background-color: #ffff00;
+            color: black;
         }
 
         .btn-delete:hover {
-            background-color: #b91c1c;
+            background-color: #ffc000;
         }
 
         .btn-directory {
@@ -162,14 +163,28 @@
             background-color: #115e59;
         }
 
-        .btn-select-all { background-color: #475569; }
-        .btn-select-all:hover { background-color: #334155; }
-
         .directory-actions {
             display: flex;
-            gap: 10px;
-            margin: 15px 0;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 15px;
         }
+
+        .select-all-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .select-all-label input,
+        .site-check { width: auto; cursor: pointer; }
+
+        .btn:disabled { cursor: not-allowed; opacity: 0.55; }
+        .btn-delete-selected { background-color: #dc2626; }
+        .btn-delete-selected:hover:not(:disabled) { background-color: #b91c1c; }
 
         .select-column,
         .delete-column {
@@ -198,68 +213,39 @@
             background: #dc2626;
         }
 
-        .confirmation-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            background: rgba(15, 23, 42, 0.65);
-        }
-
-        .confirmation-overlay.show { display: flex; }
-
-        .confirmation-dialog {
-            width: 100%;
-            max-width: 460px;
+        .delete-modal {
+            width: min(460px, calc(100% - 32px));
+            padding: 0;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.3);
             overflow: hidden;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
         }
-
-        .confirmation-heading {
+        .delete-modal::backdrop { background: rgba(15,23,42,.65); backdrop-filter: blur(3px); }
+        .delete-modal-content { background: white; }
+        .delete-modal-header {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 20px 24px;
-            color: #991b1b;
-            background: #fef2f2;
-            border-bottom: 1px solid #fecaca;
+            gap: 14px;
+            padding: 22px 24px 16px;
         }
-
-        .confirmation-heading i { font-size: 24px; }
-        .confirmation-heading h2 { font-size: 20px; }
-
-        .confirmation-body {
-            padding: 24px;
-            line-height: 1.5;
-        }
-
-        .confirmation-body p + p { margin-top: 10px; }
-
-        .confirmation-warning {
-            color: #64748b;
-            font-size: 14px;
-        }
-
-        .confirmation-actions {
+        .delete-modal-icon { display:grid; place-items:center; flex:0 0 48px; height:48px; border-radius:50%; background:#fee2e2; color:#dc2626; font-size:21px; }
+        .delete-modal-header h2 { color:#1e293b; font-size:21px; margin-bottom:3px; }
+        .delete-modal-header p { color:#64748b; font-size:14px; }
+        .delete-modal-body { padding:4px 24px 22px; color:#475569; line-height:1.55; }
+        .delete-modal-target { margin-top:14px; padding:12px 14px; border:1px solid #fecaca; border-radius:9px; background:#fff7f7; color:#991b1b; font-weight:bold; }
+        .delete-modal-actions {
             display: flex;
             justify-content: flex-end;
             gap: 10px;
             padding: 16px 24px;
-            background: #f8fafc;
             border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
         }
-
-        .btn-cancel {
-            color: #334155;
-            background: #e2e8f0;
-        }
-
-        .btn-cancel:hover { background: #cbd5e1; }
+        .btn-modal-cancel { background:white; color:#334155; border:1px solid #cbd5e1; }
+        .btn-modal-cancel:hover { background:#f1f5f9; }
+        .btn-modal-delete { background:#dc2626; }
+        .btn-modal-delete:hover { background:#b91c1c; }
 
         .message-box {
             background-color: white;
@@ -268,21 +254,23 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             font-weight: bold;
             min-height: 60px;
+            margin-bottom: 20px;
         }
+
+        .directory-note { margin-bottom:15px; color:#475569; font-size:14px; }
 
         @media (max-width: 768px) {
 
-            .row {
-                flex-direction: column;
-            }
-
-            .button-row {
+            .row,
+            .button-row,
+            .directory-actions {
                 flex-direction: column;
             }
 
             .btn {
                 width: 100%;
             }
+            .delete-modal-actions .btn { width:auto; }
         }
 
         table {
@@ -437,13 +425,15 @@
 
        <h2>Sites Directory</h2>
 
-       <div class="directory-actions">
-           <button type="button" id="selectAllBtn" class="btn btn-select-all">
-               <i class="fa-solid fa-square-check"></i>
-               Select All
-           </button>
+       <p class="directory-note">Manage sites individually or select multiple sites for deletion.</p>
 
-           <button type="button" id="deleteSelectedBtn" class="btn btn-delete">
+       <div class="directory-actions">
+           <label class="select-all-label" for="selectAllSites">
+               <input type="checkbox" id="selectAllSites">
+               Select All
+           </label>
+
+           <button type="button" id="deleteSelectedBtn" class="btn btn-delete-selected" disabled>
                <i class="fa-solid fa-trash"></i>
                Delete Selected
            </button>
@@ -471,57 +461,76 @@
     </div>    
 </div>
 
-<div
-    id="confirmationOverlay"
-    class="confirmation-overlay"
-    role="dialog"
-    aria-modal="true"
-    aria-labelledby="confirmationTitle"
->
-    <div class="confirmation-dialog">
-        <div class="confirmation-heading">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <h2 id="confirmationTitle">Confirm Site Deletion</h2>
+<dialog id="deleteConfirmationModal" class="delete-modal" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalMessage">
+    <div class="delete-modal-content">
+        <div class="delete-modal-header">
+            <div class="delete-modal-icon" aria-hidden="true"><i class="fa-solid fa-trash-can"></i></div>
+            <div>
+                <h2 id="deleteModalTitle">Confirm deletion</h2>
+                <p>This action cannot be undone.</p>
+            </div>
         </div>
-
-        <div class="confirmation-body">
-            <p id="confirmationMessage"></p>
-            <p class="confirmation-warning">This action cannot be undone.</p>
+        <div class="delete-modal-body">
+            <p id="deleteModalMessage"></p>
+            <div id="deleteModalTarget" class="delete-modal-target"></div>
         </div>
-
-        <div class="confirmation-actions">
-            <button type="button" id="cancelDeleteBtn" class="btn btn-cancel">
+        <div class="delete-modal-actions">
+            <button type="button" id="cancelDeleteBtn" class="btn btn-modal-cancel">
                 Cancel
             </button>
-            <button type="button" id="confirmDeleteBtn" class="btn btn-delete">
-                <i class="fa-solid fa-trash"></i>
+            <button type="button" id="confirmDeleteBtn" class="btn btn-modal-delete">
+                <i class="fa-solid fa-trash-can"></i>
                 Delete
             </button>
         </div>
     </div>
-</div>
+</dialog>
 
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
 
 const messageBox = document.getElementById("message");
-let pendingDeleteAction = null;
+const selectAllSites = document.getElementById("selectAllSites");
+const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
+const deleteConfirmationModal = document.getElementById("deleteConfirmationModal");
 
 function clearSitesForm() {
     document.getElementById("sitesForm").reset();
 }
 
-function showDeleteConfirmation(message, deleteAction) {
-    document.getElementById("confirmationMessage").textContent = message;
-    pendingDeleteAction = deleteAction;
-    document.getElementById("confirmationOverlay").classList.add("show");
-    document.getElementById("confirmDeleteBtn").focus();
+function confirmSiteDeletion(message, target) {
+    document.getElementById("deleteModalMessage").textContent = message;
+    document.getElementById("deleteModalTarget").textContent = target;
+    deleteConfirmationModal.showModal();
+
+    return new Promise(function (resolve) {
+        function finish(confirmed) {
+            document.getElementById("confirmDeleteBtn").removeEventListener("click", confirmDeletion);
+            document.getElementById("cancelDeleteBtn").removeEventListener("click", cancelDeletion);
+            deleteConfirmationModal.removeEventListener("cancel", cancelWithEscape);
+            deleteConfirmationModal.removeEventListener("click", cancelFromBackdrop);
+            deleteConfirmationModal.close();
+            resolve(confirmed);
+        }
+        function confirmDeletion() { finish(true); }
+        function cancelDeletion() { finish(false); }
+        function cancelWithEscape(event) { event.preventDefault(); finish(false); }
+        function cancelFromBackdrop(event) { if (event.target === deleteConfirmationModal) finish(false); }
+        document.getElementById("confirmDeleteBtn").addEventListener("click", confirmDeletion);
+        document.getElementById("cancelDeleteBtn").addEventListener("click", cancelDeletion);
+        deleteConfirmationModal.addEventListener("cancel", cancelWithEscape);
+        deleteConfirmationModal.addEventListener("click", cancelFromBackdrop);
+        document.getElementById("cancelDeleteBtn").focus();
+    });
 }
 
-function closeDeleteConfirmation() {
-    document.getElementById("confirmationOverlay").classList.remove("show");
-    pendingDeleteAction = null;
+function updateSiteSelection() {
+    const checkboxes = Array.from(document.querySelectorAll(".site-check"));
+    const selectedCount = checkboxes.filter(checkbox => checkbox.checked).length;
+    selectAllSites.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
+    selectAllSites.indeterminate = selectedCount > 0 && selectedCount < checkboxes.length;
+    deleteSelectedBtn.disabled = selectedCount === 0;
 }
 
 async function deleteSite(siteId) {
@@ -547,23 +556,6 @@ async function deleteSite(siteId) {
 
     return message;
 }
-
-document.getElementById("cancelDeleteBtn").addEventListener("click", closeDeleteConfirmation);
-
-document.getElementById("confirmationOverlay").addEventListener("click", function (event) {
-    if (event.target === this) closeDeleteConfirmation();
-});
-
-document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape") closeDeleteConfirmation();
-});
-
-document.getElementById("confirmDeleteBtn").addEventListener("click", async function () {
-    if (!pendingDeleteAction) return;
-    const deleteAction = pendingDeleteAction;
-    closeDeleteConfirmation();
-    await deleteAction();
-});
 
 document
     .getElementById("importSitesBtn")
@@ -637,18 +629,17 @@ document.getElementById("deleteBtn").addEventListener("click", async () => {
         ? `\"${siteName}\" (${siteId})`
         : `site ${siteId}`;
 
-    showDeleteConfirmation(
-        `Are you sure you want to permanently delete ${description}?`,
-        async function () {
-            try {
-                const message = await deleteSite(siteId);
-                messageBox.innerText = message || "Site deleted successfully.";
-                clearSitesForm();
-            } catch (err) {
-                messageBox.innerText = err.message;
-            }
-        }
+    const confirmed = await confirmSiteDeletion(
+        "You are about to permanently delete this site.", description
     );
+    if (!confirmed) return;
+    try {
+        const message = await deleteSite(siteId);
+        messageBox.innerText = message || "Site deleted successfully.";
+        clearSitesForm();
+    } catch (err) {
+        messageBox.innerText = err.message;
+    }
 });
 
 document.getElementById("sitesForm").addEventListener("submit", async function(e) {
@@ -763,6 +754,9 @@ document.getElementById("directoryBtn")
             document.querySelector("#sitesTable tbody");
 
         tbody.innerHTML = "";
+        selectAllSites.checked = false;
+        selectAllSites.indeterminate = false;
+        deleteSelectedBtn.disabled = true;
 
         if (sites.length === 0) {
             document.getElementById(
@@ -804,6 +798,8 @@ document.getElementById("directoryBtn")
                 </td>
             `;
 
+            row.querySelector(".site-check").addEventListener("change", updateSiteSelection);
+
             row.addEventListener("click", function (event) {
                 if (event.target.closest(".site-check, .row-delete-btn")) return;
 
@@ -815,29 +811,22 @@ document.getElementById("directoryBtn")
                 messageBox.innerText = "Site loaded.";
             });
 
-            row.querySelector(".row-delete-btn").addEventListener("click", function () {
+            row.querySelector(".row-delete-btn").addEventListener("click", async function () {
                 const description = site.Name
                     ? `\"${site.Name}\" (${site.Id})`
                     : `site ${site.Id}`;
 
-                showDeleteConfirmation(
-                    `Are you sure you want to permanently delete ${description}?`,
-                    async function () {
-                        try {
-                            const message = await deleteSite(site.Id);
-                            row.remove();
-                            messageBox.innerText = message || "Site deleted successfully.";
-
-                            if (!tbody.children.length) {
-                                document.getElementById("directorySection").style.display = "none";
-                                messageBox.innerText =
-                                    "Site deleted successfully. The site directory is empty.";
-                            }
-                        } catch (err) {
-                            messageBox.innerText = err.message;
-                        }
-                    }
+                const confirmed = await confirmSiteDeletion(
+                    "You are about to permanently delete this site.", description
                 );
+                if (!confirmed) return;
+                try {
+                    const message = await deleteSite(site.Id);
+                    row.remove();
+                    updateSiteSelection();
+                    messageBox.innerText = message || "Site deleted successfully.";
+                    if (!tbody.children.length) messageBox.innerText = "Site deleted successfully. The site directory is empty.";
+                } catch (err) { messageBox.innerText = err.message; }
             });
 
             tbody.appendChild(row);
@@ -856,23 +845,14 @@ document.getElementById("directoryBtn")
     }
 });
 
-document.getElementById("selectAllBtn").addEventListener("click", function () {
-    const checkboxes = Array.from(document.querySelectorAll(".site-check"));
-
-    if (!checkboxes.length) {
-        messageBox.innerText = "There are no sites to select.";
-        return;
-    }
-
-    const shouldSelectAll = checkboxes.some(checkbox => !checkbox.checked);
-    checkboxes.forEach(checkbox => checkbox.checked = shouldSelectAll);
-
-    this.innerHTML = shouldSelectAll
-        ? '<i class="fa-solid fa-square-minus"></i> Clear Selection'
-        : '<i class="fa-solid fa-square-check"></i> Select All';
+selectAllSites.addEventListener("change", function () {
+    document.querySelectorAll(".site-check").forEach(function (checkbox) {
+        checkbox.checked = selectAllSites.checked;
+    });
+    updateSiteSelection();
 });
 
-document.getElementById("deleteSelectedBtn").addEventListener("click", function () {
+deleteSelectedBtn.addEventListener("click", async function () {
     const selected = Array.from(document.querySelectorAll(".site-check:checked"));
 
     if (!selected.length) {
@@ -881,9 +861,11 @@ document.getElementById("deleteSelectedBtn").addEventListener("click", function 
     }
 
     const count = selected.length;
-    showDeleteConfirmation(
-        `Are you sure you want to permanently delete ${count} selected site${count === 1 ? "" : "s"}?`,
-        async function () {
+    const confirmed = await confirmSiteDeletion(
+        "You are about to permanently delete the selected sites.",
+        `${count} selected site(s)`
+    );
+    if (!confirmed) return;
             const deletedIds = [];
             const errors = [];
 
@@ -905,14 +887,7 @@ document.getElementById("deleteSelectedBtn").addEventListener("click", function 
                     `${deletedIds.length} deleted. ${errors.length} could not be deleted: ${errors.join(" | ")}`;
             }
 
-            if (!document.querySelector("#sitesTable tbody").children.length) {
-                document.getElementById("directorySection").style.display = "none";
-            }
-
-            document.getElementById("selectAllBtn").innerHTML =
-                '<i class="fa-solid fa-square-check"></i> Select All';
-        }
-    );
+            updateSiteSelection();
 });
 
 </script>
