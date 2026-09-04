@@ -430,7 +430,7 @@ func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
 	reptFmtStr := "%-19s%-17s$%-11s%-16s%-60s\n"
 	reptFmtStr2 := "%-64s%-60s\n"
 
-	title := "Game Report\n"
+	title := "Payment Report\n"
 	heading1 := "Payment ID         Payment Date     Amount      Association     Game IDs\n"
 	separator := "===================================================================================================================================\n"
 	reptTimeMsg := getReportGeneratedDate()
