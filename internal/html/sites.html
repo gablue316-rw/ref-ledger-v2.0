@@ -160,7 +160,106 @@
 
         .btn-import:hover {
             background-color: #115e59;
-        }        
+        }
+
+        .btn-select-all { background-color: #475569; }
+        .btn-select-all:hover { background-color: #334155; }
+
+        .directory-actions {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .select-column,
+        .delete-column {
+            width: 70px;
+            text-align: center;
+        }
+
+        .site-check {
+            width: 17px;
+            height: 17px;
+            cursor: pointer;
+        }
+
+        .row-delete-btn {
+            border: none;
+            background: transparent;
+            color: #dc2626;
+            cursor: pointer;
+            font-size: 17px;
+            padding: 6px 9px;
+            border-radius: 5px;
+        }
+
+        .row-delete-btn:hover {
+            color: white;
+            background: #dc2626;
+        }
+
+        .confirmation-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.65);
+        }
+
+        .confirmation-overlay.show { display: flex; }
+
+        .confirmation-dialog {
+            width: 100%;
+            max-width: 460px;
+            overflow: hidden;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+        }
+
+        .confirmation-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 24px;
+            color: #991b1b;
+            background: #fef2f2;
+            border-bottom: 1px solid #fecaca;
+        }
+
+        .confirmation-heading i { font-size: 24px; }
+        .confirmation-heading h2 { font-size: 20px; }
+
+        .confirmation-body {
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        .confirmation-body p + p { margin-top: 10px; }
+
+        .confirmation-warning {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .confirmation-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 24px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .btn-cancel {
+            color: #334155;
+            background: #e2e8f0;
+        }
+
+        .btn-cancel:hover { background: #cbd5e1; }
 
         .message-box {
             background-color: white;
@@ -338,15 +437,29 @@
 
        <h2>Sites Directory</h2>
 
+       <div class="directory-actions">
+           <button type="button" id="selectAllBtn" class="btn btn-select-all">
+               <i class="fa-solid fa-square-check"></i>
+               Select All
+           </button>
+
+           <button type="button" id="deleteSelectedBtn" class="btn btn-delete">
+               <i class="fa-solid fa-trash"></i>
+               Delete Selected
+           </button>
+       </div>
+
        <table id="sitesTable" style="width:100%; border-collapse:collapse;">
 
            <thead>
                <tr>
+                   <th class="select-column">Select</th>
                    <th>Site ID</th>
                    <th>Site Name</th>
                    <th>Contact Name</th>
                    <th>Contact Number</th>
                    <th>Contact Email</th>
+                   <th class="delete-column">Delete</th>
                </tr>
            </thead>
   
@@ -358,9 +471,99 @@
     </div>    
 </div>
 
+<div
+    id="confirmationOverlay"
+    class="confirmation-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="confirmationTitle"
+>
+    <div class="confirmation-dialog">
+        <div class="confirmation-heading">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <h2 id="confirmationTitle">Confirm Site Deletion</h2>
+        </div>
+
+        <div class="confirmation-body">
+            <p id="confirmationMessage"></p>
+            <p class="confirmation-warning">This action cannot be undone.</p>
+        </div>
+
+        <div class="confirmation-actions">
+            <button type="button" id="cancelDeleteBtn" class="btn btn-cancel">
+                Cancel
+            </button>
+            <button type="button" id="confirmDeleteBtn" class="btn btn-delete">
+                <i class="fa-solid fa-trash"></i>
+                Delete
+            </button>
+        </div>
+    </div>
+</div>
+
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
+
+const messageBox = document.getElementById("message");
+let pendingDeleteAction = null;
+
+function clearSitesForm() {
+    document.getElementById("sitesForm").reset();
+}
+
+function showDeleteConfirmation(message, deleteAction) {
+    document.getElementById("confirmationMessage").textContent = message;
+    pendingDeleteAction = deleteAction;
+    document.getElementById("confirmationOverlay").classList.add("show");
+    document.getElementById("confirmDeleteBtn").focus();
+}
+
+function closeDeleteConfirmation() {
+    document.getElementById("confirmationOverlay").classList.remove("show");
+    pendingDeleteAction = null;
+}
+
+async function deleteSite(siteId) {
+    const response = await fetch(
+        `/api/deleteSite/${encodeURIComponent(siteId)}`,
+        { method: "DELETE" }
+    );
+
+    if (response.status === 401 || response.redirected) {
+        window.location.href = "/login";
+        throw new Error("Your session has expired.");
+    }
+
+    const message = await response.text();
+
+    if (response.status === 403) {
+        throw new Error("Permission denied. Read-only users cannot delete sites.");
+    }
+
+    if (!response.ok) {
+        throw new Error(message || `Unable to delete site ${siteId}.`);
+    }
+
+    return message;
+}
+
+document.getElementById("cancelDeleteBtn").addEventListener("click", closeDeleteConfirmation);
+
+document.getElementById("confirmationOverlay").addEventListener("click", function (event) {
+    if (event.target === this) closeDeleteConfirmation();
+});
+
+document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") closeDeleteConfirmation();
+});
+
+document.getElementById("confirmDeleteBtn").addEventListener("click", async function () {
+    if (!pendingDeleteAction) return;
+    const deleteAction = pendingDeleteAction;
+    closeDeleteConfirmation();
+    await deleteAction();
+});
 
 document
     .getElementById("importSitesBtn")
@@ -422,34 +625,30 @@ document.getElementById("getSiteBtn").addEventListener("click", async function (
 
 document.getElementById("deleteBtn").addEventListener("click", async () => {
 
-    const siteId = document.getElementById("siteId").value;
+    const siteId = document.getElementById("siteId").value.trim();
+    const siteName = document.getElementById("siteName").value.trim();
 
-    try {
-        const response = await fetch(`/api/deleteSite/${siteId}`, {
-            method: "DELETE"
-        });
-
-        if (response.status === 401 || response.redirected) {
-            window.location.href = "/login";
-            return;
-        }
-
-        if (response.status === 403) {
-            messageBox.innerText =
-                "Permission denied. Read-only users cannot delete sites.";
-            return;
-        }    
-
-        const message = await response.text();
-
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Site deleted successfully."
-                : message || "Error deleting site.";
-    
-    } catch(err) {
-        document.getElementById("message").innerText = "Server unavailable.";
+    if (!siteId) {
+        messageBox.innerText = "Enter or load a Site ID before deleting.";
+        return;
     }
+
+    const description = siteName
+        ? `\"${siteName}\" (${siteId})`
+        : `site ${siteId}`;
+
+    showDeleteConfirmation(
+        `Are you sure you want to permanently delete ${description}?`,
+        async function () {
+            try {
+                const message = await deleteSite(siteId);
+                messageBox.innerText = message || "Site deleted successfully.";
+                clearSitesForm();
+            } catch (err) {
+                messageBox.innerText = err.message;
+            }
+        }
+    );
 });
 
 document.getElementById("sitesForm").addEventListener("submit", async function(e) {
@@ -580,12 +779,66 @@ document.getElementById("directoryBtn")
             const row = document.createElement("tr");
 
             row.innerHTML = `
+                <td class="select-column">
+                    <input
+                        type="checkbox"
+                        class="site-check"
+                        value="${site.Id || ""}"
+                        aria-label="Select ${site.Name || site.Id || "site"}"
+                    >
+                </td>
                 <td>${site.Id}</td>
                 <td>${site.Name}</td>
                 <td>${site.Contact}</td>
                 <td>${site.Phone}</td>
                 <td>${site.Email}</td>
+                <td class="delete-column">
+                    <button
+                        type="button"
+                        class="row-delete-btn"
+                        title="Delete site"
+                        aria-label="Delete ${site.Name || site.Id || "site"}"
+                    >
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
             `;
+
+            row.addEventListener("click", function (event) {
+                if (event.target.closest(".site-check, .row-delete-btn")) return;
+
+                document.getElementById("siteId").value = site.Id || "";
+                document.getElementById("siteName").value = site.Name || "";
+                document.getElementById("contactName").value = site.Contact || "";
+                document.getElementById("contactNumber").value = site.Phone || "";
+                document.getElementById("contactEmail").value = site.Email || "";
+                messageBox.innerText = "Site loaded.";
+            });
+
+            row.querySelector(".row-delete-btn").addEventListener("click", function () {
+                const description = site.Name
+                    ? `\"${site.Name}\" (${site.Id})`
+                    : `site ${site.Id}`;
+
+                showDeleteConfirmation(
+                    `Are you sure you want to permanently delete ${description}?`,
+                    async function () {
+                        try {
+                            const message = await deleteSite(site.Id);
+                            row.remove();
+                            messageBox.innerText = message || "Site deleted successfully.";
+
+                            if (!tbody.children.length) {
+                                document.getElementById("directorySection").style.display = "none";
+                                messageBox.innerText =
+                                    "Site deleted successfully. The site directory is empty.";
+                            }
+                        } catch (err) {
+                            messageBox.innerText = err.message;
+                        }
+                    }
+                );
+            });
 
             tbody.appendChild(row);
         });
@@ -601,6 +854,65 @@ document.getElementById("directoryBtn")
         document.getElementById("message").innerText =
             `Unable to load directory: ${err.message}`;
     }
+});
+
+document.getElementById("selectAllBtn").addEventListener("click", function () {
+    const checkboxes = Array.from(document.querySelectorAll(".site-check"));
+
+    if (!checkboxes.length) {
+        messageBox.innerText = "There are no sites to select.";
+        return;
+    }
+
+    const shouldSelectAll = checkboxes.some(checkbox => !checkbox.checked);
+    checkboxes.forEach(checkbox => checkbox.checked = shouldSelectAll);
+
+    this.innerHTML = shouldSelectAll
+        ? '<i class="fa-solid fa-square-minus"></i> Clear Selection'
+        : '<i class="fa-solid fa-square-check"></i> Select All';
+});
+
+document.getElementById("deleteSelectedBtn").addEventListener("click", function () {
+    const selected = Array.from(document.querySelectorAll(".site-check:checked"));
+
+    if (!selected.length) {
+        messageBox.innerText = "Select at least one site to delete.";
+        return;
+    }
+
+    const count = selected.length;
+    showDeleteConfirmation(
+        `Are you sure you want to permanently delete ${count} selected site${count === 1 ? "" : "s"}?`,
+        async function () {
+            const deletedIds = [];
+            const errors = [];
+
+            for (const checkbox of selected) {
+                try {
+                    await deleteSite(checkbox.value);
+                    deletedIds.push(checkbox.value);
+                    checkbox.closest("tr").remove();
+                } catch (err) {
+                    errors.push(`${checkbox.value}: ${err.message}`);
+                }
+            }
+
+            if (!errors.length) {
+                messageBox.innerText =
+                    `${deletedIds.length} site${deletedIds.length === 1 ? "" : "s"} deleted successfully.`;
+            } else {
+                messageBox.innerText =
+                    `${deletedIds.length} deleted. ${errors.length} could not be deleted: ${errors.join(" | ")}`;
+            }
+
+            if (!document.querySelector("#sitesTable tbody").children.length) {
+                document.getElementById("directorySection").style.display = "none";
+            }
+
+            document.getElementById("selectAllBtn").innerHTML =
+                '<i class="fa-solid fa-square-check"></i> Select All';
+        }
+    );
 });
 
 </script>
