@@ -630,6 +630,51 @@ func QueryOfficials(parentCtx context.Context, dbase, collection, assoc, officia
 	return officialRecords, nil
 }
 
+func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDescriptor, error) {
+
+	paymentFilter := bson.M{"tenantId": filter.TenantId}
+
+	if filter.PaymentId != "" {
+		paymentFilter["paymentId"] = filter.PaymentId
+	}
+
+	if filter.Association != "" {
+		paymentFilter["association"] = filter.Association
+	}
+
+	if filter.Date != "" {
+		paymentFilter["paymentDate"] = filter.Date
+	}
+
+	if filter.Amount > 0 {
+		paymentFilter["amount"] = filter.Amount
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+
+	cursor, err := coll.Find(ctx, paymentFilter)
+
+	var results []model.PaymentDoc
+	var paymentRecords []model.PaymentDescriptor
+
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.PaymentDescriptor{}, err
+	}
+
+	for _, r := range results {
+
+		paymentRecords = append(paymentRecords, utils.ConvertPaymentDocToPaymentDescr(r))
+
+	}
+	return paymentRecords, nil
+}
+
 func QueryPayments(parentCtx context.Context, dbase, collection, assoc string) ([]model.PaymentDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)

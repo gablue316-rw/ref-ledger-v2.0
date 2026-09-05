@@ -73,6 +73,14 @@ type PaymentDoc struct {
 	TenantId    string  `bson:"tenantId,omitempty"`
 }
 
+type PaymentRegistryFilter struct {
+	PaymentId   string
+	Date        string
+	Association string
+	Amount      int64
+	TenantId    string
+}
+
 type OfficialDescriptor struct {
 	OfficialId  int
 	FirstName   string
