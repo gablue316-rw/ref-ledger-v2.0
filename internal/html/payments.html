@@ -500,7 +500,8 @@ paymentForm.addEventListener(
                 messageBox.innerText =
                     "Payment not saved. " +
                     `${result.totalAdded} payment(s) added. ` +
-                    `${result.totalUpdatedToPaid} game(s) marked as Paid.`;
+                    `${result.totalUpdatedToPaid} game(s) marked as Paid.` +
+                    errorMessage;
 
                 return;
             }
