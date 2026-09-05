@@ -165,6 +165,134 @@
             font-weight: bold;
         }
 
+        .registry-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .select-all-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .select-all-label input,
+        .payment-select {
+            width: auto;
+            cursor: pointer;
+        }
+
+        .btn-delete-selected {
+            background-color: #dc2626;
+        }
+
+        .btn-delete-selected:hover:not(:disabled) {
+            background-color: #b91c1c;
+        }
+
+        .select-column,
+        .delete-column {
+            width: 70px;
+            text-align: center !important;
+        }
+
+        .btn-row-delete {
+            border: none;
+            background: transparent;
+            color: #dc2626;
+            padding: 6px 9px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .btn-row-delete:hover {
+            color: white;
+            background-color: #dc2626;
+        }
+
+        .delete-modal {
+            width: min(460px, calc(100% - 32px));
+            padding: 0;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.3);
+            overflow: hidden;
+        }
+
+        .delete-modal::backdrop {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(3px);
+        }
+
+        .delete-modal-content { background: white; }
+
+        .delete-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 22px 24px 16px;
+        }
+
+        .delete-modal-icon {
+            display: grid;
+            place-items: center;
+            flex: 0 0 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #fee2e2;
+            color: #dc2626;
+            font-size: 21px;
+        }
+
+        .delete-modal-header h2 {
+            color: #1e293b;
+            font-size: 21px;
+            margin-bottom: 3px;
+        }
+
+        .delete-modal-header p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .delete-modal-body {
+            padding: 4px 24px 22px;
+            color: #475569;
+            line-height: 1.55;
+        }
+
+        .delete-modal-target {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border: 1px solid #fecaca;
+            border-radius: 9px;
+            background: #fff7f7;
+            color: #991b1b;
+            font-weight: bold;
+        }
+
+        .delete-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .btn-modal-cancel {
+            background: white;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn-modal-delete { background: #dc2626; }
+
         .table-wrapper {
             overflow-x: auto;
         }
@@ -246,7 +374,8 @@
                 flex-direction: column;
             }
 
-            .button-row {
+            .button-row,
+            .registry-actions {
                 flex-direction: column;
             }
 
@@ -435,15 +564,40 @@
             </button>
         </div>
 
+        <div class="registry-actions">
+            <label
+                class="select-all-label"
+                for="selectAllPayments"
+            >
+                <input
+                    type="checkbox"
+                    id="selectAllPayments"
+                >
+                Select All
+            </label>
+
+            <button
+                type="button"
+                id="deleteSelectedPaymentsBtn"
+                class="btn btn-delete-selected"
+                disabled
+            >
+                <i class="fa-solid fa-trash"></i>
+                Delete Selected
+            </button>
+        </div>
+
         <div class="table-wrapper">
             <table class="games-table">
                 <thead>
                     <tr>
+                        <th class="select-column">Select</th>
                         <th>Payment ID</th>
                         <th>Date</th>
                         <th>Association</th>
                         <th>Amount</th>
                         <th>Game IDs</th>
+                        <th class="delete-column">Delete</th>
                     </tr>
                 </thead>
 
@@ -453,6 +607,53 @@
     </section>
 
 </div>
+
+<dialog
+    id="deletePaymentModal"
+    class="delete-modal"
+    aria-labelledby="deletePaymentModalTitle"
+    aria-describedby="deletePaymentModalMessage"
+>
+    <div class="delete-modal-content">
+        <div class="delete-modal-header">
+            <div class="delete-modal-icon" aria-hidden="true">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <div>
+                <h2 id="deletePaymentModalTitle">Confirm deletion</h2>
+                <p>This action cannot be undone.</p>
+            </div>
+        </div>
+
+        <div class="delete-modal-body">
+            <p id="deletePaymentModalMessage">
+                Are you sure you want to delete this payment?
+            </p>
+            <div
+                id="deletePaymentModalTarget"
+                class="delete-modal-target"
+            ></div>
+        </div>
+
+        <div class="delete-modal-actions">
+            <button
+                type="button"
+                id="cancelPaymentDeleteBtn"
+                class="btn btn-modal-cancel"
+            >
+                Cancel
+            </button>
+            <button
+                type="button"
+                id="confirmPaymentDeleteBtn"
+                class="btn btn-modal-delete"
+            >
+                <i class="fa-solid fa-trash-can"></i>
+                Delete
+            </button>
+        </div>
+    </div>
+</dialog>
 
 <script src="/components/navbar.js?v=12"></script>
 
@@ -487,6 +688,27 @@ const gameBulkControls =
 
 const paymentRegistrySection =
     document.getElementById("paymentRegistrySection");
+
+const selectAllPayments =
+    document.getElementById("selectAllPayments");
+
+const deleteSelectedPaymentsBtn =
+    document.getElementById("deleteSelectedPaymentsBtn");
+
+const deletePaymentModal =
+    document.getElementById("deletePaymentModal");
+
+const deletePaymentModalMessage =
+    document.getElementById("deletePaymentModalMessage");
+
+const deletePaymentModalTarget =
+    document.getElementById("deletePaymentModalTarget");
+
+const confirmPaymentDeleteBtn =
+    document.getElementById("confirmPaymentDeleteBtn");
+
+const cancelPaymentDeleteBtn =
+    document.getElementById("cancelPaymentDeleteBtn");
 
 let resetAfterSuccessfulSave = false;
 
@@ -769,6 +991,222 @@ function getPaymentValue(payment, ...names) {
     return "";
 }
 
+function confirmPaymentDeletion(message, target) {
+    deletePaymentModalMessage.textContent = message;
+    deletePaymentModalTarget.textContent = target;
+    deletePaymentModal.showModal();
+
+    return new Promise(function(resolve) {
+        function finish(confirmed) {
+            confirmPaymentDeleteBtn.removeEventListener(
+                "click",
+                confirmDeletion
+            );
+            cancelPaymentDeleteBtn.removeEventListener(
+                "click",
+                cancelDeletion
+            );
+            deletePaymentModal.removeEventListener(
+                "cancel",
+                cancelWithEscape
+            );
+            deletePaymentModal.removeEventListener(
+                "click",
+                cancelFromBackdrop
+            );
+
+            deletePaymentModal.close();
+            resolve(confirmed);
+        }
+
+        function confirmDeletion() {
+            finish(true);
+        }
+
+        function cancelDeletion() {
+            finish(false);
+        }
+
+        function cancelWithEscape(event) {
+            event.preventDefault();
+            finish(false);
+        }
+
+        function cancelFromBackdrop(event) {
+            if (event.target === deletePaymentModal) {
+                finish(false);
+            }
+        }
+
+        confirmPaymentDeleteBtn.addEventListener(
+            "click",
+            confirmDeletion
+        );
+        cancelPaymentDeleteBtn.addEventListener(
+            "click",
+            cancelDeletion
+        );
+        deletePaymentModal.addEventListener(
+            "cancel",
+            cancelWithEscape
+        );
+        deletePaymentModal.addEventListener(
+            "click",
+            cancelFromBackdrop
+        );
+
+        cancelPaymentDeleteBtn.focus();
+    });
+}
+
+function updatePaymentSelection() {
+    const checkboxes = Array.from(
+        document.querySelectorAll(".payment-select")
+    );
+
+    const selectedCount = checkboxes.filter(
+        checkbox => checkbox.checked
+    ).length;
+
+    selectAllPayments.checked =
+        checkboxes.length > 0 &&
+        selectedCount === checkboxes.length;
+
+    selectAllPayments.indeterminate =
+        selectedCount > 0 &&
+        selectedCount < checkboxes.length;
+
+    deleteSelectedPaymentsBtn.disabled =
+        selectedCount === 0;
+}
+
+async function deleteRegistryPayment(paymentId) {
+    return fetch(
+        `/api/deletePayment/${encodeURIComponent(paymentId)}`,
+        {
+            method: "DELETE"
+        }
+    );
+}
+
+async function deletePaymentAndHandleResponse(paymentId) {
+    const response = await deleteRegistryPayment(paymentId);
+
+    if (
+        response.status === 401 ||
+        response.redirected
+    ) {
+        window.location.href = "/login";
+        return { stopped: true };
+    }
+
+    if (response.status === 403) {
+        showMessage(
+            "Permission denied. Read-only users cannot delete payments.",
+            "error"
+        );
+        return { stopped: true };
+    }
+
+    const responseMessage = await response.text();
+
+    return {
+        stopped: false,
+        ok: response.ok,
+        message: responseMessage.trim()
+    };
+}
+
+selectAllPayments.addEventListener(
+    "change",
+    function() {
+        document
+            .querySelectorAll(".payment-select")
+            .forEach(function(checkbox) {
+                checkbox.checked = selectAllPayments.checked;
+            });
+
+        updatePaymentSelection();
+    }
+);
+
+deleteSelectedPaymentsBtn.addEventListener(
+    "click",
+    async function() {
+        const selected = Array.from(
+            document.querySelectorAll(
+                ".payment-select:checked"
+            )
+        );
+
+        if (selected.length === 0) {
+            showMessage(
+                "Select at least one payment to delete.",
+                "error"
+            );
+            return;
+        }
+
+        const confirmed = await confirmPaymentDeletion(
+            "You are about to permanently delete the selected payments.",
+            `${selected.length} selected payment(s)`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        deleteSelectedPaymentsBtn.disabled = true;
+        messageBox.innerText =
+            `Deleting ${selected.length} selected payment(s)...`;
+
+        let deletedCount = 0;
+        let failedCount = 0;
+
+        for (const checkbox of selected) {
+            try {
+                const result = await deletePaymentAndHandleResponse(
+                    checkbox.dataset.paymentId
+                );
+
+                if (result.stopped) {
+                    updatePaymentSelection();
+                    return;
+                }
+
+                if (result.ok) {
+                    checkbox.closest("tr").remove();
+                    deletedCount++;
+                } else {
+                    failedCount++;
+                }
+            } catch (error) {
+                failedCount++;
+            }
+        }
+
+        updatePaymentSelection();
+        updatePaymentRegistryCount();
+
+        messageBox.innerText = failedCount === 0
+            ? `${deletedCount} payment(s) deleted successfully.`
+            : `${deletedCount} payment(s) deleted; ` +
+              `${failedCount} could not be deleted.`;
+    }
+);
+
+function updatePaymentRegistryCount() {
+    const count = document.getElementById(
+        "paymentRegistryCount"
+    );
+
+    const rowCount = document.querySelectorAll(
+        "#paymentsBody tr[data-payment-row]"
+    ).length;
+
+    count.textContent = `${rowCount} payment(s) found.`;
+}
+
 function renderPayments(payments) {
     const tbody =
         document.getElementById("paymentsBody");
@@ -783,7 +1221,7 @@ function renderPayments(payments) {
     if (payments.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="5">
+                <td colspan="7">
                     No payments are currently in the registry.
                 </td>
             </tr>
@@ -844,7 +1282,15 @@ function renderPayments(payments) {
             : gameIds;
 
         return `
-            <tr>
+            <tr data-payment-row>
+                <td class="select-column">
+                    <input
+                        type="checkbox"
+                        class="payment-select"
+                        data-payment-id="${escapeHtml(paymentId)}"
+                        aria-label="Select payment ${escapeHtml(paymentId)}"
+                    >
+                </td>
                 <td>${escapeHtml(paymentId)}</td>
                 <td>${escapeHtml(date)}</td>
                 <td>${escapeHtml(association)}</td>
@@ -852,9 +1298,92 @@ function renderPayments(payments) {
                 <td class="payment-games">
                     ${escapeHtml(displayGameIds)}
                 </td>
+                <td class="delete-column">
+                    <button
+                        type="button"
+                        class="btn-row-delete"
+                        data-payment-id="${escapeHtml(paymentId)}"
+                        title="Delete payment"
+                        aria-label="Delete payment ${escapeHtml(paymentId)}"
+                    >
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
             </tr>
         `;
     }).join("");
+
+    selectAllPayments.checked = false;
+    selectAllPayments.indeterminate = false;
+    deleteSelectedPaymentsBtn.disabled = true;
+
+    document
+        .querySelectorAll(".payment-select")
+        .forEach(function(checkbox) {
+            checkbox.addEventListener(
+                "change",
+                updatePaymentSelection
+            );
+        });
+
+    document
+        .querySelectorAll(".btn-row-delete")
+        .forEach(function(deleteButton) {
+            deleteButton.addEventListener(
+                "click",
+                async function() {
+                    const paymentId =
+                        deleteButton.dataset.paymentId;
+
+                    const confirmed = await confirmPaymentDeletion(
+                        "You are about to permanently delete this payment.",
+                        `Payment ID: ${paymentId}`
+                    );
+
+                    if (!confirmed) {
+                        return;
+                    }
+
+                    messageBox.innerText =
+                        `Deleting payment ${paymentId}...`;
+
+                    try {
+                        const result =
+                            await deletePaymentAndHandleResponse(
+                                paymentId
+                            );
+
+                        if (result.stopped) {
+                            return;
+                        }
+
+                        if (!result.ok) {
+                            showMessage(
+                                result.message ||
+                                    "Error deleting payment.",
+                                "error"
+                            );
+                            return;
+                        }
+
+                        deleteButton.closest("tr").remove();
+                        updatePaymentSelection();
+                        updatePaymentRegistryCount();
+
+                        showMessage(
+                            result.message ||
+                                "Payment deleted successfully.",
+                            "success"
+                        );
+                    } catch (error) {
+                        showMessage(
+                            "Server unavailable.",
+                            "error"
+                        );
+                    }
+                }
+            );
+        });
 }
 
 async function loadPaymentsRegistry() {
@@ -863,29 +1392,25 @@ async function loadPaymentsRegistry() {
 
     registryBtn.disabled = true;
 
-    const paymentId =
-        document
-            .getElementById("paymentid")
-            .value
-            .trim();
-
-    const date =
-        document
-            .getElementById("date")
-            .value;
-
-    const association =
-        document
-            .getElementById("association")
-            .value;
-
-    const amountText =
-        document
-            .getElementById("amount")
-            .value
-            .trim();
-
     const params = new URLSearchParams();
+
+    const paymentId = document
+        .getElementById("paymentid")
+        .value
+        .trim();
+
+    const date = document
+        .getElementById("date")
+        .value;
+
+    const association = document
+        .getElementById("association")
+        .value;
+
+    const amountText = document
+        .getElementById("amount")
+        .value
+        .trim();
 
     if (paymentId !== "") {
         params.append("paymentId", paymentId);
@@ -903,15 +1428,13 @@ async function loadPaymentsRegistry() {
         params.append("amount", amountText);
     }
 
-    const queryString = params.toString();
-
-    const url = queryString === ""
-        ? "/api/payment-registry"
-        : `/api/payment-registry?${queryString}`;
+    params.append("t", Date.now());
 
     try {
-        const response = await fetch(url);
-
+        const response = await fetch(
+            `/api/payment-registry?${params.toString()}`
+        );
+        
         if (
             response.status === 401 ||
             response.redirected
@@ -921,8 +1444,7 @@ async function loadPaymentsRegistry() {
         }
 
         if (!response.ok) {
-            const errorMessage =
-                await response.text();
+            const errorMessage = await response.text();
 
             showMessage(
                 errorMessage.trim() ||
@@ -936,21 +1458,14 @@ async function loadPaymentsRegistry() {
         const result = await response.json();
 
         const payments = Array.isArray(result)
-            ? result
-            : result.payments ||
-              result.Payments ||
-              [];
+           ? result
+           : result.payments || result.Payments || [];
 
         renderPayments(payments);
-
-        completedGamesSection.style.display =
-            "none";
-
-        gameBulkControls.style.display =
-            "none";
-
-        paymentRegistrySection.style.display =
-            "block";
+        
+        completedGamesSection.style.display = "none";
+        gameBulkControls.style.display = "none";
+        paymentRegistrySection.style.display = "block";
 
         messageBox.innerText =
             document.getElementById(
@@ -963,10 +1478,8 @@ async function loadPaymentsRegistry() {
             error
         );
 
-        showMessage(
-            "Unable to load the payment registry.",
-            "error"
-        );
+        messageBox.innerText =
+            "Unable to load the payment registry.";
     } finally {
         registryBtn.disabled = false;
     }
