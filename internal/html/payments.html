@@ -628,7 +628,8 @@ paymentForm.addEventListener(
                 messageBox.innerText =
                     "Payment not saved. " +
                     `${result.totalAdded} payment(s) added. ` +
-                    `${result.totalUpdatedToPaid} game(s) marked as Paid.`;
+                    `${result.totalUpdatedToPaid} game(s) marked as Paid. ` + 
+                    errorMessage;
 
                 return;
             }
@@ -865,6 +866,17 @@ async function loadPaymentsRegistry() {
     try {
         const response = await fetch("/api/payment-registry");
 
+        if (!response.ok) {
+            const errorMessage = await response.text();
+
+            showMessage(
+                errorMessage || "Unable to load the payment registry.",
+                "error"
+            );
+
+            return;
+        }
+        
         if (
             response.status === 401 ||
             response.redirected
