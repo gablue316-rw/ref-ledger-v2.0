@@ -4654,6 +4654,12 @@ func CreatePayment(
 	}
 }
 
+func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
+
+	http.Error(w, "Not Implemented", http.StatusBadRequest)
+
+}
+
 func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
@@ -5932,6 +5938,7 @@ func main() {
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
+	mux.HandleFunc("/api/payment-registry", authRequired(readOnlyForbidden(LoadPaymentRegistry)))
 	mux.HandleFunc("/api/login", ValidateLogin)
 	mux.HandleFunc("/api/logout", Logout)
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)

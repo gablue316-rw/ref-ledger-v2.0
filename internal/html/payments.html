@@ -126,6 +126,14 @@
             background-color: #b91c1c;
         }
 
+        .btn-registry {
+            background-color: #3b82f6;
+        }
+
+        .btn-registry:hover {
+            background-color: #2563eb;
+        }
+
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -133,6 +141,32 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             font-weight: bold;
             min-height: 60px;
+        }
+
+        .registry-section {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .registry-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .registry-header h2 {
+            color: #1e293b;
+        }
+
+        .registry-count {
+            color: #475569;
+            font-weight: bold;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
         }
 
         .games-table {
@@ -158,6 +192,11 @@
 
         .games-table tr:hover {
             background-color: #f8fafc;
+        }
+
+        .payment-games {
+            white-space: normal;
+            min-width: 160px;
         }
 
         .bulk-controls {
@@ -309,7 +348,19 @@
                     Clear Form
                 </button>
 
-                <div class="bulk-controls">
+                <button
+                    type="button"
+                    id="registryBtn"
+                    class="btn btn-registry"
+                >
+                    <i class="fa-solid fa-money-check"></i>
+                    Registry
+                </button>
+
+                <div
+                    class="bulk-controls"
+                    id="gameBulkControls"
+                >
                     <label>
                         <input
                             type="checkbox"
@@ -333,6 +384,10 @@
         Ready to enter payments.
     </div>
 
+    <div
+        class="table-wrapper"
+        id="completedGamesSection"
+    >
     <table class="games-table">
         <thead>
             <tr>
@@ -355,6 +410,47 @@
         <tbody id="gamesBody">
         </tbody>
     </table>
+    </div>
+
+    <section
+        id="paymentRegistrySection"
+        class="registry-section"
+    >
+        <div class="registry-header">
+            <div>
+                <h2>Payment Registry</h2>
+                <p
+                    class="registry-count"
+                    id="paymentRegistryCount"
+                ></p>
+            </div>
+
+            <button
+                type="button"
+                id="closeRegistryBtn"
+                class="btn btn-registry"
+            >
+                <i class="fa-solid fa-arrow-left"></i>
+                Back to Completed Games
+            </button>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="games-table">
+                <thead>
+                    <tr>
+                        <th>Payment ID</th>
+                        <th>Date</th>
+                        <th>Association</th>
+                        <th>Amount</th>
+                        <th>Game IDs</th>
+                    </tr>
+                </thead>
+
+                <tbody id="paymentsBody"></tbody>
+            </table>
+        </div>
+    </section>
 
 </div>
 
@@ -377,7 +473,39 @@ const messageBox =
 const selectAllCheckbox =
     document.getElementById("selectAll");
 
+const registryBtn =
+    document.getElementById("registryBtn");
+
+const closeRegistryBtn =
+    document.getElementById("closeRegistryBtn");
+
+const completedGamesSection =
+    document.getElementById("completedGamesSection");
+
+const gameBulkControls =
+    document.getElementById("gameBulkControls");
+
+const paymentRegistrySection =
+    document.getElementById("paymentRegistrySection");
+
 let resetAfterSuccessfulSave = false;
+
+registryBtn.addEventListener(
+    "click",
+    loadPaymentsRegistry
+);
+
+closeRegistryBtn.addEventListener(
+    "click",
+    function() {
+        paymentRegistrySection.style.display = "none";
+        completedGamesSection.style.display = "block";
+        gameBulkControls.style.display = "flex";
+
+        messageBox.innerText =
+            "Ready to enter payments.";
+    }
+);
 
 paymentForm.addEventListener(
     "submit",
@@ -500,8 +628,7 @@ paymentForm.addEventListener(
                 messageBox.innerText =
                     "Payment not saved. " +
                     `${result.totalAdded} payment(s) added. ` +
-                    `${result.totalUpdatedToPaid} game(s) marked as Paid. ` +
-                    errorMessage;
+                    `${result.totalUpdatedToPaid} game(s) marked as Paid.`;
 
                 return;
             }
@@ -617,6 +744,175 @@ function getStatusClass(status) {
     }
 
     return "pending";
+}
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function getPaymentValue(payment, ...names) {
+    for (const name of names) {
+        if (
+            payment[name] !== undefined &&
+            payment[name] !== null
+        ) {
+            return payment[name];
+        }
+    }
+
+    return "";
+}
+
+function renderPayments(payments) {
+    const tbody =
+        document.getElementById("paymentsBody");
+
+    const count =
+        document.getElementById("paymentRegistryCount");
+
+    tbody.innerHTML = "";
+    count.textContent =
+        `${payments.length} payment(s) found.`;
+
+    if (payments.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5">
+                    No payments are currently in the registry.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    tbody.innerHTML = payments.map(payment => {
+        const paymentId = getPaymentValue(
+            payment,
+            "PaymentId",
+            "PaymentID",
+            "paymentId",
+            "paymentid"
+        );
+
+        const date = getPaymentValue(
+            payment,
+            "Date",
+            "date"
+        );
+
+        const association = getPaymentValue(
+            payment,
+            "Association",
+            "association"
+        );
+
+        const rawAmount = getPaymentValue(
+            payment,
+            "Amount",
+            "amount"
+        );
+
+        const gameIds = getPaymentValue(
+            payment,
+            "GameIds",
+            "GameIDs",
+            "gameIds",
+            "gameids"
+        );
+
+        const numericAmount = Number(rawAmount);
+        const displayAmount =
+            rawAmount !== "" && Number.isFinite(numericAmount)
+                ? numericAmount.toLocaleString(
+                    "en-US",
+                    {
+                        style: "currency",
+                        currency: "USD"
+                    }
+                )
+                : rawAmount;
+
+        const displayGameIds = Array.isArray(gameIds)
+            ? gameIds.join(", ")
+            : gameIds;
+
+        return `
+            <tr>
+                <td>${escapeHtml(paymentId)}</td>
+                <td>${escapeHtml(date)}</td>
+                <td>${escapeHtml(association)}</td>
+                <td>${escapeHtml(displayAmount)}</td>
+                <td class="payment-games">
+                    ${escapeHtml(displayGameIds)}
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+async function loadPaymentsRegistry() {
+    messageBox.innerText =
+        "Loading payment registry...";
+
+    registryBtn.disabled = true;
+
+    try {
+        const response = await fetch("/api/payment-registry");
+
+        if (
+            response.status === 401 ||
+            response.redirected
+        ) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 404) {
+            renderPayments([]);
+        } else {
+            if (!response.ok) {
+                const errorText = await response.text();
+
+                throw new Error(
+                    `HTTP ${response.status}: ${errorText}`
+                );
+            }
+
+            const result = await response.json();
+
+            const payments = Array.isArray(result)
+                ? result
+                : result.payments || result.Payments || [];
+
+            renderPayments(payments);
+        }
+
+        completedGamesSection.style.display = "none";
+        gameBulkControls.style.display = "none";
+        paymentRegistrySection.style.display = "block";
+
+        messageBox.innerText =
+            document.getElementById(
+                "paymentRegistryCount"
+            ).textContent;
+
+    } catch (error) {
+        console.error(
+            "Error loading payment registry:",
+            error
+        );
+
+        messageBox.innerText =
+            "Unable to load the payment registry.";
+    } finally {
+        registryBtn.disabled = false;
+    }
 }
 
 function renderGames(games) {
