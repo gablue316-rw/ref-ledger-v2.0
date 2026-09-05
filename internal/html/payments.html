@@ -865,17 +865,6 @@ async function loadPaymentsRegistry() {
 
     try {
         const response = await fetch("/api/payment-registry");
-
-        if (!response.ok) {
-            const errorMessage = await response.text();
-
-            showMessage(
-                errorMessage || "Unable to load the payment registry.",
-                "error"
-            );
-
-            return;
-        }
         
         if (
             response.status === 401 ||
@@ -885,26 +874,35 @@ async function loadPaymentsRegistry() {
             return;
         }
 
-        if (response.status === 404) {
-            renderPayments([]);
-        } else {
-            if (!response.ok) {
-                const errorText = await response.text();
+        if (!response.ok) {
+            const errorMessage = await response.text();
 
-                throw new Error(
-                    `HTTP ${response.status}: ${errorText}`
-                );
-            }
+            showMessage(
+                errorMessage.trim() ||
+                    `Unable to load the payment registry. HTTP ${response.status}`,
+                "error"
+            );
 
-            const result = await response.json();
-
-            const payments = Array.isArray(result)
-                ? result
-                : result.payments || result.Payments || [];
-
-            renderPayments(payments);
+            return;
         }
 
+        if (!response.ok) {
+            const errorText = await response.text();
+
+            throw new Error(
+               errorText.trim() ||
+               `Unable to load the payment registry. HTTP ${response.status}`
+          );
+        }
+
+        const result = await response.json();
+
+        const payments = Array.isArray(result)
+           ? result
+           : result.payments || result.Payments || [];
+
+        renderPayments(payments);
+        
         completedGamesSection.style.display = "none";
         gameBulkControls.style.display = "none";
         paymentRegistrySection.style.display = "block";
