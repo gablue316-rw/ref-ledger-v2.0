@@ -465,7 +465,15 @@ function renderGames(
 
     const totalGameFees = Array.isArray(games)
         ? games.reduce((total, game) => {
-            const gameFee = Number(game.GameFee) || 0;
+            const feeValue =
+                game.GameFee ??
+                game.gameFee ??
+                0;
+
+            const gameFee = Number(
+                String(feeValue).replace(/[$,\s]/g, "")
+            ) || 0;
+
             return total + gameFee;
         }, 0)
         : 0;
