@@ -1103,6 +1103,20 @@ function updatePaymentSelection() {
         selectedCount === 0;
 }
 
+selectAllPayments.addEventListener(
+    "change",
+    function() {
+        document
+            .querySelectorAll(".payment-select")
+            .forEach(function(checkbox) {
+                checkbox.checked =
+                    selectAllPayments.checked;
+            });
+
+        updatePaymentSelection();
+    }
+);
+
 async function deleteRegistryPayment(paymentId) {
     const params = new URLSearchParams();
 
