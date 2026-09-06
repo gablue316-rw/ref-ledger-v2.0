@@ -675,6 +675,32 @@ func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDesc
 	return paymentRecords, nil
 }
 
+func DeletePayment(paymentId string) error {
+
+	doc, err := GetPayment(paymentId)
+
+	if err != nil {
+		return fmt.Errorf("DeletePayment failure.  Reason: %s", err)
+	}
+
+	for gameId := range doc.GameIds {
+		fmt.Println("Game ID to be set to Completed:", gameId)
+	}
+
+	// ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	// defer cancel()
+
+	// db := Client.Database(Database)
+	// coll := db.Collection("payments")
+
+	// _, err = coll.DeleteOne(ctx, bson.M{"paymentId": paymentId})
+	// if err != nil {
+	// 	return fmt.Errorf("DeleteOne failure.  Reason: %s", err)
+	// }
+
+	return nil
+}
+
 func QueryPayments(parentCtx context.Context, dbase, collection, assoc string) ([]model.PaymentDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -1537,6 +1563,27 @@ func GetOfficialsCollection(parentCtx context.Context) ([]model.OfficialDoc, err
 	}
 
 	return results, nil
+}
+
+func GetPayment(paymentId string) (model.PaymentDoc, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+
+	filter := bson.M{
+		"paymentId": paymentId,
+		"tenantId":  TenantId,
+	}
+
+	var result model.PaymentDoc
+	err := coll.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		return model.PaymentDoc{}, fmt.Errorf("FindOne failure.  Reason: %s", err)
+	}
+
+	return result, nil
 }
 
 func GetPaymentsCollection(parentCtx context.Context) ([]model.PaymentDoc, error) {

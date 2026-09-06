@@ -1081,8 +1081,15 @@ function updatePaymentSelection() {
 }
 
 async function deleteRegistryPayment(paymentId) {
+    const params = new URLSearchParams();
+
+    params.append(
+        "paymentId",
+        paymentId
+    );
+
     return fetch(
-        `/api/deletePayment/${encodeURIComponent(paymentId)}`,
+        `/api/deletePayment?${params.toString()}`,
         {
             method: "DELETE"
         }
@@ -1239,20 +1246,24 @@ function renderPayments(payments) {
             "paymentid"
         );
 
-        const date = getPaymentValue(
-            payment,
-            "Date",
-            "date"
-        );
-
         const association = getPaymentValue(
             payment,
             "Association",
             "association"
         );
 
+        const date = getPaymentValue(
+            payment,
+            "PaymentDate",
+            "paymentDate",
+            "Date",
+            "date"
+        );
+
         const rawAmount = getPaymentValue(
             payment,
+            "PaymentAmt",
+            "paymentAmt",
             "Amount",
             "amount"
         );

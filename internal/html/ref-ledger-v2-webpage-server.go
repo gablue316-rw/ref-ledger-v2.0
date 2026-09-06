@@ -4654,6 +4654,36 @@ func CreatePayment(
 	}
 }
 
+func DeletePayment(w http.ResponseWriter, r *http.Request) {
+
+	paymentID := strings.TrimSpace(
+		r.URL.Query().Get("paymentId"),
+	)
+
+	if paymentID == "" {
+		http.Error(
+			w,
+			"paymentId is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	err := database.DeletePayment(paymentID)
+	if err != nil {
+		http.Error(
+			w,
+			"Failed to delete payment",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Payment deleted successfully"))
+}
+
 func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 
 	paymentId := strings.TrimSpace(
@@ -6004,6 +6034,7 @@ func main() {
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
 	mux.HandleFunc("/api/payment-registry", authRequired(readOnlyForbidden(LoadPaymentRegistry)))
+	mux.HandleFunc("/api/deletePayment", authRequired(readOnlyForbidden(DeletePayment)))
 	mux.HandleFunc("/api/login", ValidateLogin)
 	mux.HandleFunc("/api/logout", Logout)
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
