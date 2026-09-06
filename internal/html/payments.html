@@ -1504,7 +1504,7 @@ async function loadPaymentsRegistry() {
         const response = await fetch(
             `/api/payment-registry?${params.toString()}`
         );
-        
+
         if (
             response.status === 401 ||
             response.redirected
@@ -1514,10 +1514,11 @@ async function loadPaymentsRegistry() {
         }
 
         if (!response.ok) {
-            const errorMessage = await response.text();
+            const errorMessage =
+                (await response.text()).trim();
 
             showMessage(
-                errorMessage.trim() ||
+                errorMessage ||
                     `Unable to load the payment registry. HTTP ${response.status}`,
                 "error"
             );
@@ -1528,17 +1529,30 @@ async function loadPaymentsRegistry() {
         const result = await response.json();
 
         const payments = Array.isArray(result)
-           ? result
-           : result.payments || result.Payments || [];
+            ? result
+            : (
+                result?.payments ||
+                result?.Payments ||
+                []
+            );
 
         renderPayments(payments);
-        
+
         completedGamesSection.style.display = "none";
         gameBulkControls.style.display = "none";
         paymentRegistrySection.style.display = "block";
 
-        messageBox.innerText =
-            "Payment registry loaded successfully.";
+        if (payments.length === 0) {
+            showMessage(
+                "No payments found.",
+                "info"
+            );
+        } else {
+            showMessage(
+                `${payments.length} payment(s) loaded successfully.`,
+                "success"
+            );
+        }
 
     } catch (error) {
         console.error(
@@ -1546,8 +1560,10 @@ async function loadPaymentsRegistry() {
             error
         );
 
-        messageBox.innerText =
-            "Unable to load the payment registry.";
+        showMessage(
+            "Unable to load the payment registry.",
+            "error"
+        );
     } finally {
         registryBtn.disabled = false;
     }
