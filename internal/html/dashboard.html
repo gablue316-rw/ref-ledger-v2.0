@@ -436,11 +436,12 @@ function hideMessage() {
 }
 
 function updateGamesCount(count, totalFees) {
-    const gamesCount = document.getElementById("gamesCount");
+    const gamesCount =
+        document.getElementById("gamesCount");
 
     gamesCount.textContent =
-        `${count} ${count === 1 ? "game" : "games"} displayed` +
-        `Total game fees: ${formatCurrency(totalGameFees)}`;
+        `${count} ${count === 1 ? "game" : "games"} displayed — ` +
+        `Total game fees: ${formatCurrency(totalFees)}`;
 }
 
 function formatCurrency(amount) {

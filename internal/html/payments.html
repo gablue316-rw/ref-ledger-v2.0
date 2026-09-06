@@ -1628,6 +1628,16 @@ function renderGames(games) {
     tbody.innerHTML = rows;
 }
 
+function formatCurrency(amount) {
+    return Number(amount || 0).toLocaleString(
+        "en-US",
+        {
+            style: "currency",
+            currency: "USD"
+        }
+    );
+}
+
 async function loadCompletedGames(
     displayCountMessage = true
 ) {
@@ -1658,9 +1668,17 @@ async function loadCompletedGames(
         const games =
             await response.json();
 
+        const totalGameFees = Array.isArray(games)
+        ? games.reduce((total, game) => {
+            const gameFee = Number(game.GameFee) || 0;
+            return total + gameFee;
+        }, 0)
+        : 0;
+        
         if (displayCountMessage) {
             messageBox.innerText =
-                `${games.length} completed game(s) available for payment.`;
+                `${games.length} completed game(s) available for payment. ` +
+                `Total game fees: ${formatCurrency(totalGameFees)}`;
         }
 
         renderGames(games);
