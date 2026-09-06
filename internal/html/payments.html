@@ -1501,9 +1501,7 @@ async function loadPaymentsRegistry() {
         paymentRegistrySection.style.display = "block";
 
         messageBox.innerText =
-            document.getElementById(
-                "paymentRegistryCount"
-            ).textContent;
+            "Payment registry loaded successfully.";
 
     } catch (error) {
         console.error(
