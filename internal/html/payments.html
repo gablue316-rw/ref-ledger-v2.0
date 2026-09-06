@@ -1088,12 +1088,25 @@ async function deleteRegistryPayment(paymentId) {
         paymentId
     );
 
-    return fetch(
+    const response = await fetch(
         `/api/deletePayment?${params.toString()}`,
         {
             method: "DELETE"
         }
     );
+
+    if (!response.ok) {
+        const errorText = await response.text();
+
+        throw new Error(
+            errorText ||
+            `Unable to delete payment ${paymentId}.`
+        );
+    }
+
+    await loadCompletedGames();
+
+    return response;
 }
 
 async function deletePaymentAndHandleResponse(paymentId) {
