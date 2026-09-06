@@ -630,6 +630,84 @@ func QueryOfficials(parentCtx context.Context, dbase, collection, assoc, officia
 	return officialRecords, nil
 }
 
+func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDescriptor, error) {
+
+	paymentFilter := bson.M{"tenantId": filter.TenantId}
+
+	if filter.PaymentId != "" {
+		paymentFilter["paymentId"] = filter.PaymentId
+	}
+
+	if filter.Association != "" {
+		paymentFilter["association"] = filter.Association
+	}
+
+	if filter.Date != "" {
+		paymentFilter["paymentDate"] = filter.Date
+	}
+
+	if filter.Amount > 0 {
+		paymentFilter["amount"] = filter.Amount
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+
+	cursor, err := coll.Find(ctx, paymentFilter)
+
+	var results []model.PaymentDoc
+	var paymentRecords []model.PaymentDescriptor
+
+	err = cursor.All(context.TODO(), &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.PaymentDescriptor{}, err
+	}
+
+	for _, r := range results {
+
+		paymentRecords = append(paymentRecords, utils.ConvertPaymentDocToPaymentDescr(r))
+
+	}
+	return paymentRecords, nil
+}
+
+func DeletePayment(paymentId string) error {
+
+	doc, err := GetPayment(paymentId)
+	if err != nil {
+		return fmt.Errorf(
+			"DeletePayment failure getting payment: %w",
+			err,
+		)
+	}
+
+	err = SetGamesCompleted(doc.TenantId, doc.GameIds)
+
+	if err != nil {
+		return fmt.Errorf(
+			"DeletePayment failure updating games: %w",
+			err,
+		)
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+
+	_, err = coll.DeleteOne(ctx, bson.M{"paymentId": paymentId})
+	if err != nil {
+		return fmt.Errorf("DeleteOne failure.  Reason: %s", err)
+	}
+
+	return nil
+}
+
 func QueryPayments(parentCtx context.Context, dbase, collection, assoc string) ([]model.PaymentDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -1492,6 +1570,27 @@ func GetOfficialsCollection(parentCtx context.Context) ([]model.OfficialDoc, err
 	}
 
 	return results, nil
+}
+
+func GetPayment(paymentId string) (model.PaymentDoc, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+
+	filter := bson.M{
+		"paymentId": paymentId,
+		"tenantId":  TenantId,
+	}
+
+	var result model.PaymentDoc
+	err := coll.FindOne(ctx, filter).Decode(&result)
+	if err != nil {
+		return model.PaymentDoc{}, fmt.Errorf("FindOne failure.  Reason: %s", err)
+	}
+
+	return result, nil
 }
 
 func GetPaymentsCollection(parentCtx context.Context) ([]model.PaymentDoc, error) {
@@ -3239,6 +3338,78 @@ func (gc *GameCollection) GetGameIdsByDateTime(tId, date, timeStamp string) ([]i
 	}
 
 	return gameIds, nil
+}
+
+func SetGamesCompleted(tenantId string, gameIDs []int64) error {
+
+	ctx := context.Background()
+	if len(gameIDs) == 0 {
+		return fmt.Errorf("no game IDs were provided")
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	session, err := coll.Database().Client().StartSession()
+	if err != nil {
+		return fmt.Errorf("failed to start MongoDB session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	_, err = session.WithTransaction(
+		ctx,
+		func(sessionCtx mongo.SessionContext) (interface{}, error) {
+
+			filter := bson.M{
+				"tenantId": tenantId,
+				"gameId": bson.M{
+					"$in": gameIDs,
+				},
+			}
+
+			update := bson.M{
+				"$set": bson.M{
+					"status": "Completed",
+				},
+			}
+
+			result, err := coll.UpdateMany(
+				sessionCtx,
+				filter,
+				update,
+			)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"failed to update games: %w",
+					err,
+				)
+			}
+
+			/*
+			   If even one requested game was not found,
+			   return an error. Returning the error causes
+			   WithTransaction to roll back the updates.
+			*/
+			if result.MatchedCount != int64(len(gameIDs)) {
+				return nil, fmt.Errorf(
+					"expected to update %d games, but only %d were found",
+					len(gameIDs),
+					result.MatchedCount,
+				)
+			}
+
+			return nil, nil
+		},
+	)
+
+	if err != nil {
+		return fmt.Errorf(
+			"game status transaction was rolled back: %w",
+			err,
+		)
+	}
+
+	return nil
 }
 
 // Official Collection, Documents and API Code

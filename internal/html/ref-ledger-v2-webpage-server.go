@@ -4654,6 +4654,107 @@ func CreatePayment(
 	}
 }
 
+func DeletePayment(w http.ResponseWriter, r *http.Request) {
+
+	paymentID := strings.TrimSpace(
+		r.URL.Query().Get("paymentId"),
+	)
+
+	if paymentID == "" {
+		http.Error(
+			w,
+			"paymentId is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	err := database.DeletePayment(paymentID)
+	if err != nil {
+		http.Error(
+			w,
+			"Failed to delete payment",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Payment deleted successfully"))
+}
+
+func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
+
+	paymentId := strings.TrimSpace(
+		r.URL.Query().Get("paymentId"),
+	)
+
+	date := strings.TrimSpace(
+		r.URL.Query().Get("date"),
+	)
+
+	association := strings.TrimSpace(
+		r.URL.Query().Get("association"),
+	)
+
+	amountText := strings.TrimSpace(
+		r.URL.Query().Get("amount"),
+	)
+
+	var amount int64
+
+	if amountText != "" {
+		parsedAmount, err := strconv.ParseInt(
+			amountText,
+			10,
+			64,
+		)
+		if err != nil {
+			http.Error(
+				w,
+				"Amount must be a valid whole number.",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		amount = parsedAmount * 100 // Convert dollars to cents
+
+	}
+
+	registryFilter := model.PaymentRegistryFilter{
+		PaymentId:   paymentId,
+		Date:        date,
+		Association: association,
+		Amount:      amount,
+		TenantId:    database.TenantId,
+	}
+
+	fmt.Println("Payment Filter:", registryFilter)
+	payments, err := database.GetPaymentRegistry(registryFilter)
+	fmt.Println("Payments:", payments, " Error:", err)
+	if err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(payments); err != nil {
+		fmt.Println(
+			"Failed to encode payment registry response:",
+			err,
+		)
+	}
+
+}
+
 func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
@@ -5932,6 +6033,8 @@ func main() {
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
+	mux.HandleFunc("/api/payment-registry", authRequired(readOnlyForbidden(LoadPaymentRegistry)))
+	mux.HandleFunc("/api/deletePayment", authRequired(readOnlyForbidden(DeletePayment)))
 	mux.HandleFunc("/api/login", ValidateLogin)
 	mux.HandleFunc("/api/logout", Logout)
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)

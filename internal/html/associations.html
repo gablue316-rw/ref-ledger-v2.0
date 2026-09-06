@@ -109,12 +109,12 @@
         }
 
         .btn-clear {
-            background-color: #eab308; /* yellow */
-            color: #000;              /* black text for contrast */
+            background-color: #dc2626;
+            color: white;
         }
 
         .btn-clear:hover {
-            background-color: #ca8a04; /* darker yellow */
+            background-color: #b91c1c;
         }
 
         .btn-find{
@@ -134,19 +134,20 @@
         }
         
         .btn-delete {
-            background-color: #dc2626;
+            background-color: #ffff00;
+            color: black;
         }
 
         .btn-delete:hover {
-            background-color: #b91c1c;
+            background-color: #ffc000;
         }
 
         .btn-directory {
-            background-color: #dc2626;
+            background-color: #7c3aed;
         }
 
         .btn-directory:hover {
-            background-color: #b91c1c;
+            background-color: #6d28d9;
         }
 
         .btn-import {
@@ -157,6 +158,60 @@
         .btn-import:hover {
             background-color: #115e59;
         }
+
+        .directory-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .select-all-label { display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; }
+        .select-all-label input, .association-check { width:auto; cursor:pointer; }
+        .btn:disabled { cursor:not-allowed; opacity:.55; }
+        .btn-delete-selected { background:#dc2626; }
+        .btn-delete-selected:hover:not(:disabled) { background:#b91c1c; }
+
+        .row-delete-btn {
+            border: none;
+            background: transparent;
+            color: #dc2626;
+            cursor: pointer;
+            font-size: 17px;
+            padding: 6px 9px;
+            border-radius: 5px;
+        }
+
+        .row-delete-btn:hover {
+            color: white;
+            background: #dc2626;
+        }
+
+        .select-column,
+        .delete-column {
+            width: 70px;
+            text-align: center !important;
+        }
+
+        .association-check {
+            width: 17px;
+            height: 17px;
+            cursor: pointer;
+        }
+
+        .delete-modal { width:min(460px,calc(100% - 32px)); padding:0; border:none; border-radius:16px; box-shadow:0 24px 60px rgba(15,23,42,.3); overflow:hidden; }
+        .delete-modal::backdrop { background:rgba(15,23,42,.65); backdrop-filter:blur(3px); }
+        .delete-modal-content { background:white; }
+        .delete-modal-header { display:flex; align-items:center; gap:14px; padding:22px 24px 16px; }
+        .delete-modal-icon { display:grid; place-items:center; flex:0 0 48px; height:48px; border-radius:50%; background:#fee2e2; color:#dc2626; font-size:21px; }
+        .delete-modal-header h2 { color:#1e293b; font-size:21px; margin-bottom:3px; }
+        .delete-modal-header p { color:#64748b; font-size:14px; }
+        .delete-modal-body { padding:4px 24px 22px; color:#475569; line-height:1.55; }
+        .delete-modal-target { margin-top:14px; padding:12px 14px; border:1px solid #fecaca; border-radius:9px; background:#fff7f7; color:#991b1b; font-weight:bold; }
+        .delete-modal-actions { display:flex; justify-content:flex-end; gap:10px; padding:16px 24px; border-top:1px solid #e2e8f0; background:#f8fafc; }
+        .btn-modal-cancel { background:white; color:#334155; border:1px solid #cbd5e1; }
+        .btn-modal-delete { background:#dc2626; }
  
         .message-box {
             background-color: white;
@@ -165,24 +220,10 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
             font-weight: bold;
             min-height: 60px;
+            margin-bottom: 20px;
         }
 
-.directory-card {
-    display: none;
-    margin-top: 20px;
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0,0,0,.1);
-    overflow: hidden;
-}
-
-.directory-header {
-    background: #1e293b;
-    color: white;
-    padding: 15px 20px;
-    font-size: 18px;
-    font-weight: bold;
-}
+.directory-note { margin-bottom:15px; color:#475569; font-size:14px; }
 
 .directory-table {
     width: 100%;
@@ -190,7 +231,7 @@
 }
 
 .directory-table th {
-    background: #082b4f;
+    background: #2563eb;
     color: white;
     padding: 12px;
     text-align: left;
@@ -215,17 +256,14 @@
 
         @media (max-width: 768px) {
 
-            .row {
-                flex-direction: column;
-            }
-
-            .button-row {
+            .row, .button-row, .directory-actions {
                 flex-direction: column;
             }
 
             .btn {
                 width: 100%;
             }
+            .delete-modal-actions .btn { width:auto; }
         }
 
     </style>
@@ -353,28 +391,65 @@
 
     </div>
 
-<div class="directory-card" id="directorySection">
-    <div class="directory-header">Association Directory</div>
+    <div class="message-box" id="message">
+        Ready to enter Associations
+    </div>
+
+<div class="form-card" id="directorySection" style="display:none;">
+    <h2>Association Directory</h2>
+    <p class="directory-note">Manage associations individually or select multiple associations for deletion.</p>
+
+    <div class="directory-actions">
+        <label class="select-all-label" for="selectAllAssociations">
+            <input type="checkbox" id="selectAllAssociations">
+            Select All
+        </label>
+
+        <button type="button" id="deleteSelectedBtn" class="btn btn-delete-selected" disabled>
+            <i class="fa-solid fa-trash"></i>
+            Delete Selected
+        </button>
+    </div>
 
     <table id="associationsTable" class="directory-table">
         <thead>
             <tr>
+                <th class="select-column">Select</th>
                 <th>ID</th>
                 <th>Association</th>
                 <th>Contact</th>
                 <th>Phone</th>
                 <th>Email</th>
                 <th>Assignors</th>
+                <th class="delete-column">Delete</th>
             </tr>
         </thead>
         <tbody></tbody>
     </table>
 </div>
-    
-    <div class="message-box" id="message">
-        Ready to enter Associations
-    </div>
 
+<dialog id="deleteConfirmationModal" class="delete-modal" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalMessage">
+    <div class="delete-modal-content">
+        <div class="delete-modal-header">
+            <div class="delete-modal-icon" aria-hidden="true"><i class="fa-solid fa-trash-can"></i></div>
+            <div><h2 id="deleteModalTitle">Confirm deletion</h2><p>This action cannot be undone.</p></div>
+        </div>
+        <div class="delete-modal-body">
+            <p id="deleteModalMessage"></p>
+            <div id="deleteModalTarget" class="delete-modal-target"></div>
+        </div>
+        <div class="delete-modal-actions">
+            <button type="button" id="cancelDeleteBtn" class="btn btn-modal-cancel">
+                Cancel
+            </button>
+            <button type="button" id="confirmDeleteBtn" class="btn btn-modal-delete">
+                <i class="fa-solid fa-trash-can"></i>
+                Delete
+            </button>
+        </div>
+    </div>
+</dialog>
+    
 </div>
 
 <script src="/components/navbar.js?v=12"></script>
@@ -383,6 +458,58 @@
 
 function clearAssociationsForm() {
     document.getElementById("associationForm").reset();
+}
+
+const selectAllAssociations = document.getElementById("selectAllAssociations");
+const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
+const deleteConfirmationModal = document.getElementById("deleteConfirmationModal");
+
+function confirmAssociationDeletion(message, target) {
+    document.getElementById("deleteModalMessage").textContent = message;
+    document.getElementById("deleteModalTarget").textContent = target;
+    deleteConfirmationModal.showModal();
+    return new Promise(function (resolve) {
+        function finish(confirmed) {
+            document.getElementById("confirmDeleteBtn").removeEventListener("click", confirmDeletion);
+            document.getElementById("cancelDeleteBtn").removeEventListener("click", cancelDeletion);
+            deleteConfirmationModal.removeEventListener("cancel", cancelWithEscape);
+            deleteConfirmationModal.removeEventListener("click", cancelFromBackdrop);
+            deleteConfirmationModal.close();
+            resolve(confirmed);
+        }
+        function confirmDeletion() { finish(true); }
+        function cancelDeletion() { finish(false); }
+        function cancelWithEscape(event) { event.preventDefault(); finish(false); }
+        function cancelFromBackdrop(event) { if (event.target === deleteConfirmationModal) finish(false); }
+        document.getElementById("confirmDeleteBtn").addEventListener("click", confirmDeletion);
+        document.getElementById("cancelDeleteBtn").addEventListener("click", cancelDeletion);
+        deleteConfirmationModal.addEventListener("cancel", cancelWithEscape);
+        deleteConfirmationModal.addEventListener("click", cancelFromBackdrop);
+        document.getElementById("cancelDeleteBtn").focus();
+    });
+}
+
+function updateAssociationSelection() {
+    const checkboxes = Array.from(document.querySelectorAll(".association-check"));
+    const selectedCount = checkboxes.filter(checkbox => checkbox.checked).length;
+    selectAllAssociations.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
+    selectAllAssociations.indeterminate = selectedCount > 0 && selectedCount < checkboxes.length;
+    deleteSelectedBtn.disabled = selectedCount === 0;
+}
+
+async function deleteAssociation(assocId) {
+    const response = await fetch(
+        `/api/deleteAssociation/${encodeURIComponent(assocId)}`,
+        { method: "DELETE" }
+    );
+
+    const message = await response.text();
+
+    if (!response.ok) {
+        throw new Error(message || `Unable to delete association ${assocId}.`);
+    }
+
+    return message;
 }
 
 document
@@ -441,27 +568,28 @@ document.getElementById("getAssocBtn").addEventListener("click", async function 
 
 document.getElementById("deleteBtn").addEventListener("click", async () => {
 
-    const assocId = document.getElementById("assocId").value;
+    const assocId = document.getElementById("assocId").value.trim();
+    const assocName = document.getElementById("assocName").value.trim();
 
-    try {
-        const response = await fetch(`/api/deleteAssociation/${assocId}`, {
-            method: "DELETE"
-        });
-
-        const message = await response.text();
-
+    if (!assocId) {
         document.getElementById("message").innerText =
-            response.ok
-                ? message || "Association deleted successfully."
-                : message || "Error deleting association.";
-    
-        if (response.ok) {
-           clearAssociationsForm();
-        }
-
-    } catch(err) {
-        document.getElementById("message").innerText = "Server unavailable.";
+            "Enter or load an Association ID before deleting.";
+        return;
     }
+
+    const description = assocName
+        ? `\"${assocName}\" (${assocId})`
+        : `association ${assocId}`;
+
+    const confirmed = await confirmAssociationDeletion(
+        "You are about to permanently delete this association.", description
+    );
+    if (!confirmed) return;
+    try {
+        const message = await deleteAssociation(assocId);
+        document.getElementById("message").innerText = message || "Association deleted successfully.";
+        clearAssociationsForm();
+    } catch (err) { document.getElementById("message").innerText = err.message; }
 });
 
 document.getElementById("associationForm").addEventListener("submit", async function(e) {
@@ -547,6 +675,9 @@ document.getElementById("directoryBtn").addEventListener("click", async function
 
         const tbody = document.querySelector("#associationsTable tbody");
         tbody.innerHTML = "";
+        selectAllAssociations.checked = false;
+        selectAllAssociations.indeterminate = false;
+        deleteSelectedBtn.disabled = true;
 
         if (!associations || associations.length === 0) {
             document.getElementById("directorySection").style.display = "block";
@@ -559,15 +690,39 @@ document.getElementById("directoryBtn").addEventListener("click", async function
             const row = document.createElement("tr");
 
             row.innerHTML = `
+                <td class="select-column">
+                    <input
+                        type="checkbox"
+                        class="association-check"
+                        value="${association.Id || ""}"
+                        aria-label="Select ${association.Name || association.Id || "association"}"
+                    >
+                </td>
                 <td>${association.Id || ""}</td>
                 <td>${association.Name || ""}</td>
                 <td>${association.Contact || ""}</td>
                 <td>${association.Phone || ""}</td>
                 <td>${association.Email || ""}</td>
                 <td>${association.Assignors || ""}</td>
+                <td class="delete-column">
+                    <button
+                        type="button"
+                        class="row-delete-btn"
+                        title="Delete association"
+                        aria-label="Delete ${association.Name || association.Id || "association"}"
+                    >
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </td>
             `;
 
-            row.addEventListener("click", function () {
+            row.querySelector(".association-check").addEventListener("change", updateAssociationSelection);
+
+            row.addEventListener("click", function (event) {
+                if (event.target.closest(".association-check, .row-delete-btn")) {
+                    return;
+                }
+
                 document.getElementById("assocId").value = association.Id || "";
                 document.getElementById("assocName").value = association.Name || "";
                 document.getElementById("contactName").value = association.Contact || "";
@@ -577,6 +732,24 @@ document.getElementById("directoryBtn").addEventListener("click", async function
 
                 document.getElementById("message").innerText =
                     "Association loaded.";
+            });
+
+            row.querySelector(".row-delete-btn").addEventListener("click", async function () {
+                const description = association.Name
+                    ? `\"${association.Name}\" (${association.Id})`
+                    : `association ${association.Id}`;
+
+                const confirmed = await confirmAssociationDeletion(
+                    "You are about to permanently delete this association.", description
+                );
+                if (!confirmed) return;
+                try {
+                    const message = await deleteAssociation(association.Id);
+                    row.remove();
+                    updateAssociationSelection();
+                    document.getElementById("message").innerText = message || "Association deleted successfully.";
+                    if (!tbody.children.length) document.getElementById("message").innerText = "Association deleted successfully. No associations remain.";
+                } catch (err) { document.getElementById("message").innerText = err.message; }
             });
 
             tbody.appendChild(row);
@@ -590,6 +763,56 @@ document.getElementById("directoryBtn").addEventListener("click", async function
     } catch (err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }
+});
+
+selectAllAssociations.addEventListener("change", function () {
+    document.querySelectorAll(".association-check").forEach(function (checkbox) {
+        checkbox.checked = selectAllAssociations.checked;
+    });
+    updateAssociationSelection();
+});
+
+deleteSelectedBtn.addEventListener("click", async function () {
+    const selected = Array.from(
+        document.querySelectorAll(".association-check:checked")
+    );
+
+    if (!selected.length) {
+        document.getElementById("message").innerText =
+            "Select at least one association to delete.";
+        return;
+    }
+
+    const count = selected.length;
+    const confirmed = await confirmAssociationDeletion(
+        "You are about to permanently delete the selected associations.",
+        `${count} selected association(s)`
+    );
+    if (!confirmed) return;
+            const deletedIds = [];
+            const errors = [];
+
+            for (const checkbox of selected) {
+                try {
+                    await deleteAssociation(checkbox.value);
+                    deletedIds.push(checkbox.value);
+                    checkbox.closest("tr").remove();
+                } catch (err) {
+                    errors.push(`${checkbox.value}: ${err.message}`);
+                }
+            }
+
+            const messageElement = document.getElementById("message");
+
+            if (!errors.length) {
+                messageElement.innerText =
+                    `${deletedIds.length} association${deletedIds.length === 1 ? "" : "s"} deleted successfully.`;
+            } else {
+                messageElement.innerText =
+                    `${deletedIds.length} deleted. ${errors.length} could not be deleted: ${errors.join(" | ")}`;
+            }
+
+            updateAssociationSelection();
 });
 
 </script>
