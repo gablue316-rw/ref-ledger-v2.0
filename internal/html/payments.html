@@ -1088,67 +1088,55 @@ async function deleteRegistryPayment(paymentId) {
         paymentId
     );
 
-    const response = await fetch(
+    return fetch(
         `/api/deletePayment?${params.toString()}`,
         {
             method: "DELETE"
         }
     );
-
-    if (!response.ok) {
-        const errorText = await response.text();
-
-        throw new Error(
-            errorText ||
-            `Unable to delete payment ${paymentId}.`
-        );
-    }
-
-    await loadCompletedGames();
-
-    return response;
 }
 
 async function deletePaymentAndHandleResponse(paymentId) {
-    const response = await deleteRegistryPayment(paymentId);
+    const response =
+        await deleteRegistryPayment(paymentId);
 
     if (
         response.status === 401 ||
         response.redirected
     ) {
         window.location.href = "/login";
-        return { stopped: true };
+
+        return {
+            stopped: true,
+            ok: false,
+            message: ""
+        };
     }
 
     if (response.status === 403) {
-        showMessage(
-            "Permission denied. Read-only users cannot delete payments.",
-            "error"
-        );
-        return { stopped: true };
+        return {
+            stopped: true,
+            ok: false,
+            message:
+                "Permission denied. Read-only users cannot delete payments."
+        };
     }
 
-    const responseMessage = await response.text();
+    const responseMessage =
+        (await response.text()).trim();
 
     return {
         stopped: false,
         ok: response.ok,
-        message: responseMessage.trim()
+        message:
+            responseMessage ||
+            (
+                response.ok
+                    ? `Payment ${paymentId} deleted successfully.`
+                    : `Error deleting payment ${paymentId}.`
+            )
     };
 }
-
-selectAllPayments.addEventListener(
-    "change",
-    function() {
-        document
-            .querySelectorAll(".payment-select")
-            .forEach(function(checkbox) {
-                checkbox.checked = selectAllPayments.checked;
-            });
-
-        updatePaymentSelection();
-    }
-);
 
 deleteSelectedPaymentsBtn.addEventListener(
     "click",
@@ -1190,6 +1178,13 @@ deleteSelectedPaymentsBtn.addEventListener(
                 );
 
                 if (result.stopped) {
+                    if (result.message) {
+                        showMessage(
+                            result.message,
+                            "error"
+                        );
+                    }
+
                     updatePaymentSelection();
                     return;
                 }
@@ -1208,10 +1203,15 @@ deleteSelectedPaymentsBtn.addEventListener(
         updatePaymentSelection();
         updatePaymentRegistryCount();
 
-        messageBox.innerText = failedCount === 0
-            ? `${deletedCount} payment(s) deleted successfully.`
-            : `${deletedCount} payment(s) deleted; ` +
-              `${failedCount} could not be deleted.`;
+        await loadCompletedGames(false);
+
+        showMessage(
+            failedCount === 0
+                ? `${deletedCount} payment(s) deleted successfully.`
+                : `${deletedCount} payment(s) deleted; ` +
+                  `${failedCount} could not be deleted.`,
+            failedCount === 0 ? "success" : "error"
+        );
     }
 );
 
@@ -1378,6 +1378,13 @@ function renderPayments(payments) {
                             );
 
                         if (result.stopped) {
+                            if (result.message) {
+                                showMessage(
+                                    result.message,
+                                    "error"
+                                );
+                            }
+
                             return;
                         }
 
@@ -1393,6 +1400,8 @@ function renderPayments(payments) {
                         deleteButton.closest("tr").remove();
                         updatePaymentSelection();
                         updatePaymentRegistryCount();
+
+                        await loadCompletedGames(false);
 
                         showMessage(
                             result.message ||
@@ -1624,8 +1633,10 @@ async function loadCompletedGames(
     } catch (error) {
         console.error(error);
 
-        messageBox.innerText =
-            "Unable to load completed games.";
+        if (displayCountMessage) {
+            messageBox.innerText =
+                "Unable to load completed games.";
+        }
     }
 }
 
