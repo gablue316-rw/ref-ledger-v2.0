@@ -678,25 +678,32 @@ func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDesc
 func DeletePayment(paymentId string) error {
 
 	doc, err := GetPayment(paymentId)
+	if err != nil {
+		return fmt.Errorf(
+			"DeletePayment failure getting payment: %w",
+			err,
+		)
+	}
+
+	err = SetGamesCompleted(doc.TenantId, doc.GameIds)
 
 	if err != nil {
-		return fmt.Errorf("DeletePayment failure.  Reason: %s", err)
+		return fmt.Errorf(
+			"DeletePayment failure updating games: %w",
+			err,
+		)
 	}
 
-	for gameId := range doc.GameIds {
-		fmt.Println("Game ID to be set to Completed:", gameId)
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("payments")
+
+	_, err = coll.DeleteOne(ctx, bson.M{"paymentId": paymentId})
+	if err != nil {
+		return fmt.Errorf("DeleteOne failure.  Reason: %s", err)
 	}
-
-	// ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	// defer cancel()
-
-	// db := Client.Database(Database)
-	// coll := db.Collection("payments")
-
-	// _, err = coll.DeleteOne(ctx, bson.M{"paymentId": paymentId})
-	// if err != nil {
-	// 	return fmt.Errorf("DeleteOne failure.  Reason: %s", err)
-	// }
 
 	return nil
 }
@@ -3331,6 +3338,78 @@ func (gc *GameCollection) GetGameIdsByDateTime(tId, date, timeStamp string) ([]i
 	}
 
 	return gameIds, nil
+}
+
+func SetGamesCompleted(tenantId string, gameIDs []int64) error {
+
+	ctx := context.Background()
+	if len(gameIDs) == 0 {
+		return fmt.Errorf("no game IDs were provided")
+	}
+
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+
+	session, err := coll.Database().Client().StartSession()
+	if err != nil {
+		return fmt.Errorf("failed to start MongoDB session: %w", err)
+	}
+	defer session.EndSession(ctx)
+
+	_, err = session.WithTransaction(
+		ctx,
+		func(sessionCtx mongo.SessionContext) (interface{}, error) {
+
+			filter := bson.M{
+				"tenantId": tenantId,
+				"gameId": bson.M{
+					"$in": gameIDs,
+				},
+			}
+
+			update := bson.M{
+				"$set": bson.M{
+					"status": "Completed",
+				},
+			}
+
+			result, err := coll.UpdateMany(
+				sessionCtx,
+				filter,
+				update,
+			)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"failed to update games: %w",
+					err,
+				)
+			}
+
+			/*
+			   If even one requested game was not found,
+			   return an error. Returning the error causes
+			   WithTransaction to roll back the updates.
+			*/
+			if result.MatchedCount != int64(len(gameIDs)) {
+				return nil, fmt.Errorf(
+					"expected to update %d games, but only %d were found",
+					len(gameIDs),
+					result.MatchedCount,
+				)
+			}
+
+			return nil, nil
+		},
+	)
+
+	if err != nil {
+		return fmt.Errorf(
+			"game status transaction was rolled back: %w",
+			err,
+		)
+	}
+
+	return nil
 }
 
 // Official Collection, Documents and API Code
