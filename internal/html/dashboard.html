@@ -435,11 +435,22 @@ function hideMessage() {
     div.style.display = "none";
 }
 
-function updateGamesCount(count) {
+function updateGamesCount(count, totalFees) {
     const gamesCount = document.getElementById("gamesCount");
 
     gamesCount.textContent =
-        `${count} ${count === 1 ? "game" : "games"} displayed`;
+        `${count} ${count === 1 ? "game" : "games"} displayed` +
+        `Total game fees: ${formatCurrency(totalGameFees)}`;
+}
+
+function formatCurrency(amount) {
+    return Number(amount || 0).toLocaleString(
+        "en-US",
+        {
+            style: "currency",
+            currency: "USD"
+        }
+    );
 }
 
 function renderGames(
@@ -451,9 +462,16 @@ function renderGames(
     const displayedGameCount =
         Array.isArray(games) ? games.length : 0;
 
-    tbody.innerHTML = "";
+    const totalGameFees = Array.isArray(games)
+        ? games.reduce((total, game) => {
+            const gameFee = Number(game.GameFee) || 0;
+            return total + gameFee;
+        }, 0)
+        : 0;
+   
+        tbody.innerHTML = "";
 
-    updateGamesCount(displayedGameCount);
+    updateGamesCount(displayedGameCount, totalGameFees);
 
     document.getElementById("selectAll").checked = false;
 
