@@ -1478,46 +1478,56 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		)
 	}
 
-	_, err = oc.Exists(row.Data.Referee, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching referee: %v", err),
-		)
+	if row.Data.Referee != "Unassigned" {
+	    _, err = oc.Exists(row.Data.Referee, tId)
+	    if err != nil {
+		    row.Errors = append(
+			    row.Errors,
+			    fmt.Sprintf("Error occurred while fetching referee: %v", err),
+		    )
+	    }
 	}
 
-	_, err = oc.Exists(row.Data.U1, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching U1: %v", err),
-		)
+	if row.Data.U1 != "Unassigned" {	
+	    _, err = oc.Exists(row.Data.U1, tId)
+	    if err != nil {
+		    row.Errors = append(
+			    row.Errors,
+			    fmt.Sprintf("Error occurred while fetching U1: %v", err),
+		    )
+	    }
 	}
 
-	_, err = oc.Exists(row.Data.U2, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching U2: %v", err),
-		)
+	if row.Data.U2 != "Unassigned" {
+	    _, err = oc.Exists(row.Data.U2, tId)
+	    if err != nil {
+		    row.Errors = append(
+			    row.Errors,
+			    fmt.Sprintf("Error occurred while fetching U2: %v", err),
+		    )
+	    }
 	}
 
-	_, err = oc.Exists(row.Data.ECO, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching ECO: %v", err),
-		)
+	if row.Data.ECO != "Unassigned" {
+	    _, err = oc.Exists(row.Data.ECO, tId)
+	    if err != nil {
+		    row.Errors = append(
+			    row.Errors,
+			    fmt.Sprintf("Error occurred while fetching ECO: %v", err),
+		    )
+	    }
 	}
 
-	_, err = ac.AssignorExists(row.Data.Assignor, tId, row.Data.Association)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching Assignor: %v", err),
-		)
+	if row.Data.Assignor != "Unassigned" {
+	    _, err = ac.AssignorExists(row.Data.Assignor, tId, row.Data.Association)
+	    if err != nil {
+		    row.Errors = append(
+			    row.Errors,
+			    fmt.Sprintf("Error occurred while fetching Assignor: %v", err),
+		    )
+	    }
 	}
-
+	
 	row.Valid = len(row.Errors) == 0
 
 	return row
