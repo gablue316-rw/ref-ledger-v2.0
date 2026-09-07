@@ -1549,6 +1549,14 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
         }
     }
 
+
+	fmt.Printf(
+  	    "AssignorExists arguments: name=%q tenantId=%q associationId=%q\n",
+	    row.Data.Assignor,
+	    tId,
+	    row.Data.Association,
+    )
+
     if row.Data.Assignor != "Unassigned" {
 	    exists, err = ac.AssignorExists(
 		    row.Data.Assignor,

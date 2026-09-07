@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -2223,37 +2222,71 @@ func (ac *AssociationCollection) Get(id string, tenantId string) (*Association, 
 	return &association, nil
 }
 
-func (ac *AssociationCollection) AssignorExists(name string, tenantId string, associationId string) (bool, error) {
+func (ac *AssociationCollection) AssignorExists(
+	name string,
+	tenantId string,
+	associationId string,
+) (bool, error) {
 
-	var doc AssociationDoc
+	name = strings.TrimSpace(name)
+	tenantId = strings.TrimSpace(tenantId)
+	associationId = strings.TrimSpace(associationId)
+
+	fmt.Printf(
+		"AssignorExists: name=%q tenantId=%q associationId=%q\n",
+		name,
+		tenantId,
+		associationId,
+	)
 
 	filter := bson.M{
 		"id":       associationId,
 		"tenantId": tenantId,
-		"assignors": bson.M{
-			"$regex":   "(^|,\\s*)" + regexp.QuoteMeta(name) + "(\\s*,|$)",
-			"$options": "i",
-		},
 	}
 
-	if tenantId == "na" {
-		fmt.Println("Invalid Tenant ID")
+	var doc AssociationDoc
+
+	err := ac.Coll.FindOne(
+		context.TODO(),
+		filter,
+	).Decode(&doc)
+
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		fmt.Printf(
+			"Association not found: id=%q tenantId=%q\n",
+			associationId,
+			tenantId,
+		)
+
+		return false, nil
 	}
-
-	fmt.Println("Filter:", filter)
-	fmt.Println("Checking if assignor exists")
-
-	err := ac.Coll.FindOne(context.TODO(), filter).Decode(&doc)
 
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return false, nil
-		} else {
-			return false, fmt.Errorf("Database error: %v", err)
+		return false, fmt.Errorf(
+			"failed to retrieve association %q: %w",
+			associationId,
+			err,
+		)
+	}
+
+	for _, storedAssignor := range strings.Split(
+		doc.Assignors,
+		",",
+	) {
+		storedAssignor = strings.TrimSpace(storedAssignor)
+
+		fmt.Printf(
+			"Comparing imported assignor %q to stored assignor %q\n",
+			name,
+			storedAssignor,
+		)
+
+		if strings.EqualFold(storedAssignor, name) {
+			return true, nil
 		}
 	}
 
-	return true, nil
+	return false, nil
 }
 
 func (ac *AssociationCollection) GetAssignorNames(tenantId string) ([]AssignorName, error) {
