@@ -3899,6 +3899,7 @@ func (oc *OfficialCollection) Exists(name, tenantId string) (bool, error) {
 		fmt.Println("Invalid tenantId")
 	}
 
+	fmt.Println("Checking for",name,"in officials collection")
 	names = strings.Split(name, " ")
 
 	if len(names) < 2 || names[0] == "" || names[1] == "" {

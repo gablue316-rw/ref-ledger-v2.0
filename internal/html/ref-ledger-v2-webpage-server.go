@@ -1462,75 +1462,118 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 
 	// Validate fields
 
-	_, err := sc.GetSiteId(row.Data.Site, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching site ID: %v", err),
-		)
-	}
+    _, err := sc.GetSiteId(row.Data.Site, tId)
+    if err != nil {
+         row.Errors = append(
+             row.Errors,
+             fmt.Sprintf("Error occurred while fetching site ID: %v", err),
+         )
+    }
 
-	_, err = ac.Exists(row.Data.Association, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching association ID: %v", err),
-		)
-	}
+    exists, err := ac.Exists(
+	    row.Data.Association,
+	    tId,
+    )
 
-	fmt.Println("Ref=[",row.Data.Referee,"]")
-	if row.Data.Referee != "Unassigned" {
-	    _, err = oc.Exists(row.Data.Referee, tId)
+    if err != nil {
+	    row.Errors = append(
+		    row.Errors,
+		    fmt.Sprintf(
+			    "Error occurred while fetching association ID: %v",
+			    err,
+		    ),
+	    )
+    } else if !exists {
+	    row.Errors = append(
+		    row.Errors,
+		    fmt.Sprintf(
+			    "Association %q does not exist",
+			    row.Data.Association,
+		    ),
+	    )
+    }
+
+    officials := []struct {
+        role string
+        name string
+    }{
+        {
+            role: "Official",
+            name: row.Data.Referee,
+        },
+        {
+            role: "Official",
+            name: row.Data.U1,
+        },
+        {
+            role: "Official",
+            name: row.Data.U2,
+        },
+        {
+            role: "ECO",
+            name: row.Data.ECO,
+        },
+        {
+            role: "Assignor",
+            name: row.Data.Assignor,
+        },
+    }
+
+    for _, official := range officials {
+        name := strings.TrimSpace(official.name)
+
+        if name == "" ||
+            strings.EqualFold(name, "Unassigned") {
+            continue
+        }
+
+        exists, err := oc.Exists(name, tId)
+
+        if err != nil {
+            row.Errors = append(
+                row.Errors,
+                err.Error(),
+            )
+            continue
+        }
+
+        if !exists {
+            row.Errors = append(
+                row.Errors,
+                fmt.Sprintf(
+                    "%s %q does not exist",
+                    official.role,
+                    name,
+                ),
+            )
+        }
+    }
+
+    if row.Data.Assignor != "Unassigned" {
+	    exists, err = ac.AssignorExists(
+		    row.Data.Assignor,
+		    tId,
+		    row.Data.Association,
+	    )
+
 	    if err != nil {
 		    row.Errors = append(
 			    row.Errors,
-			    fmt.Sprintf("Error occurred while fetching referee: %v", err),
+			    fmt.Sprintf(
+				    "Error occurred while fetching Assignor: %v",
+				    err,
+			    ),
 		    )
-	    }
-	}
-
-	fmt.Println("U1=[",row.Data.U1,"]")
-	if row.Data.U1 != "Unassigned" {	
-	    _, err = oc.Exists(row.Data.U1, tId)
-	    if err != nil {
+	    } else if !exists {
 		    row.Errors = append(
 			    row.Errors,
-			    fmt.Sprintf("Error occurred while fetching U1: %v", err),
+			    fmt.Sprintf(
+				    "Assignor %q does not exist",
+				    row.Data.Assignor,
+			    ),
 		    )
 	    }
-	}
-
-	fmt.Println("U2=[",row.Data.U2,"]")	
-	if row.Data.U2 != "Unassigned" {
-	    _, err = oc.Exists(row.Data.U2, tId)
-	    if err != nil {
-		    row.Errors = append(
-			    row.Errors,
-			    fmt.Sprintf("Error occurred while fetching U2: %v", err),
-		    )
-	    }
-	}
-
-	fmt.Println("ECO=[",row.Data.ECO,"]")	
-	if row.Data.ECO != "Unassigned" {
-	    _, err = oc.Exists(row.Data.ECO, tId)
-	    if err != nil {
-		    row.Errors = append(
-			    row.Errors,
-			    fmt.Sprintf("Error occurred while fetching ECO: %v", err),
-		    )
-	    }
-	}
-
-	if row.Data.Assignor != "Unassigned" {
-	    _, err = ac.AssignorExists(row.Data.Assignor, tId, row.Data.Association)
-	    if err != nil {
-		    row.Errors = append(
-			    row.Errors,
-			    fmt.Sprintf("Error occurred while fetching Assignor: %v", err),
-		    )
-	    }
-	}
+    }
 	
 	row.Valid = len(row.Errors) == 0
 
