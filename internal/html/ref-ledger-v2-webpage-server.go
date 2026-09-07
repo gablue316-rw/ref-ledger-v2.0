@@ -1549,6 +1549,10 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
         }
     }
 
+	fmt.Printf(
+	    "Errors before assignor validation: %#v\n",
+	    row.Errors,
+    )
 
 	fmt.Printf(
   	    "AssignorExists arguments: name=%q tenantId=%q associationId=%q\n",
@@ -1557,22 +1561,33 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 	    row.Data.Association,
     )
 
-    if row.Data.Assignor != "Unassigned" {
-	    exists, err = ac.AssignorExists(
+    if !strings.EqualFold(
+	    strings.TrimSpace(row.Data.Assignor),
+	    "Unassigned",
+    ) {
+	    assignorExists, assignorErr := ac.AssignorExists(
 		    row.Data.Assignor,
 		    tId,
 		    row.Data.Association,
 	    )
 
-	    if err != nil {
+	    fmt.Printf(
+		    "AssignorExists returned: exists=%t err=%v assignor=%q association=%q\n",
+		    assignorExists,
+		    assignorErr,
+		    row.Data.Assignor,
+		    row.Data.Association,
+	    )
+
+	    if assignorErr != nil {
 		    row.Errors = append(
 			    row.Errors,
 			    fmt.Sprintf(
 				    "Error occurred while fetching Assignor: %v",
-				    err,
+				    assignorErr,
 			    ),
 		    )
-	    } else if !exists {
+	    } else if !assignorExists {
 		    row.Errors = append(
 			    row.Errors,
 			    fmt.Sprintf(
@@ -1582,6 +1597,11 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		    )
 	    }
     }
+
+    fmt.Printf(
+	    "Errors after assignor validation: %#v\n",
+	    row.Errors,
+    )
 	
 	row.Valid = len(row.Errors) == 0
 
