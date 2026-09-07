@@ -2282,10 +2282,13 @@ func (ac *AssociationCollection) AssignorExists(
 		)
 
 		if strings.EqualFold(storedAssignor, name) {
+			fmt.Printf("Assignor found\n")
 			return true, nil
 		}
 	}
 
+	fmt.Printf("Assignor not found\n")
+	
 	return false, nil
 }
 
