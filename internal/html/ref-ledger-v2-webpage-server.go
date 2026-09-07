@@ -1478,6 +1478,7 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		)
 	}
 
+	fmt.Println("Ref=[",row.Data.Referee,"]")
 	if row.Data.Referee != "Unassigned" {
 	    _, err = oc.Exists(row.Data.Referee, tId)
 	    if err != nil {
@@ -1488,6 +1489,7 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 	    }
 	}
 
+	fmt.Println("U1=[",row.Data.U1,"]")
 	if row.Data.U1 != "Unassigned" {	
 	    _, err = oc.Exists(row.Data.U1, tId)
 	    if err != nil {
@@ -1498,6 +1500,7 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 	    }
 	}
 
+	fmt.Println("U2=[",row.Data.U2,"]")	
 	if row.Data.U2 != "Unassigned" {
 	    _, err = oc.Exists(row.Data.U2, tId)
 	    if err != nil {
@@ -1508,6 +1511,7 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 	    }
 	}
 
+	fmt.Println("ECO=[",row.Data.ECO,"]")	
 	if row.Data.ECO != "Unassigned" {
 	    _, err = oc.Exists(row.Data.ECO, tId)
 	    if err != nil {
@@ -3677,6 +3681,7 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		fmt.Println("Record=[",record,"]")
 		previewRow := buildGamePreviewRow(
 			csvRowNumber,
 			record,
