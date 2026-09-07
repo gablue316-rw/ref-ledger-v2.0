@@ -1513,10 +1513,6 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
             role: "ECO",
             name: row.Data.ECO,
         },
-        {
-            role: "Assignor",
-            name: row.Data.Assignor,
-        },
     }
 
     for _, official := range officials {
