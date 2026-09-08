@@ -4219,3 +4219,56 @@ func (uc *UsersCollection) GetName(tenantId, username string) (string, error) {
 
 	return user.Name, nil
 }
+
+
+type Level struct {
+	ID   string `bson:"id" json:"id"`
+	Name string `bson:"name" json:"name"`
+}
+
+type LevelsCollection struct {
+    DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+
+func (lc *LevelsCollection) Init(client *mongo.Client) error {
+
+	lc.DB = client.Database(Database)
+	lc.Coll = lc.DB.Collection("levels")
+
+	fmt.Println("Successfully initialized Levels Collection")
+	return nil
+}
+
+func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
+
+	ctx := context.TODO() 
+	filter := bson.M{}
+
+	opts := options.Find().
+		SetSort(bson.D{
+			{Key: "name", Value: 1},
+		})
+
+	cursor, err := lc.Coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to query levels: %w",
+			err,
+		)
+	}
+	defer cursor.Close(ctx)
+
+	var levels []Level
+
+	if err := cursor.All(ctx, &levels); err != nil {
+		return nil, fmt.Errorf(
+			"failed to decode levels: %w",
+			err,
+		)
+	}
+
+	return levels, nil
+}

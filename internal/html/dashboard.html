@@ -309,16 +309,7 @@ body {
         <div class="filter-group">
             <label for="level">Level</label>
             <select id="level">
-                <option value="">All</option>
-                <option value="SP">Slow Pitch</option>
-                <option value="PW">Pee Wee</option>
-                <option value="Minor">Minor</option>
-                <option value="Major">Major</option>
-                <option value="Junior">Junior</option>
-                <option value="Senior">Senior</option>
-                <option value="9th Grade">9th Grade</option>
-                <option value="JV">Junior Varsity</option>
-                <option value="Varsity">Varsity</option>
+                <option value="">Select Site</option>                
             </select>
         </div>
 
@@ -837,6 +828,53 @@ async function fetchGames(
             "error"
         );
     }
+}
+
+async function loadLevels() {
+
+    try {
+        const response = await fetch("/api/loadLevels");
+
+        if (!response.ok) {
+            const text = await response.text();
+
+            console.error(
+                "loadLevels failed:",
+                response.status,
+                text
+            );
+
+            showMessage(
+                "loadLevels failed: " +
+                response.status +
+                "\n" +
+                text,
+                "error"
+            );
+
+            return;
+        }
+
+        const levels = await response.json();
+        const select = document.getElementById("level");
+
+        select.innerHTML =
+            '<option value="">Select Level</option>';
+
+        levels.forEach(level => {
+            const option =
+                document.createElement("option");
+
+            option.value = level.name;
+            option.textContent = level.name;
+
+            select.appendChild(option);
+        });
+
+    } catch (err) {
+        console.error("Error loading levels:", err);
+    }    
+    
 }
 
 async function loadSites() {
