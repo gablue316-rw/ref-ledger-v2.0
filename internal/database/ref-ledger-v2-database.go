@@ -4245,7 +4245,11 @@ func (lc *LevelsCollection) Init(client *mongo.Client) error {
 func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 
 	ctx := context.TODO() 
-	filter := bson.M{}
+
+	filter := bson.M{
+		"tenantId":    tenantId,
+	}
+
 
 	opts := options.Find().
 		SetSort(bson.D{
@@ -4271,4 +4275,59 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 	}
 
 	return levels, nil
+}
+
+type Sport struct {
+	ID   string `bson:"id" json:"id"`
+	Name string `bson:"name" json:"name"`
+}
+
+type SportsCollection struct {
+    DB        *mongo.Database
+	Coll      *mongo.Collection
+	LastError error
+}
+
+
+func (sc *SportsCollection) Init(client *mongo.Client) error {
+
+	sc.DB = client.Database(Database)
+	sc.Coll = sc.DB.Collection("sports")
+
+	fmt.Println("Successfully initialized Sports Collection")
+	return nil
+}
+
+func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
+
+	ctx := context.TODO() 
+
+	filter := bson.M{
+		"tenantId":    tenantId,
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{
+			{Key: "name", Value: 1},
+		})
+
+	cursor, err := sc.Coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to query sports: %w",
+			err,
+		)
+	}
+	defer cursor.Close(ctx)
+
+	var sports []Sport
+
+	if err := cursor.All(ctx, &sports); err != nil {
+		return nil, fmt.Errorf(
+			"failed to decode sports: %w",
+			err,
+		)
+	}
+
+	return sports, nil
 }

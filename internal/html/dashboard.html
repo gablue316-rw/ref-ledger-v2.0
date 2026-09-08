@@ -286,9 +286,7 @@ body {
         <div class="filter-group">
             <label for="sport">Sport</label>
             <select id="sport">
-                <option value="">All</option>
-                <option value="Basketball">Basketball</option>
-                <option value="Softball">Softball</option>
+                <option value="">Select Sport</option>
             </select>
         </div>
 
@@ -309,7 +307,7 @@ body {
         <div class="filter-group">
             <label for="level">Level</label>
             <select id="level">
-                <option value="">Select Site</option>                
+                <option value="">Select Level</option>                
             </select>
         </div>
 
@@ -877,6 +875,53 @@ async function loadLevels() {
     
 }
 
+async function loadSports() {
+
+    try {
+        const response = await fetch("/api/loadSports");
+
+        if (!response.ok) {
+            const text = await response.text();
+
+            console.error(
+                "loadSports failed:",
+                response.status,
+                text
+            );
+
+            showMessage(
+                "loadSports failed: " +
+                response.status +
+                "\n" +
+                text,
+                "error"
+            );
+
+            return;
+        }
+
+        const sports = await response.json();
+        const select = document.getElementById("sport");
+
+        select.innerHTML =
+            '<option value="">Select Sport</option>';
+
+        levels.forEach(sport => {
+            const option =
+                document.createElement("option");
+
+            option.value = level.name;
+            option.textContent = level.name;
+
+            select.appendChild(option);
+        });
+
+    } catch (err) {
+        console.error("Error loading sports:", err);
+    }    
+    
+}
+
 async function loadSites() {
     try {
         const response = await fetch("/api/loadSites");
@@ -962,6 +1007,8 @@ document.addEventListener("DOMContentLoaded", function () {
     loadSites();
     loadAssociations();
     loadOfficials();
+    loadLevels();
+    loadSports();
     loadPendingGamesTable();
 });
 

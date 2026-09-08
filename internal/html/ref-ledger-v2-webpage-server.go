@@ -101,6 +101,7 @@ var ec database.ExpensesCollection
 var se database.SessionsCollection
 var uc database.UsersCollection
 var lc database.LevelsCollection
+var spc database.SportsCollection
 
 var AuditLog *log.Logger = nil
 
@@ -521,6 +522,39 @@ func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sites)
+}
+
+
+func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(r)
+
+	var tId string = database.TenantId
+	var err error
+
+	fmt.Println("Request path:", r.URL.Path)
+	fmt.Println("TenantId global:", database.TenantId)
+
+	for _, c := range r.Cookies() {
+		fmt.Println("Cookie:", c.Name, c.Value)
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	sports, err := spc.GetSports(tId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sports)
 }
 
 func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
@@ -5941,6 +5975,13 @@ func main() {
 		return
 	}
 
+	err = spc.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize sports collection.")
+		utils.AuditLog.Println("Failed to initialize sports collection.")
+		return
+	}
+	
 	err = ac.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize associations collection.")
@@ -6096,6 +6137,7 @@ func main() {
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadLevels", GetLevelsHandler)
+	mux.HandleFunc("/api/loadSports", GetSportsHandler)
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
 	mux.HandleFunc("/api/associationsDirectory", GetAssociationsDirectoryHandler)
