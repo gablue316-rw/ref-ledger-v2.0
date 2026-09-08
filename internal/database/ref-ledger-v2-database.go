@@ -4270,11 +4270,14 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 	var levels []Level
 
 	if err := cursor.All(ctx, &levels); err != nil {
+		fmt.Println("failed to decode levels. err=[",err,"]")
 		return nil, fmt.Errorf(
 			"failed to decode levels: %w",
 			err,
 		)
 	}
+
+	fmt.Println("Total levels found for tenant", tenantId, ":", len(levels))
 
 	return levels, nil
 }
@@ -4328,11 +4331,13 @@ func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 	var sports []Sport
 
 	if err := cursor.All(ctx, &sports); err != nil {
+		fmt.Println("failed to decode sports. err=[",err,"]")
 		return nil, fmt.Errorf(
 			"failed to decode sports: %w",
 			err,
 		)
 	}
 
+	fmt.Println("Total sports found for tenant", tenantId, ":", len(sports))
 	return sports, nil
 }
