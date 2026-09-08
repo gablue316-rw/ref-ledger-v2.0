@@ -514,14 +514,16 @@ func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sites, err := lc.GetLevels(tId)
+	levels, err := lc.GetLevels(tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	fmt.Println("Number of levels returned",len(levels),"for tenantId",tId)
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sites)
+	json.NewEncoder(w).Encode(levels)
 }
 
 
@@ -552,6 +554,8 @@ func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	fmt.Println("Number of sports returned",len(sports),"for tenantId",tId)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sports)
