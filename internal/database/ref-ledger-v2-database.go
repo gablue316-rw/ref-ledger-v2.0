@@ -4250,6 +4250,7 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 		"tenantId":    tenantId,
 	}
 
+	fmt.Println("Searching for Levels for tenantId",tenantId)
 
 	opts := options.Find().
 		SetSort(bson.D{
@@ -4258,6 +4259,7 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 
 	cursor, err := lc.Coll.Find(ctx, filter, opts)
 	if err != nil {
+		fmt.Println("Failed to query levels: Error=[",err,"]")
 		return nil, fmt.Errorf(
 			"failed to query levels: %w",
 			err,
@@ -4306,6 +4308,8 @@ func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 		"tenantId":    tenantId,
 	}
 
+	fmt.Println("Searching for Sports for tenantId",tenantId)
+
 	opts := options.Find().
 		SetSort(bson.D{
 			{Key: "name", Value: 1},
@@ -4313,6 +4317,7 @@ func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 
 	cursor, err := sc.Coll.Find(ctx, filter, opts)
 	if err != nil {
+        fmt.Println("Failed to query sports: Error=[",err,"]")		
 		return nil, fmt.Errorf(
 			"failed to query sports: %w",
 			err,
