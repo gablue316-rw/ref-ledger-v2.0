@@ -2,13 +2,17 @@ package email
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"gopkg.in/gomail.v2"
 )
 
-var emailUser string = "refLedger316@gmail.com"
-var emailPwd string = "tzlgytjnsfcsvxbh"
+//var emailUser string = "refLedger316@gmail.com"
+//var emailPwd string = "tzlgytjnsfcsvxbh"
+
+var emailUser string = ""
+var emailPwd string = ""
 
 type Email struct {
 	To         []string
@@ -20,10 +24,14 @@ type Email struct {
 
 func (e *Email) Initialize() {
 	e.To = []string{}
-	e.From = emailUser
+	e.From = strings.TrimSpace(os.Getenv("EMAIL_USERNAME"))
 }
 
 func (e *Email) Send() error {
+
+	emailPwd = strings.TrimSpace(os.Getenv("EMAIL_APP_PASSWORD"))
+
+	fmt.Println("Email username:", e.From)
 	// Implementation for sending email
 	m := gomail.NewMessage()
 	m.SetHeader("From", e.From)
@@ -36,10 +44,11 @@ func (e *Email) Send() error {
 		m.Attach(e.Attachment)
 	}
 
-	d := gomail.NewDialer("smtp.gmail.com", 587, emailUser, emailPwd)
+	d := gomail.NewDialer("smtp.gmail.com", 587, e.From, emailPwd)
 
 	fmt.Println("Sending email to", strings.Join(e.To, ","))
 	if err := d.DialAndSend(m); err != nil {
+		fmt.Println("Failed to send email:", err)
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 	fmt.Println("Email sent successfully to", strings.Join(e.To, ","))

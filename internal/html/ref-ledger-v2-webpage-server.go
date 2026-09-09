@@ -100,6 +100,8 @@ var oc database.OfficialCollection
 var ec database.ExpensesCollection
 var se database.SessionsCollection
 var uc database.UsersCollection
+var lc database.LevelsCollection
+var spc database.SportsCollection
 
 var AuditLog *log.Logger = nil
 
@@ -488,6 +490,74 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(associations)
+}
+
+func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(r)
+
+	var tId string = database.TenantId
+	var err error
+
+	fmt.Println("Request path:", r.URL.Path)
+	fmt.Println("TenantId global:", database.TenantId)
+
+	for _, c := range r.Cookies() {
+		fmt.Println("Cookie:", c.Name, c.Value)
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	levels, err := lc.GetLevels(tId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("Number of levels returned", len(levels), "for tenantId", tId)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(levels)
+}
+
+func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(r)
+
+	var tId string = database.TenantId
+	var err error
+
+	fmt.Println("Request path:", r.URL.Path)
+	fmt.Println("TenantId global:", database.TenantId)
+
+	for _, c := range r.Cookies() {
+		fmt.Println("Cookie:", c.Name, c.Value)
+	}
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
+	sports, err := spc.GetSports(tId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println("Number of sports returned", len(sports), "for tenantId", tId)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sports)
 }
 
 func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
@@ -1470,53 +1540,134 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		)
 	}
 
-	_, err = ac.Exists(row.Data.Association, tId)
+	exists, err := ac.Exists(
+		row.Data.Association,
+		tId,
+	)
+
 	if err != nil {
 		row.Errors = append(
 			row.Errors,
-			fmt.Sprintf("Error occurred while fetching association ID: %v", err),
+			fmt.Sprintf(
+				"Error occurred while fetching association ID: %v",
+				err,
+			),
+		)
+	} else if !exists {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Association %q does not exist",
+				row.Data.Association,
+			),
 		)
 	}
 
-	_, err = oc.Exists(row.Data.Referee, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching referee: %v", err),
-		)
+	officials := []struct {
+		role string
+		name string
+	}{
+		{
+			role: "Official",
+			name: row.Data.Referee,
+		},
+		{
+			role: "Official",
+			name: row.Data.U1,
+		},
+		{
+			role: "Official",
+			name: row.Data.U2,
+		},
+		{
+			role: "ECO",
+			name: row.Data.ECO,
+		},
 	}
 
-	_, err = oc.Exists(row.Data.U1, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching U1: %v", err),
-		)
+	for _, official := range officials {
+		name := strings.TrimSpace(official.name)
+
+		if name == "" ||
+			strings.EqualFold(name, "Unassigned") {
+			continue
+		}
+
+		exists, err := oc.Exists(name, tId)
+
+		if err != nil {
+			row.Errors = append(
+				row.Errors,
+				err.Error(),
+			)
+			continue
+		}
+
+		if !exists {
+			row.Errors = append(
+				row.Errors,
+				fmt.Sprintf(
+					"%s %q does not exist",
+					official.role,
+					name,
+				),
+			)
+		}
 	}
 
-	_, err = oc.Exists(row.Data.U2, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching U2: %v", err),
+	fmt.Printf(
+		"Errors before assignor validation: %#v\n",
+		row.Errors,
+	)
+
+	fmt.Printf(
+		"AssignorExists arguments: name=%q tenantId=%q associationId=%q\n",
+		row.Data.Assignor,
+		tId,
+		row.Data.Association,
+	)
+
+	if !strings.EqualFold(
+		strings.TrimSpace(row.Data.Assignor),
+		"Unassigned",
+	) {
+		assignorExists, assignorErr := ac.AssignorExists(
+			row.Data.Assignor,
+			tId,
+			row.Data.Association,
 		)
+
+		fmt.Printf(
+			"AssignorExists returned: exists=%t err=%v assignor=%q association=%q\n",
+			assignorExists,
+			assignorErr,
+			row.Data.Assignor,
+			row.Data.Association,
+		)
+
+		if assignorErr != nil {
+			row.Errors = append(
+				row.Errors,
+				fmt.Sprintf(
+					"Error occurred while fetching Assignor: %v",
+					assignorErr,
+				),
+			)
+		} else if !assignorExists {
+			row.Errors = append(
+				row.Errors,
+				fmt.Sprintf(
+					"Assignor %q does not exist",
+					row.Data.Assignor,
+				),
+			)
+		}
 	}
 
-	_, err = oc.Exists(row.Data.ECO, tId)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching ECO: %v", err),
-		)
-	}
-
-	_, err = ac.AssignorExists(row.Data.Assignor, tId, row.Data.Association)
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf("Error occurred while fetching Assignor: %v", err),
-		)
-	}
+	fmt.Printf(
+		"Errors after assignor validation: %#v\n",
+		row.Errors,
+	)
 
 	row.Valid = len(row.Errors) == 0
 
@@ -3667,6 +3818,7 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		fmt.Println("Record=[", record, "]")
 		previewRow := buildGamePreviewRow(
 			csvRowNumber,
 			record,
@@ -4947,7 +5099,7 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Site updated successfully"))
+	w.Write([]byte("Site added successfully"))
 }
 
 func UpdateSite(w http.ResponseWriter, r *http.Request) {
@@ -5819,6 +5971,20 @@ func main() {
 		return
 	}
 
+	err = lc.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize levels collection.")
+		utils.AuditLog.Println("Failed to initialize levels collection.")
+		return
+	}
+
+	err = spc.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize sports collection.")
+		utils.AuditLog.Println("Failed to initialize sports collection.")
+		return
+	}
+
 	err = ac.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize associations collection.")
@@ -5973,6 +6139,8 @@ func main() {
 
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
+	mux.HandleFunc("/api/loadLevels", GetLevelsHandler)
+	mux.HandleFunc("/api/loadSports", GetSportsHandler)
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
 	mux.HandleFunc("/api/associationsDirectory", GetAssociationsDirectoryHandler)

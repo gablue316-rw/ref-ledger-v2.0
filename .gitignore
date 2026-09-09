@@ -32,3 +32,10 @@ tests/
 # values.yaml.atlas and values.yaml.local
 values.yaml.atlas
 values.yaml.local
+
+# PDF Files
+*.pdf
+
+# Report JSON and BSON files
+*Report*.json
+*Report*.bson

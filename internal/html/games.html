@@ -111,9 +111,19 @@ body{padding:10px;}
         <option value="">Select Site</option>
     </select>
 </div>
+<div class="form-group">
+    <label for="level">Level</label>
+    <select id="level">
+        <option value="">Select Level</option>
+    </select>
+</div>
 <div class="form-group"><label for="field">Field</label><input type="text" id="field"></div>
-<div class="form-group"><label for="sport">Sport</label><select id="sport"><option></option><option>Basketball</option><option>Softball</option></select></div>
-<div class="form-group"><label for="level">Level</label><select id="level"><option></option><option>9th Grade</option><option>JV</option><option>Varsity</option><option>TB</option><option>PW</option><option>Minor</option><option>Major</option><option>Junior</option><option>Senior</option><option>SP</option><option>TRN30</option><option>TRN45</option><option>TRN50</option></select></div>
+<div class="form-group">
+    <label for="sport">Sport</label>
+    <select id="sport">
+        <option value="">Select Sport</option>
+    </select>
+</div>
 </div>
 </div>
 
@@ -321,6 +331,41 @@ async function loadAssociations() {
     }
 }
 
+async function loadLevels() {
+    try {
+        const response = await fetch("/api/loadLevels");
+
+        if (!response.ok) {
+            throw new Error("Failed to load levels");
+        }
+
+        const levels = await response.json();
+        console.log(levels);
+    
+        const dropdowns = [
+            "level"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Level</option>';
+
+            levels.forEach(level => {
+               const option = document.createElement("option");
+               option.value = level.name;
+               option.textContent = level.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading levels:", err);
+    }
+}
+
 async function loadSites() {
     try {
         const response = await fetch("/api/loadSites");
@@ -356,6 +401,41 @@ async function loadSites() {
     }
 }
 
+
+async function loadSports() {
+    try {
+        const response = await fetch("/api/loadSports");
+
+        if (!response.ok) {
+            throw new Error("Failed to load sports");
+        }
+
+        const sports = await response.json();
+        console.log(sports);
+    
+        const dropdowns = [
+            "sport"
+        ];
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+
+            // Keep the first option
+            select.innerHTML =
+                '<option value="">Select Sport</option>';
+
+            sports.forEach(sport => {
+               const option = document.createElement("option");
+               option.value = sport.name;
+               option.textContent = sport.name;
+               select.appendChild(option);
+            });
+        });
+
+    } catch (err) {
+        console.error("Error loading sports:", err);
+    }
+}
 
 async function loadOfficials() {
     try {
@@ -399,6 +479,8 @@ document.addEventListener("DOMContentLoaded", function() {
     loadOfficials();
     loadSites();
     loadAssociations();
+    loadLevels();
+    loadSports();
     loadAssignors();
 
     setUpdateMode(false);
