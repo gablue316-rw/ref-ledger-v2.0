@@ -800,8 +800,9 @@ func PaymentExists(doc model.PaymentDoc) (bool, error) {
 	coll := db.Collection("payments")
 
 	filter = bson.M{
-		"paymentId": doc.PaymentId,
-		"tenantId":  TenantId,
+		"paymentId":   doc.PaymentId,
+		"association": doc.Association,
+		"tenantId":    TenantId,
 	}
 
 	// Query to find all documents
@@ -1847,33 +1848,33 @@ func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) int {
 func VerifyGameMatchesAssociation(gameIds []int64, association, tenantId string) []error {
 
 	ctx := context.TODO()
-    
+
 	var gameErrors []error
-    db := Client.Database(Database)
+	db := Client.Database(Database)
 	coll := db.Collection("games")
-	
+
 	for _, gameID := range gameIds {
 
 		filter := bson.M{
-			"gameId":   gameID,
-			 "tenantId": tenantId,
-			 "association": association,
-   		}
+			"gameId":      gameID,
+			"tenantId":    tenantId,
+			"association": association,
+		}
 
-	    result := coll.FindOne(ctx, filter)
+		result := coll.FindOne(ctx, filter)
 
 		err := result.Err()
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-           gameErrors = append(gameErrors,fmt.Errorf("game %d was not found",gameID))
-		   continue
-        }
-	    
-		if err != nil {
-			gameErrors = append(gameErrors,fmt.Errorf("GetGameByAssocAndId failure.  Reason: %s", err))
+			gameErrors = append(gameErrors, fmt.Errorf("game %d was not found assigned to association %s", gameID, association))
 			continue
-	    }
-    
+		}
+
+		if err != nil {
+			gameErrors = append(gameErrors, fmt.Errorf("GetGameByAssocAndId failure.  Reason: %s", err))
+			continue
+		}
+
 	}
 
 	return gameErrors
@@ -1894,9 +1895,9 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 	totalErrors := 0
 	var gameIds []int64
 	var gamesUpdatedToPaid int = 0
-    
+
 	importErrors := make([]error, 0)
-	
+
 	for _, v := range payment {
 
 		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
@@ -1906,15 +1907,15 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 		if paymentExists {
 			totalErrors++
 			fmt.Println("Payment with id already exists")
-			importErrors = append(importErrors,errors.New("Payment with ID already exists"))
+			importErrors = append(importErrors, errors.New("Payment with ID already exists"))
 			continue
 		}
 
 		if err != nil {
-		   totalErrors++
-		   fmt.Println(err)
-		   importErrors = append(importErrors, err)
-		   continue
+			totalErrors++
+			fmt.Println(err)
+			importErrors = append(importErrors, err)
+			continue
 		}
 
 		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
@@ -1926,13 +1927,13 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			continue
 		}
 
-		gameErrors  := VerifyGameMatchesAssociation(gameIds, v.Association, TenantId)
+		gameErrors := VerifyGameMatchesAssociation(gameIds, v.Association, TenantId)
 
 		if gameErrors != nil {
 			importErrors = append(importErrors, gameErrors...)
 			continue
 		}
-		
+
 		totalGameFee, err := GetGameFee(gameIds)
 		if err != nil {
 			utils.AuditLog.Printf("Failed to get game fee for Game Ids %v.  Reason: %v", gameIds, err)
@@ -2336,7 +2337,7 @@ func (ac *AssociationCollection) AssignorExists(
 	}
 
 	fmt.Printf("Assignor not found\n")
-	
+
 	return false, nil
 }
 
@@ -3983,7 +3984,7 @@ func (oc *OfficialCollection) Exists(name, tenantId string) (bool, error) {
 		fmt.Println("Invalid tenantId")
 	}
 
-	fmt.Println("Checking for",name,"in officials collection")
+	fmt.Println("Checking for", name, "in officials collection")
 	names = strings.Split(name, " ")
 
 	if len(names) < 2 || names[0] == "" || names[1] == "" {
@@ -4268,18 +4269,16 @@ func (uc *UsersCollection) GetName(tenantId, username string) (string, error) {
 	return user.Name, nil
 }
 
-
 type Level struct {
 	ID   string `bson:"id" json:"id"`
 	Name string `bson:"name" json:"name"`
 }
 
 type LevelsCollection struct {
-    DB        *mongo.Database
+	DB        *mongo.Database
 	Coll      *mongo.Collection
 	LastError error
 }
-
 
 func (lc *LevelsCollection) Init(client *mongo.Client) error {
 
@@ -4292,13 +4291,13 @@ func (lc *LevelsCollection) Init(client *mongo.Client) error {
 
 func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 
-	ctx := context.TODO() 
+	ctx := context.TODO()
 
 	filter := bson.M{
-		"tenantId":    tenantId,
+		"tenantId": tenantId,
 	}
 
-	fmt.Println("Searching for Levels for tenantId",tenantId)
+	fmt.Println("Searching for Levels for tenantId", tenantId)
 
 	opts := options.Find().
 		SetSort(bson.D{
@@ -4307,7 +4306,7 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 
 	cursor, err := lc.Coll.Find(ctx, filter, opts)
 	if err != nil {
-		fmt.Println("Failed to query levels: Error=[",err,"]")
+		fmt.Println("Failed to query levels: Error=[", err, "]")
 		return nil, fmt.Errorf(
 			"failed to query levels: %w",
 			err,
@@ -4318,7 +4317,7 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 	var levels []Level
 
 	if err := cursor.All(ctx, &levels); err != nil {
-		fmt.Println("failed to decode levels. err=[",err,"]")
+		fmt.Println("failed to decode levels. err=[", err, "]")
 		return nil, fmt.Errorf(
 			"failed to decode levels: %w",
 			err,
@@ -4336,11 +4335,10 @@ type Sport struct {
 }
 
 type SportsCollection struct {
-    DB        *mongo.Database
+	DB        *mongo.Database
 	Coll      *mongo.Collection
 	LastError error
 }
-
 
 func (sc *SportsCollection) Init(client *mongo.Client) error {
 
@@ -4353,13 +4351,13 @@ func (sc *SportsCollection) Init(client *mongo.Client) error {
 
 func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 
-	ctx := context.TODO() 
+	ctx := context.TODO()
 
 	filter := bson.M{
-		"tenantId":    tenantId,
+		"tenantId": tenantId,
 	}
 
-	fmt.Println("Searching for Sports for tenantId",tenantId)
+	fmt.Println("Searching for Sports for tenantId", tenantId)
 
 	opts := options.Find().
 		SetSort(bson.D{
@@ -4368,7 +4366,7 @@ func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 
 	cursor, err := sc.Coll.Find(ctx, filter, opts)
 	if err != nil {
-        fmt.Println("Failed to query sports: Error=[",err,"]")		
+		fmt.Println("Failed to query sports: Error=[", err, "]")
 		return nil, fmt.Errorf(
 			"failed to query sports: %w",
 			err,
@@ -4379,7 +4377,7 @@ func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 	var sports []Sport
 
 	if err := cursor.All(ctx, &sports); err != nil {
-		fmt.Println("failed to decode sports. err=[",err,"]")
+		fmt.Println("failed to decode sports. err=[", err, "]")
 		return nil, fmt.Errorf(
 			"failed to decode sports: %w",
 			err,

@@ -520,12 +520,11 @@ func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Number of levels returned",len(levels),"for tenantId",tId)
+	fmt.Println("Number of levels returned", len(levels), "for tenantId", tId)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(levels)
 }
-
 
 func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
@@ -555,7 +554,7 @@ func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Number of sports returned",len(sports),"for tenantId",tId)
+	fmt.Println("Number of sports returned", len(sports), "for tenantId", tId)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sports)
@@ -1533,143 +1532,143 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 
 	// Validate fields
 
-    _, err := sc.GetSiteId(row.Data.Site, tId)
-    if err != nil {
-         row.Errors = append(
-             row.Errors,
-             fmt.Sprintf("Error occurred while fetching site ID: %v", err),
-         )
-    }
+	_, err := sc.GetSiteId(row.Data.Site, tId)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf("Error occurred while fetching site ID: %v", err),
+		)
+	}
 
-    exists, err := ac.Exists(
-	    row.Data.Association,
-	    tId,
-    )
+	exists, err := ac.Exists(
+		row.Data.Association,
+		tId,
+	)
 
-    if err != nil {
-	    row.Errors = append(
-		    row.Errors,
-		    fmt.Sprintf(
-			    "Error occurred while fetching association ID: %v",
-			    err,
-		    ),
-	    )
-    } else if !exists {
-	    row.Errors = append(
-		    row.Errors,
-		    fmt.Sprintf(
-			    "Association %q does not exist",
-			    row.Data.Association,
-		    ),
-	    )
-    }
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Error occurred while fetching association ID: %v",
+				err,
+			),
+		)
+	} else if !exists {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Association %q does not exist",
+				row.Data.Association,
+			),
+		)
+	}
 
-    officials := []struct {
-        role string
-        name string
-    }{
-        {
-            role: "Official",
-            name: row.Data.Referee,
-        },
-        {
-            role: "Official",
-            name: row.Data.U1,
-        },
-        {
-            role: "Official",
-            name: row.Data.U2,
-        },
-        {
-            role: "ECO",
-            name: row.Data.ECO,
-        },
-    }
+	officials := []struct {
+		role string
+		name string
+	}{
+		{
+			role: "Official",
+			name: row.Data.Referee,
+		},
+		{
+			role: "Official",
+			name: row.Data.U1,
+		},
+		{
+			role: "Official",
+			name: row.Data.U2,
+		},
+		{
+			role: "ECO",
+			name: row.Data.ECO,
+		},
+	}
 
-    for _, official := range officials {
-        name := strings.TrimSpace(official.name)
+	for _, official := range officials {
+		name := strings.TrimSpace(official.name)
 
-        if name == "" ||
-            strings.EqualFold(name, "Unassigned") {
-            continue
-        }
+		if name == "" ||
+			strings.EqualFold(name, "Unassigned") {
+			continue
+		}
 
-        exists, err := oc.Exists(name, tId)
+		exists, err := oc.Exists(name, tId)
 
-        if err != nil {
-            row.Errors = append(
-                row.Errors,
-                err.Error(),
-            )
-            continue
-        }
+		if err != nil {
+			row.Errors = append(
+				row.Errors,
+				err.Error(),
+			)
+			continue
+		}
 
-        if !exists {
-            row.Errors = append(
-                row.Errors,
-                fmt.Sprintf(
-                    "%s %q does not exist",
-                    official.role,
-                    name,
-                ),
-            )
-        }
-    }
-
-	fmt.Printf(
-	    "Errors before assignor validation: %#v\n",
-	    row.Errors,
-    )
+		if !exists {
+			row.Errors = append(
+				row.Errors,
+				fmt.Sprintf(
+					"%s %q does not exist",
+					official.role,
+					name,
+				),
+			)
+		}
+	}
 
 	fmt.Printf(
-  	    "AssignorExists arguments: name=%q tenantId=%q associationId=%q\n",
-	    row.Data.Assignor,
-	    tId,
-	    row.Data.Association,
-    )
+		"Errors before assignor validation: %#v\n",
+		row.Errors,
+	)
 
-    if !strings.EqualFold(
-	    strings.TrimSpace(row.Data.Assignor),
-	    "Unassigned",
-    ) {
-	    assignorExists, assignorErr := ac.AssignorExists(
-		    row.Data.Assignor,
-		    tId,
-		    row.Data.Association,
-	    )
+	fmt.Printf(
+		"AssignorExists arguments: name=%q tenantId=%q associationId=%q\n",
+		row.Data.Assignor,
+		tId,
+		row.Data.Association,
+	)
 
-	    fmt.Printf(
-		    "AssignorExists returned: exists=%t err=%v assignor=%q association=%q\n",
-		    assignorExists,
-		    assignorErr,
-		    row.Data.Assignor,
-		    row.Data.Association,
-	    )
+	if !strings.EqualFold(
+		strings.TrimSpace(row.Data.Assignor),
+		"Unassigned",
+	) {
+		assignorExists, assignorErr := ac.AssignorExists(
+			row.Data.Assignor,
+			tId,
+			row.Data.Association,
+		)
 
-	    if assignorErr != nil {
-		    row.Errors = append(
-			    row.Errors,
-			    fmt.Sprintf(
-				    "Error occurred while fetching Assignor: %v",
-				    assignorErr,
-			    ),
-		    )
-	    } else if !assignorExists {
-		    row.Errors = append(
-			    row.Errors,
-			    fmt.Sprintf(
-				    "Assignor %q does not exist",
-				    row.Data.Assignor,
-			    ),
-		    )
-	    }
-    }
+		fmt.Printf(
+			"AssignorExists returned: exists=%t err=%v assignor=%q association=%q\n",
+			assignorExists,
+			assignorErr,
+			row.Data.Assignor,
+			row.Data.Association,
+		)
 
-    fmt.Printf(
-	    "Errors after assignor validation: %#v\n",
-	    row.Errors,
-    )
-	
+		if assignorErr != nil {
+			row.Errors = append(
+				row.Errors,
+				fmt.Sprintf(
+					"Error occurred while fetching Assignor: %v",
+					assignorErr,
+				),
+			)
+		} else if !assignorExists {
+			row.Errors = append(
+				row.Errors,
+				fmt.Sprintf(
+					"Assignor %q does not exist",
+					row.Data.Assignor,
+				),
+			)
+		}
+	}
+
+	fmt.Printf(
+		"Errors after assignor validation: %#v\n",
+		row.Errors,
+	)
+
 	row.Valid = len(row.Errors) == 0
 
 	return row
@@ -3819,7 +3818,7 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		fmt.Println("Record=[",record,"]")
+		fmt.Println("Record=[", record, "]")
 		previewRow := buildGamePreviewRow(
 			csvRowNumber,
 			record,
@@ -5985,7 +5984,7 @@ func main() {
 		utils.AuditLog.Println("Failed to initialize sports collection.")
 		return
 	}
-	
+
 	err = ac.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize associations collection.")
