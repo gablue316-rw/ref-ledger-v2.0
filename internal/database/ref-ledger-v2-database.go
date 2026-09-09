@@ -1844,6 +1844,41 @@ func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) int {
 	return recordsUpdated
 }
 
+func VerifyGameMatchesAssociation(gameIds []int64, association, tenantId string) []error {
+
+	ctx := context.TODO()
+    
+	var gameErrors []error
+    db := Client.Database(Database)
+	coll := db.Collection("games")
+	
+	for _, gameID := range gameIds {
+
+		filter := bson.M{
+			"gameId":   gameID,
+			 "tenantId": tenantId,
+			 "association": association,
+   		}
+
+	    result := coll.FindOne(ctx, filter)
+
+		err := result.Err()
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+           gameErrors = append(gameErrors,fmt.Errorf("game %d was not found",gameID))
+		   continue
+        }
+	    
+		if err != nil {
+			gameErrors = append(gameErrors,fmt.Errorf("GetGameByAssocAndId failure.  Reason: %s", err))
+			continue
+	    }
+    
+	}
+
+	return gameErrors
+}
+
 func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection string) (int, int, int, []error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -1858,22 +1893,28 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 	recordsInserted := 0
 	totalErrors := 0
 	var gameIds []int64
-	var errors []error
 	var gamesUpdatedToPaid int = 0
-
+    
+	importErrors := make([]error, 0)
+	
 	for _, v := range payment {
 
 		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
 		doc.TenantId = TenantId
 		paymentExists, err := PaymentExists(doc)
 
-		if paymentExists || err != nil {
-			if err != nil {
-				totalErrors++
-				fmt.Println(err)
-				errors = append(errors, err)
-			}
+		if paymentExists {
+			totalErrors++
+			fmt.Println("Payment with id already exists")
+			importErrors = append(importErrors,errors.New("Payment with ID already exists"))
 			continue
+		}
+
+		if err != nil {
+		   totalErrors++
+		   fmt.Println(err)
+		   importErrors = append(importErrors, err)
+		   continue
 		}
 
 		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
@@ -1881,15 +1922,22 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 		if err != nil {
 			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
 			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
-			errors = append(errors, err)
+			importErrors = append(importErrors, err)
 			continue
 		}
 
+		gameErrors  := VerifyGameMatchesAssociation(gameIds, v.Association, TenantId)
+
+		if gameErrors != nil {
+			importErrors = append(importErrors, gameErrors...)
+			continue
+		}
+		
 		totalGameFee, err := GetGameFee(gameIds)
 		if err != nil {
 			utils.AuditLog.Printf("Failed to get game fee for Game Ids %v.  Reason: %v", gameIds, err)
 			fmt.Println("Failed to get game fee.  Reason:", err)
-			errors = append(errors, err)
+			importErrors = append(importErrors, err)
 			continue
 		}
 
@@ -1898,7 +1946,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			utils.AuditLog.Println(errStr)
 			fmt.Println(errStr)
 			totalErrors++
-			errors = append(errors, fmt.Errorf("%s", errStr))
+			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
 			continue
 		}
 
@@ -1907,7 +1955,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			utils.AuditLog.Printf("Failed to insert payment record for PaymentId %s.  Reason: %v", doc.PaymentId, err)
 			fmt.Println("Insert failed.  Reason:", err)
 			totalErrors++
-			errors = append(errors, err)
+			importErrors = append(importErrors, err)
 			continue
 		}
 
@@ -1917,7 +1965,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 	}
 
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors, "Games Updated to Paid:", gamesUpdatedToPaid)
-	return recordsInserted, totalErrors, gamesUpdatedToPaid, errors
+	return recordsInserted, totalErrors, gamesUpdatedToPaid, importErrors
 
 }
 

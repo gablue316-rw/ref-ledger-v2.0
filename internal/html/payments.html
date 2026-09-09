@@ -141,6 +141,7 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             font-weight: bold;
             min-height: 60px;
+            white-space: pre-line;
         }
 
         .message-box.success {
@@ -766,49 +767,59 @@ paymentForm.addEventListener(
         );
 
         if (selectedGameIds.length === 0) {
-            messageBox.innerText =
-                "Select at least one completed game before saving the payment.";
+            showMessage(
+                "Select at least one completed game before saving the payment.",
+                "error"
+            );
             return;
         }
 
-        const paymentId =
-            document
-                .getElementById("paymentid")
-                .value
-                .trim();
+        const paymentId = document
+            .getElementById("paymentid")
+            .value
+            .trim();
 
-        const paymentDate =
-            document.getElementById("date").value;
+        const paymentDate = document
+            .getElementById("date")
+            .value;
 
-        const association =
-            document.getElementById("association").value;
+        const association = document
+            .getElementById("association")
+            .value;
 
-        const amount =
-            parseFloat(
-                document.getElementById("amount").value
-            );
+        const amount = parseFloat(
+            document.getElementById("amount").value
+        );
 
         if (paymentId === "") {
-            messageBox.innerText =
-                "Enter a Payment ID.";
+            showMessage(
+                "Enter a Payment ID.",
+                "error"
+            );
             return;
         }
 
         if (paymentDate === "") {
-            messageBox.innerText =
-                "Enter a payment date.";
+            showMessage(
+                "Enter a payment date.",
+                "error"
+            );
             return;
         }
 
         if (association === "") {
-            messageBox.innerText =
-                "Select an association.";
+            showMessage(
+                "Select an association.",
+                "error"
+            );
             return;
         }
 
         if (Number.isNaN(amount) || amount <= 0) {
-            messageBox.innerText =
-                "Enter a valid payment amount greater than zero.";
+            showMessage(
+                "Enter a valid payment amount greater than zero.",
+                "error"
+            );
             return;
         }
 
@@ -821,8 +832,10 @@ paymentForm.addEventListener(
         };
 
         try {
-            messageBox.innerText =
-                "Saving payment...";
+            showMessage(
+                "Saving payment...",
+                "info"
+            );
 
             const response = await fetch(
                 "/api/payments",
@@ -843,38 +856,83 @@ paymentForm.addEventListener(
                 return;
             }
 
-            const result = await response.json();
+            /*
+             * Parse the JSON even when response.ok is false.
+             * Your Go handler returns the errors in the JSON body.
+             */
+            let result;
+
+            try {
+                result = await response.json();
+            } catch (parseError) {
+                throw new Error(
+                    `The server returned HTTP ${response.status} ` +
+                    "without a valid JSON response."
+                );
+            }
+
+            const returnedErrors = Array.isArray(result.errors)
+                ? result.errors.filter(error => error)
+                : [];
+
+            const formattedErrors = returnedErrors
+                .map(
+                    (error, index) =>
+                        `${index + 1}. ${error}`
+                )
+                .join("\n");
 
             if (response.status === 403) {
-                messageBox.innerText =
-                    result.errors?.join(", ") ||
-                    "Permission denied. Read-only users cannot enter payments.";
+                showMessage(
+                    formattedErrors ||
+                    "Permission denied. Read-only users cannot enter payments.",
+                    "error"
+                );
                 return;
             }
 
             if (
                 !response.ok ||
-                result.totalErrors > 0
+                Number(result.totalErrors) > 0
             ) {
-                const errorMessage =
-                    result.errors?.length > 0
-                        ? result.errors.join(", ")
-                        : "Error saving payment.";
+                let errorMessage =
+                    "Payment could not be saved.\n" +
+                    `Payments added: ${result.totalAdded ?? 0}\n` +
+                    `Games marked as Paid: ` +
+                    `${result.totalUpdatedToPaid ?? 0}\n` +
+                    `Errors: ${result.totalErrors ?? returnedErrors.length}`;
 
-                messageBox.innerText =
-                    `Added: ${result.totalAdded}. ` +
-                    `Errors: ${result.totalErrors}. ` +
-                    errorMessage;
+                if (formattedErrors !== "") {
+                    errorMessage +=
+                        "\n\nError details:\n" +
+                        formattedErrors;
+                }
+
+                showMessage(
+                    errorMessage,
+                    "error"
+                );
 
                 return;
             }
 
-            if (result.totalAdded === 0) {
-                messageBox.innerText =
-                    "Payment not saved. " +
-                    `${result.totalAdded} payment(s) added. ` +
-                    `${result.totalUpdatedToPaid} game(s) marked as Paid. ` + 
-                    errorMessage;
+            if (Number(result.totalAdded) === 0) {
+                let errorMessage =
+                    "Payment was not saved.\n" +
+                    `Payments added: ${result.totalAdded ?? 0}\n` +
+                    `Games marked as Paid: ` +
+                    `${result.totalUpdatedToPaid ?? 0}`;
+
+                if (formattedErrors !== "") {
+                    errorMessage +=
+                        "\n\nError details:\n" +
+                        formattedErrors;
+                }
+
+                showMessage(
+                    errorMessage,
+                    "error"
+                );
 
                 return;
             }
@@ -888,15 +946,23 @@ paymentForm.addEventListener(
 
             await loadCompletedGames(false);
 
-            messageBox.innerText =
-                "Payment saved successfully. " +
-                `${result.totalAdded} payment(s) added. ` +
-                `${result.totalUpdatedToPaid} game(s) marked as Paid.`;
+            showMessage(
+                "Payment saved successfully.\n" +
+                `Payments added: ${result.totalAdded}\n` +
+                `Games marked as Paid: ` +
+                `${result.totalUpdatedToPaid}`,
+                "success"
+            );
         } catch (error) {
-            console.error(error);
+            console.error(
+                "Error saving payment:",
+                error
+            );
 
-            messageBox.innerText =
-                "The server returned an invalid response or is unavailable.";
+            showMessage(
+                `Unable to save payment: ${error.message}`,
+                "error"
+            );
         }
     }
 );

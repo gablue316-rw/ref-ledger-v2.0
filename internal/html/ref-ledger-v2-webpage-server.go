@@ -5100,7 +5100,7 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Site updated successfully"))
+	w.Write([]byte("Site added successfully"))
 }
 
 func UpdateSite(w http.ResponseWriter, r *http.Request) {
