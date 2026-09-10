@@ -351,6 +351,14 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func SettingsPage(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(
+		w,
+		r,
+		"internal/html/settings.html",
+	)
+}
+
 func GetEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
@@ -5925,6 +5933,293 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func AddSport(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tenantId, err := getTenantId(r)
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to determine tenant ID",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	var sport database.Sport
+
+	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
+		http.Error(
+			w,
+			"Invalid sport data",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := spc.Add(sport, tenantId); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Sport added successfully",
+	})
+}
+
+func DelSport(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodDelete {
+		w.Header().Set("Allow", http.MethodDelete)
+
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tenantID, err := getTenantId(r)
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to determine tenant ID",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	sportID := strings.TrimSpace(
+		r.URL.Query().Get("id"),
+	)
+
+	if sportID == "" {
+		http.Error(
+			w,
+			"Sport ID is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := spc.Delete(sportID, tenantID); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(
+		map[string]string{
+			"message": fmt.Sprintf(
+				"Sport %q deleted successfully",
+				sportID,
+			),
+		},
+	); err != nil {
+		fmt.Printf(
+			"Unable to encode delete sport response: %v\n",
+			err,
+		)
+	}
+}
+
+func SportsHandler(w http.ResponseWriter, r *http.Request) {
+
+	switch r.Method {
+	case http.MethodGet:
+		GetSportsHandler(w, r)
+
+	case http.MethodPost:
+		AddSport(w, r)
+
+	case http.MethodDelete:
+		DelSport(w, r)
+
+	default:
+		w.Header().Set(
+			"Allow",
+			"GET, POST, DELETE",
+		)
+
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+	}
+}
+
+func DelLevel(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodDelete {
+		w.Header().Set("Allow", http.MethodDelete)
+
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tenantID, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to determine tenant ID",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	levelID := strings.TrimSpace(
+		r.URL.Query().Get("id"),
+	)
+
+	if levelID == "" {
+		http.Error(
+			w,
+			"Level ID is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := lc.Delete(levelID, tenantID); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(
+		map[string]string{
+			"message": fmt.Sprintf(
+				"Level %q deleted successfully",
+				levelID,
+			),
+		},
+	); err != nil {
+		fmt.Printf(
+			"Unable to encode delete level response: %v\n",
+			err,
+		)
+	}
+}
+
+func AddLevel(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tenantId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to determine tenant ID",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	var level database.Level
+
+	if err := json.NewDecoder(r.Body).Decode(&level); err != nil {
+		http.Error(
+			w,
+			"Invalid level data",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := lc.Add(level, tenantId); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Level added successfully",
+	})
+
+}
+
+func LevelsHandler(w http.ResponseWriter, r *http.Request) {
+
+	switch r.Method {
+	case http.MethodGet:
+		GetLevelsHandler(w, r)
+
+	case http.MethodPost:
+		AddLevel(w, r)
+
+	case http.MethodDelete:
+		DelLevel(w, r)
+
+	default:
+		w.Header().Set(
+			"Allow",
+			"GET, POST, DELETE",
+		)
+
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+	}
+}
+
 func main() {
 
 	var err error
@@ -6071,6 +6366,7 @@ func main() {
 
 	mux.HandleFunc("/api/environment", GetEnvironmentHandler)
 	mux.HandleFunc("/api/about", AboutHandler)
+	mux.HandleFunc("/settings", SettingsPage)
 
 	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
@@ -6141,6 +6437,8 @@ func main() {
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadLevels", GetLevelsHandler)
 	mux.HandleFunc("/api/loadSports", GetSportsHandler)
+	mux.HandleFunc("/api/sports", SportsHandler)
+	mux.HandleFunc("/api/levels", LevelsHandler)
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
 	mux.HandleFunc("/api/associationsDirectory", GetAssociationsDirectoryHandler)
