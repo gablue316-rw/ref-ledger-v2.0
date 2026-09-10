@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Ref Ledger V2.0 - Settings</title>
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/components/navbar.css?v=12"
+    >
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            color: #333;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 20px 40px;
+        }
+
+        .page-header {
+            margin-bottom: 25px;
+        }
+
+        .page-header h1 {
+            color: #082b4f;
+            margin-bottom: 8px;
+        }
+
+        .page-header p {
+            color: #667085;
+            line-height: 1.5;
+        }
+
+        .message-box {
+            display: none;
+            margin-bottom: 20px;
+            padding: 14px 16px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+        }
+
+        .message-box.success {
+            display: block;
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+
+        .message-box.error {
+            display: block;
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .message-box.info {
+            display: block;
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border-color: #bee5eb;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 25px;
+            align-items: start;
+        }
+
+        .settings-card {
+            overflow: hidden;
+            background-color: #fff;
+            border: 1px solid #e4e7ec;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 22px;
+            color: #fff;
+            background-color: #082b4f;
+        }
+
+        .card-header i {
+            font-size: 22px;
+        }
+
+        .card-header h2 {
+            font-size: 20px;
+        }
+
+        .card-header p {
+            margin-top: 3px;
+            color: #d9e5f0;
+            font-size: 13px;
+        }
+
+        .card-body {
+            padding: 22px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 7px;
+            color: #344054;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .form-control {
+            width: 100%;
+            height: 42px;
+            padding: 9px 11px;
+            color: #333;
+            background-color: #fff;
+            border: 1px solid #cfd4dc;
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        .form-control:focus {
+            border-color: #1f6fb2;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(31, 111, 178, 0.15);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .form-row .form-group {
+            margin-bottom: 0;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        .btn {
+            min-height: 42px;
+            padding: 9px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background-color: #0b5fa5;
+        }
+
+        .btn-primary:hover {
+            background-color: #084b83;
+        }
+
+        .btn-secondary {
+            color: #344054;
+            background-color: #e9edf2;
+        }
+
+        .btn-secondary:hover {
+            background-color: #dce2e9;
+        }
+
+        .section-divider {
+            margin: 22px 0;
+            border: none;
+            border-top: 1px solid #e4e7ec;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .list-header h3 {
+            color: #344054;
+            font-size: 16px;
+        }
+
+        .record-count {
+            color: #667085;
+            font-size: 13px;
+        }
+
+        .settings-table-wrapper {
+            overflow-x: auto;
+            border: 1px solid #e4e7ec;
+            border-radius: 8px;
+        }
+
+        .settings-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .settings-table th,
+        .settings-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e4e7ec;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .settings-table th {
+            color: #475467;
+            background-color: #f8fafc;
+            font-size: 13px;
+        }
+
+        .settings-table td {
+            font-size: 14px;
+        }
+
+        .settings-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .settings-table tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .status-active {
+            color: #166534;
+            background-color: #dcfce7;
+        }
+
+        .status-inactive {
+            color: #991b1b;
+            background-color: #fee2e2;
+        }
+
+        .action-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 5px;
+        }
+
+        .icon-button {
+            width: 34px;
+            height: 34px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: transparent;
+        }
+
+        .edit-button {
+            color: #0b5fa5;
+        }
+
+        .edit-button:hover {
+            background-color: #e8f2fb;
+        }
+
+        .delete-button {
+            color: #c62828;
+        }
+
+        .delete-button:hover {
+            background-color: #fdeaea;
+        }
+
+        .empty-row {
+            padding: 25px !important;
+            color: #667085;
+            text-align: center !important;
+        }
+
+        .settings-note {
+            margin-top: 25px;
+            padding: 16px 18px;
+            color: #475467;
+            background-color: #eef5fb;
+            border-left: 4px solid #0b5fa5;
+            border-radius: 6px;
+            line-height: 1.5;
+        }
+
+        .settings-note i {
+            margin-right: 7px;
+            color: #0b5fa5;
+        }
+
+        .delete-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 24px;
+            background-color: rgba(15, 23, 42, 0.68);
+        }
+
+        .delete-modal-overlay.open {
+            display: flex;
+        }
+
+        .delete-modal {
+            width: 100%;
+            max-width: 575px;
+            overflow: hidden;
+            background-color: #fff;
+            border-radius: 18px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .delete-modal-body {
+            padding: 30px;
+        }
+
+        .delete-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            margin-bottom: 27px;
+        }
+
+        .delete-modal-icon {
+            display: flex;
+            flex: 0 0 60px;
+            align-items: center;
+            justify-content: center;
+            width: 60px;
+            height: 60px;
+            color: #dc2626;
+            background-color: #fee2e2;
+            border-radius: 50%;
+            font-size: 25px;
+        }
+
+        .delete-modal-title {
+            margin: 0 0 4px;
+            color: #102a4c;
+            font-size: 26px;
+        }
+
+        .delete-modal-subtitle {
+            margin: 0;
+            color: #667085;
+            font-size: 17px;
+        }
+
+        .delete-modal-message {
+            margin-bottom: 20px;
+            color: #344054;
+            font-size: 18px;
+            line-height: 1.5;
+        }
+
+        .delete-modal-record {
+            padding: 19px;
+            color: #a40000;
+            background-color: #fff7f7;
+            border: 1px solid #fca5a5;
+            border-radius: 11px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .delete-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 20px 30px;
+            background-color: #f8fafc;
+            border-top: 1px solid #e4e7ec;
+        }
+
+        .delete-modal-button {
+            min-width: 110px;
+            min-height: 50px;
+            padding: 10px 20px;
+            border-radius: 7px;
+            cursor: pointer;
+            font-size: 17px;
+            font-weight: bold;
+        }
+
+        .delete-modal-cancel {
+            color: #344054;
+            background-color: #fff;
+            border: 1px solid #cbd5e1;
+        }
+
+        .delete-modal-confirm {
+            color: #fff;
+            background-color: #e5252a;
+            border: 1px solid #e5252a;
+        }
+
+        .delete-modal-confirm:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
+        @media (max-width: 850px) {
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 550px) {
+            .container {
+                margin-top: 25px;
+                padding-right: 12px;
+                padding-left: 12px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .settings-table th,
+            .settings-table td {
+                padding: 10px 8px;
+            }
+
+            .card-body {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <nav id="main-navbar" class="navbar">
+        <div class="nav-links">
+            <a href="/" data-page="home">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+            </a>
+
+            <a href="/dashboard" data-page="dashboard">
+                <i class="fa-solid fa-chart-column"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <a href="/reports" data-page="reports">
+                <i class="fa-solid fa-file-lines"></i>
+                <span>Reports</span>
+            </a>
+
+            <a href="/games" data-page="games" class="games-nav-link">
+                <span class="nav-icon-wrapper">
+                    <i class="fa-solid fa-calendar-days"></i>
+
+                    <span
+                        id="pendingGames"
+                        class="nav-count-badge"
+                        aria-live="polite"
+                        aria-label="0 pending games today and 0 pending games in the next 7 days"
+                        title="Pending games: Today / Next 7 Days"
+                    >
+                        0/0
+                    </span>
+                </span>
+
+                <span>Games</span>
+            </a>
+
+            <a href="/officials" data-page="officials">
+                <i class="fa-solid fa-users"></i>
+                <span>Officials</span>
+            </a>
+
+            <a href="/associations" data-page="associations">
+                <i class="fa-solid fa-building-columns"></i>
+                <span>Associations</span>
+            </a>
+
+            <a href="/sites" data-page="sites">
+                <i class="fa-solid fa-location-dot"></i>
+                <span>Sites</span>
+            </a>
+
+            <a href="/expenses" data-page="expenses">
+                <i class="fa-solid fa-receipt"></i>
+                <span>Expenses</span>
+            </a>
+
+            <a href="/payments" data-page="payments">
+                <i class="fa-solid fa-dollar-sign"></i>
+                <span>Payments</span>
+            </a>
+
+            <a href="/settings" data-page="settings" class="active">
+                <i class="fa-solid fa-gear"></i>
+                <span>Settings</span>
+            </a>
+
+            <a href="/contact" data-page="contact">
+                <i class="fa-solid fa-envelope"></i>
+                <span>Contact</span>
+            </a>
+
+            <a href="#" id="logoutBtn">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Logout</span>
+            </a>
+
+            <a href="/about" id="aboutBtn">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>About</span>
+            </a>
+        </div>
+
+        <div class="user-profile">
+            <div id="userAvatar" class="user-avatar">
+                <img
+                    src="/images/official-avatar.png?v=2"
+                    alt="Referee avatar"
+                    class="avatar-image"
+                >
+            </div>
+
+            <div class="user-details">
+                <div id="userName" class="user-name">
+                    Loading...
+                </div>
+
+                <div id="userRole" class="user-role"></div>
+
+                <div
+                    id="environment-label"
+                    class="environment-label"
+                    hidden
+                ></div>
+            </div>
+        </div>
+    </nav>
+
+    <div
+        id="sportDeleteModal"
+        class="delete-modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sportDeleteModalTitle"
+        aria-hidden="true"
+    >
+        <div class="delete-modal">
+            <div class="delete-modal-body">
+                <div class="delete-modal-header">
+                    <div class="delete-modal-icon">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </div>
+
+                    <div>
+                        <h2
+                            id="sportDeleteModalTitle"
+                            class="delete-modal-title"
+                        >
+                            Confirm deletion
+                        </h2>
+
+                        <p class="delete-modal-subtitle">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                </div>
+
+                <p class="delete-modal-message">
+                    You are about to permanently delete this sport.
+                </p>
+
+                <div
+                    id="sportDeleteName"
+                    class="delete-modal-record"
+                ></div>
+            </div>
+
+            <div class="delete-modal-footer">
+                <button
+                    id="cancelSportDeleteButton"
+                    class="delete-modal-button delete-modal-cancel"
+                    type="button"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    id="confirmSportDeleteButton"
+                    class="delete-modal-button delete-modal-confirm"
+                    type="button"
+                >
+                    <i class="fa-solid fa-trash-can"></i>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div
+        id="levelDeleteModal"
+        class="delete-modal-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="levelDeleteModalTitle"
+        aria-hidden="true"
+    >
+        <div class="delete-modal">
+            <div class="delete-modal-body">
+                <div class="delete-modal-header">
+                    <div class="delete-modal-icon">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </div>
+
+                    <div>
+                        <h2
+                            id="levelDeleteModalTitle"
+                            class="delete-modal-title"
+                        >
+                            Confirm deletion
+                        </h2>
+
+                        <p class="delete-modal-subtitle">
+                            This action cannot be undone.
+                        </p>
+                    </div>
+                </div>
+
+                <p class="delete-modal-message">
+                    You are about to permanently delete this level.
+                </p>
+
+                <div
+                    id="levelDeleteName"
+                    class="delete-modal-record"
+                ></div>
+            </div>
+
+            <div class="delete-modal-footer">
+                <button
+                    id="cancelLevelDeleteButton"
+                    class="delete-modal-button delete-modal-cancel"
+                    type="button"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    id="confirmLevelDeleteButton"
+                    class="delete-modal-button delete-modal-confirm"
+                    type="button"
+                >
+                    <i class="fa-solid fa-trash-can"></i>
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="container">
+        <header class="page-header">
+            <h1>
+                <i class="fa-solid fa-gear"></i>
+                Settings
+            </h1>
+
+            <p>
+                Configure the sports and competition levels available
+                throughout Ref Ledger.
+            </p>
+        </header>
+
+        <div
+            id="messageBox"
+            class="message-box"
+            role="alert"
+            aria-live="polite"
+        ></div>
+
+        <div class="settings-grid">
+            <!-- Sports card -->
+            <section class="settings-card">
+                <div class="card-header">
+                    <i class="fa-solid fa-basketball"></i>
+
+                    <div>
+                        <h2>Sports</h2>
+                        <p>Add and manage your available sports.</p>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <form id="sportForm">
+                        <input
+                            id="sportOriginalId"
+                            type="hidden"
+                        >
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="sportName">
+                                    Sport name
+                                </label>
+
+                                <input
+                                    id="sportName"
+                                    class="form-control"
+                                    type="text"
+                                    maxlength="50"
+                                    placeholder="Example: Basketball"
+                                    required
+                                >
+                            </div>
+
+                            <button
+                                id="saveSportButton"
+                                class="btn btn-primary"
+                                type="submit"
+                            >
+                                <i class="fa-solid fa-plus"></i>
+                                Add Sport
+                            </button>
+                        </div>
+
+                        <button
+                            id="cancelSportEditButton"
+                            class="btn btn-secondary"
+                            type="button"
+                            hidden
+                        >
+                            Cancel Edit
+                        </button>
+                    </form>
+
+                    <hr class="section-divider">
+
+                    <div class="list-header">
+                        <h3>Configured Sports</h3>
+
+                        <span
+                            id="sportsCount"
+                            class="record-count"
+                        >
+                            0 sports
+                        </span>
+                    </div>
+
+                    <div class="settings-table-wrapper">
+                        <table class="settings-table">
+                            <thead>
+                                <tr>
+                                    <th>Sport</th>
+                                    <th>Status</th>
+                                    <th aria-label="Actions"></th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="sportsBody">
+                                <tr>
+                                    <td colspan="3" class="empty-row">
+                                        No sports have been configured.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Levels card -->
+            <section class="settings-card">
+                <div class="card-header">
+                    <i class="fa-solid fa-layer-group"></i>
+
+                    <div>
+                        <h2>Levels</h2>
+                        <p>Add and manage your available levels.</p>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <form id="levelForm">
+                        <input
+                            id="levelOriginalId"
+                            type="hidden"
+                        >
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="levelName">
+                                    Level name
+                                </label>
+
+                                <input
+                                    id="levelName"
+                                    class="form-control"
+                                    type="text"
+                                    maxlength="50"
+                                    placeholder="Example: Varsity"
+                                    required
+                                >
+                            </div>
+
+                            <button
+                                id="saveLevelButton"
+                                class="btn btn-primary"
+                                type="submit"
+                            >
+                                <i class="fa-solid fa-plus"></i>
+                                Add Level
+                            </button>
+                        </div>
+
+                        <button
+                            id="cancelLevelEditButton"
+                            class="btn btn-secondary"
+                            type="button"
+                            hidden
+                        >
+                            Cancel Edit
+                        </button>
+                    </form>
+
+                    <hr class="section-divider">
+
+                    <div class="list-header">
+                        <h3>Configured Levels</h3>
+
+                        <span
+                            id="levelsCount"
+                            class="record-count"
+                        >
+                            0 levels
+                        </span>
+                    </div>
+
+                    <div class="settings-table-wrapper">
+                        <table class="settings-table">
+                            <thead>
+                                <tr>
+                                    <th>Level</th>
+                                    <th>Status</th>
+                                    <th aria-label="Actions"></th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="levelsBody">
+                                <tr>
+                                    <td colspan="3" class="empty-row">
+                                        No levels have been configured.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="settings-note">
+            <i class="fa-solid fa-circle-info"></i>
+
+            Sports or levels already used by games should be marked inactive
+            instead of deleted. Inactive choices will remain on existing games
+            but will not be available when creating new games.
+        </div>
+    </main>
+
+    <script>
+        function showMessage(message, type = "info") {
+            const messageBox = document.getElementById("messageBox");
+
+            messageBox.textContent = message;
+            messageBox.className = `message-box ${type}`;
+        }
+
+        function hideMessage() {
+            const messageBox = document.getElementById("messageBox");
+
+            messageBox.textContent = "";
+            messageBox.className = "message-box";
+        }
+
+        let sports = [];
+
+        let levels = [];
+
+        function createStatusBadge(active) {
+            if (active) {
+                return `
+                    <span class="status-badge status-active">
+                        Active
+                    </span>
+                `;
+            }
+
+            return `
+                <span class="status-badge status-inactive">
+                    Inactive
+                </span>
+            `;
+        }
+
+        async function loadSports() {
+            try {
+                const response = await fetch("/api/sports", {
+                    method: "GET"
+                });
+
+                if (
+                    response.status === 401 ||
+                    response.redirected
+                ) {
+                    window.location.href = "/login";
+                    return;
+                }
+
+                const responseText = await response.text();
+
+                if (!response.ok) {
+                    throw new Error(
+                        responseText.trim() ||
+                        "Unable to load sports."
+                    );
+                }
+
+                const result = responseText
+                    ? JSON.parse(responseText)
+                    : [];
+
+                const loadedSports = Array.isArray(result)
+                    ? result
+                    : result.sports || result.Sports || [];
+
+                sports = loadedSports.map(sport => ({
+                    id: sport.id ?? sport.ID ?? "",
+                    name: sport.name ?? sport.Name ?? "",
+                    active:
+                        sport.active ??
+                        sport.Active ??
+                        true
+                }));
+
+                renderSports(sports);
+            } catch (error) {
+                sports = [];
+
+                renderSports(sports);
+
+                showMessage(
+                    error.message ||
+                    "Unable to load sports.",
+                    "error"
+                );
+            }
+        }
+
+        async function loadLevels() {
+            try {
+                const response = await fetch("/api/levels", {
+                    method: "GET"
+                });
+
+                if (
+                    response.status === 401 ||
+                    response.redirected
+                ) {
+                    window.location.href = "/login";
+                    return;
+                }
+
+                const responseText = await response.text();
+
+                if (!response.ok) {
+                    throw new Error(
+                        responseText.trim() ||
+                        "Unable to load levels."
+                    );
+                }
+
+                const result = responseText
+                    ? JSON.parse(responseText)
+                    : [];
+
+                const loadedLevels = Array.isArray(result)
+                    ? result
+                    : result.levels || result.Levels || [];
+
+                levels = loadedLevels.map(level => ({
+                    id: level.id ?? level.ID ?? "",
+                    name: level.name ?? level.Name ?? "",
+                    active:
+                        level.active ??
+                        level.Active ??
+                        true
+                }));
+
+                renderLevels(levels);
+            } catch (error) {
+                levels = [];
+                renderLevels(levels);
+
+                showMessage(
+                    error.message ||
+                    "Unable to load levels.",
+                    "error"
+                );
+            }
+        }
+
+        function renderSports(sports) {
+            const sportsBody =
+                document.getElementById("sportsBody");
+
+            const sportsCount =
+                document.getElementById("sportsCount");
+
+            sportsBody.innerHTML = "";
+
+            sportsCount.textContent =
+                `${sports.length} sport${sports.length === 1 ? "" : "s"}`;
+
+            if (sports.length === 0) {
+                sportsBody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="empty-row">
+                            No sports have been configured.
+                        </td>
+                    </tr>
+                `;
+
+                return;
+            }
+
+            sports.forEach(sport => {
+                const row = document.createElement("tr");
+
+                row.innerHTML = `
+                    <td>${escapeHtml(sport.name)}</td>
+
+                    <td>
+                        ${createStatusBadge(sport.active)}
+                    </td>
+
+                    <td>
+                        <div class="action-buttons">
+                            <button
+                                class="icon-button edit-button"
+                                type="button"
+                                title="Edit ${escapeHtml(sport.name)}"
+                                aria-label="Edit ${escapeHtml(sport.name)}"
+                                onclick="editSport('${sport.id}')"
+                            >
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+
+                            <button
+                                class="icon-button delete-button"
+                                type="button"
+                                title="Delete ${escapeHtml(sport.name)}"
+                                aria-label="Delete ${escapeHtml(sport.name)}"
+                                onclick="deleteSport('${sport.id}')"
+                            >
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+
+                sportsBody.appendChild(row);
+            });
+        }
+
+        function renderLevels(levels) {
+            const levelsBody =
+                document.getElementById("levelsBody");
+
+            const levelsCount =
+                document.getElementById("levelsCount");
+
+            levelsBody.innerHTML = "";
+
+            levelsCount.textContent =
+                `${levels.length} level${levels.length === 1 ? "" : "s"}`;
+
+            if (levels.length === 0) {
+                levelsBody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="empty-row">
+                            No levels have been configured.
+                        </td>
+                    </tr>
+                `;
+
+                return;
+            }
+
+            levels.forEach(level => {
+                const row = document.createElement("tr");
+
+                row.innerHTML = `
+                    <td>${escapeHtml(level.name)}</td>
+
+                    <td>
+                        ${createStatusBadge(level.active)}
+                    </td>
+
+                    <td>
+                        <div class="action-buttons">
+                            <button
+                                class="icon-button edit-button"
+                                type="button"
+                                title="Edit ${escapeHtml(level.name)}"
+                                aria-label="Edit ${escapeHtml(level.name)}"
+                                onclick="editLevel('${level.id}')"
+                            >
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+
+                            <button
+                                class="icon-button delete-button"
+                                type="button"
+                                title="Delete ${escapeHtml(level.name)}"
+                                aria-label="Delete ${escapeHtml(level.name)}"
+                                onclick="deleteLevel('${level.id}')"
+                            >
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+
+                levelsBody.appendChild(row);
+            });
+        }
+
+        function editSport(sportId) {
+            const sport = sports.find(
+                item => item.id === sportId
+            );
+
+            if (!sport) {
+                return;
+            }
+
+            document.getElementById("sportOriginalId").value =
+                sport.id;
+
+            document.getElementById("sportName").value =
+                sport.name;
+
+            document.getElementById("saveSportButton").innerHTML = `
+                <i class="fa-solid fa-floppy-disk"></i>
+                Save Sport
+            `;
+
+            document.getElementById(
+                "cancelSportEditButton"
+            ).hidden = false;
+        }
+
+        function editLevel(levelId) {
+            const level = levels.find(
+                item => item.id === levelId
+            );
+
+            if (!level) {
+                return;
+            }
+
+            document.getElementById("levelOriginalId").value =
+                level.id;
+
+            document.getElementById("levelName").value =
+                level.name;
+
+            document.getElementById("saveLevelButton").innerHTML = `
+                <i class="fa-solid fa-floppy-disk"></i>
+                Save Level
+            `;
+
+            document.getElementById(
+                "cancelLevelEditButton"
+            ).hidden = false;
+        }
+
+        let sportPendingDeletion = null;
+
+        function deleteSport(sportId) {
+            sportPendingDeletion = sports.find(
+                item => item.id === sportId
+            );
+
+            if (!sportPendingDeletion) {
+                return;
+            }
+
+            document.getElementById("sportDeleteName").textContent =
+                sportPendingDeletion.name;
+
+            const modal =
+                document.getElementById("sportDeleteModal");
+
+            modal.classList.add("open");
+            modal.setAttribute("aria-hidden", "false");
+
+            document.getElementById(
+                "confirmSportDeleteButton"
+            ).focus();
+        }
+
+        function closeSportDeleteModal() {
+            const modal =
+                document.getElementById("sportDeleteModal");
+
+            modal.classList.remove("open");
+            modal.setAttribute("aria-hidden", "true");
+
+            sportPendingDeletion = null;
+        }
+
+        async function confirmSportDelete() {
+            if (!sportPendingDeletion) {
+                return;
+            }
+
+            const sport = sportPendingDeletion;
+            const confirmButton = document.getElementById(
+                "confirmSportDeleteButton"
+            );
+
+            confirmButton.disabled = true;
+            confirmButton.innerHTML = `
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                Deleting...
+            `;
+
+            try {
+                const params = new URLSearchParams({
+                    id: sport.id
+                });
+
+                const response = await fetch(
+                    `/api/sports?${params.toString()}`,
+                    {
+                        method: "DELETE"
+                    }
+                );
+
+                if (response.status === 401 || response.redirected) {
+                    window.location.href = "/login";
+                    return;
+                }
+
+                if (response.status === 403) {
+                    closeSportDeleteModal();
+
+                    showMessage(
+                        "Permission denied. You cannot delete sports.",
+                        "error"
+                    );
+                    return;
+                }
+
+                const responseText = await response.text();
+                let responseData = {};
+
+                if (responseText) {
+                    try {
+                        responseData = JSON.parse(responseText);
+                    } catch {
+                        responseData = {};
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(
+                        responseData.message ||
+                        responseText.trim() ||
+                        `Unable to delete ${sport.name}.`
+                    );
+                }
+
+                await loadSports();
+                resetSportForm();
+                closeSportDeleteModal();
+
+                showMessage(
+                    responseData.message ||
+                    `${sport.name} deleted successfully.`,
+                    "success"
+                );
+            } catch (error) {
+                closeSportDeleteModal();
+
+                showMessage(
+                    error.message ||
+                    `Unable to delete ${sport.name}.`,
+                    "error"
+                );
+            } finally {
+                confirmButton.disabled = false;
+                confirmButton.innerHTML = `
+                    <i class="fa-solid fa-trash-can"></i>
+                    Delete
+                `;
+            }
+        }
+
+        let levelPendingDeletion = null;
+
+        function deleteLevel(levelId) {
+            levelPendingDeletion = levels.find(
+                item => item.id === levelId
+            );
+
+            if (!levelPendingDeletion) {
+                return;
+            }
+
+            document.getElementById("levelDeleteName").textContent =
+                levelPendingDeletion.name;
+
+            const modal =
+                document.getElementById("levelDeleteModal");
+
+            modal.classList.add("open");
+            modal.setAttribute("aria-hidden", "false");
+
+            document.getElementById(
+                "confirmLevelDeleteButton"
+            ).focus();
+        }
+
+        function closeLevelDeleteModal() {
+            const modal =
+                document.getElementById("levelDeleteModal");
+
+            modal.classList.remove("open");
+            modal.setAttribute("aria-hidden", "true");
+
+            levelPendingDeletion = null;
+        }
+
+        async function confirmLevelDelete() {
+            if (!levelPendingDeletion) {
+                return;
+            }
+
+            const level = levelPendingDeletion;
+            const confirmButton = document.getElementById(
+                "confirmLevelDeleteButton"
+            );
+
+            confirmButton.disabled = true;
+            confirmButton.innerHTML = `
+                <i class="fa-solid fa-spinner fa-spin"></i>
+                Deleting...
+            `;
+
+            try {
+                const params = new URLSearchParams({
+                    id: level.id
+                });
+
+                const response = await fetch(
+                    `/api/levels?${params.toString()}`,
+                    {
+                        method: "DELETE"
+                    }
+                );
+
+                if (response.status === 401 || response.redirected) {
+                    window.location.href = "/login";
+                    return;
+                }
+
+                if (response.status === 403) {
+                    closeLevelDeleteModal();
+
+                    showMessage(
+                        "Permission denied. You cannot delete levels.",
+                        "error"
+                    );
+                    return;
+                }
+
+                const responseText = await response.text();
+                let responseData = {};
+
+                if (responseText) {
+                    try {
+                        responseData = JSON.parse(responseText);
+                    } catch {
+                        responseData = {};
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(
+                        responseData.message ||
+                        responseText.trim() ||
+                        `Unable to delete ${level.name}.`
+                    );
+                }
+
+                await loadLevels();
+                resetLevelForm();
+                closeLevelDeleteModal();
+
+                showMessage(
+                    responseData.message ||
+                    `${level.name} deleted successfully.`,
+                    "success"
+                );
+            } catch (error) {
+                closeLevelDeleteModal();
+
+                showMessage(
+                    error.message ||
+                    `Unable to delete ${level.name}.`,
+                    "error"
+                );
+            } finally {
+                confirmButton.disabled = false;
+                confirmButton.innerHTML = `
+                    <i class="fa-solid fa-trash-can"></i>
+                    Delete
+                `;
+            }
+        }
+
+        function resetSportForm() {
+            document.getElementById("sportForm").reset();
+
+            document.getElementById("sportOriginalId").value = "";
+
+            document.getElementById("saveSportButton").innerHTML = `
+                <i class="fa-solid fa-plus"></i>
+                Add Sport
+            `;
+
+            document.getElementById(
+                "cancelSportEditButton"
+            ).hidden = true;
+        }
+
+        function resetLevelForm() {
+            document.getElementById("levelForm").reset();
+
+            document.getElementById("levelOriginalId").value = "";
+
+            document.getElementById("saveLevelButton").innerHTML = `
+                <i class="fa-solid fa-plus"></i>
+                Add Level
+            `;
+
+            document.getElementById(
+                "cancelLevelEditButton"
+            ).hidden = true;
+        }
+
+        function escapeHtml(value) {
+            const element = document.createElement("div");
+
+            element.textContent = value ?? "";
+
+            return element.innerHTML;
+        }
+
+        document
+            .getElementById("sportForm")
+            .addEventListener("submit", async event => {
+                event.preventDefault();
+
+                const sportName = document
+                    .getElementById("sportName")
+                    .value
+                    .trim();
+
+                if (!sportName) {
+                    showMessage("Sport name is required.", "error");
+                    return;
+                }
+
+                const saveButton =
+                    document.getElementById("saveSportButton");
+
+                saveButton.disabled = true;
+                showMessage("Adding sport...", "info");
+
+                try {
+                    const response = await fetch("/api/sports", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            id: sportName,
+                            name: sportName
+                        })
+                    });
+
+                    if (response.status === 401) {
+                        window.location.href = "/login";
+                        return;
+                    }
+
+                    const responseText = await response.text();
+                    let responseData = {};
+
+                    if (responseText) {
+                        try {
+                            responseData = JSON.parse(responseText);
+                        } catch {
+                            responseData = {};
+                        }
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(
+                            responseData.message ||
+                            responseText.trim() ||
+                            "Unable to add sport."
+                        );
+                    }
+
+                    await loadSports();
+                    resetSportForm();
+
+                    showMessage(
+                        responseData.message ||
+                        "Sport added successfully",
+                        "success"
+                    );
+                } catch (error) {
+                    showMessage(
+                        error.message || "Unable to add sport.",
+                        "error"
+                    );
+                } finally {
+                    saveButton.disabled = false;
+                }
+            });
+
+        document
+            .getElementById("levelForm")
+            .addEventListener("submit", async event => {
+                event.preventDefault();
+
+                const levelName = document
+                    .getElementById("levelName")
+                    .value
+                    .trim();
+
+                if (!levelName) {
+                    showMessage("Level name is required.", "error");
+                    return;
+                }
+
+                const saveButton =
+                    document.getElementById("saveLevelButton");
+
+                saveButton.disabled = true;
+                showMessage("Adding level...", "info");
+
+                try {
+                    const response = await fetch("/api/levels", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            id: levelName,
+                            name: levelName
+                        })
+                    });
+
+                    if (response.status === 401 || response.redirected) {
+                        window.location.href = "/login";
+                        return;
+                    }
+
+                    const responseText = await response.text();
+                    let responseData = {};
+
+                    if (responseText) {
+                        try {
+                            responseData = JSON.parse(responseText);
+                        } catch {
+                            responseData = {};
+                        }
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(
+                            responseData.message ||
+                            responseText.trim() ||
+                            "Unable to add level."
+                        );
+                    }
+
+                    await loadLevels();
+                    resetLevelForm();
+
+                    showMessage(
+                        responseData.message ||
+                        "Level added successfully",
+                        "success"
+                    );
+                } catch (error) {
+                    showMessage(
+                        error.message || "Unable to add level.",
+                        "error"
+                    );
+                } finally {
+                    saveButton.disabled = false;
+                }
+            });
+
+        document
+            .getElementById("cancelSportEditButton")
+            .addEventListener("click", resetSportForm);
+
+        document
+            .getElementById("cancelLevelEditButton")
+            .addEventListener("click", resetLevelForm);
+
+        document
+            .getElementById("cancelSportDeleteButton")
+            .addEventListener("click", closeSportDeleteModal);
+
+        document
+            .getElementById("confirmSportDeleteButton")
+            .addEventListener("click", confirmSportDelete);
+
+        document
+            .getElementById("cancelLevelDeleteButton")
+            .addEventListener("click", closeLevelDeleteModal);
+
+        document
+            .getElementById("confirmLevelDeleteButton")
+            .addEventListener("click", confirmLevelDelete);
+
+        document
+            .getElementById("sportDeleteModal")
+            .addEventListener("click", event => {
+                if (event.target.id === "sportDeleteModal") {
+                    closeSportDeleteModal();
+                }
+            });
+
+        document
+            .getElementById("levelDeleteModal")
+            .addEventListener("click", event => {
+                if (event.target.id === "levelDeleteModal") {
+                    closeLevelDeleteModal();
+                }
+            });
+
+        document.addEventListener("keydown", event => {
+            if (event.key !== "Escape") {
+                return;
+            }
+
+            if (
+                document
+                    .getElementById("sportDeleteModal")
+                    .classList.contains("open")
+            ) {
+                closeSportDeleteModal();
+            }
+
+            if (
+                document
+                    .getElementById("levelDeleteModal")
+                    .classList.contains("open")
+            ) {
+                closeLevelDeleteModal();
+            }
+        });
+
+        async function initializeSettings() {
+            await loadSports();
+            await loadLevels();
+        }
+
+        initializeSettings();
+    </script>
+</body>
+</html>

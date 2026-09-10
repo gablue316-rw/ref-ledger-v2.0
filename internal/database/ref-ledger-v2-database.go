@@ -646,7 +646,7 @@ func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDesc
 	}
 
 	if filter.Amount > 0 {
-		paymentFilter["amount"] = filter.Amount
+		paymentFilter["paymentAmt"] = filter.Amount
 	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
@@ -4270,8 +4270,9 @@ func (uc *UsersCollection) GetName(tenantId, username string) (string, error) {
 }
 
 type Level struct {
-	ID   string `bson:"id" json:"id"`
-	Name string `bson:"name" json:"name"`
+	ID       string `bson:"id" json:"id"`
+	Name     string `bson:"name" json:"name"`
+	TenantID string `bson:"tenantId" json:"tenantId"`
 }
 
 type LevelsCollection struct {
@@ -4286,6 +4287,81 @@ func (lc *LevelsCollection) Init(client *mongo.Client) error {
 	lc.Coll = lc.DB.Collection("levels")
 
 	fmt.Println("Successfully initialized Levels Collection")
+	return nil
+}
+
+func (lc *LevelsCollection) Add(level Level, tenantId string) error {
+
+	level.ID = strings.TrimSpace(level.ID)
+	level.Name = strings.TrimSpace(level.Name)
+
+	// Use the authenticated tenant ID.
+	level.TenantID = strings.TrimSpace(tenantId)
+
+	if level.ID == "" {
+		return fmt.Errorf("level ID is required")
+	}
+
+	if level.Name == "" {
+		return fmt.Errorf("level name is required")
+	}
+
+	if level.TenantID == "" {
+		return fmt.Errorf("tenant ID is required")
+	}
+
+	_, err := lc.Coll.InsertOne(
+		context.Background(),
+		level,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to add level %q: %w",
+			level.Name,
+			err,
+		)
+	}
+
+	return nil
+}
+
+func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
+
+	levelID = strings.TrimSpace(levelID)
+	tenantID = strings.TrimSpace(tenantID)
+
+	if levelID == "" {
+		return fmt.Errorf("level ID is required")
+	}
+
+	if tenantID == "" {
+		return fmt.Errorf("tenant ID is required")
+	}
+
+	filter := bson.M{
+		"id":       levelID,
+		"tenantId": tenantID,
+	}
+
+	result, err := lc.Coll.DeleteOne(
+		context.Background(),
+		filter,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to delete level %q: %w",
+			levelID,
+			err,
+		)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf(
+			"level %q was not found",
+			levelID,
+		)
+	}
+
 	return nil
 }
 
@@ -4330,8 +4406,9 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 }
 
 type Sport struct {
-	ID   string `bson:"id" json:"id"`
-	Name string `bson:"name" json:"name"`
+	ID       string `bson:"id" json:"id"`
+	Name     string `bson:"name" json:"name"`
+	TenantID string `bson:"tenantId" json:"tenantId"`
 }
 
 type SportsCollection struct {
@@ -4386,4 +4463,79 @@ func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 
 	fmt.Println("Total sports found for tenant", tenantId, ":", len(sports))
 	return sports, nil
+}
+
+func (sc *SportsCollection) Add(sport Sport, tenantId string) error {
+
+	sport.ID = strings.TrimSpace(sport.ID)
+	sport.Name = strings.TrimSpace(sport.Name)
+
+	// Use the authenticated tenant ID.
+	sport.TenantID = strings.TrimSpace(tenantId)
+
+	if sport.ID == "" {
+		return fmt.Errorf("sport ID is required")
+	}
+
+	if sport.Name == "" {
+		return fmt.Errorf("sport name is required")
+	}
+
+	if sport.TenantID == "" {
+		return fmt.Errorf("tenant ID is required")
+	}
+
+	_, err := sc.Coll.InsertOne(
+		context.Background(),
+		sport,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to add sport %q: %w",
+			sport.Name,
+			err,
+		)
+	}
+
+	return nil
+}
+
+func (sc *SportsCollection) Delete(sportID string, tenantID string) error {
+
+	sportID = strings.TrimSpace(sportID)
+	tenantID = strings.TrimSpace(tenantID)
+
+	if sportID == "" {
+		return fmt.Errorf("sport ID is required")
+	}
+
+	if tenantID == "" {
+		return fmt.Errorf("tenant ID is required")
+	}
+
+	filter := bson.M{
+		"id":       sportID,
+		"tenantId": tenantID,
+	}
+
+	result, err := sc.Coll.DeleteOne(
+		context.Background(),
+		filter,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to delete sport %q: %w",
+			sportID,
+			err,
+		)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf(
+			"sport %q was not found",
+			sportID,
+		)
+	}
+
+	return nil
 }
