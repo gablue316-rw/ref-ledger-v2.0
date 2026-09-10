@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -352,10 +353,20 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SettingsPage(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("SettingsPage called:", r.URL.Path)
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
 	http.ServeFile(
 		w,
 		r,
-		"internal/html/settings.html",
+		"./internal/html/settings.html",
 	)
 }
 
@@ -4854,6 +4865,28 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 		r.URL.Query().Get("date"),
 	)
 
+	if date != "" {
+		parsedDate, err := time.Parse(
+			"2006-01-02",
+			date,
+		)
+		if err != nil {
+			http.Error(
+				w,
+				"Date must be a valid date.",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		date = fmt.Sprintf(
+			"%d/%d/%d",
+			int(parsedDate.Month()),
+			parsedDate.Day(),
+			parsedDate.Year(),
+		)
+	}
+
 	association := strings.TrimSpace(
 		r.URL.Query().Get("association"),
 	)
@@ -4865,22 +4898,30 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 	var amount int64
 
 	if amountText != "" {
-		parsedAmount, err := strconv.ParseInt(
+		parsedAmount, err := strconv.ParseFloat(
 			amountText,
-			10,
 			64,
 		)
+
 		if err != nil {
 			http.Error(
 				w,
-				"Amount must be a valid whole number.",
+				"Amount must be a valid dollar amount.",
 				http.StatusBadRequest,
 			)
 			return
 		}
 
-		amount = parsedAmount * 100 // Convert dollars to cents
+		if parsedAmount < 0 {
+			http.Error(
+				w,
+				"Amount cannot be negative.",
+				http.StatusBadRequest,
+			)
+			return
+		}
 
+		amount = int64(math.Round(parsedAmount * 100))
 	}
 
 	registryFilter := model.PaymentRegistryFilter{
@@ -6366,7 +6407,7 @@ func main() {
 
 	mux.HandleFunc("/api/environment", GetEnvironmentHandler)
 	mux.HandleFunc("/api/about", AboutHandler)
-	mux.HandleFunc("/settings", SettingsPage)
+	mux.HandleFunc("/settings", authRequired(SettingsPage))
 
 	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
@@ -6437,8 +6478,8 @@ func main() {
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadLevels", GetLevelsHandler)
 	mux.HandleFunc("/api/loadSports", GetSportsHandler)
-	mux.HandleFunc("/api/sports", SportsHandler)
-	mux.HandleFunc("/api/levels", LevelsHandler)
+	mux.HandleFunc("/api/sports", authRequired(readOnlyForbidden(SportsHandler)))
+	mux.HandleFunc("/api/levels", authRequired(readOnlyForbidden(LevelsHandler)))
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
 	mux.HandleFunc("/api/associationsDirectory", GetAssociationsDirectoryHandler)
@@ -6537,7 +6578,16 @@ func main() {
 	)
 
 	mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./internal/html/index.html")
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+
+		http.ServeFile(
+			w,
+			r,
+			"./internal/html/index.html",
+		)
 	}))
 
 	fmt.Println("Routes successfully registered")

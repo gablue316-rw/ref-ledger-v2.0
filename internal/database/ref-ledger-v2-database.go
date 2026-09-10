@@ -646,7 +646,7 @@ func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDesc
 	}
 
 	if filter.Amount > 0 {
-		paymentFilter["amount"] = filter.Amount
+		paymentFilter["paymentAmt"] = filter.Amount
 	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
