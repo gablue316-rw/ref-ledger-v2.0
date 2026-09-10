@@ -5601,25 +5601,33 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	coll := db.Collection("games")
 
 	// 1. Read query parameters
-	status := r.URL.Query().Get("status")
-	association := r.URL.Query().Get("association")
+	statuses := r.URL.Query()["status"]
+	associations := r.URL.Query()["association"]
+	sports := r.URL.Query()["sport"]
 	begindate := r.URL.Query().Get("begindate")
 	enddate := r.URL.Query().Get("enddate")
-	level := r.URL.Query().Get("level")
+	levels := r.URL.Query()["level"]
 	gameId := r.URL.Query().Get("gameId")
 	site := r.URL.Query().Get("site")
 	official := r.URL.Query().Get("official")
 
+	fmt.Println("Statuses:", statuses, "Associations:", associations, "Sports:", sports, "Levels:", levels, "GameId:", gameId, "Site:", site, "Official:", official)
 	fmt.Println("Begin Date:", begindate, "End Date:", enddate)
 
 	if begindate == "today" && enddate == "" {
 		enddate = begindate
 	}
 
-	if len(status) > 0 {
+	for i, status := range statuses {
+		status = strings.TrimSpace(status)
+
+		if status == "" {
+			continue
+		}
+
 		runes := []rune(status)
 		runes[0] = unicode.ToUpper(runes[0])
-		status = string(runes)
+		statuses[i] = string(runes)
 	}
 
 	var bDate string = ""
@@ -5664,9 +5672,9 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	gameFilters.Status = status
-	gameFilters.Association = association
-	gameFilters.Level = level
+	gameFilters.Status = ""
+	gameFilters.Association = ""
+	gameFilters.Level = ""
 	gameFilters.FromDate = bDate
 	gameFilters.ToDate = eDate
 	gameFilters.Site = siteId
@@ -5686,6 +5694,30 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("FILTER BUILD ERROR", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if len(statuses) > 0 {
+		mongoDbFilter["status"] = bson.M{
+			"$in": statuses,
+		}
+	}
+
+	if len(associations) > 0 {
+		mongoDbFilter["association"] = bson.M{
+			"$in": associations,
+		}
+	}
+
+	if len(sports) > 0 {
+		mongoDbFilter["sport"] = bson.M{
+			"$in": sports,
+		}
+	}
+
+	if len(levels) > 0 {
+		mongoDbFilter["level"] = bson.M{
+			"$in": levels,
+		}
 	}
 
 	fmt.Println("Game Filters", gameFilters)

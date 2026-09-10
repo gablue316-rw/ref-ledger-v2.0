@@ -71,6 +71,95 @@ body {
     min-width: 180px;
 }
 
+.status-options,
+.association-options,
+.level-options,
+.sport-options {
+    min-width: 180px;
+    padding: 9px 12px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 8px 14px;
+    background-color: white;
+}
+
+.status-option,
+.association-option,
+.level-option,
+.sport-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    font-weight: normal;
+    cursor: pointer;
+}
+
+.filter-group .status-option input,
+.filter-group .association-option input,
+.filter-group .level-option input,
+.filter-group .sport-option input {
+    width: auto;
+    min-width: 0;
+    margin: 0;
+}
+
+.checkbox-dropdown {
+    position: relative;
+    min-width: 220px;
+}
+
+.checkbox-dropdown-button {
+    width: 100%;
+    min-width: 220px;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background-color: white;
+    color: #333;
+    cursor: pointer;
+    font-size: 14px;
+    text-align: left;
+}
+
+.checkbox-dropdown-button:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: 1px;
+}
+
+.checkbox-dropdown-button i {
+    transition: transform 0.2s ease;
+}
+
+.checkbox-dropdown.open .checkbox-dropdown-button i {
+    transform: rotate(180deg);
+}
+
+.checkbox-dropdown .checkbox-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 100;
+    width: max-content;
+    min-width: 100%;
+    max-width: 320px;
+    max-height: 260px;
+    overflow-y: auto;
+    display: none;
+    grid-template-columns: repeat(2, max-content);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+}
+
+.checkbox-dropdown.open .checkbox-options {
+    display: grid;
+}
+
 .btn {
     background-color: #2563eb;
     color: white;
@@ -253,14 +342,23 @@ body {
         </div>
 
         <div class="filter-group">
-            <label for="status">Status</label>
-            <select id="status">
-                <option value="">All</option>
-                <option value="Completed">Completed</option>
-                <option value="Pending">Pending</option>
-                <option value="Paid">Paid</option>
-                <option value="Cancelled">Cancelled</option>
-            </select>
+            <label>Status</label>
+            <div id="statusDropdown" class="checkbox-dropdown">
+                <button type="button" id="statusDropdownButton"
+                    class="checkbox-dropdown-button" aria-haspopup="true"
+                    aria-expanded="false" onclick="toggleCheckboxDropdown('status', event)">
+                    <span id="statusDropdownText">Select Statuses</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div class="status-options checkbox-options" role="group" aria-label="Game statuses">
+                    <label class="status-option"><input type="checkbox" id="statusAll"
+                        onchange="setAllFilterOptions('status', this.checked)"><strong>All</strong></label>
+                    <label class="status-option"><input type="checkbox" name="status" value="Completed">Completed</label>
+                    <label class="status-option"><input type="checkbox" name="status" value="Pending">Pending</label>
+                    <label class="status-option"><input type="checkbox" name="status" value="Paid">Paid</label>
+                    <label class="status-option"><input type="checkbox" name="status" value="Cancelled">Cancelled</label>
+                </div>
+            </div>
         </div>
 
         <div class="filter-group">
@@ -277,17 +375,35 @@ body {
         </div>
 
         <div class="filter-group">
-            <label for="association">Association</label>
-            <select id="association">
-                <option value="">Select Association</option>
-            </select>
+            <label>Association</label>
+            <div id="associationDropdown" class="checkbox-dropdown">
+                <button type="button" id="associationDropdownButton"
+                    class="checkbox-dropdown-button" aria-haspopup="true"
+                    aria-expanded="false" onclick="toggleCheckboxDropdown('association', event)">
+                    <span id="associationDropdownText">Select Associations</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div id="associationOptions" class="association-options checkbox-options"
+                    role="group" aria-label="Associations">
+                    <span>Loading associations...</span>
+                </div>
+            </div>
         </div>        
 
         <div class="filter-group">
-            <label for="sport">Sport</label>
-            <select id="sport">
-                <option value="">Select Sport</option>
-            </select>
+            <label>Sport</label>
+            <div id="sportDropdown" class="checkbox-dropdown">
+                <button type="button" id="sportDropdownButton"
+                    class="checkbox-dropdown-button" aria-haspopup="true"
+                    aria-expanded="false" onclick="toggleCheckboxDropdown('sport', event)">
+                    <span id="sportDropdownText">Select Sports</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div id="sportOptions" class="sport-options checkbox-options"
+                    role="group" aria-label="Sports">
+                    <span>Loading sports...</span>
+                </div>
+            </div>
         </div>
 
         <div class="filter-group">
@@ -305,10 +421,27 @@ body {
         </div>
         
         <div class="filter-group">
-            <label for="level">Level</label>
-            <select id="level">
-                <option value="">Select Level</option>                
-            </select>
+            <label>Level</label>
+            <div id="levelDropdown" class="checkbox-dropdown">
+                <button
+                    type="button"
+                    id="levelDropdownButton"
+                    class="checkbox-dropdown-button"
+                    aria-haspopup="true"
+                    aria-expanded="false"
+                    onclick="toggleCheckboxDropdown('level', event)">
+                    <span id="levelDropdownText">Select Levels</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+
+                <div
+                    id="levelOptions"
+                    class="level-options checkbox-options"
+                    role="group"
+                    aria-label="Levels">
+                    <span>Loading levels...</span>
+                </div>
+            </div>
         </div>
 
         <button class="btn" onclick="loadGames()">Search</button>
@@ -643,6 +776,52 @@ document.addEventListener("change", function (event) {
         allCheckboxes.length === checkedCheckboxes.length;
 });
 
+function setAllFilterOptions(groupName, checked) {
+    document.querySelectorAll(
+        `input[name="${groupName}"]`
+    ).forEach(checkbox => {
+        checkbox.checked = checked;
+    });
+
+    updateAllFilterCheckbox(groupName);
+
+    updateDropdownText(groupName);
+}
+
+function updateAllFilterCheckbox(groupName) {
+    const allCheckbox = document.getElementById(`${groupName}All`);
+
+    if (!allCheckbox) {
+        return;
+    }
+
+    const checkboxes = Array.from(
+        document.querySelectorAll(`input[name="${groupName}"]`)
+    );
+
+    const checkedCount = checkboxes.filter(
+        checkbox => checkbox.checked
+    ).length;
+
+    allCheckbox.checked =
+        checkboxes.length > 0 && checkedCount === checkboxes.length;
+
+    allCheckbox.indeterminate =
+        checkedCount > 0 && checkedCount < checkboxes.length;
+}
+
+document.addEventListener("change", function (event) {
+    const groupName = event.target.name;
+
+    if (!["status", "association", "level", "sport"].includes(groupName)) {
+        return;
+    }
+
+    updateAllFilterCheckbox(groupName);
+
+    updateDropdownText(groupName);
+});
+
 async function loadAssociations() {
     try {
         const response =
@@ -655,23 +834,46 @@ async function loadAssociations() {
         }
 
         const associations = await response.json();
-        const select =
-            document.getElementById("association");
+        const associationOptions =
+            document.getElementById("associationOptions");
 
-        select.innerHTML =
-            '<option value="">' +
-            'Select Association' +
-            '</option>';
+        associationOptions.innerHTML = "";
+
+        const allLabel = document.createElement("label");
+        allLabel.className = "association-option";
+
+        const allCheckbox = document.createElement("input");
+        allCheckbox.type = "checkbox";
+        allCheckbox.id = "associationAll";
+        allCheckbox.addEventListener("change", function () {
+            setAllFilterOptions("association", this.checked);
+        });
+
+        allLabel.appendChild(allCheckbox);
+        const allText = document.createElement("strong");
+        allText.textContent = "All";
+        allLabel.appendChild(allText);
+        associationOptions.appendChild(allLabel);
 
         associations.forEach(assoc => {
-            const option =
-                document.createElement("option");
+            const label = document.createElement("label");
+            label.className = "association-option";
 
-            option.value = assoc.id;
-            option.textContent = assoc.id;
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = "association";
+            checkbox.value = assoc.id;
 
-            select.appendChild(option);
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(assoc.id));
+            associationOptions.appendChild(label);
         });
+
+        if (associations.length === 0) {
+            associationOptions.textContent = "No associations found";
+        }
+
+        updateDropdownText("association");
 
     } catch (err) {
         console.error(
@@ -696,8 +898,9 @@ async function loadGames() {
     const gameId =
         document.getElementById("gameId").value;
 
-    const status =
-        document.getElementById("status").value;
+    const statuses = Array.from(
+        document.querySelectorAll('input[name="status"]:checked')
+    ).map(checkbox => checkbox.value);
 
     const begindate =
         document.getElementById("begindate").value;
@@ -708,14 +911,21 @@ async function loadGames() {
     const site =
         document.getElementById("site").value;
 
-    const association =
-        document.getElementById("association").value;
+    const associations = Array.from(
+        document.querySelectorAll(
+            'input[name="association"]:checked'
+        )
+    ).map(checkbox => checkbox.value);
 
-    const level =
-        document.getElementById("level").value;
+    const levels = Array.from(
+        document.querySelectorAll(
+            'input[name="level"]:checked'
+        )
+    ).map(checkbox => checkbox.value);
 
-    const sport =
-        document.getElementById("sport").value;
+    const sports = Array.from(
+        document.querySelectorAll('input[name="sport"]:checked')
+    ).map(checkbox => checkbox.value);
 
     const official =
         document.getElementById("official").value;
@@ -726,9 +936,9 @@ async function loadGames() {
         params.append("gameId", gameId);
     }
 
-    if (status) {
+    statuses.forEach(status => {
         params.append("status", status);
-    }
+    });
 
     if (begindate) {
         params.append("begindate", begindate);
@@ -742,17 +952,17 @@ async function loadGames() {
         params.append("site", site);
     }
 
-    if (association) {
+    associations.forEach(association => {
         params.append("association", association);
-    }
+    });
 
-    if (level) {
+    levels.forEach(level => {
         params.append("level", level);
-    }
+    });
 
-    if (sport) {
+    sports.forEach(sport => {
         params.append("sport", sport);
-    }
+    });
 
     if (official) {
         params.append("official", official);
@@ -854,26 +1064,125 @@ async function loadLevels() {
         }
 
         const levels = await response.json();
-        const select = document.getElementById("level");
+        const levelOptions =
+            document.getElementById("levelOptions");
 
-        select.innerHTML =
-            '<option value="">Select Level</option>';
+        levelOptions.innerHTML = "";
+
+        const allLabel = document.createElement("label");
+        allLabel.className = "level-option";
+
+        const allCheckbox = document.createElement("input");
+        allCheckbox.type = "checkbox";
+        allCheckbox.id = "levelAll";
+        allCheckbox.addEventListener("change", function () {
+            setAllFilterOptions("level", this.checked);
+        });
+
+        allLabel.appendChild(allCheckbox);
+        const allText = document.createElement("strong");
+        allText.textContent = "All";
+        allLabel.appendChild(allText);
+        levelOptions.appendChild(allLabel);
 
         levels.forEach(level => {
-            const option =
-                document.createElement("option");
+            const label = document.createElement("label");
+            label.className = "level-option";
 
-            option.value = level.name;
-            option.textContent = level.name;
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = "level";
+            checkbox.value = level.name;
+            checkbox.addEventListener(
+                "change",
+                () => updateDropdownText("level")
+            );
 
-            select.appendChild(option);
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(level.name));
+            levelOptions.appendChild(label);
         });
+
+        if (levels.length === 0) {
+            levelOptions.textContent = "No levels found";
+        }
+
+        updateDropdownText("level");
 
     } catch (err) {
         console.error("Error loading levels:", err);
     }    
     
 }
+
+function toggleCheckboxDropdown(groupName, event) {
+    event.stopPropagation();
+
+    document.querySelectorAll(".checkbox-dropdown.open").forEach(openDropdown => {
+        if (openDropdown.id !== `${groupName}Dropdown`) {
+            closeCheckboxDropdown(openDropdown.id.replace("Dropdown", ""));
+        }
+    });
+
+    const dropdown = document.getElementById(`${groupName}Dropdown`);
+    const button = document.getElementById(`${groupName}DropdownButton`);
+    const isOpen = dropdown.classList.toggle("open");
+
+    button.setAttribute("aria-expanded", String(isOpen));
+}
+
+function closeCheckboxDropdown(groupName) {
+    const dropdown = document.getElementById(`${groupName}Dropdown`);
+    const button = document.getElementById(`${groupName}DropdownButton`);
+
+    if (!dropdown || !button) {
+        return;
+    }
+
+    dropdown.classList.remove("open");
+    button.setAttribute("aria-expanded", "false");
+}
+
+function updateDropdownText(groupName) {
+    const labels = {
+        status: ["Status", "Statuses"],
+        association: ["Association", "Associations"],
+        level: ["Level", "Levels"],
+        sport: ["Sport", "Sports"]
+    };
+    const [, plural] = labels[groupName];
+    const selectedValues = Array.from(
+        document.querySelectorAll(`input[name="${groupName}"]:checked`)
+    ).map(checkbox => checkbox.value);
+    const allOptions = document.querySelectorAll(`input[name="${groupName}"]`);
+    const text = document.getElementById(`${groupName}DropdownText`);
+
+    if (selectedValues.length === 0) {
+        text.textContent = `Select ${plural}`;
+    } else if (allOptions.length > 0 && selectedValues.length === allOptions.length) {
+        text.textContent = `All ${plural}`;
+    } else if (selectedValues.length === 1) {
+        text.textContent = selectedValues[0];
+    } else {
+        text.textContent = `${selectedValues.length} ${plural.toLowerCase()} selected`;
+    }
+}
+
+document.addEventListener("click", function (event) {
+    document.querySelectorAll(".checkbox-dropdown.open").forEach(dropdown => {
+        if (!dropdown.contains(event.target)) {
+            closeCheckboxDropdown(dropdown.id.replace("Dropdown", ""));
+        }
+    });
+});
+
+document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+        ["status", "association", "level", "sport"].forEach(
+            closeCheckboxDropdown
+        );
+    }
+});
 
 async function loadSports() {
 
@@ -901,20 +1210,45 @@ async function loadSports() {
         }
 
         const sports = await response.json();
-        const select = document.getElementById("sport");
+        const sportOptions = document.getElementById("sportOptions");
 
-        select.innerHTML =
-            '<option value="">Select Sport</option>';
+        sportOptions.innerHTML = "";
+
+        const allLabel = document.createElement("label");
+        allLabel.className = "sport-option";
+
+        const allCheckbox = document.createElement("input");
+        allCheckbox.type = "checkbox";
+        allCheckbox.id = "sportAll";
+        allCheckbox.addEventListener("change", function () {
+            setAllFilterOptions("sport", this.checked);
+        });
+
+        allLabel.appendChild(allCheckbox);
+        const allText = document.createElement("strong");
+        allText.textContent = "All";
+        allLabel.appendChild(allText);
+        sportOptions.appendChild(allLabel);
 
         sports.forEach(sport => {
-            const option =
-                document.createElement("option");
+            const label = document.createElement("label");
+            label.className = "sport-option";
 
-            option.value = sport.name;
-            option.textContent = sport.name;
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = "sport";
+            checkbox.value = sport.name;
 
-            select.appendChild(option);
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(sport.name));
+            sportOptions.appendChild(label);
         });
+
+        if (sports.length === 0) {
+            sportOptions.textContent = "No sports found";
+        }
+
+        updateDropdownText("sport");
 
     } catch (err) {
         console.error("Error loading sports:", err);
@@ -1082,13 +1416,32 @@ async function updateSelectedStatus() {
 
 function clearFilters() {
     document.getElementById("gameId").value = "";
-    document.getElementById("status").value = "";
+    document.querySelectorAll('input[name="status"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+    updateAllFilterCheckbox("status");
+    updateDropdownText("status");
     document.getElementById("begindate").value = "";
     document.getElementById("enddate").value = "";
     document.getElementById("site").value = "";
-    document.getElementById("association").value = "";
-    document.getElementById("level").value = "";
-    document.getElementById("sport").value = "";
+    document.querySelectorAll('input[name="association"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+    updateAllFilterCheckbox("association");
+    updateDropdownText("association");
+    document.querySelectorAll('input[name="level"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+    updateAllFilterCheckbox("level");
+    updateDropdownText("level");
+    document.querySelectorAll('input[name="sport"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+    updateAllFilterCheckbox("sport");
+    updateDropdownText("sport");
+    ["status", "association", "level", "sport"].forEach(
+        closeCheckboxDropdown
+    );
     document.getElementById("official").value = "";
 
     loadPendingGamesTable();
