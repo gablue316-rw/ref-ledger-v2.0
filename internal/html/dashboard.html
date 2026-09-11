@@ -77,14 +77,11 @@ body {
 .sport-options,
 .official-options,
 .site-options {
-    min-width: 180px;
-    padding: 9px 12px;
+    min-width: 100%;
+    padding: 8px;
     border: 1px solid #ccc;
     border-radius: 5px;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px 14px;
-    background-color: white;
+    background: white;
 }
 
 .status-option,
@@ -95,10 +92,21 @@ body {
 .site-option {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 6px;
     margin: 0;
-    font-weight: normal;
+    font-weight: normal !important;
     cursor: pointer;
+}
+
+.status-option:hover,
+.association-option:hover,
+.level-option:hover,
+.sport-option:hover,
+.official-option:hover,
+.site-option:hover {
+    background-color: #f1f5f9;
 }
 
 .filter-group .status-option input,
@@ -119,51 +127,48 @@ body {
 
 .checkbox-dropdown-button {
     width: 100%;
-    min-width: 220px;
-    padding: 10px 12px;
+    min-height: 38px;
+    padding: 10px;
     border: 1px solid #ccc;
     border-radius: 5px;
+    background: white;
+    color: #333;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    background-color: white;
-    color: #333;
-    cursor: pointer;
-    font-size: 14px;
     text-align: left;
 }
 
-.checkbox-dropdown-button:focus {
-    outline: 2px solid #2563eb;
-    outline-offset: 1px;
+.checkbox-dropdown-button::after {
+    content: "\25BE";
+    margin-left: 12px;
 }
 
 .checkbox-dropdown-button i {
-    transition: transform 0.2s ease;
+    display: none;
 }
 
-.checkbox-dropdown.open .checkbox-dropdown-button i {
-    transform: rotate(180deg);
+.checkbox-dropdown.open .checkbox-dropdown-button::after {
+    content: "\25B4";
 }
 
 .checkbox-dropdown .checkbox-options {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
-    z-index: 100;
-    width: max-content;
-    min-width: 100%;
-    max-width: 320px;
-    max-height: 260px;
+    z-index: 1000;
+    width: 100%;
+    max-height: 280px;
     overflow-y: auto;
     display: none;
-    grid-template-columns: 1fr;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .checkbox-dropdown.open .checkbox-options {
-    display: grid;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
 .btn {

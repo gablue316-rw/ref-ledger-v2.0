@@ -4302,7 +4302,7 @@ func LogVisitor(r *http.Request) {
 	)
 }
 
-func generatePaymentsReport(assoc string) []string {
+func generatePaymentsReport(assoc []string, tid string) []string {
 
 	var rept []string = []string{}
 	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
@@ -4310,11 +4310,11 @@ func generatePaymentsReport(assoc string) []string {
 		rept = append(rept, "Error generating payment report.  Failed to retrieve payment records.")
 		return rept
 	}
-	rept = reports.GeneratePaymentReport(paymentRecords)
+	rept = reports.GeneratePaymentReport(paymentRecords, tid)
 	return rept
 }
 
-func generateReconciliationReport(assoc string) []string {
+func generateReconciliationReport(assoc []string, tid string) []string {
 
 	var rept []string = []string{}
 
@@ -4323,36 +4323,30 @@ func generateReconciliationReport(assoc string) []string {
 		rept = append(rept, "Error generating reconciliation report.  Failed to retrieve payment records.")
 		return rept
 	}
-	rept = reports.GenerateReconciliationReport(paymentRecords)
+	rept = reports.GenerateReconciliationReport(paymentRecords, tid)
 
 	return rept
 }
 
-func generateAccountsReceivableReport(assoc, tid string) []string {
+func generateAccountsReceivableReport(assoc []string, tid string) []string {
 
 	var rept []string = []string{}
 	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc, tid)
 	return rept
 }
 
-func generateIncomeReport(assoc string) []string {
+func generateIncomeReport(assoc []string, tid string) []string {
 
 	var rept []string = []string{}
-	rept = reports.GenerateIncomeReport(assoc)
+	rept = reports.GenerateIncomeReport(assoc, tid)
 	return rept
 }
 
-func generateExpenseReport(expenseFilters model.EFilters) []string {
+func generateExpenseReport(filter bson.M) []string {
 
 	var rept []string = []string{}
 
-	efilter, err := utils.ConvertExpenseFilterToJsonFile(expenseFilters)
-	if err != nil {
-		fmt.Println(err)
-		return []string{}
-	}
-
-	expenseRecords, err := database.QueryExpenses(context.TODO(), database.GetMongoDbName(), "expenses", efilter)
+	expenseRecords, err := database.QueryExpenses(context.TODO(), database.GetMongoDbName(), "expenses", filter)
 	if err != nil {
 		fmt.Println(err)
 		return []string{}
@@ -4362,16 +4356,10 @@ func generateExpenseReport(expenseFilters model.EFilters) []string {
 	return rept
 }
 
-func generateGamesReport(gameFilters model.GFilters) []string {
+func generateGamesReport(gameFilter bson.M) []string {
 	// Implementation for generating games report
 
-	gFilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
-	if err != nil {
-		fmt.Println(err)
-		return []string{}
-	}
-
-	gameRecords, err := database.QueryAggregatedGames(context.TODO(), database.GetMongoDbName(), "games", gFilter)
+	gameRecords, err := database.QueryAggregatedGames(context.TODO(), database.GetMongoDbName(), "games", gameFilter)
 	if err != nil {
 		fmt.Println("Failed to query aggregated games")
 		return []string{}
@@ -4389,17 +4377,19 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	var tId string = database.TenantId
 	var err error
-	var siteId string
+	//var siteId string
 
 	gameFilters := model.GFilters{}
-	expenseFilters := model.EFilters{}
+	//expenseFilters := model.EFilters{}
+
 	rType := r.URL.Query().Get("type")
 	rEmail := r.URL.Query().Get("emailaddr")
 	rFile := r.URL.Query().Get("filename")
-	rStatus := r.URL.Query().Get("status")
-	rAssoc := r.URL.Query().Get("association")
 	rGameIds := r.URL.Query().Get("gameids")
-	rSite := r.URL.Query().Get("site")
+
+	rSites := r.URL.Query()["site"]
+	rStatuses := r.URL.Query()["status"]
+	rAssociations := r.URL.Query()["association"]
 
 	rept := []string{}
 
@@ -4413,13 +4403,13 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The HTML uses the site name, so we need to convert it to an ID
-	if rSite != "" {
-		siteId, err = sc.GetSiteId(rSite, tId)
-		if err != nil {
-			http.Error(w, "Invalid site ID", http.StatusBadRequest)
-			return
-		}
-	}
+	// if rSite != "" {
+	// 	siteId, err = sc.GetSiteId(rSite, tId)
+	// 	if err != nil {
+	// 		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+	// 		return
+	// 	}
+	// }
 
 	if len(rGameIds) > 0 {
 		ids, err := utils.ConvertGameIdStrToInt(rGameIds)
@@ -4436,25 +4426,50 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 		gameFilters.GameId = rGameIds
 	}
 
-	gameFilters.Association = rAssoc
-	gameFilters.Status = rStatus
-	gameFilters.Site = siteId
+	gameFilters.Association = ""
+	gameFilters.Status = ""
+	gameFilters.Site = ""
 	gameFilters.TenantId = tId
 	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
 
+	gameFilter := bson.M{}
+	expenseFilter := bson.M{}
+
+	if len(rStatuses) > 0 {
+		gameFilter["status"] = bson.M{
+			"$in": rStatuses,
+		}
+	}
+
+	if len(rAssociations) > 0 {
+		gameFilter["association"] = bson.M{
+			"$in": rAssociations,
+		}
+
+		expenseFilter["association"] = bson.M{
+			"$in": rAssociations,
+		}
+	}
+
+	if len(rSites) > 0 {
+		gameFilter["site"] = bson.M{
+			"$in": rSites,
+		}
+	}
+
 	switch rType {
 	case "Games":
-		rept = generateGamesReport(gameFilters)
+		rept = generateGamesReport(gameFilter)
 	case "Expenses":
-		rept = generateExpenseReport(expenseFilters)
+		rept = generateExpenseReport(expenseFilter)
 	case "Income":
-		rept = generateIncomeReport(rAssoc)
+		rept = generateIncomeReport(rAssociations, tId)
 	case "Payments":
-		rept = generatePaymentsReport(rAssoc)
+		rept = generatePaymentsReport(rAssociations, tId)
 	case "Reconciliation":
-		rept = generateReconciliationReport(rAssoc)
+		rept = generateReconciliationReport(rAssociations, tId)
 	case "Accounts Receivable":
-		rept = generateAccountsReceivableReport(rAssoc, tId)
+		rept = generateAccountsReceivableReport(rAssociations, tId)
 	default:
 		w.Header().Set("Content-Type", "text/plain")
 		fmt.Fprint(w, "Invalid Report Type")
