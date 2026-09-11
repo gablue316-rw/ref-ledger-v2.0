@@ -518,7 +518,7 @@ body {
         id="gamesCount"
         class="games-count"
         aria-live="polite">
-        0 games displayed
+        0 assignments displayed
     </div>
 
     <table class="games-table">
@@ -590,7 +590,7 @@ function updateGamesCount(count, totalFees) {
         document.getElementById("gamesCount");
 
     gamesCount.textContent =
-        `${count} ${count === 1 ? "game" : "games"} displayed — ` +
+        `${count} ${count === 1 ? "assignment" : "assignments"} displayed — ` +
         `Total game fees: ${formatCurrency(totalFees)}`;
 }
 
