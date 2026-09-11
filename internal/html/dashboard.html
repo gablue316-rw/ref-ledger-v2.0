@@ -74,13 +74,15 @@ body {
 .status-options,
 .association-options,
 .level-options,
-.sport-options {
+.sport-options,
+.official-options,
+.site-options {
     min-width: 180px;
     padding: 9px 12px;
     border: 1px solid #ccc;
     border-radius: 5px;
     display: grid;
-    grid-template-columns: repeat(2, max-content);
+    grid-template-columns: 1fr;
     gap: 8px 14px;
     background-color: white;
 }
@@ -88,7 +90,9 @@ body {
 .status-option,
 .association-option,
 .level-option,
-.sport-option {
+.sport-option,
+.official-option,
+.site-option {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -100,7 +104,9 @@ body {
 .filter-group .status-option input,
 .filter-group .association-option input,
 .filter-group .level-option input,
-.filter-group .sport-option input {
+.filter-group .sport-option input,
+.filter-group .official-option input,
+.filter-group .site-option input {
     width: auto;
     min-width: 0;
     margin: 0;
@@ -152,7 +158,7 @@ body {
     max-height: 260px;
     overflow-y: auto;
     display: none;
-    grid-template-columns: repeat(2, max-content);
+    grid-template-columns: 1fr;
     box-shadow: 0 6px 18px rgba(0,0,0,0.18);
 }
 
@@ -407,17 +413,35 @@ body {
         </div>
 
         <div class="filter-group">
-            <label for="official">Official</label>
-            <select id="official">
-                <option value="">Select Official</option>
-            </select>
+            <label>Official</label>
+            <div id="officialDropdown" class="checkbox-dropdown">
+                <button type="button" id="officialDropdownButton"
+                    class="checkbox-dropdown-button" aria-haspopup="true"
+                    aria-expanded="false" onclick="toggleCheckboxDropdown('official', event)">
+                    <span id="officialDropdownText">Select Officials</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div id="officialOptions" class="official-options checkbox-options"
+                    role="group" aria-label="Officials">
+                    <span>Loading officials...</span>
+                </div>
+            </div>
         </div>    
         
         <div class="filter-group">
-            <label for="site">Site</label>
-            <select id="site">
-                <option value="">Select Site</option>
-            </select>
+            <label>Site</label>
+            <div id="siteDropdown" class="checkbox-dropdown">
+                <button type="button" id="siteDropdownButton"
+                    class="checkbox-dropdown-button" aria-haspopup="true"
+                    aria-expanded="false" onclick="toggleCheckboxDropdown('site', event)">
+                    <span id="siteDropdownText">Select Sites</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div id="siteOptions" class="site-options checkbox-options"
+                    role="group" aria-label="Sites">
+                    <span>Loading sites...</span>
+                </div>
+            </div>
         </div>
         
         <div class="filter-group">
@@ -813,7 +837,7 @@ function updateAllFilterCheckbox(groupName) {
 document.addEventListener("change", function (event) {
     const groupName = event.target.name;
 
-    if (!["status", "association", "level", "sport"].includes(groupName)) {
+    if (!["status", "association", "level", "sport", "official", "site"].includes(groupName)) {
         return;
     }
 
@@ -908,8 +932,9 @@ async function loadGames() {
     const enddate =
         document.getElementById("enddate").value;
 
-    const site =
-        document.getElementById("site").value;
+    const sites = Array.from(
+        document.querySelectorAll('input[name="site"]:checked')
+    ).map(checkbox => checkbox.value);
 
     const associations = Array.from(
         document.querySelectorAll(
@@ -927,8 +952,9 @@ async function loadGames() {
         document.querySelectorAll('input[name="sport"]:checked')
     ).map(checkbox => checkbox.value);
 
-    const official =
-        document.getElementById("official").value;
+    const officials = Array.from(
+        document.querySelectorAll('input[name="official"]:checked')
+    ).map(checkbox => checkbox.value);
 
     const params = new URLSearchParams();
 
@@ -948,9 +974,9 @@ async function loadGames() {
         params.append("enddate", enddate);
     }
 
-    if (site) {
+    sites.forEach(site => {
         params.append("site", site);
-    }
+    });
 
     associations.forEach(association => {
         params.append("association", association);
@@ -964,9 +990,9 @@ async function loadGames() {
         params.append("sport", sport);
     });
 
-    if (official) {
+    officials.forEach(official => {
         params.append("official", official);
-    }
+    });
 
     await fetchGames(params);
 }
@@ -1148,7 +1174,9 @@ function updateDropdownText(groupName) {
         status: ["Status", "Statuses"],
         association: ["Association", "Associations"],
         level: ["Level", "Levels"],
-        sport: ["Sport", "Sports"]
+        sport: ["Sport", "Sports"],
+        official: ["Official", "Officials"],
+        site: ["Site", "Sites"]
     };
     const [, plural] = labels[groupName];
     const selectedValues = Array.from(
@@ -1178,7 +1206,7 @@ document.addEventListener("click", function (event) {
 
 document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
-        ["status", "association", "level", "sport"].forEach(
+        ["status", "association", "level", "sport", "official", "site"].forEach(
             closeCheckboxDropdown
         );
     }
@@ -1281,20 +1309,45 @@ async function loadSites() {
         }
 
         const sites = await response.json();
-        const select = document.getElementById("site");
+        const siteOptions = document.getElementById("siteOptions");
 
-        select.innerHTML =
-            '<option value="">Select Site</option>';
+        siteOptions.innerHTML = "";
+
+        const allLabel = document.createElement("label");
+        allLabel.className = "site-option";
+
+        const allCheckbox = document.createElement("input");
+        allCheckbox.type = "checkbox";
+        allCheckbox.id = "siteAll";
+        allCheckbox.addEventListener("change", function () {
+            setAllFilterOptions("site", this.checked);
+        });
+
+        allLabel.appendChild(allCheckbox);
+        const allText = document.createElement("strong");
+        allText.textContent = "All";
+        allLabel.appendChild(allText);
+        siteOptions.appendChild(allLabel);
 
         sites.forEach(site => {
-            const option =
-                document.createElement("option");
+            const label = document.createElement("label");
+            label.className = "site-option";
 
-            option.value = site.name;
-            option.textContent = site.name;
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = "site";
+            checkbox.value = site.name;
 
-            select.appendChild(option);
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(site.name));
+            siteOptions.appendChild(label);
         });
+
+        if (sites.length === 0) {
+            siteOptions.textContent = "No sites found";
+        }
+
+        updateDropdownText("site");
 
     } catch (err) {
         console.error("Error loading sites:", err);
@@ -1313,21 +1366,46 @@ async function loadOfficials() {
         }
 
         const officials = await response.json();
-        const select =
-            document.getElementById("official");
+        const officialOptions =
+            document.getElementById("officialOptions");
 
-        select.innerHTML =
-            '<option value="">Select Official</option>';
+        officialOptions.innerHTML = "";
+
+        const allLabel = document.createElement("label");
+        allLabel.className = "official-option";
+
+        const allCheckbox = document.createElement("input");
+        allCheckbox.type = "checkbox";
+        allCheckbox.id = "officialAll";
+        allCheckbox.addEventListener("change", function () {
+            setAllFilterOptions("official", this.checked);
+        });
+
+        allLabel.appendChild(allCheckbox);
+        const allText = document.createElement("strong");
+        allText.textContent = "All";
+        allLabel.appendChild(allText);
+        officialOptions.appendChild(allLabel);
 
         officials.forEach(official => {
-            const option =
-                document.createElement("option");
+            const label = document.createElement("label");
+            label.className = "official-option";
 
-            option.value = official.name;
-            option.textContent = official.name;
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = "official";
+            checkbox.value = official.name;
 
-            select.appendChild(option);
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(official.name));
+            officialOptions.appendChild(label);
         });
+
+        if (officials.length === 0) {
+            officialOptions.textContent = "No officials found";
+        }
+
+        updateDropdownText("official");
 
     } catch (err) {
         console.error(
@@ -1423,7 +1501,11 @@ function clearFilters() {
     updateDropdownText("status");
     document.getElementById("begindate").value = "";
     document.getElementById("enddate").value = "";
-    document.getElementById("site").value = "";
+    document.querySelectorAll('input[name="site"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+    updateAllFilterCheckbox("site");
+    updateDropdownText("site");
     document.querySelectorAll('input[name="association"]').forEach(
         checkbox => checkbox.checked = false
     );
@@ -1439,10 +1521,14 @@ function clearFilters() {
     );
     updateAllFilterCheckbox("sport");
     updateDropdownText("sport");
-    ["status", "association", "level", "sport"].forEach(
+    document.querySelectorAll('input[name="official"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+    updateAllFilterCheckbox("official");
+    updateDropdownText("official");
+    ["status", "association", "level", "sport", "official", "site"].forEach(
         closeCheckboxDropdown
     );
-    document.getElementById("official").value = "";
 
     loadPendingGamesTable();
 }

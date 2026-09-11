@@ -5589,7 +5589,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	var games []model.HtmlResponse
 	var gameView []model.GameView
 	var gameFilters model.GFilters = model.GFilters{}
-	var siteId string
+	//var siteId string
 	var tId string = database.TenantId
 	var HtmlAssocGameTotals reports.AssocGameTotalsMap
 	HtmlAssocGameTotals.Init()
@@ -5608,10 +5608,10 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	enddate := r.URL.Query().Get("enddate")
 	levels := r.URL.Query()["level"]
 	gameId := r.URL.Query().Get("gameId")
-	site := r.URL.Query().Get("site")
-	official := r.URL.Query().Get("official")
+	sites := r.URL.Query()["site"]
+	officials := r.URL.Query()["official"]
 
-	fmt.Println("Statuses:", statuses, "Associations:", associations, "Sports:", sports, "Levels:", levels, "GameId:", gameId, "Site:", site, "Official:", official)
+	fmt.Println("Statuses:", statuses, "Associations:", associations, "Sports:", sports, "Levels:", levels, "GameId:", gameId, "Sites:", sites, "Official:", officials)
 	fmt.Println("Begin Date:", begindate, "End Date:", enddate)
 
 	if begindate == "today" && enddate == "" {
@@ -5664,21 +5664,21 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if len(site) > 0 {
-		siteId, err = sc.GetSiteId(site, tId)
-		if err != nil {
-			http.Error(w, "Invalid site ID", http.StatusBadRequest)
-			return
-		}
-	}
+	// if len(site) > 0 {
+	// 	siteId, err = sc.GetSiteId(site, tId)
+	// 	if err != nil {
+	// 		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+	// 		return
+	// 	}
+	// }
 
 	gameFilters.Status = ""
 	gameFilters.Association = ""
 	gameFilters.Level = ""
 	gameFilters.FromDate = bDate
 	gameFilters.ToDate = eDate
-	gameFilters.Site = siteId
-	gameFilters.Official = official
+	gameFilters.Site = ""
+	gameFilters.Official = ""
 	gameFilters.TenantId = tId
 
 	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
@@ -5717,6 +5717,22 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	if len(levels) > 0 {
 		mongoDbFilter["level"] = bson.M{
 			"$in": levels,
+		}
+	}
+
+	if len(officials) > 0 {
+		mongoDbFilter["$or"] = bson.A{
+			bson.M{"referee": bson.M{"$in": officials}},
+			bson.M{"u1": bson.M{"$in": officials}},
+			bson.M{"u2": bson.M{"$in": officials}},
+			bson.M{"eco": bson.M{"$in": officials}},
+			bson.M{"assignor": bson.M{"$in": officials}},
+		}
+	}
+
+	if len(sites) > 0 {
+		mongoDbFilter["site"] = bson.M{
+			"$in": sites,
 		}
 	}
 
