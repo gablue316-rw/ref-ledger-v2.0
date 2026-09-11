@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
@@ -13,9 +12,11 @@ import (
 	"time"
 
 	"github.com/jung-kurt/gofpdf"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 var ec database.ExpensesCollection
+var ac database.AssociationCollection
 
 func TrimMileageStr(miles string) string {
 
@@ -335,7 +336,7 @@ func CalculateGameFee(gameRec model.GameDescriptor) int64 {
 	return gameFee
 }
 
-func GenerateReconciliationReport(records []model.PaymentDescriptor) []string {
+func GenerateReconciliationReport(records []model.PaymentDescriptor, tid string) []string {
 
 	var totalPayments int64 = 0
 	var paymentAmtInt64 int64 = 0
@@ -418,7 +419,7 @@ func GenerateReconciliationReport(records []model.PaymentDescriptor) []string {
 	return rept
 }
 
-func GeneratePaymentReport(records []model.PaymentDescriptor) []string {
+func GeneratePaymentReport(records []model.PaymentDescriptor, tid string) []string {
 
 	fmt.Println("Generating Payment Report")
 	rept := make([]string, 10, 20)
@@ -505,7 +506,7 @@ func GenerateOfficialsReport(records []model.OfficialDescriptor) []string {
 	return rept
 }
 
-func GenerateAcctsRecvReport(parentCtx context.Context, associations, tid string) []string {
+func GenerateAcctsRecvReport(parentCtx context.Context, associations []string, tid string) []string {
 
 	fmt.Println("Generating Accounts Receivable Report")
 	rept := make([]string, 10, 20)
@@ -526,35 +527,34 @@ func GenerateAcctsRecvReport(parentCtx context.Context, associations, tid string
 	rept = append(rept, heading1)
 	rept = append(rept, separator)
 
-	if associations == "" {
-		assocs, err := api.GetAssociations(parentCtx)
+	var assocList []string
+	var err error
+
+	if len(associations) == 0 {
+		assocList, err = ac.GetAssociationNamesAsStrings(tid)
 		if err != nil {
-			fmt.Println("Error:", err)
-			return nil
+			fmt.Println("Failed to retrieve association names.")
+			utils.AuditLog.Println("Failed to retrieve association names.")
+			return []string{}
 		}
-		associations = assocs
+	} else {
+		assocList = associations
 	}
-	associationList := strings.Split(associations, ",")
 
 	grandTot := int64(0)
 	totalGameId := 0
 
-	for _, assoc := range associationList {
+	for _, assoc := range assocList {
 
-		gFilter := model.GFilters{
-			Status:      "Completed",
-			Association: assoc,
-			TenantId:    tid,
+		gFilter := bson.M{
+			"status":      "Completed",
+			"association": assoc,
+			"tenantId":    tid,
 		}
 
-		gFilters, err := utils.ConvertGameFiltersToJsonFile(gFilter)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return nil
-		}
-		fmt.Println("gFilters", gFilters)
+		fmt.Println("gFilter", gFilter)
 
-		gameRecords, err := database.QueryAggregatedGames(parentCtx, database.GetMongoDbName(), "games", gFilters)
+		gameRecords, err := database.QueryAggregatedGames(parentCtx, database.GetMongoDbName(), "games", gFilter)
 
 		if err != nil {
 			fmt.Println("Error:", err)
@@ -634,12 +634,19 @@ func getMissingPaidGames(assoc string) []string {
 	return missingGamesStr
 }
 
-func GenerateIncomeReport(assoc string) []string {
+func GenerateIncomeReport(assoc []string, tid string) []string {
 
 	err := ec.Init(database.Client)
 	if err != nil {
 		fmt.Println("Failed to initialize expenses collection.")
 		utils.AuditLog.Println("Failed to initialize expenses collection.")
+		return []string{}
+	}
+
+	err = ac.Init(database.Client)
+	if err != nil {
+		fmt.Println("Failed to initialize associations collection.")
+		utils.AuditLog.Println("Failed to initialize associations collection.")
 		return []string{}
 	}
 
@@ -652,10 +659,15 @@ func GenerateIncomeReport(assoc string) []string {
 	reptTimeMsg := getReportGeneratedDate()
 	assocList := []string{}
 
-	if assoc == "" {
-		assocList = database.Associations
+	if len(assoc) == 0 {
+		assocList, err = ac.GetAssociationNamesAsStrings(tid)
+		if err != nil {
+			fmt.Println("Failed to retrieve association names.")
+			utils.AuditLog.Println("Failed to retrieve association names.")
+			return []string{}
+		}
 	} else {
-		assocList = strings.Split(assoc, ",")
+		assocList = assoc
 	}
 
 	heading1 := "               Total      Total     Total      Gross         Total         Total          Net         Total     Total  \n"

@@ -1,15 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
     <title>Ref Ledger V2.0 Expense Entry</title>
-    <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">    
-    <link rel="stylesheet" href="/components/navbar.css?v=12">
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/components/navbar.css?v=12"
+    >
 
     <style>
-
         * {
             box-sizing: border-box;
             margin: 0;
@@ -18,8 +30,8 @@
         }
 
         body {
-           background-color: #f4f6f9;
-           color: #333;
+            background-color: #f4f6f9;
+            color: #333;
         }
 
         .container {
@@ -44,7 +56,7 @@
             background-color: white;
             padding: 25px;
             border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
         }
 
@@ -120,13 +132,30 @@
             background-color: white;
             padding: 15px 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             font-weight: bold;
             min-height: 60px;
         }
 
-        @media (max-width: 768px) {
+        .message-box.success {
+            color: #166534;
+            background-color: #dcfce7;
+            border: 1px solid #86efac;
+        }
 
+        .message-box.error {
+            color: #991b1b;
+            background-color: #fee2e2;
+            border: 1px solid #fca5a5;
+        }
+
+        .message-box.info {
+            color: #1e3a8a;
+            background-color: #dbeafe;
+            border: 1px solid #93c5fd;
+        }
+
+        @media (max-width: 768px) {
             .row {
                 flex-direction: column;
             }
@@ -139,13 +168,12 @@
                 width: 100%;
             }
         }
-
     </style>
 </head>
 
 <body>
 
-<div id="navbar-container"></div>   
+<div id="navbar-container"></div>
 
 <div class="container">
 
@@ -153,7 +181,6 @@
         <h1>Ref Ledger V2.0 Expense Entry</h1>
         <p>Record and track your officiating expenses.</p>
     </div>
-
 
     <div class="form-card">
 
@@ -163,47 +190,85 @@
 
                 <div class="col">
                     <label for="date">Date</label>
-                    <input type="date" id="date" required>
+
+                    <input
+                        type="date"
+                        id="date"
+                        required
+                    >
                 </div>
 
                 <div class="col">
                     <label for="association">Association</label>
-                    <select id="association">
-                        <option value="">Select Association</option>
-                        <option value="GOLLC">GOLLC</option>
-                        <option value="MCBOA">MCBOA</option>
-                        <option value="MSO">MSO</option>
+
+                    <select
+                        id="association"
+                        required
+                    >
+                        <option value="">
+                            Loading associations...
+                        </option>
                     </select>
                 </div>
 
             </div>
 
             <div class="form-group">
-                <label for="expenseType">Expense Type</label>
-                <select id="expenseType" required>
-                    <option value="">Select Expense Type</option>
-                    <option value="Mileage">Mileage</option>
-                    <option value="Food">Food</option>
-                    <option value="Equipment">Equipment</option>
-                    <option value="Camp Fees">Camp Fees</option>
-                    <option value="Association Dues">Association Dues</option>
+                <label for="expenseType">
+                    Expense Type
+                </label>
+
+                <select
+                    id="expenseType"
+                    required
+                >
+                    <option value="">
+                        Select Expense Type
+                    </option>
+
+                    <option value="Mileage">
+                        Mileage
+                    </option>
+
+                    <option value="Food">
+                        Food
+                    </option>
+
+                    <option value="Equipment">
+                        Equipment
+                    </option>
+
+                    <option value="Camp Fees">
+                        Camp Fees
+                    </option>
+
+                    <option value="Association Dues">
+                        Association Dues
+                    </option>
                 </select>
             </div>
 
             <div class="row">
 
                 <div class="col">
-                    <label for="amount">Amount / Miles</label>
+                    <label for="amount">
+                        Amount / Miles
+                    </label>
+
                     <input
                         type="number"
                         id="amount"
                         step="0.01"
+                        min="0"
                         required
                     >
                 </div>
 
                 <div class="col">
-                    <label for="gameId">Game ID</label>
+                    <label for="gameId">
+                        Game ID
+                    </label>
+
                     <input
                         type="number"
                         id="gameId"
@@ -213,24 +278,29 @@
             </div>
 
             <div class="form-group">
-                <label for="description">Description</label>
+                <label for="description">
+                    Description
+                </label>
+
                 <textarea
                     id="description"
-                    rows="4">
-                </textarea>
+                    rows="4"
+                ></textarea>
             </div>
 
             <div class="button-row">
 
                 <button
                     type="submit"
-                    class="btn btn-save">
+                    class="btn btn-save"
+                >
                     Save Expense
                 </button>
 
                 <button
                     type="reset"
-                    class="btn btn-clear">
+                    class="btn btn-clear"
+                >
                     Clear Form
                 </button>
 
@@ -240,7 +310,10 @@
 
     </div>
 
-    <div class="message-box" id="message">
+    <div
+        class="message-box"
+        id="message"
+    >
         Ready to enter expenses.
     </div>
 
@@ -249,65 +322,213 @@
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
+const expenseForm =
+    document.getElementById("expenseForm");
 
+const messageBox =
+    document.getElementById("message");
 
-document.getElementById("expenseForm")
-.addEventListener("submit", async function(e) {
+const associationSelect =
+    document.getElementById("association");
 
-    e.preventDefault();
+document.addEventListener(
+    "DOMContentLoaded",
+    function() {
+        loadAssociations();
+    }
+);
 
-    const messageBox = document.getElementById("message");
+function showMessage(message, type = "info") {
+    messageBox.className =
+        `message-box ${type}`;
 
+    messageBox.textContent =
+        message;
+}
 
-    const amount = Math.round(
-        parseFloat(document.getElementById("amount").value) * 100
-    );
-    
-    const expense = {
-        date: document.getElementById("date").value,
-        expenseType: document.getElementById("expenseType").value,
-        amount: amount,
-        description: document.getElementById("description").value.trim(),
-        association: document.getElementById("association").value,
-        gameId: parseInt(document.getElementById("gameId").value) || 0
-    };
-
+async function loadAssociations() {
     try {
-        const response = await fetch("/api/expenses", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify(expense)
-        });
+        const response =
+            await fetch("/api/loadAssociations");
 
-        if (response.status === 401 || response.redirected) {
+        if (
+            response.status === 401 ||
+            response.redirected
+        ) {
             window.location.href = "/login";
             return;
         }
 
-        if (response.status === 403) {
-            messageBox.innerText =
-                "Permission denied. Read-only users cannot enter expenses.";
+        if (!response.ok) {
+            throw new Error(
+                "Failed to load associations"
+            );
+        }
+
+        const associations =
+            await response.json();
+
+        associationSelect.innerHTML =
+            '<option value="">Select Association</option>';
+
+        associations.forEach(assoc => {
+            const option =
+                document.createElement("option");
+
+            option.value = assoc.id;
+            option.textContent = assoc.id;
+
+            associationSelect.appendChild(option);
+        });
+
+        if (associations.length === 0) {
+            associationSelect.innerHTML =
+                '<option value="">No associations found</option>';
+
+            showMessage(
+                "No associations were found.",
+                "info"
+            );
+        }
+
+    } catch (error) {
+        console.error(
+            "Error loading associations:",
+            error
+        );
+
+        associationSelect.innerHTML =
+            '<option value="">Unable to load associations</option>';
+
+        showMessage(
+            "Unable to load associations.",
+            "error"
+        );
+    }
+}
+
+expenseForm.addEventListener(
+    "submit",
+    async function(event) {
+        event.preventDefault();
+
+        const amountValue =
+            document.getElementById("amount").value;
+
+        const amount = Math.round(
+            parseFloat(amountValue) * 100
+        );
+
+        const association =
+            associationSelect.value;
+
+        if (association === "") {
+            showMessage(
+                "Select an association.",
+                "error"
+            );
             return;
         }
 
-        const message = await response.text();
-
-        messageBox.innerText =
-            response.ok
-                ? message || "Expense saved successfully."
-                : message || "Error saving expense.";
-
-        if (response.ok) {
-            document.getElementById("expenseForm").reset();
+        if (
+            Number.isNaN(amount) ||
+            amount < 0
+        ) {
+            showMessage(
+                "Enter a valid amount or number of miles.",
+                "error"
+            );
+            return;
         }
 
-    } catch (err) {
-        messageBox.innerText = "Server unavailable.";
-    }
-});
+        const expense = {
+            date:
+                document.getElementById("date").value,
 
+            expenseType:
+                document.getElementById("expenseType").value,
+
+            amount: amount,
+
+            description:
+                document
+                    .getElementById("description")
+                    .value
+                    .trim(),
+
+            association: association,
+
+            gameId:
+                parseInt(
+                    document.getElementById("gameId").value,
+                    10
+                ) || 0
+        };
+
+        try {
+            showMessage(
+                "Saving expense...",
+                "info"
+            );
+
+            const response = await fetch(
+                "/api/expenses",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(expense)
+                }
+            );
+
+            if (
+                response.status === 401 ||
+                response.redirected
+            ) {
+                window.location.href = "/login";
+                return;
+            }
+
+            if (response.status === 403) {
+                showMessage(
+                    "Permission denied. Read-only users cannot enter expenses.",
+                    "error"
+                );
+                return;
+            }
+
+            const message =
+                await response.text();
+
+            if (!response.ok) {
+                showMessage(
+                    message || "Error saving expense.",
+                    "error"
+                );
+                return;
+            }
+
+            showMessage(
+                message || "Expense saved successfully.",
+                "success"
+            );
+
+            expenseForm.reset();
+
+        } catch (error) {
+            console.error(
+                "Error saving expense:",
+                error
+            );
+
+            showMessage(
+                "Server unavailable.",
+                "error"
+            );
+        }
+    }
+);
 </script>
 
 </body>

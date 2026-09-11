@@ -451,12 +451,8 @@
 
                     <select id="association">
                         <option value="">
-                            Select Association
+                            Loading associations...
                         </option>
-
-                        <option value="GOLLC">GOLLC</option>
-                        <option value="MCBOA">MCBOA</option>
-                        <option value="MSO">MSO</option>
                     </select>
                 </div>
 
@@ -680,9 +676,49 @@
 document.addEventListener(
     "DOMContentLoaded",
     function() {
+        loadAssociations();
         loadCompletedGames();
     }
 );
+
+async function loadAssociations() {
+    const associationSelect =
+        document.getElementById("association");
+
+    try {
+        const response =
+            await fetch("/api/loadAssociations");
+
+        if (!response.ok) {
+            throw new Error(
+                "Failed to load associations"
+            );
+        }
+
+        const associations = await response.json();
+
+        associationSelect.innerHTML =
+            '<option value="">Select Association</option>';
+
+        associations.forEach(assoc => {
+            const option = document.createElement("option");
+            option.value = assoc.id;
+            option.textContent = assoc.id;
+            associationSelect.appendChild(option);
+        });
+
+        if (associations.length === 0) {
+            associationSelect.innerHTML =
+                '<option value="">No associations found</option>';
+        }
+
+    } catch (error) {
+        console.error("Error loading associations:", error);
+
+        associationSelect.innerHTML =
+            '<option value="">Unable to load associations</option>';
+    }
+}
 
 const paymentForm =
     document.getElementById("paymentForm");

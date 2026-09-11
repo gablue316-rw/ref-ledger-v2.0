@@ -707,7 +707,7 @@ func DeletePayment(paymentId string) error {
 	return nil
 }
 
-func QueryPayments(parentCtx context.Context, dbase, collection, assoc string) ([]model.PaymentDescriptor, error) {
+func QueryPayments(parentCtx context.Context, dbase, collection string, assoc []string) ([]model.PaymentDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -715,9 +715,8 @@ func QueryPayments(parentCtx context.Context, dbase, collection, assoc string) (
 	filter := bson.M{}
 
 	if len(assoc) > 0 {
-		assocValues := utils.ParseCsv(assoc)
 		filter["association"] = bson.M{
-			"$in": assocValues,
+			"$in": assoc,
 		}
 	}
 
@@ -743,18 +742,12 @@ func QueryPayments(parentCtx context.Context, dbase, collection, assoc string) (
 	return paymentRecords, nil
 }
 
-func QueryAggregatedGames(parentCtx context.Context, dbase, collection, filter string) ([]model.GameDescriptor, error) {
+func QueryAggregatedGames(parentCtx context.Context, dbase, collection string, filter bson.M) ([]model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
-	mongoDbFilter, err := BuildMongoGameFilterFromFile(filter)
-
-	fmt.Println("mongoDbFilter:", mongoDbFilter)
-	if err != nil {
-		fmt.Println("Failed to build Mongo DB Filter for games collection")
-		return []model.GameDescriptor{}, err
-	}
+	fmt.Println("mongoDbFilter:", filter)
 
 	db := Client.Database(Database)
 	coll := db.Collection("games")
@@ -764,7 +757,7 @@ func QueryAggregatedGames(parentCtx context.Context, dbase, collection, filter s
 			{Key: "gameDateTime", Value: 1},
 		})
 
-	cursor, err := coll.Find(ctx, mongoDbFilter, opts)
+	cursor, err := coll.Find(ctx, filter, opts)
 
 	if err != nil {
 		fmt.Println("Find failed.  Reason:", err)
@@ -1123,22 +1116,15 @@ func QueryCollection(filter bson.M, dbase, collection string) *mongo.Cursor {
 
 }
 
-func QueryExpenses(parentCtx context.Context, dbase, collection, filter string) ([]model.ExpenseDescriptor, error) {
+func QueryExpenses(parentCtx context.Context, dbase, collection string, filter bson.M) ([]model.ExpenseDescriptor, error) {
 
-	mongoDbFilter, err := BuildMongoExpenseFilterFromFile(filter)
-
-	if err != nil {
-		fmt.Println("Failed to build Mongo DB Filter for expenses collection")
-		return []model.ExpenseDescriptor{}, err
-	}
-
-	fmt.Println("mongoDbFilter:", mongoDbFilter)
+	fmt.Println("filter:", filter)
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
-	cursor, err := coll.Find(ctx, mongoDbFilter)
+	cursor, err := coll.Find(ctx, filter)
 	if err != nil {
 		fmt.Println("Error", err)
 		return []model.ExpenseDescriptor{}, err
@@ -2510,6 +2496,55 @@ func (ac *AssociationCollection) GetAssociationNames(tenantId string) ([]Associa
 	return associations, nil
 }
 
+func (ac *AssociationCollection) GetAssociationNamesAsStrings(
+	tenantId string,
+) ([]string, error) {
+
+	associations := []string{}
+	ctx := context.TODO()
+
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	cursor, err := ac.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to query associations: %w",
+			err,
+		)
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var doc AssociationDoc
+
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, fmt.Errorf(
+				"failed to decode association document: %w",
+				err,
+			)
+		}
+
+		for part := range strings.SplitSeq(doc.Name, ",") {
+			name := strings.TrimSpace(part)
+
+			if name != "" {
+				associations = append(associations, name)
+			}
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf(
+			"error while reading association documents: %w",
+			err,
+		)
+	}
+
+	return associations, nil
+}
+
 func (ac *AssociationCollection) GetAssociationIds(tenantId string) ([]AssociationId, error) {
 	var ids []AssociationId = []AssociationId{}
 
@@ -2537,6 +2572,68 @@ func (ac *AssociationCollection) GetAssociationIds(tenantId string) ([]Associati
 		}
 	}
 	fmt.Println("Total associations found for tenant", tenantId, ":", totalAssociations)
+
+	return ids, nil
+}
+
+func (ac *AssociationCollection) GetAssociationIdsAsStrings(
+	tenantId string,
+) ([]string, error) {
+
+	ids := []string{}
+	ctx := context.TODO()
+
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	fmt.Println("Retrieving association IDs for tenant:", tenantId)
+
+	cursor, err := ac.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to query associations: %w",
+			err,
+		)
+	}
+	defer cursor.Close(ctx)
+
+	var totalAssociations int64
+
+	for cursor.Next(ctx) {
+		var doc AssociationDoc
+
+		if err := cursor.Decode(&doc); err != nil {
+			return nil, fmt.Errorf(
+				"failed to decode association document: %w",
+				err,
+			)
+		}
+
+		totalAssociations++
+
+		for part := range strings.SplitSeq(doc.Id, ",") {
+			id := strings.TrimSpace(part)
+
+			if id != "" {
+				ids = append(ids, id)
+			}
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf(
+			"error while reading association documents: %w",
+			err,
+		)
+	}
+
+	fmt.Println(
+		"Total associations found for tenant",
+		tenantId,
+		":",
+		totalAssociations,
+	)
 
 	return ids, nil
 }

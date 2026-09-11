@@ -81,6 +81,78 @@
             min-width: 220px;
         }
 
+        .checkbox-dropdown {
+            position: relative;
+            min-width: 220px;
+        }
+
+        .checkbox-dropdown-button {
+            width: 100%;
+            min-height: 38px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: white;
+            color: #333;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            text-align: left;
+        }
+
+        .checkbox-dropdown-button::after {
+            content: "\25BE";
+            margin-left: 12px;
+        }
+
+        .checkbox-dropdown.open .checkbox-dropdown-button::after {
+            content: "\25B4";
+        }
+
+        .checkbox-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            z-index: 1000;
+            width: 100%;
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .checkbox-dropdown.open .checkbox-dropdown-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .checkbox-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+            padding: 7px 6px;
+            margin: 0;
+            font-weight: normal !important;
+            cursor: pointer;
+        }
+
+        .checkbox-option:hover {
+            background-color: #f1f5f9;
+        }
+
+        .checkbox-option input {
+            width: auto;
+            min-width: 0;
+            margin: 0;
+        }
+
         .email-row {
             display:flex;
             gap: 20px;
@@ -202,31 +274,39 @@
             <label for="type">Report Type</label>
             <select id="type">
                 <option value=""></option>
-                <option value="Accounts Receivable">Accounts Receivable</option>
+                <!-- <option value="Accounts Receivable">Accounts Receivable</option> -->
                 <option value="Expenses">Expenses</option>
                 <option value="Games">Games</option>
-                <option value="Income">Income</option>
+                <!-- <option value="Income">Income</option> -->
                 <option value="Payments">Payments</option>
                 <option value="Reconciliation">Reconciliation</option>
             </select>
         </div>
 
         <div class="filter-group">
-            <label for="association">Association</label>
-               <select id="association">
-                  <option value="">Select Association</option>
-               </select>
+            <label>Association</label>
+            <div class="checkbox-dropdown" id="associationDropdown">
+                <button type="button" class="checkbox-dropdown-button" onclick="toggleCheckboxDropdown('associationDropdown')">
+                    <span id="associationSummary">All Associations</span>
+                </button>
+                <div class="checkbox-dropdown-menu" id="associationOptions"></div>
+            </div>
         </div>
 
         <div class="filter-group">
-            <label for="status">Status</label>
-            <select id="status">
-                <option value="">All</option>
-                <option value="Cancelled">Cancelled</option>
-                <option value="Completed">Completed</option>
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending</option>
-            </select>
+            <label>Status</label>
+            <div class="checkbox-dropdown" id="statusDropdown">
+                <button type="button" class="checkbox-dropdown-button" onclick="toggleCheckboxDropdown('statusDropdown')">
+                    <span id="statusSummary">All Statuses</span>
+                </button>
+                <div class="checkbox-dropdown-menu">
+                    <label class="checkbox-option"><input type="checkbox" data-all-for="status" checked> All</label>
+                    <label class="checkbox-option"><input type="checkbox" name="status" value="Cancelled"> Cancelled</label>
+                    <label class="checkbox-option"><input type="checkbox" name="status" value="Completed"> Completed</label>
+                    <label class="checkbox-option"><input type="checkbox" name="status" value="Paid"> Paid</label>
+                    <label class="checkbox-option"><input type="checkbox" name="status" value="Pending"> Pending</label>
+                </div>
+            </div>
         </div>
 
         <div class="filter-group">
@@ -239,10 +319,13 @@
         </div>
         
         <div class="filter-group">
-            <label for="site">Site</label>
-               <select id="site">
-                  <option value="">Select Site</option>
-               </select>
+            <label>Site</label>
+            <div class="checkbox-dropdown" id="siteDropdown">
+                <button type="button" class="checkbox-dropdown-button" onclick="toggleCheckboxDropdown('siteDropdown')">
+                    <span id="siteSummary">All Sites</span>
+                </button>
+                <div class="checkbox-dropdown-menu" id="siteOptions"></div>
+            </div>
         </div>
          
     </div>
@@ -306,6 +389,71 @@ Select report options and click "Create Report".
 
 <script>
 
+function checkboxOption(name, value, text) {
+    const label = document.createElement("label");
+    label.className = "checkbox-option";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.name = name;
+    checkbox.value = value;
+
+    label.append(checkbox, document.createTextNode(" " + text));
+    return label;
+}
+
+function fillCheckboxOptions(name, containerId, items) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+
+    const all = checkboxOption("", "", "All");
+    const allCheckbox = all.querySelector("input");
+    allCheckbox.removeAttribute("name");
+    allCheckbox.dataset.allFor = name;
+    allCheckbox.checked = true;
+    container.appendChild(all);
+
+    items.forEach(item => container.appendChild(
+        checkboxOption(name, item.value, item.text)
+    ));
+}
+
+function toggleCheckboxDropdown(id) {
+    const dropdown = document.getElementById(id);
+    const willOpen = !dropdown.classList.contains("open");
+    document.querySelectorAll(".checkbox-dropdown.open").forEach(item => item.classList.remove("open"));
+    dropdown.classList.toggle("open", willOpen);
+}
+
+function selectedValues(name) {
+    return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`))
+        .map(checkbox => checkbox.value);
+}
+
+function updateCheckboxSummary(name) {
+    const values = selectedValues(name);
+    const summary = document.getElementById(`${name}Summary`);
+    const allLabel = name === "status" ? "All Statuses" : `All ${name.charAt(0).toUpperCase() + name.slice(1)}s`;
+    summary.textContent = values.length === 0
+        ? allLabel
+        : values.length === 1 ? values[0] : `${values.length} selected`;
+}
+
+function setupCheckboxDropdown(name) {
+    const all = document.querySelector(`input[data-all-for="${name}"]`);
+    const choices = Array.from(document.querySelectorAll(`input[name="${name}"]`));
+
+    all.addEventListener("change", function() {
+        if (this.checked) choices.forEach(checkbox => checkbox.checked = false);
+        updateCheckboxSummary(name);
+    });
+
+    choices.forEach(checkbox => checkbox.addEventListener("change", function() {
+        all.checked = !choices.some(item => item.checked);
+        updateCheckboxSummary(name);
+    }));
+}
+
 async function loadAssociations() {
     try {
         const response = await fetch("/api/loadAssociations");
@@ -317,24 +465,10 @@ async function loadAssociations() {
         const associations = await response.json();
         console.log(associations);
     
-        const dropdowns = [
-            "association"
-        ];
-
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
-
-            // Keep the first option
-            select.innerHTML =
-                '<option value="">Select Association</option>';
-
-            associations.forEach(assoc => {
-               const option = document.createElement("option");
-               option.value = assoc.id;
-               option.textContent = assoc.id;
-               select.appendChild(option);
-            });
-        });
+        fillCheckboxOptions("association", "associationOptions",
+            associations.map(assoc => ({ value: assoc.id, text: assoc.id }))
+        );
+        setupCheckboxDropdown("association");
 
     } catch (err) {
         console.error("Error loading associations:", err);
@@ -355,24 +489,10 @@ async function loadSites() {
 
         const sites = await response.json();
  
-        const dropdowns = [
-            "site"
-        ];
-
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
-
-            // Keep the first option
-            select.innerHTML =
-                '<option value="">Select Site</option>';
-
-            sites.forEach(site => {
-               const option = document.createElement("option");
-               option.value = site.name;
-               option.textContent = site.name;
-               select.appendChild(option);
-            });
-        });
+        fillCheckboxOptions("site", "siteOptions",
+            sites.map(site => ({ value: site.name, text: site.name }))
+        );
+        setupCheckboxDropdown("site");
 
     } catch (err) {
         console.error("Error loading sites:", err);
@@ -380,9 +500,16 @@ async function loadSites() {
 }
 
 document.addEventListener("DOMContentLoaded", function() {
+    setupCheckboxDropdown("status");
     loadSites();  
     loadAssociations();
 })
+
+document.addEventListener("click", function(event) {
+    if (!event.target.closest(".checkbox-dropdown")) {
+        document.querySelectorAll(".checkbox-dropdown.open").forEach(item => item.classList.remove("open"));
+    }
+});
 
 
 async function generateReport() {
@@ -390,8 +517,7 @@ async function generateReport() {
     const type =
         document.getElementById("type").value;
 
-    const association =
-        document.getElementById("association").value;
+    const associations = selectedValues("association");
 
     const email =
         document.getElementById("emailaddr").value.trim();
@@ -399,22 +525,19 @@ async function generateReport() {
     const file =
         document.getElementById("filename").value.trim();
 
-    const status =
-        document.getElementById("status").value;
+    const statuses = selectedValues("status");
 
    const gameids =
         document.getElementById("gameids").value; 
 
-   const site =
-        document.getElementById("site").value; 
+   const sites = selectedValues("site");
 
     const params = new URLSearchParams();
 
     if (type)
         params.append("type", type);
 
-    if (association)
-        params.append("association", association);
+    associations.forEach(association => params.append("association", association));
 
     if (email)
         params.append("emailaddr", email);
@@ -422,14 +545,12 @@ async function generateReport() {
     if (file)
         params.append("filename", file);
 
-    if (status)
-        params.append("status", status);
+    statuses.forEach(status => params.append("status", status));
 
     if (gameids)
         params.append("gameids", gameids);
 
-    if (site)
-        params.append("site", site);
+    sites.forEach(site => params.append("site", site));
 
     try {
 
@@ -464,12 +585,16 @@ async function generateReport() {
 function clearFilters() {
 
     document.getElementById("type").value = "";
-    document.getElementById("association").value = "";
     document.getElementById("emailaddr").value = "";
     document.getElementById("filename").value = "";
-    document.getElementById("status").value = "";
     document.getElementById("gameids").value = "";
-    document.getElementById("site").value = "";
+
+    ["association", "status", "site"].forEach(name => {
+        document.querySelectorAll(`input[name="${name}"]`).forEach(checkbox => checkbox.checked = false);
+        const all = document.querySelector(`input[data-all-for="${name}"]`);
+        if (all) all.checked = true;
+        updateCheckboxSummary(name);
+    });
 
     document.getElementById("reportContainer").textContent =
         'Select report options and click "Create Report".';
