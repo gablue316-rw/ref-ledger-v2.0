@@ -358,14 +358,14 @@ body {
                 <button type="button" id="statusDropdownButton"
                     class="checkbox-dropdown-button" aria-haspopup="true"
                     aria-expanded="false" onclick="toggleCheckboxDropdown('status', event)">
-                    <span id="statusDropdownText">Select Statuses</span>
+                    <span id="statusDropdownText">Pending</span>
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </button>
                 <div class="status-options checkbox-options" role="group" aria-label="Game statuses">
                     <label class="status-option"><input type="checkbox" id="statusAll"
                         onchange="setAllFilterOptions('status', this.checked)"><strong>All</strong></label>
                     <label class="status-option"><input type="checkbox" name="status" value="Completed">Completed</label>
-                    <label class="status-option"><input type="checkbox" name="status" value="Pending">Pending</label>
+                    <label class="status-option"><input type="checkbox" name="status" value="Pending" checked>Pending</label>
                     <label class="status-option"><input type="checkbox" name="status" value="Paid">Paid</label>
                     <label class="status-option"><input type="checkbox" name="status" value="Cancelled">Cancelled</label>
                 </div>
@@ -1500,7 +1500,7 @@ async function updateSelectedStatus() {
 function clearFilters() {
     document.getElementById("gameId").value = "";
     document.querySelectorAll('input[name="status"]').forEach(
-        checkbox => checkbox.checked = false
+        checkbox => checkbox.checked = checkbox.value === "Pending"
     );
     updateAllFilterCheckbox("status");
     updateDropdownText("status");

@@ -4609,7 +4609,7 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 	}
 	defer cursor.Close(ctx)
 
-	var levels []Level
+	levels := []Level{}
 
 	if err := cursor.All(ctx, &levels); err != nil {
 		fmt.Println("failed to decode levels. err=[", err, "]")
@@ -4670,7 +4670,7 @@ func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 	}
 	defer cursor.Close(ctx)
 
-	var sports []Sport
+	sports := []Sport{}
 
 	if err := cursor.All(ctx, &sports); err != nil {
 		fmt.Println("failed to decode sports. err=[", err, "]")
