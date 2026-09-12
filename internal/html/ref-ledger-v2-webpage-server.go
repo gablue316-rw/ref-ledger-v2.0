@@ -5745,8 +5745,19 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(sites) > 0 {
+		siteIds := make([]string, len(sites))
+		for sid := range sites {
+			siteName := sites[sid]
+			siteId, err := sc.GetSiteId(siteName, tId)
+			if err != nil {
+				http.Error(w, "Invalid site ID", http.StatusBadRequest)
+				continue
+			}
+			siteIds = append(siteIds, siteId)
+		}
+
 		mongoDbFilter["site"] = bson.M{
-			"$in": sites,
+			"$in": siteIds,
 		}
 	}
 
@@ -5972,7 +5983,7 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		10,
 		64,
 	)
-	if err != nil || maxUserAccounts < 1 {
+	if err != nil || maxUserAccounts < 0 {
 		log.Printf(
 			"Invalid MAX_USER_ACCOUNTS value: %q",
 			maxUserAccountsString,
@@ -5996,12 +6007,14 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if currentUserAccounts >= maxUserAccounts {
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "the maximum number of user accounts has been reached",
-		})
-		return
+	if maxUserAccounts > 0 { // 0 means unlimited
+		if currentUserAccounts >= maxUserAccounts {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "the maximum number of user accounts has been reached",
+			})
+			return
+		}
 	}
 
 	tenantID, err := uc.Add(r.Context(), req)
