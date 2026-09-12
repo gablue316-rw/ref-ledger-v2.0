@@ -38,7 +38,6 @@ import (
 
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -5746,8 +5745,19 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(sites) > 0 {
+		siteIds := make([]string, len(sites))
+		for sid := range sites {
+			siteName := sites[sid]
+			siteId, err := sc.GetSiteId(siteName, tId)
+			if err != nil {
+				http.Error(w, "Invalid site ID", http.StatusBadRequest)
+				continue
+			}
+			siteIds = append(siteIds, siteId)
+		}
+
 		mongoDbFilter["site"] = bson.M{
-			"$in": sites,
+			"$in": siteIds,
 		}
 	}
 
@@ -5940,22 +5950,19 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateAccount(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "method not allowed",
+		})
 		return
 	}
 
-	var role string = "user"
+	var req model.UserRequest
 
-	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Name     string `json:"name"`
-	}
-
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]string{
 			"message": "invalid request",
@@ -5963,46 +5970,36 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
-
-	if !isValidEmail(req.Username) {
-		http.Error(w, "Username must be a valid email address.", http.StatusBadRequest)
-		return
-	}
-
-	if req.Username == "" || req.Password == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "username and password are required",
-		})
-		return
-	}
-
-	usersCollection := database.Client.
-		Database(database.GetMongoDbName()).
-		Collection("users")
-
-	var existingUser model.User
-
-	err = usersCollection.FindOne(
-		r.Context(),
-		bson.M{"username": req.Username},
-	).Decode(&existingUser)
-
-	if err == nil {
-		w.WriteHeader(http.StatusConflict)
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "username already exists",
-		})
-		return
-	}
-
-	passwordHash, err := bcrypt.GenerateFromPassword(
-		[]byte(req.Password),
-		bcrypt.DefaultCost,
+	maxUserAccountsString := strings.TrimSpace(
+		os.Getenv("MAX_USER_ACCOUNTS"),
 	)
 
+	if maxUserAccountsString == "" {
+		maxUserAccountsString = "10"
+	}
+
+	maxUserAccounts, err := strconv.ParseInt(
+		maxUserAccountsString,
+		10,
+		64,
+	)
+	if err != nil || maxUserAccounts < 0 {
+		log.Printf(
+			"Invalid MAX_USER_ACCOUNTS value: %q",
+			maxUserAccountsString,
+		)
+
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "account creation is not configured correctly",
+		})
+		return
+	}
+
+	currentUserAccounts, err := uc.GetNumOfUserAccounts()
 	if err != nil {
+		log.Printf("Could not count user accounts: %v", err)
+
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{
 			"message": "could not create account",
@@ -6010,27 +6007,44 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID := primitive.NewObjectID().Hex()
-
-	user := model.User{
-		Username:     req.Username,
-		PasswordHash: string(passwordHash),
-		TenantID:     tenantID,
-		Role:         role,
-		CreatedAt:    time.Now(),
-		Name:         req.Name,
+	if maxUserAccounts > 0 { // 0 means unlimited
+		if currentUserAccounts >= maxUserAccounts {
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "the maximum number of user accounts has been reached",
+			})
+			return
+		}
 	}
 
-	_, err = usersCollection.InsertOne(r.Context(), user)
+	tenantID, err := uc.Add(r.Context(), req)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "could not save account",
-		})
+		switch {
+		case errors.Is(err, database.ErrUserAlreadyExists):
+			w.WriteHeader(http.StatusConflict)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "username already exists",
+			})
+
+		case errors.Is(err, database.ErrInvalidEmail):
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "username must be a valid email address",
+			})
+
+		default:
+			log.Printf("Could not create user account: %v", err)
+
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "could not create account",
+			})
+		}
+
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
 		"message":  "account created",
 		"tenantId": tenantID,

@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"os"
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
@@ -4364,6 +4367,125 @@ func (uc *UsersCollection) GetName(tenantId, username string) (string, error) {
 	}
 
 	return user.Name, nil
+}
+
+var (
+	ErrUserAlreadyExists = errors.New("failed to create user account") // Don't tell the user that the username already exists, just return a generic error message
+	ErrInvalidEmail      = errors.New("username must be a valid email address")
+)
+
+func (uc *UsersCollection) Add(
+	ctx context.Context,
+	req model.UserRequest,
+) (string, error) {
+
+	req.Username = strings.ToLower(strings.TrimSpace(req.Username))
+	req.Name = strings.TrimSpace(req.Name)
+
+	if req.Username == "" {
+		return "", fmt.Errorf("username is required")
+	}
+
+	if req.Password == "" {
+		return "", fmt.Errorf("password is required")
+	}
+
+	if !validEmail(req.Username) {
+		return "", ErrInvalidEmail
+	}
+
+	err := uc.Coll.FindOne(
+		ctx,
+		bson.M{"username": req.Username},
+	).Err()
+
+	switch {
+	case err == nil:
+		return "", ErrUserAlreadyExists
+
+	case !errors.Is(err, mongo.ErrNoDocuments):
+		return "", fmt.Errorf(
+			"failed to check whether user exists: %w",
+			err,
+		)
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword(
+		[]byte(req.Password),
+		bcrypt.DefaultCost,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	tenantID := primitive.NewObjectID().Hex()
+
+	user := model.User{
+		Username:     req.Username,
+		PasswordHash: string(passwordHash),
+		TenantID:     tenantID,
+		Role:         "user",
+		CreatedAt:    time.Now(),
+		Name:         req.Name,
+	}
+
+	_, err = uc.Coll.InsertOne(ctx, user)
+	if err != nil {
+		return "", fmt.Errorf("failed to save user account: %w", err)
+	}
+
+	return tenantID, nil
+}
+
+func validEmail(username string) bool {
+	address, err := mail.ParseAddress(username)
+	if err != nil {
+		return false
+	}
+
+	// Prevent values such as "Randall <randall@example.com>".
+	return address.Address == username
+}
+
+func (uc *UsersCollection) UserExists(username string) (bool, error) {
+
+	username = strings.ToLower(strings.TrimSpace(username))
+
+	filter := bson.M{
+		"username": username,
+	}
+
+	err := uc.Coll.FindOne(
+		context.TODO(),
+		filter,
+		options.FindOne().SetProjection(bson.M{"_id": 1}),
+	).Err()
+
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return false, nil
+	}
+
+	if err != nil {
+		return false, fmt.Errorf(
+			"failed to check whether user %q exists: %w",
+			username,
+			err,
+		)
+	}
+
+	return true, nil
+}
+
+func (uc *UsersCollection) GetNumOfUserAccounts() (int64, error) {
+
+	filter := bson.M{}
+
+	count, err := uc.Coll.CountDocuments(context.TODO(), filter)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count user accounts: %w", err)
+	}
+
+	return count, nil
 }
 
 type Level struct {
