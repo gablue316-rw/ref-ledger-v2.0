@@ -72,6 +72,7 @@ body {
 }
 
 .status-options,
+.date-range-options,
 .association-options,
 .level-options,
 .sport-options,
@@ -85,6 +86,7 @@ body {
 }
 
 .status-option,
+.date-range-option,
 .association-option,
 .level-option,
 .sport-option,
@@ -101,6 +103,7 @@ body {
 }
 
 .status-option:hover,
+.date-range-option:hover,
 .association-option:hover,
 .level-option:hover,
 .sport-option:hover,
@@ -110,6 +113,7 @@ body {
 }
 
 .filter-group .status-option input,
+.filter-group .date-range-option input,
 .filter-group .association-option input,
 .filter-group .level-option input,
 .filter-group .sport-option input,
@@ -358,14 +362,14 @@ body {
                 <button type="button" id="statusDropdownButton"
                     class="checkbox-dropdown-button" aria-haspopup="true"
                     aria-expanded="false" onclick="toggleCheckboxDropdown('status', event)">
-                    <span id="statusDropdownText">Select Statuses</span>
+                    <span id="statusDropdownText">Pending</span>
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </button>
                 <div class="status-options checkbox-options" role="group" aria-label="Game statuses">
                     <label class="status-option"><input type="checkbox" id="statusAll"
                         onchange="setAllFilterOptions('status', this.checked)"><strong>All</strong></label>
                     <label class="status-option"><input type="checkbox" name="status" value="Completed">Completed</label>
-                    <label class="status-option"><input type="checkbox" name="status" value="Pending">Pending</label>
+                    <label class="status-option"><input type="checkbox" name="status" value="Pending" checked>Pending</label>
                     <label class="status-option"><input type="checkbox" name="status" value="Paid">Paid</label>
                     <label class="status-option"><input type="checkbox" name="status" value="Cancelled">Cancelled</label>
                 </div>
@@ -373,16 +377,40 @@ body {
         </div>
 
         <div class="filter-group">
+            <label>Date Range</label>
+            <div id="dateRangeDropdown" class="checkbox-dropdown">
+                <button type="button" id="dateRangeDropdownButton"
+                    class="checkbox-dropdown-button" aria-haspopup="true"
+                    aria-expanded="false" onclick="toggleCheckboxDropdown('dateRange', event)">
+                    <span id="dateRangeDropdownText">Select Date Range</span>
+                    <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div class="date-range-options checkbox-options"
+                    role="group" aria-label="Date ranges">
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="yesterday" onchange="selectDateRange(this)">Yesterday</label>
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="today" onchange="selectDateRange(this)">Today</label>
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="tomorrow" onchange="selectDateRange(this)">Tomorrow</label>
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="lastWeek" onchange="selectDateRange(this)">Last Week</label>
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="thisWeek" onchange="selectDateRange(this)">This Week</label>
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="nextWeek" onchange="selectDateRange(this)">Next Week</label>
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="lastMonth" onchange="selectDateRange(this)">Last Month</label>
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="thisMonth" onchange="selectDateRange(this)">This Month</label>
+                    <label class="date-range-option"><input type="checkbox" name="dateRange" value="nextMonth" onchange="selectDateRange(this)">Next Month</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="filter-group">
             <label for="begindate">Begin Date</label>
             <input
-                type="text"
+                type="date"
                 id="begindate"
-                placeholder="m/d/yyyy, today, this week">
+                onchange="clearDateRangeSelection()">
         </div>
 
         <div class="filter-group">
             <label for="enddate">End Date</label>
-            <input type="text" id="enddate" placeholder="m/d/yyyy">
+            <input type="date" id="enddate" onchange="clearDateRangeSelection()">
         </div>
 
         <div class="filter-group">
@@ -925,11 +953,19 @@ async function loadPendingGamesTable() {
 
 async function loadGames() {
     const gameId =
-        document.getElementById("gameId").value;
+        document.getElementById("gameId").value.trim();
 
     const statuses = Array.from(
         document.querySelectorAll('input[name="status"]:checked')
     ).map(checkbox => checkbox.value);
+
+    const selectedDateRange = document.querySelector(
+        'input[name="dateRange"]:checked'
+    );
+
+    if (selectedDateRange) {
+        applyDateRange(selectedDateRange.value);
+    }
 
     const begindate =
         document.getElementById("begindate").value;
@@ -1174,6 +1210,101 @@ function closeCheckboxDropdown(groupName) {
     button.setAttribute("aria-expanded", "false");
 }
 
+function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+}
+
+function addDays(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
+
+function selectDateRange(selectedCheckbox) {
+    document.querySelectorAll('input[name="dateRange"]').forEach(checkbox => {
+        checkbox.checked = checkbox === selectedCheckbox && selectedCheckbox.checked;
+    });
+
+    if (!selectedCheckbox.checked) {
+        document.getElementById("dateRangeDropdownText").textContent =
+            "Select Date Range";
+
+        document.getElementById("begindate").value = "";
+        document.getElementById("enddate").value = "";
+        return;
+    }
+
+    applyDateRange(selectedCheckbox.value);
+
+    document.getElementById("dateRangeDropdownText").textContent =
+        selectedCheckbox.parentElement.textContent.trim();
+    closeCheckboxDropdown("dateRange");
+}
+
+function applyDateRange(dateRange) {
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let beginDate;
+    let endDate;
+
+    switch (dateRange) {
+        case "yesterday":
+            beginDate = endDate = addDays(today, -1);
+            break;
+        case "today":
+            beginDate = endDate = new Date(today);
+            break;
+        case "tomorrow":
+            beginDate = endDate = addDays(today, 1);
+            break;
+        case "lastWeek": {
+            const thisSunday = addDays(today, -today.getDay());
+            beginDate = addDays(thisSunday, -7);
+            endDate = addDays(thisSunday, -1);
+            break;
+        }
+        case "thisWeek":
+            beginDate = addDays(today, -today.getDay());
+            endDate = addDays(beginDate, 6);
+            break;
+        case "nextWeek":
+            beginDate = addDays(today, 7 - today.getDay());
+            endDate = addDays(beginDate, 6);
+            break;
+        case "lastMonth":
+            beginDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case "thisMonth":
+            beginDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+        case "nextMonth":
+            beginDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+            break;
+        default:
+            return;
+    }
+
+    document.getElementById("begindate").value = formatDateForInput(beginDate);
+    document.getElementById("enddate").value = formatDateForInput(endDate);
+}
+
+function clearDateRangeSelection() {
+    document.querySelectorAll('input[name="dateRange"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+    document.getElementById("dateRangeDropdownText").textContent =
+        "Select Date Range";
+}
+
 function updateDropdownText(groupName) {
     const labels = {
         status: ["Status", "Statuses"],
@@ -1211,7 +1342,7 @@ document.addEventListener("click", function (event) {
 
 document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
-        ["status", "association", "level", "sport", "official", "site"].forEach(
+        ["status", "dateRange", "association", "level", "sport", "official", "site"].forEach(
             closeCheckboxDropdown
         );
     }
@@ -1500,12 +1631,13 @@ async function updateSelectedStatus() {
 function clearFilters() {
     document.getElementById("gameId").value = "";
     document.querySelectorAll('input[name="status"]').forEach(
-        checkbox => checkbox.checked = false
+        checkbox => checkbox.checked = checkbox.value === "Pending"
     );
     updateAllFilterCheckbox("status");
     updateDropdownText("status");
     document.getElementById("begindate").value = "";
     document.getElementById("enddate").value = "";
+    clearDateRangeSelection();
     document.querySelectorAll('input[name="site"]').forEach(
         checkbox => checkbox.checked = false
     );
@@ -1531,7 +1663,7 @@ function clearFilters() {
     );
     updateAllFilterCheckbox("official");
     updateDropdownText("official");
-    ["status", "association", "level", "sport", "official", "site"].forEach(
+    ["status", "dateRange", "association", "level", "sport", "official", "site"].forEach(
         closeCheckboxDropdown
     );
 
