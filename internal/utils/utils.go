@@ -167,90 +167,59 @@ func getStartOfNextMonth() string {
 }
 
 func FormatDateFilter(begin, end string) (string, string, error) {
-
-	var bDate string = ""
-	var eDate string = ""
-
-	if begin == "today" && end == "" {
-		bDate = time.Now().Format(layout)
-		eDate = bDate
-		return bDate, eDate, nil
-	}
-
-	if begin == "tomorrow" && end == "" {
-		bDate = time.Now().AddDate(0, 0, 1).Format(layout)
-		eDate = bDate
-		return bDate, eDate, nil
-	}
-
-	if end != "" {
-		switch end {
-		case "today":
-			eDate = time.Now().Format(layout)
-		case "tomorrow":
-			eDate = time.Now().AddDate(0, 0, 1).Format(layout)
-		case "yesterday":
-			eDate = time.Now().AddDate(0, 0, -1).Format(layout)
-		default:
-			eDate = end
-		}
-	}
-
-	switch begin {
-	case "today":
-		bDate = time.Now().Format(layout)
-	case "tomorrow":
-		bDate = time.Now().AddDate(0, 0, 1).Format(layout)
-	case "yesterday":
-		bDate = time.Now().AddDate(0, 0, -1).Format(layout)
-	case "this week":
-		bDate = getStartOfThisWeek()
-		eDate = getEndOfWeek(bDate)
-	case "next week":
-		bDate = getStartOfNextWeek()
-		eDate = getEndOfWeek(bDate)
-	case "last week":
-		bDate = getStartOfLastWeek()
-		eDate = getEndOfWeek(bDate)
-	case "this month":
-		bDate = getStartOfThisMonth()
-		eDate = getEndOfMonth(bDate)
-	case "next month":
-		bDate = getStartOfNextMonth()
-		eDate = getEndOfMonth(bDate)
-	case "last month":
-		bDate = getStartOfLastMonth()
-		eDate = getEndOfMonth(bDate)
-	default:
-		bDate = begin
-	}
+	const (
+		inputLayout  = "2006-01-02"
+		outputLayout = "1/2/2006"
+	)
 
 	var beginDate time.Time
 	var endDate time.Time
 	var err error
 
-	if bDate != "" {
-		// Make sure the begin date is not later than the end date
-		beginDate, err = time.Parse(layout, bDate)
+	if begin != "" {
+		beginDate, err = time.Parse(inputLayout, begin)
 		if err != nil {
-			return "", "", err
+			return "", "", fmt.Errorf(
+				"invalid begin date %q; expected YYYY-MM-DD: %w",
+				begin,
+				err,
+			)
 		}
 	}
 
-	if eDate != "" {
-		endDate, err = time.Parse(layout, eDate)
+	if end != "" {
+		endDate, err = time.Parse(inputLayout, end)
 		if err != nil {
-			return "", "", err
+			return "", "", fmt.Errorf(
+				"invalid end date %q; expected YYYY-MM-DD: %w",
+				end,
+				err,
+			)
 		}
 	}
 
-	if beginDate.IsZero() == false && endDate.IsZero() == false {
-		if beginDate.After(endDate) {
-			return "", "", fmt.Errorf("Begin date [%s] must not be later than end date [%s]", bDate, eDate)
-		}
+	if !beginDate.IsZero() &&
+		!endDate.IsZero() &&
+		beginDate.After(endDate) {
+		return "", "", fmt.Errorf(
+			"begin date [%s] must not be later than end date [%s]",
+			begin,
+			end,
+		)
 	}
 
-	return bDate, eDate, nil
+	var formattedBegin string
+	var formattedEnd string
+
+	if !beginDate.IsZero() {
+		formattedBegin = beginDate.Format(outputLayout)
+	}
+
+	if !endDate.IsZero() {
+		formattedEnd = endDate.Format(outputLayout)
+	}
+
+	return formattedBegin, formattedEnd, nil
 }
 
 func ConvertJsonToGameDescriptor(file string) ([]model.GameDescriptor, error) {
