@@ -534,6 +534,8 @@ tr:nth-child(even) {
                         <th>Field</th>
                         <th>Num of Games</th>
                         <th>Level</th>
+                        <th>Home</th>
+                        <th>Visitor</th>
                         <th>Game Fee</th>
                         <th>Travel Pay</th>
                         <th>Assignor Fee</th>
@@ -1029,6 +1031,16 @@ function displayPreview(result) {
         appendCell(
             tableRow,
             getValue(data, "level", "Level")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "home", "Home")
+        );
+
+        appendCell(
+            tableRow,
+            getValue(data, "visitor", "Visitor")
         );
 
         appendCell(

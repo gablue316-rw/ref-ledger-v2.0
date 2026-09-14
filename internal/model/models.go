@@ -106,6 +106,8 @@ type GameDescriptor struct {
 	Field       string
 	NumOfGames  string
 	Level       string
+	Home        string
+	Visitor     string
 	GameFee     string
 	TravelPay   string
 	AssignorFee string
@@ -129,6 +131,8 @@ type GameDoc struct {
 	Field        string    `bson:"field,omitempty"`
 	NumOfGames   int64     `bson:"numOfGames,omitempty"`
 	Level        string    `bson:"level,omitempty"`
+	Home         string    `bson:"home,omitempty"`
+	Visitor      string    `bson:"visitor,omitempty"`
 	GameFee      int64     `bson:"gameFee"`
 	TravelPay    int64     `bson:"travelPay"`
 	AssignorFee  int64     `bson:"assignorFee"`
@@ -152,6 +156,8 @@ type JsonDoc struct {
 	Field       string `json:"field"`
 	NumOfGames  int64  `json:"numOfGames"`
 	Level       string `json:"level"`
+	Home        string `json:"home"`
+	Visitor     string `json:"visitor"`
 	GameFee     string `json:"gameFee"`
 	TravelPay   string `json:"travelPay"`
 	AssignorFee string `json:"assignorFee"`
@@ -185,6 +191,8 @@ type GFilters struct {
 	Site        string
 	Sport       string
 	Level       string
+	Home        string
+	Visitor     string
 	GameFee     string
 	TenantId    string
 }
@@ -200,6 +208,8 @@ type GameFilter struct {
 	Site        []string `json:"site,omitempty"`
 	Sport       []string `json:"sport,omitempty"`
 	Level       []string `json:"level,omitempty"`
+	Home        string   `json:"home,omitempty"`
+	Visitor     string   `json:"visitor,omitempty"`
 	TenantId    string   `json:"tenantId"`
 }
 
@@ -226,6 +236,8 @@ type HtmlResponse struct {
 	Field       string `json:"field" bson:"field,omitempty"`
 	NumOfGames  int64  `json:"numOfGames" bson:"numOfGames,omitempty"`
 	Level       string `json:"level" bson:"level,omitempty"`
+	Home        string `json:"home" bson:"home,omitempty"`
+	Visitor     string `json:"visitor" bson:"visitor,omitempty"`
 	GameFee     int64  `json:"gameFee" bson:"gameFee,omitempty"`
 	TravelPay   int64  `json:"travelPay" bson:"travelPay,omitempty"`
 	AssignorFee int64  `json:"assignorFee" bson:"assignorFee,omitempty"`
@@ -260,6 +272,8 @@ type GameView struct {
 	Field       string         `json:"Field"`
 	NumOfGames  int64          `json:"NumOfGames"`
 	Level       string         `json:"Level"`
+	Home        string         `json:"Home"`
+	Visitor     string         `json:"Visitor"`
 	GameFee     string         `json:"GameFee"`
 	Association string         `json:"Association"`
 	Status      string         `json:"Status"`

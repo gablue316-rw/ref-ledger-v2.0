@@ -273,80 +273,6 @@ func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
 	return nil
 
 }
-func UpdateGames(parentCtx context.Context, file string) error {
-
-	fmt.Println("Adding to Games Collection")
-
-	games := []model.GameDescriptor{}
-	// Read file
-	fd, err := os.Open(file)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("Failed to open file %s.  Reason: %s", file, err)
-	}
-	defer fd.Close()
-
-	sc := bufio.NewScanner(fd)
-
-	recordsRead := 0
-	recordsAppended := 0
-	recordsDeleted := 0
-	validationErrors := 0
-
-	for sc.Scan() {
-
-		line := sc.Text()
-		recordsRead++
-		fields := strings.Split(line, ",")
-
-		game := model.GameDescriptor{
-			GameId:      fields[2],
-			Date:        fields[0],
-			Time:        fields[1],
-			Sport:       fields[3],
-			Site:        fields[5],
-			Field:       fields[6],
-			NumOfGames:  fields[7],
-			Level:       fields[4],
-			GameFee:     fields[8],
-			TravelPay:   fields[18],
-			AssignorFee: fields[17],
-			Deductions:  fields[9],
-			Association: fields[11],
-			Status:      fields[10],
-			Referee:     fields[12],
-			U1:          fields[13],
-			U2:          fields[14],
-			ECO:         fields[15],
-			Assignor:    fields[16],
-		}
-
-		if game.Status == "Delete" {
-			DelGame(parentCtx, game.GameId)
-			recordsDeleted++
-			continue
-		}
-
-		checkForDup := true
-		err = ValidateGameDescriptor(parentCtx, game, checkForDup)
-		if err != nil {
-			fmt.Println(err)
-			validationErrors++
-			continue
-		}
-
-		games = append(games, game)
-
-		recordsAppended++
-	}
-
-	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
-	if len(games) > 0 {
-		AddGames(parentCtx, games)
-	}
-
-	return nil
-}
 
 // Stubbed out for now
 func ValidatePaymentDescriptor(parentCtx context.Context, p model.PaymentDescriptor) error {
@@ -956,25 +882,27 @@ func BulkAddGames(parentCtx context.Context, file string) {
 		fields := strings.Split(line, ",")
 
 		game := model.GameDescriptor{
-			GameId:      fields[2],
-			Date:        fields[0],
-			Time:        fields[1],
+			GameId:      fields[0],
+			Date:        fields[1],
+			Time:        fields[2],
 			Sport:       fields[3],
-			Site:        fields[5],
-			Field:       fields[6],
-			NumOfGames:  fields[7],
-			Level:       fields[4],
+			Site:        fields[4],
+			Field:       fields[5],
+			NumOfGames:  fields[6],
+			Level:       fields[7],
 			GameFee:     fields[8],
-			TravelPay:   fields[18],
-			AssignorFee: fields[17],
-			Deductions:  fields[9],
-			Association: fields[11],
-			Status:      fields[10],
-			Referee:     fields[12],
-			U1:          fields[13],
-			U2:          fields[14],
-			ECO:         fields[15],
-			Assignor:    fields[16],
+			TravelPay:   fields[9],
+			AssignorFee: fields[10],
+			Deductions:  fields[11],
+			Association: fields[12],
+			Status:      fields[13],
+			Referee:     fields[14],
+			U1:          fields[15],
+			U2:          fields[16],
+			ECO:         fields[17],
+			Assignor:    fields[18],
+			Home:        fields[19],
+			Visitor:     fields[20],
 		}
 
 		checkForDup := true

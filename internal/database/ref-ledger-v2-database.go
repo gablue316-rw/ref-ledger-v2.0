@@ -478,7 +478,7 @@ func GetGameFee(gameIds []int64) (int64, error) {
 }
 
 // Used by HTML Web Pages
-func GetGameByGameIdAndOrAssoc(assoc string, gameId string) (model.GameDescriptor, error) {
+func GetGameByGameIdAndAssoc(assoc string, gameId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
@@ -493,18 +493,9 @@ func GetGameByGameIdAndOrAssoc(assoc string, gameId string) (model.GameDescripto
 		return model.GameDescriptor{}, fmt.Errorf("GetGameByAssocAndOrId failure.  Reason: Invalid parameters")
 	}
 
-	if gameId == "" {
-		return model.GameDescriptor{}, fmt.Errorf("GetGameByAssocAndOrId failure.  Reason: Invalid parameters")
-	}
-
 	filter := bson.M{
-		"gameId": id,
-	}
-
-	if assoc == "" {
-		filter = bson.M{
-			"association": assoc,
-		}
+		"gameId":      id,
+		"association": assoc,
 	}
 
 	db := Client.Database(Database)
@@ -925,46 +916,62 @@ func BuildMongoExpenseFilterFromFile(path string) (bson.M, error) {
 
 func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
-	fmt.Println("Building MongoDb Game Filter")
+	fmt.Println("Building MongoDb Game Filter using:", filter)
 	mongoFilter := bson.M{}
 
 	fmt.Println("Building MongoDb Game Filter with Tenant ID:", filter.TenantId)
 	mongoFilter["tenantId"] = filter.TenantId
 
 	if len(filter.Status) > 0 {
+		fmt.Println("Adding Statuses...")
 		mongoFilter["status"] = bson.M{
 			"$in": filter.Status,
 		}
 	}
 
 	if len(filter.Association) > 0 {
+		fmt.Println("Adding Associations...")
 		mongoFilter["association"] = bson.M{
 			"$in": filter.Association,
 		}
 	}
 
 	if len(filter.GameId) > 0 {
+		fmt.Println("Adding GameIds...")
 		mongoFilter["gameId"] = bson.M{
 			"$in": filter.GameId,
 		}
 	}
 
 	if len(filter.Site) > 0 {
+		fmt.Println("Adding Sites...")
 		mongoFilter["site"] = bson.M{
 			"$in": filter.Site,
 		}
 	}
 
 	if len(filter.Sport) > 0 {
+		fmt.Println("Adding Sports...")
 		mongoFilter["sport"] = bson.M{
 			"$in": filter.Sport,
 		}
 	}
 
 	if len(filter.Level) > 0 {
+		fmt.Println("Adding Levels...")
 		mongoFilter["level"] = bson.M{
 			"$in": filter.Level,
 		}
+	}
+
+	if strings.TrimSpace(filter.Home) != "" {
+		fmt.Println("Adding Home...")
+		mongoFilter["home"] = strings.TrimSpace(filter.Home)
+	}
+
+	if strings.TrimSpace(filter.Visitor) != "" {
+		fmt.Println("Adding Visitor...")
+		mongoFilter["visitor"] = strings.TrimSpace(filter.Visitor)
 	}
 
 	// Official filters
@@ -3129,6 +3136,8 @@ func (gc *GameCollection) ConvDocToGame(doc model.GameDoc) model.GameDescriptor 
 		Field:       doc.Field,
 		NumOfGames:  utils.ConvertInt64ToStr(doc.NumOfGames),
 		Level:       doc.Level,
+		Home:        doc.Home,
+		Visitor:     doc.Visitor,
 		GameFee:     utils.ConvertInt64ToAmtStr(doc.GameFee),
 		TravelPay:   utils.ConvertInt64ToAmtStr(doc.TravelPay),
 		AssignorFee: utils.ConvertInt64ToAmtStr(doc.AssignorFee),

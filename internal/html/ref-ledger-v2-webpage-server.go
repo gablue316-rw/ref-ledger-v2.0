@@ -58,6 +58,8 @@ type Game struct {
 	Field       string  `json:"field"`
 	Sport       string  `json:"sport"`
 	Level       string  `json:"level"`
+	Home        string  `json:"home"`
+	Visitor     string  `json:"visitor"`
 	NumOfGames  int     `json:"numOfGames"`
 	GameFee     float64 `json:"gameFee"`
 	TravelPay   float64 `json:"travelPay"`
@@ -225,6 +227,8 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 		Field:       g.Field,
 		Sport:       g.Sport,
 		Level:       g.Level,
+		Home:        g.Home,
+		Visitor:     g.Visitor,
 		NumOfGames:  strconv.Itoa(g.NumOfGames),
 		GameFee:     strconv.FormatFloat(g.GameFee, 'f', 2, 64),
 		TravelPay:   strconv.FormatFloat(g.TravelPay, 'f', 2, 64),
@@ -880,6 +884,8 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"field",
 		"numOfGames",
 		"level",
+		"home",
+		"visitor",
 		"gameFee",
 		"travelPay",
 		"assignorFee",
@@ -921,6 +927,8 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"Softball Field",
 		"1",
 		"Varsity",
+		"Mill Creek",
+		"Buford",
 		"$50.00",
 		"$25.00",
 		"$10.00",
@@ -1036,6 +1044,8 @@ type GameImportData struct {
 	Field       string `json:"field"`
 	NumOfGames  int64  `json:"numOfGames"`
 	Level       string `json:"level"`
+	Home        string `json:"home"`
+	Visitor     string `json:"visitor"`
 	GameFee     string `json:"gameFee"`
 	TravelPay   string `json:"travelPay"`
 	AssignorFee string `json:"assignorFee"`
@@ -1391,6 +1401,8 @@ func validateGamesCSVHeader(header []string) error {
 		"u2",
 		"eco",
 		"assignor",
+		"home",
+		"visitor",
 	}
 
 	if len(header) != len(expected) {
@@ -1491,11 +1503,11 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 	gameId, _ := strconv.ParseInt(csvColumn(record, 0), 10, 64)
 	numOfGames, _ := strconv.ParseInt(csvColumn(record, 6), 10, 64)
 
-	if len(record) != 19 {
+	if len(record) != 21 {
 		row.Errors = append(
 			row.Errors,
 			fmt.Sprintf(
-				"Expected 19 columns but found %d",
+				"Expected 21 columns but found %d",
 				len(record),
 			),
 		)
@@ -1522,6 +1534,8 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 			U2:          csvColumn(record, 16),
 			ECO:         csvColumn(record, 17),
 			Assignor:    csvColumn(record, 18),
+			Home:        csvColumn(record, 19),
+			Visitor:     csvColumn(record, 20),
 		}
 		return row
 	}
@@ -1546,6 +1560,8 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		U2:          csvColumn(record, 16),
 		ECO:         csvColumn(record, 17),
 		Assignor:    csvColumn(record, 18),
+		Home:        csvColumn(record, 19),
+		Visitor:     csvColumn(record, 20),
 	}
 
 	// Validate fields
@@ -2917,6 +2933,8 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			Field:       data.Field,
 			NumOfGames:  utils.ConvertInt64ToStr(data.NumOfGames),
 			Level:       data.Level,
+			Home:        data.Home,
+			Visitor:     data.Visitor,
 			GameFee:     data.GameFee,
 			TravelPay:   data.TravelPay,
 			AssignorFee: data.AssignorFee,
@@ -4510,7 +4528,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	var tId string = database.TenantId
 	var err error
 	var siteId string
-	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
 	fmt.Println("##### UpdateGame Enpoint Called #####")
@@ -4582,6 +4599,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Println(err)
+		http.Error(w, "Invalid Game", http.StatusBadRequest)
 		return
 	}
 
@@ -4589,13 +4607,13 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games", tId)
 		if err != nil {
 			fmt.Println(err)
+			http.Error(w, "Invalid Game", http.StatusBadRequest)
 			return
 		}
 		return
 	}
 
-	gameDesc = append(gameDesc, singleGameDesc)
-	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games", tId)
+	http.Error(w, "Game not found", http.StatusBadRequest)
 
 }
 
@@ -4672,12 +4690,12 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//
+	// We shouldn't update game if it already exists.  We should return an error to the user.
+	//
+
 	if gameExists {
-		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games", tId)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+		http.Error(w, "Game already exists", http.StatusBadRequest)
 		return
 	}
 
@@ -5489,7 +5507,7 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 	association := r.PathValue("association")
 	gameID := r.PathValue("gameid")
 
-	game, err := database.GetGameByGameIdAndOrAssoc(association, gameID)
+	game, err := database.GetGameByGameIdAndAssoc(association, gameID)
 	if err != nil {
 		http.Error(w, "Game not found", http.StatusNotFound)
 		return
@@ -5624,9 +5642,11 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	gameId := r.URL.Query().Get("gameId")
 	sites := r.URL.Query()["site"]
 	officials := r.URL.Query()["official"]
+	home := r.URL.Query().Get("home")
+	visitor := r.URL.Query().Get("visitor")
 
 	fmt.Println("Statuses:", statuses, "Associations:", associations, "Sports:", sports, "Levels:", levels, "GameId:", gameId, "Sites:", sites, "Official:", officials)
-	fmt.Println("Begin Date:", begindate, "End Date:", enddate)
+	fmt.Println("Home:", home, "Visitor:", visitor, "Begin Date:", begindate, "End Date:", enddate)
 
 	if begindate == "today" && enddate == "" {
 		enddate = begindate
@@ -5694,6 +5714,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	gameFilters.Site = ""
 	gameFilters.Official = ""
 	gameFilters.TenantId = tId
+	gameFilters.Home = home
+	gameFilters.Visitor = visitor
 
 	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
 	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
@@ -5823,6 +5845,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Field:       game.Field,
 			NumOfGames:  game.NumOfGames,
 			Level:       game.Level,
+			Home:        game.Home,
+			Visitor:     game.Visitor,
 			Status:      game.Status,
 			Association: game.Association,
 		}

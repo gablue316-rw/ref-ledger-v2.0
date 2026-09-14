@@ -249,6 +249,8 @@ func ConvertJsonToGameDescriptor(file string) ([]model.GameDescriptor, error) {
 			Field:       g.Field,
 			NumOfGames:  strconv.FormatInt(g.NumOfGames, 10),
 			Level:       g.Level,
+			Home:        g.Home,
+			Visitor:     g.Visitor,
 			GameFee:     g.GameFee,
 			TravelPay:   g.TravelPay,
 			AssignorFee: g.AssignorFee,
@@ -374,6 +376,8 @@ func ConvertGameFiltersToJsonFile(filters model.GFilters) (string, error) {
 	jsonFilters.Site = siteValues
 	jsonFilters.Sport = sportValues
 	jsonFilters.Level = levelValues
+	jsonFilters.Home = filters.Home
+	jsonFilters.Visitor = filters.Visitor
 
 	if filters.FromDate != "" || filters.ToDate != "" {
 		jsonFilters.Date = &model.Date{}
@@ -680,6 +684,8 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 		Field:       doc.Field,
 		NumOfGames:  numOfGames,
 		Level:       doc.Level,
+		Home:        doc.Home,
+		Visitor:     doc.Visitor,
 		GameFee:     gameFee,
 		TravelPay:   travelPay,
 		AssignorFee: assignorFee,
@@ -814,6 +820,8 @@ func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
 		Sport:       gameDescr.Sport,
 		Site:        gameDescr.Site,
 		Field:       gameDescr.Field,
+		Home:        gameDescr.Home,
+		Visitor:     gameDescr.Visitor,
 		NumOfGames:  numOfGames,
 		Level:       gameDescr.Level,
 		GameFee:     gameFee,
