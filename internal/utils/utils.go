@@ -249,6 +249,8 @@ func ConvertJsonToGameDescriptor(file string) ([]model.GameDescriptor, error) {
 			Field:       g.Field,
 			NumOfGames:  strconv.FormatInt(g.NumOfGames, 10),
 			Level:       g.Level,
+			Home:        g.Home,
+			Visitor:     g.Visitor,
 			GameFee:     g.GameFee,
 			TravelPay:   g.TravelPay,
 			AssignorFee: g.AssignorFee,

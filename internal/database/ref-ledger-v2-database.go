@@ -478,7 +478,7 @@ func GetGameFee(gameIds []int64) (int64, error) {
 }
 
 // Used by HTML Web Pages
-func GetGameByGameIdAndOrAssoc(assoc string, gameId string) (model.GameDescriptor, error) {
+func GetGameByGameIdAndAssoc(assoc string, gameId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
@@ -493,18 +493,9 @@ func GetGameByGameIdAndOrAssoc(assoc string, gameId string) (model.GameDescripto
 		return model.GameDescriptor{}, fmt.Errorf("GetGameByAssocAndOrId failure.  Reason: Invalid parameters")
 	}
 
-	if gameId == "" {
-		return model.GameDescriptor{}, fmt.Errorf("GetGameByAssocAndOrId failure.  Reason: Invalid parameters")
-	}
-
 	filter := bson.M{
-		"gameId": id,
-	}
-
-	if assoc == "" {
-		filter = bson.M{
-			"association": assoc,
-		}
+		"gameId":      id,
+		"association": assoc,
 	}
 
 	db := Client.Database(Database)
@@ -3129,6 +3120,8 @@ func (gc *GameCollection) ConvDocToGame(doc model.GameDoc) model.GameDescriptor 
 		Field:       doc.Field,
 		NumOfGames:  utils.ConvertInt64ToStr(doc.NumOfGames),
 		Level:       doc.Level,
+		Home:        doc.Home,
+		Visitor:     doc.Visitor,
 		GameFee:     utils.ConvertInt64ToAmtStr(doc.GameFee),
 		TravelPay:   utils.ConvertInt64ToAmtStr(doc.TravelPay),
 		AssignorFee: utils.ConvertInt64ToAmtStr(doc.AssignorFee),

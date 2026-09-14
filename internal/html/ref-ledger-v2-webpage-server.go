@@ -1040,6 +1040,8 @@ type GameImportData struct {
 	Field       string `json:"field"`
 	NumOfGames  int64  `json:"numOfGames"`
 	Level       string `json:"level"`
+	Home        string `json:"home"`
+	Visitor     string `json:"visitor"`
 	GameFee     string `json:"gameFee"`
 	TravelPay   string `json:"travelPay"`
 	AssignorFee string `json:"assignorFee"`
@@ -2921,6 +2923,8 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			Field:       data.Field,
 			NumOfGames:  utils.ConvertInt64ToStr(data.NumOfGames),
 			Level:       data.Level,
+			Home:        data.Home,
+			Visitor:     data.Visitor,
 			GameFee:     data.GameFee,
 			TravelPay:   data.TravelPay,
 			AssignorFee: data.AssignorFee,
@@ -5493,7 +5497,7 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 	association := r.PathValue("association")
 	gameID := r.PathValue("gameid")
 
-	game, err := database.GetGameByGameIdAndOrAssoc(association, gameID)
+	game, err := database.GetGameByGameIdAndAssoc(association, gameID)
 	if err != nil {
 		http.Error(w, "Game not found", http.StatusNotFound)
 		return
@@ -5827,6 +5831,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Field:       game.Field,
 			NumOfGames:  game.NumOfGames,
 			Level:       game.Level,
+			Home:        game.Home,
+			Visitor:     game.Visitor,
 			Status:      game.Status,
 			Association: game.Association,
 		}
