@@ -357,6 +357,16 @@ body {
         </div>
 
         <div class="filter-group">
+            <label for="home">Home</label>
+            <input type="text" id="home" placeholder="Enter Home Team">
+        </div>
+
+        <div class="filter-group">
+            <label for="visitor">Visitor</label>
+            <input type="text" id="visitor" placeholder="Enter Visiting Team">
+        </div>
+
+        <div class="filter-group">
             <label>Status</label>
             <div id="statusDropdown" class="checkbox-dropdown">
                 <button type="button" id="statusDropdownButton"
@@ -955,6 +965,12 @@ async function loadGames() {
     const gameId =
         document.getElementById("gameId").value.trim();
 
+    const home =
+        document.getElementById("home").value.trim();
+
+    const visitor =
+        document.getElementById("visitor").value.trim();
+
     const statuses = Array.from(
         document.querySelectorAll('input[name="status"]:checked')
     ).map(checkbox => checkbox.value);
@@ -1001,6 +1017,14 @@ async function loadGames() {
 
     if (gameId) {
         params.append("gameId", gameId);
+    }
+
+    if (home) {
+        params.append("home", home);
+    }
+
+    if (visitor) {
+        params.append("visitor", visitor);
     }
 
     statuses.forEach(status => {
@@ -1630,6 +1654,8 @@ async function updateSelectedStatus() {
 
 function clearFilters() {
     document.getElementById("gameId").value = "";
+    document.getElementById("home").value = "";
+    document.getElementById("visitor").value = "";
     document.querySelectorAll('input[name="status"]').forEach(
         checkbox => checkbox.checked = checkbox.value === "Pending"
     );

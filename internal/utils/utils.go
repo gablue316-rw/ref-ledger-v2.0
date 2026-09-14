@@ -376,6 +376,8 @@ func ConvertGameFiltersToJsonFile(filters model.GFilters) (string, error) {
 	jsonFilters.Site = siteValues
 	jsonFilters.Sport = sportValues
 	jsonFilters.Level = levelValues
+	jsonFilters.Home = filters.Home
+	jsonFilters.Visitor = filters.Visitor
 
 	if filters.FromDate != "" || filters.ToDate != "" {
 		jsonFilters.Date = &model.Date{}

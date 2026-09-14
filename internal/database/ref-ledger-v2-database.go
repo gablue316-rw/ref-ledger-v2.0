@@ -916,46 +916,62 @@ func BuildMongoExpenseFilterFromFile(path string) (bson.M, error) {
 
 func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
-	fmt.Println("Building MongoDb Game Filter")
+	fmt.Println("Building MongoDb Game Filter using:", filter)
 	mongoFilter := bson.M{}
 
 	fmt.Println("Building MongoDb Game Filter with Tenant ID:", filter.TenantId)
 	mongoFilter["tenantId"] = filter.TenantId
 
 	if len(filter.Status) > 0 {
+		fmt.Println("Adding Statuses...")
 		mongoFilter["status"] = bson.M{
 			"$in": filter.Status,
 		}
 	}
 
 	if len(filter.Association) > 0 {
+		fmt.Println("Adding Associations...")
 		mongoFilter["association"] = bson.M{
 			"$in": filter.Association,
 		}
 	}
 
 	if len(filter.GameId) > 0 {
+		fmt.Println("Adding GameIds...")
 		mongoFilter["gameId"] = bson.M{
 			"$in": filter.GameId,
 		}
 	}
 
 	if len(filter.Site) > 0 {
+		fmt.Println("Adding Sites...")
 		mongoFilter["site"] = bson.M{
 			"$in": filter.Site,
 		}
 	}
 
 	if len(filter.Sport) > 0 {
+		fmt.Println("Adding Sports...")
 		mongoFilter["sport"] = bson.M{
 			"$in": filter.Sport,
 		}
 	}
 
 	if len(filter.Level) > 0 {
+		fmt.Println("Adding Levels...")
 		mongoFilter["level"] = bson.M{
 			"$in": filter.Level,
 		}
+	}
+
+	if strings.TrimSpace(filter.Home) != "" {
+		fmt.Println("Adding Home...")
+		mongoFilter["home"] = strings.TrimSpace(filter.Home)
+	}
+
+	if strings.TrimSpace(filter.Visitor) != "" {
+		fmt.Println("Adding Visitor...")
+		mongoFilter["visitor"] = strings.TrimSpace(filter.Visitor)
 	}
 
 	// Official filters

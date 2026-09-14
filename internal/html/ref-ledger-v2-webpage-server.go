@@ -5632,9 +5632,11 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	gameId := r.URL.Query().Get("gameId")
 	sites := r.URL.Query()["site"]
 	officials := r.URL.Query()["official"]
+	home := r.URL.Query().Get("home")
+	visitor := r.URL.Query().Get("visitor")
 
 	fmt.Println("Statuses:", statuses, "Associations:", associations, "Sports:", sports, "Levels:", levels, "GameId:", gameId, "Sites:", sites, "Official:", officials)
-	fmt.Println("Begin Date:", begindate, "End Date:", enddate)
+	fmt.Println("Home:", home, "Visitor:", visitor, "Begin Date:", begindate, "End Date:", enddate)
 
 	if begindate == "today" && enddate == "" {
 		enddate = begindate
@@ -5702,6 +5704,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	gameFilters.Site = ""
 	gameFilters.Official = ""
 	gameFilters.TenantId = tId
+	gameFilters.Home = home
+	gameFilters.Visitor = visitor
 
 	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
 	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)

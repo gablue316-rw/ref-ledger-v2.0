@@ -191,6 +191,8 @@ type GFilters struct {
 	Site        string
 	Sport       string
 	Level       string
+	Home        string
+	Visitor     string
 	GameFee     string
 	TenantId    string
 }
@@ -206,6 +208,8 @@ type GameFilter struct {
 	Site        []string `json:"site,omitempty"`
 	Sport       []string `json:"sport,omitempty"`
 	Level       []string `json:"level,omitempty"`
+	Home        string   `json:"home,omitempty"`
+	Visitor     string   `json:"visitor,omitempty"`
 	TenantId    string   `json:"tenantId"`
 }
 
