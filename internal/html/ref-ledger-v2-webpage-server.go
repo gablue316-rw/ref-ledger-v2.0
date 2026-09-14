@@ -58,6 +58,8 @@ type Game struct {
 	Field       string  `json:"field"`
 	Sport       string  `json:"sport"`
 	Level       string  `json:"level"`
+	Home        string  `json:"home"`
+	Visitor     string  `json:"visitor"`
 	NumOfGames  int     `json:"numOfGames"`
 	GameFee     float64 `json:"gameFee"`
 	TravelPay   float64 `json:"travelPay"`
@@ -225,6 +227,8 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 		Field:       g.Field,
 		Sport:       g.Sport,
 		Level:       g.Level,
+		Home:        g.Home,
+		Visitor:     g.Visitor,
 		NumOfGames:  strconv.Itoa(g.NumOfGames),
 		GameFee:     strconv.FormatFloat(g.GameFee, 'f', 2, 64),
 		TravelPay:   strconv.FormatFloat(g.TravelPay, 'f', 2, 64),
@@ -4510,7 +4514,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	var tId string = database.TenantId
 	var err error
 	var siteId string
-	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
 	fmt.Println("##### UpdateGame Enpoint Called #####")
@@ -4582,6 +4585,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Println(err)
+		http.Error(w, "Invalid Game", http.StatusBadRequest)
 		return
 	}
 
@@ -4589,13 +4593,13 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games", tId)
 		if err != nil {
 			fmt.Println(err)
+			http.Error(w, "Invalid Game", http.StatusBadRequest)
 			return
 		}
 		return
 	}
 
-	gameDesc = append(gameDesc, singleGameDesc)
-	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games", tId)
+	http.Error(w, "Game not found", http.StatusBadRequest)
 
 }
 
@@ -4672,12 +4676,12 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//
+	// We shouldn't update game if it already exists.  We should return an error to the user.
+	//
+
 	if gameExists {
-		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games", tId)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
+		http.Error(w, "Game already exists", http.StatusBadRequest)
 		return
 	}
 

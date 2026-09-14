@@ -117,6 +117,8 @@ body{padding:10px;}
         <option value="">Select Level</option>
     </select>
 </div>
+<div class="form-group"><label for="home">Home</label><input type="text" id="home"></div>
+<div class="form-group"><label for="visitor">Visitor</label><input type="text" id="visitor"></div>
 <div class="form-group"><label for="field">Field</label><input type="text" id="field"></div>
 <div class="form-group">
     <label for="sport">Sport</label>
@@ -598,6 +600,8 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("field").value = game.Field;
         document.getElementById("sport").value = game.Sport;
         document.getElementById("level").value = game.Level;
+        document.getElementById("home").value = game.Home ?? "";
+        document.getElementById("visitor").value = game.Visitor ?? "";
 
         document.getElementById("numOfGames").value = game.NumOfGames;
         document.getElementById("gameFee").value = game.GameFee;
@@ -635,6 +639,8 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         field: document.getElementById("field").value,
         sport: document.getElementById("sport").value,
         level: document.getElementById("level").value,
+        home: document.getElementById("home").value.trim(),
+        visitor: document.getElementById("visitor").value.trim(),
         numOfGames: parseInt(document.getElementById("numOfGames").value),
         gameFee: parseFloat(document.getElementById("gameFee").value),
         travelPay: parseFloat(document.getElementById("travelPay").value),
@@ -703,6 +709,8 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         field: document.getElementById("field").value,
         sport: document.getElementById("sport").value,
         level: document.getElementById("level").value,
+        home: document.getElementById("home").value.trim(),
+        visitor: document.getElementById("visitor").value.trim(),        
         numOfGames: parseInt(document.getElementById("numOfGames").value),
         gameFee: parseFloat(document.getElementById("gameFee").value),
         travelPay: parseFloat(document.getElementById("travelPay").value),

@@ -106,6 +106,8 @@ type GameDescriptor struct {
 	Field       string
 	NumOfGames  string
 	Level       string
+	Home        string
+	Visitor     string
 	GameFee     string
 	TravelPay   string
 	AssignorFee string
@@ -129,6 +131,8 @@ type GameDoc struct {
 	Field        string    `bson:"field,omitempty"`
 	NumOfGames   int64     `bson:"numOfGames,omitempty"`
 	Level        string    `bson:"level,omitempty"`
+	Home         string    `bson:"home,omitempty"`
+	Visitor      string    `bson:"visitor,omitempty"`
 	GameFee      int64     `bson:"gameFee"`
 	TravelPay    int64     `bson:"travelPay"`
 	AssignorFee  int64     `bson:"assignorFee"`
@@ -152,6 +156,8 @@ type JsonDoc struct {
 	Field       string `json:"field"`
 	NumOfGames  int64  `json:"numOfGames"`
 	Level       string `json:"level"`
+	Home        string `json:"home"`
+	Visitor     string `json:"visitor"`
 	GameFee     string `json:"gameFee"`
 	TravelPay   string `json:"travelPay"`
 	AssignorFee string `json:"assignorFee"`
