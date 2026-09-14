@@ -884,6 +884,8 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"field",
 		"numOfGames",
 		"level",
+		"home",
+		"visitor",
 		"gameFee",
 		"travelPay",
 		"assignorFee",
@@ -925,6 +927,8 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"Softball Field",
 		"1",
 		"Varsity",
+		"Mill Creek",
+		"Buford",
 		"$50.00",
 		"$25.00",
 		"$10.00",
@@ -1397,6 +1401,8 @@ func validateGamesCSVHeader(header []string) error {
 		"u2",
 		"eco",
 		"assignor",
+		"home",
+		"visitor",
 	}
 
 	if len(header) != len(expected) {
@@ -1497,11 +1503,11 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 	gameId, _ := strconv.ParseInt(csvColumn(record, 0), 10, 64)
 	numOfGames, _ := strconv.ParseInt(csvColumn(record, 6), 10, 64)
 
-	if len(record) != 19 {
+	if len(record) != 21 {
 		row.Errors = append(
 			row.Errors,
 			fmt.Sprintf(
-				"Expected 19 columns but found %d",
+				"Expected 21 columns but found %d",
 				len(record),
 			),
 		)
@@ -1528,6 +1534,8 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 			U2:          csvColumn(record, 16),
 			ECO:         csvColumn(record, 17),
 			Assignor:    csvColumn(record, 18),
+			Home:        csvColumn(record, 19),
+			Visitor:     csvColumn(record, 20),
 		}
 		return row
 	}
@@ -1552,6 +1560,8 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		U2:          csvColumn(record, 16),
 		ECO:         csvColumn(record, 17),
 		Assignor:    csvColumn(record, 18),
+		Home:        csvColumn(record, 19),
+		Visitor:     csvColumn(record, 20),
 	}
 
 	// Validate fields
