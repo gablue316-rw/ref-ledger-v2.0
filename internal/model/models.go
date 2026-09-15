@@ -278,6 +278,8 @@ type GameView struct {
 	Association string         `json:"Association"`
 	Status      string         `json:"Status"`
 	Officials   []OfficialView `json:"Officials"`
+	ECO         string         `json:"ECO"`
+	Assignor    string         `json:"Assignor"`
 }
 
 type ExpenseReportRow struct {
