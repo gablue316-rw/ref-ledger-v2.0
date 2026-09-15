@@ -294,6 +294,15 @@ body {
     cursor: pointer;
 }
 
+.delete-game-btn {
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: #dc2626;
+    font-size: 18px;
+    cursor: pointer;
+}
+
 .game-actions-cell {
     white-space: nowrap;
     text-align: center;
@@ -318,6 +327,39 @@ body {
     outline: 2px solid #15803d;
     outline-offset: 2px;
     border-radius: 3px;
+}
+
+.delete-game-btn:hover {
+    color: #b91c1c;
+    transform: scale(1.1);
+}
+
+.delete-game-btn:focus-visible {
+    outline: 2px solid #b91c1c;
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+.deletion-modal-icon {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.deletion-game-details {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+}
+
+.deletion-modal-confirm {
+    border: 1px solid #dc2626;
+    background: #dc2626;
+    color: #ffffff;
+}
+
+.deletion-modal-confirm:hover {
+    border-color: #b91c1c;
+    background: #b91c1c;
 }
 
 .completion-modal-overlay {
@@ -711,6 +753,7 @@ body {
                 <option value="Pending">Pending</option>
                 <option value="Completed">Completed</option>
                 <option value="Cancelled">Cancelled</option>
+                <option value="Delete">Delete</option>
             </select>
         </div>
         
@@ -746,7 +789,7 @@ body {
     <table class="games-table">
         <thead>
             <tr>
-                <th>Select / Complete</th>
+                <th>Select / Actions</th>
                 <th>Game ID</th>
                 <th>Date</th>
                 <th>Time</th>
@@ -811,6 +854,53 @@ body {
                 class="completion-modal-confirm">
                 <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                 Mark Completed
+            </button>
+        </div>
+    </div>
+</div>
+
+<div
+    id="deletionModalOverlay"
+    class="completion-modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="deletionModalTitle"
+    aria-describedby="deletionModalDescription">
+    <div class="completion-modal">
+        <div class="completion-modal-content">
+            <div class="completion-modal-heading">
+                <div class="completion-modal-icon deletion-modal-icon">
+                    <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h2 id="deletionModalTitle">Confirm deletion</h2>
+                    <p>This action cannot be undone.</p>
+                </div>
+            </div>
+
+            <p id="deletionModalDescription">
+                Are you sure you want to delete this game?
+            </p>
+
+            <div
+                id="deletionGameDetails"
+                class="completion-game-details deletion-game-details">
+            </div>
+        </div>
+
+        <div class="completion-modal-actions">
+            <button
+                type="button"
+                id="cancelDeletionButton"
+                class="completion-modal-cancel">
+                Cancel
+            </button>
+            <button
+                type="button"
+                id="confirmDeletionButton"
+                class="deletion-modal-confirm">
+                <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                Delete Game
             </button>
         </div>
     </div>
@@ -915,9 +1005,19 @@ function renderGames(
         const row = document.createElement("tr");
 
         const gameId = game.GameId ?? game.gameId ?? "";
+        const association =
+            game.Association ?? game.association ?? "";
+        const encodedAssociation = encodeURIComponent(
+            String(association)
+        ).replace(/'/g, "%27");
         const gameStatus = game.Status ?? game.status ?? "";
+        const encodedGameStatus = encodeURIComponent(
+            String(gameStatus)
+        );
         const isPending =
             String(gameStatus).trim().toLowerCase() === "pending";
+        const isPaid =
+            String(gameStatus).trim().toLowerCase() === "paid";
 
         const completeGameButton = isPending
             ? `
@@ -931,6 +1031,34 @@ function renderGames(
                 </button>
             `
             : "";
+
+        const gameSelectionCheckbox = isPaid
+            ? ""
+            : `
+                <input
+                    type="checkbox"
+                    class="game-check"
+                    value="${gameId}"
+                    data-association="${encodedAssociation}"
+                    data-status="${encodedGameStatus}"
+                    aria-label="Select game ${gameId}">
+            `;
+
+        const deleteGameButton = isPaid
+            ? ""
+            : `
+                <button
+                    type="button"
+                    class="delete-game-btn"
+                    title="Delete game ${gameId}"
+                    aria-label="Delete game ${gameId}"
+                    onclick="deleteGame(
+                        decodeURIComponent('${encodedAssociation}'),
+                        ${JSON.stringify(gameId)}
+                    )">
+                    <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                </button>
+            `;
 
         const officialsHtml = Array.isArray(game.Officials)
             ? game.Officials
@@ -948,12 +1076,9 @@ function renderGames(
         row.innerHTML = `
             <td class="game-actions-cell">
                 <span class="game-actions">
-                    <input
-                        type="checkbox"
-                        class="game-check"
-                        value="${gameId}"
-                        aria-label="Select game ${gameId}">
+                    ${gameSelectionCheckbox}
                     ${completeGameButton}
+                    ${deleteGameButton}
                 </span>
             </td>
             <td>${gameId}</td>
@@ -1933,16 +2058,49 @@ async function updateSelectedStatus() {
         return;
     }
 
-    const selectedGames = Array.from(
+    const selectedCheckboxes = Array.from(
         document.querySelectorAll(
             ".game-check:checked"
         )
-    ).map(cb => Number(cb.value));
+    );
 
-    if (selectedGames.length === 0) {
+    if (selectedCheckboxes.length === 0) {
         showMessage("Please select at least one game.", "info");
         return;
     }
+
+    if (newStatus === "Delete") {
+        await deleteSelectedGames(selectedCheckboxes);
+        return;
+    }
+
+    const paidCheckboxes = selectedCheckboxes.filter(
+        checkbox =>
+            decodeURIComponent(checkbox.dataset.status || "")
+                .trim()
+                .toLowerCase() === "paid"
+    );
+
+    const updateableCheckboxes = selectedCheckboxes.filter(
+        checkbox =>
+            decodeURIComponent(checkbox.dataset.status || "")
+                .trim()
+                .toLowerCase() !== "paid"
+    );
+
+    if (updateableCheckboxes.length === 0) {
+        showMessage(
+            paidCheckboxes.length === 1
+                ? "The selected game is Paid and its status cannot be changed."
+                : `${paidCheckboxes.length} selected games are Paid and their statuses cannot be changed.`,
+            "error"
+        );
+        return;
+    }
+
+    const selectedGames = updateableCheckboxes.map(
+        checkbox => Number(checkbox.value)
+    );
 
     try {
         const response = await fetch(
@@ -1979,11 +2137,17 @@ async function updateSelectedStatus() {
             await loadPendingGames();
         }
 
+        const updatedMessage = selectedGames.length === 1
+            ? "1 game status updated successfully."
+            : `${selectedGames.length} game statuses updated successfully.`;
+
+        const paidMessage = paidCheckboxes.length === 0
+            ? ""
+            : ` ${paidCheckboxes.length} Paid ${paidCheckboxes.length === 1 ? "game was" : "games were"} not changed.`;
+
         showMessage(
-            selectedGames.length === 1
-                ? "Game status updated successfully."
-                : `${selectedGames.length} game statuses updated successfully.`,
-            "info"
+            updatedMessage + paidMessage,
+            paidCheckboxes.length > 0 ? "error" : "info"
         );
 
     } catch (err) {
@@ -2051,6 +2215,215 @@ function confirmGameCompletion(gameId) {
     );
 
     gameDetails.textContent = `Game ID: ${gameId}`;
+    overlay.classList.add("show");
+
+    return new Promise(resolve => {
+        const closeModal = result => {
+            overlay.classList.remove("show");
+            cancelButton.removeEventListener("click", cancel);
+            confirmButton.removeEventListener("click", confirm);
+            overlay.removeEventListener("click", closeFromBackdrop);
+            document.removeEventListener("keydown", closeFromEscape);
+            resolve(result);
+        };
+
+        const cancel = () => closeModal(false);
+        const confirm = () => closeModal(true);
+        const closeFromBackdrop = event => {
+            if (event.target === overlay) {
+                closeModal(false);
+            }
+        };
+        const closeFromEscape = event => {
+            if (event.key === "Escape") {
+                closeModal(false);
+            }
+        };
+
+        cancelButton.addEventListener("click", cancel);
+        confirmButton.addEventListener("click", confirm);
+        overlay.addEventListener("click", closeFromBackdrop);
+        document.addEventListener("keydown", closeFromEscape);
+        cancelButton.focus();
+    });
+}
+
+async function deleteSelectedGames(selectedCheckboxes) {
+    const selectedGames = selectedCheckboxes.map(checkbox => ({
+        gameId: checkbox.value,
+        association: decodeURIComponent(
+            checkbox.dataset.association || ""
+        ),
+        status: decodeURIComponent(
+            checkbox.dataset.status || ""
+        )
+    }));
+
+    const paidGames = selectedGames.filter(
+        game => game.status.trim().toLowerCase() === "paid"
+    );
+    const gamesToDelete = selectedGames.filter(
+        game => game.status.trim().toLowerCase() !== "paid"
+    );
+
+    if (gamesToDelete.length === 0) {
+        document.getElementById("bulkStatus").value = "";
+        showBulkDeleteResult(0, 0, paidGames.length);
+        return;
+    }
+
+    const confirmed = await confirmBulkGameDeletion(
+        gamesToDelete.length,
+        paidGames.length
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    let deletedCount = 0;
+    let errorCount = 0;
+
+    for (const game of gamesToDelete) {
+        try {
+            const response = await fetch(
+                `/api/deleteGame/` +
+                `${encodeURIComponent(game.association)}/` +
+                `${encodeURIComponent(game.gameId)}`,
+                {
+                    method: "DELETE"
+                }
+            );
+
+            if (response.status === 401) {
+                window.location.href = "/login";
+                return;
+            }
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(
+                    `Failed to delete game ${game.gameId}:`,
+                    errorText
+                );
+                errorCount++;
+                continue;
+            }
+
+            deletedCount++;
+        } catch (err) {
+            console.error(
+                `Failed to delete game ${game.gameId}:`,
+                err
+            );
+            errorCount++;
+        }
+    }
+
+    document.getElementById("bulkStatus").value = "";
+
+    await loadPendingGamesTable();
+
+    if (typeof loadPendingGames === "function") {
+        await loadPendingGames();
+    }
+
+    showBulkDeleteResult(
+        deletedCount,
+        errorCount,
+        paidGames.length
+    );
+}
+
+function showBulkDeleteResult(
+    deletedCount,
+    errorCount,
+    paidCount
+) {
+    const message =
+        `${deletedCount} ${deletedCount === 1 ? "game" : "games"} deleted; ` +
+        `${errorCount} ${errorCount === 1 ? "error" : "errors"}; ` +
+        `${paidCount} paid ${paidCount === 1 ? "game" : "games"} not deleted.`;
+
+    showMessage(
+        message,
+        errorCount > 0 || paidCount > 0 ? "error" : "info"
+    );
+}
+
+async function deleteGame(association, gameId) {
+    const confirmed = await confirmGameDeletion(
+        association,
+        gameId
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `/api/deleteGame/` +
+            `${encodeURIComponent(association)}/` +
+            `${encodeURIComponent(gameId)}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        if (response.status === 401) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            showMessage(
+                "Permission denied. Read-only users cannot delete games.",
+                "error"
+            );
+            return;
+        }
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP ${response.status}`);
+        }
+
+        await loadGames();
+        showMessage(`Game ${gameId} deleted successfully.`, "info");
+    } catch (err) {
+        console.error(err);
+        showMessage(`Failed to delete game ${gameId}.`, "error");
+    }
+}
+
+function confirmGameDeletion(association, gameId) {
+    return showGameDeletionModal(
+        `Association: ${association} — Game ID: ${gameId}`
+    );
+}
+
+function confirmBulkGameDeletion(deleteCount, paidCount) {
+    let details =
+        `${deleteCount} selected ` +
+        `${deleteCount === 1 ? "game" : "games"} will be deleted.`;
+
+    if (paidCount > 0) {
+        details +=
+            ` ${paidCount} paid ` +
+            `${paidCount === 1 ? "game" : "games"} will not be deleted.`;
+    }
+
+    return showGameDeletionModal(details);
+}
+
+function showGameDeletionModal(details) {
+    const overlay = document.getElementById("deletionModalOverlay");
+    const gameDetails = document.getElementById("deletionGameDetails");
+    const cancelButton = document.getElementById("cancelDeletionButton");
+    const confirmButton = document.getElementById("confirmDeletionButton");
+
+    gameDetails.textContent = details;
     overlay.classList.add("show");
 
     return new Promise(resolve => {
