@@ -17,6 +17,7 @@ import (
 	"encoding/hex"
 
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -5612,6 +5613,51 @@ func GetPendingGamesCount(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func SortGamesByDateTime(games []model.HtmlResponse) ([]model.HtmlResponse, error) {
+
+	const dateTimeLayout = "1/2/2006 3:04 PM"
+
+	// Copy the slice so the original order is unchanged.
+	sortedGames := append([]model.HtmlResponse(nil), games...)
+
+	dateTimes := make(map[int64]time.Time, len(sortedGames))
+
+	for _, game := range sortedGames {
+		dateTimeValue := game.Date + " " + game.Time
+
+		parsedDateTime, err := time.Parse(
+			dateTimeLayout,
+			dateTimeValue,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"invalid date/time for game %d (%q): %w",
+				game.GameId,
+				dateTimeValue,
+				err,
+			)
+		}
+
+		dateTimes[game.GameId] = parsedDateTime
+	}
+
+	sort.SliceStable(
+		sortedGames,
+		func(i, j int) bool {
+			firstDateTime := dateTimes[sortedGames[i].GameId]
+			secondDateTime := dateTimes[sortedGames[j].GameId]
+
+			if firstDateTime.Equal(secondDateTime) {
+				return sortedGames[i].GameId < sortedGames[j].GameId
+			}
+
+			return firstDateTime.Before(secondDateTime)
+		},
+	)
+
+	return sortedGames, nil
+}
+
 func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GetGames has been called")
@@ -5836,7 +5882,15 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, game := range games {
+	sortedGames, err := SortGamesByDateTime(games)
+
+	if err != nil {
+		fmt.Println("Sorting failed")
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, game := range sortedGames {
 
 		gameRec := model.GameDescriptor{
 			GameFee:     utils.ConvertInt64ToAmtStr(game.GameFee),
