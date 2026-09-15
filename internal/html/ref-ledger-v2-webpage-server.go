@@ -884,8 +884,6 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"field",
 		"numOfGames",
 		"level",
-		"home",
-		"visitor",
 		"gameFee",
 		"travelPay",
 		"assignorFee",
@@ -897,6 +895,8 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"u2",
 		"eco",
 		"assignor",
+		"home",
+		"visitor",
 	}
 
 	if err := csvWriter.Write(headers); err != nil {
@@ -927,8 +927,6 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"Softball Field",
 		"1",
 		"Varsity",
-		"Mill Creek",
-		"Buford",
 		"$50.00",
 		"$25.00",
 		"$10.00",
@@ -940,6 +938,8 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"Bob Johnson",
 		"Alice Brown",
 		"Charlie Davis",
+		"Mill Creek",
+		"Buford",
 	}
 
 	if err := csvWriter.Write(exampleRow); err != nil {
@@ -5641,12 +5641,14 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	levels := r.URL.Query()["level"]
 	gameId := r.URL.Query().Get("gameId")
 	sites := r.URL.Query()["site"]
+	ecos := r.URL.Query()["eco"]
+	assignors := r.URL.Query()["assignor"]
 	officials := r.URL.Query()["official"]
 	home := r.URL.Query().Get("home")
 	visitor := r.URL.Query().Get("visitor")
 
 	fmt.Println("Statuses:", statuses, "Associations:", associations, "Sports:", sports, "Levels:", levels, "GameId:", gameId, "Sites:", sites, "Official:", officials)
-	fmt.Println("Home:", home, "Visitor:", visitor, "Begin Date:", begindate, "End Date:", enddate)
+	fmt.Println("ECOs:", ecos, "Assignors:", assignors, "Home:", home, "Visitor:", visitor, "Begin Date:", begindate, "End Date:", enddate)
 
 	if begindate == "today" && enddate == "" {
 		enddate = begindate
@@ -5761,8 +5763,18 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			bson.M{"referee": bson.M{"$in": officials}},
 			bson.M{"u1": bson.M{"$in": officials}},
 			bson.M{"u2": bson.M{"$in": officials}},
-			bson.M{"eco": bson.M{"$in": officials}},
-			bson.M{"assignor": bson.M{"$in": officials}},
+		}
+	}
+
+	if len(ecos) > 0 {
+		mongoDbFilter["eco"] = bson.M{
+			"$in": ecos,
+		}
+	}
+
+	if len(assignors) > 0 {
+		mongoDbFilter["assignor"] = bson.M{
+			"$in": assignors,
 		}
 	}
 
@@ -5849,6 +5861,8 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Visitor:     game.Visitor,
 			Status:      game.Status,
 			Association: game.Association,
+			Assignor:    game.Assignor,
+			ECO:         game.ECO,
 		}
 
 		view.GameFee = fmt.Sprintf("$%.2f", float64(gameFee)/100)
