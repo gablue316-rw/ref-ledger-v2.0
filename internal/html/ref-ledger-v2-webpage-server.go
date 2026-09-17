@@ -1492,7 +1492,11 @@ func normalizeSiteId(siteId string) string {
 	return strings.ToLower(strings.TrimSpace(siteId))
 }
 
-func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreviewRow {
+func buildGamePreviewRow(
+	rowNumber int,
+	record []string,
+	tId string,
+) GamePreviewRow {
 
 	row := GamePreviewRow{
 		RowNumber: rowNumber,
@@ -1500,9 +1504,18 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		Errors:    make([]string, 0),
 	}
 
-	// Need to convert the first column to int64 for GameId and NumOfGames
-	gameId, _ := strconv.ParseInt(csvColumn(record, 0), 10, 64)
-	numOfGames, _ := strconv.ParseInt(csvColumn(record, 6), 10, 64)
+	// Convert GameId and NumOfGames to int64.
+	gameId, _ := strconv.ParseInt(
+		csvColumn(record, 0),
+		10,
+		64,
+	)
+
+	numOfGames, _ := strconv.ParseInt(
+		csvColumn(record, 6),
+		10,
+		64,
+	)
 
 	if len(record) != 21 {
 		row.Errors = append(
@@ -1513,8 +1526,10 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 			),
 		)
 
-		/* Still copy any available values so the user can see what was read from the CSV. */
-
+		/*
+			Still copy any available values so the user can see
+			what was read from the CSV.
+		*/
 		row.Data = GameImportData{
 			GameId:      gameId,
 			Date:        csvColumn(record, 1),
@@ -1538,6 +1553,7 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 			Home:        csvColumn(record, 19),
 			Visitor:     csvColumn(record, 20),
 		}
+
 		return row
 	}
 
@@ -1565,16 +1581,63 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		Visitor:     csvColumn(record, 20),
 	}
 
-	// Validate fields
+	/*
+		Validate site.
+	*/
+	_, err := sc.GetSiteId(
+		row.Data.Site,
+		tId,
+	)
 
-	_, err := sc.GetSiteId(row.Data.Site, tId)
 	if err != nil {
 		row.Errors = append(
 			row.Errors,
-			fmt.Sprintf("Error occurred while fetching site ID: %v", err),
+			fmt.Sprintf(
+				"Error occurred while fetching site ID: %v",
+				err,
+			),
 		)
 	}
 
+	/*
+		Validate level.
+	*/
+	levelName := strings.TrimSpace(row.Data.Level)
+
+	if levelName == "" {
+		row.Errors = append(
+			row.Errors,
+			"Level is required",
+		)
+	} else {
+		levelExists, levelErr := lc.LevelExists(
+			tId,
+			levelName,
+		)
+
+		if levelErr != nil {
+			row.Errors = append(
+				row.Errors,
+				fmt.Sprintf(
+					"Error occurred while validating level %q: %v",
+					levelName,
+					levelErr,
+				),
+			)
+		} else if !levelExists {
+			row.Errors = append(
+				row.Errors,
+				fmt.Sprintf(
+					"Level %q does not exist",
+					levelName,
+				),
+			)
+		}
+	}
+
+	/*
+		Validate association.
+	*/
 	exists, err := ac.Exists(
 		row.Data.Association,
 		tId,
@@ -1598,6 +1661,9 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		)
 	}
 
+	/*
+		Validate officials and ECO.
+	*/
 	officials := []struct {
 		role string
 		name string
@@ -1628,7 +1694,10 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 			continue
 		}
 
-		exists, err := oc.Exists(name, tId)
+		exists, err := oc.Exists(
+			name,
+			tId,
+		)
 
 		if err != nil {
 			row.Errors = append(
@@ -1662,6 +1731,9 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 		row.Data.Association,
 	)
 
+	/*
+		Validate assignor unless the game is unassigned.
+	*/
 	if !strings.EqualFold(
 		strings.TrimSpace(row.Data.Assignor),
 		"Unassigned",
@@ -1707,7 +1779,6 @@ func buildGamePreviewRow(rowNumber int, record []string, tId string) GamePreview
 	row.Valid = len(row.Errors) == 0
 
 	return row
-
 }
 
 func buildOfficialPreviewRow(rowNumber int, record []string) OfficialPreviewRow {

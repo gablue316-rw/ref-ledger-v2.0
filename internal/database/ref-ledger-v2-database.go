@@ -4656,6 +4656,62 @@ func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
 	return levels, nil
 }
 
+func (lc *LevelsCollection) LevelExists(
+	tenantId string,
+	levelName string,
+) (bool, error) {
+
+	ctx := context.TODO()
+
+	tenantId = strings.TrimSpace(tenantId)
+	levelName = strings.TrimSpace(levelName)
+
+	if tenantId == "" {
+		return false, fmt.Errorf("tenant ID is required")
+	}
+
+	if levelName == "" {
+		return false, fmt.Errorf("level name is required")
+	}
+
+	filter := bson.M{
+		"tenantId": tenantId,
+		"name":     levelName,
+	}
+
+	fmt.Printf(
+		"Searching for level %q for tenantId %s\n",
+		levelName,
+		tenantId,
+	)
+
+	err := lc.Coll.FindOne(ctx, filter).Err()
+
+	if err == nil {
+		fmt.Printf(
+			"Level %q exists for tenantId %s\n",
+			levelName,
+			tenantId,
+		)
+		return true, nil
+	}
+
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		fmt.Printf(
+			"Level %q does not exist for tenantId %s\n",
+			levelName,
+			tenantId,
+		)
+		return false, nil
+	}
+
+	return false, fmt.Errorf(
+		"failed to verify level %q: %w",
+		levelName,
+		err,
+	)
+}
+
 type Sport struct {
 	ID       string `bson:"id" json:"id"`
 	Name     string `bson:"name" json:"name"`
