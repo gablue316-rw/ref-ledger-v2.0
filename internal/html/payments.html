@@ -501,6 +501,25 @@
                     Registry
                 </button>
 
+                <button
+                    type="button"
+                    id="findPaymentBtn"
+                    class="btn btn-registry"
+                >
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    Find Payment and Associated Games
+                </button>
+
+                <button
+                    type="button"
+                    id="backToCompletedBtn"
+                    class="btn btn-registry"
+                    style="display: none;"
+                >
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Back to Completed Games
+                </button>
+
                 <div
                     class="bulk-controls"
                     id="gameBulkControls"
@@ -532,6 +551,7 @@
         class="table-wrapper"
         id="completedGamesSection"
     >
+    <h2 id="gamesSectionTitle">Completed Games Available for Payment</h2>
     <table class="games-table">
         <thead>
             <tr>
@@ -741,6 +761,9 @@ const selectAllCheckbox =
 const registryBtn =
     document.getElementById("registryBtn");
 
+const findPaymentBtn =
+    document.getElementById("findPaymentBtn");
+
 const closeRegistryBtn =
     document.getElementById("closeRegistryBtn");
 
@@ -774,11 +797,38 @@ const confirmPaymentDeleteBtn =
 const cancelPaymentDeleteBtn =
     document.getElementById("cancelPaymentDeleteBtn");
 
+const backToCompletedBtn =
+    document.getElementById("backToCompletedBtn");
+
 let resetAfterSuccessfulSave = false;
 
 registryBtn.addEventListener(
     "click",
     loadPaymentsRegistry
+);
+
+findPaymentBtn.addEventListener(
+    "click",
+    findPaymentGames
+);
+
+backToCompletedBtn.addEventListener(
+    "click",
+    async function() {
+        resetAfterSuccessfulSave = true;
+        paymentForm.reset();
+        resetAfterSuccessfulSave = false;
+
+        paymentRegistrySection.style.display = "none";
+        completedGamesSection.style.display = "block";
+        gameBulkControls.style.display = "flex";
+        backToCompletedBtn.style.display = "none";
+
+        document.getElementById("gamesSectionTitle").textContent =
+            "Completed Games Available for Payment";
+
+        await loadCompletedGames(true);
+    }
 );
 
 closeRegistryBtn.addEventListener(
@@ -787,6 +837,12 @@ closeRegistryBtn.addEventListener(
         paymentRegistrySection.style.display = "none";
         completedGamesSection.style.display = "block";
         gameBulkControls.style.display = "flex";
+        backToCompletedBtn.style.display = "none";
+
+        document.getElementById("gamesSectionTitle").textContent =
+            "Completed Games Available for Payment";
+
+        loadCompletedGames(false);
 
         messageBox.innerText =
             "Ready to enter payments.";
@@ -1372,7 +1428,10 @@ function updatePaymentRegistryCount() {
 
 function countGameIds(gameIds) {
     if (Array.isArray(gameIds)) {
-        return gameIds.length;
+        return gameIds.reduce(
+            (total, value) => total + countGameIds(value),
+            0
+        );
     }
 
     if (gameIds === null ||
@@ -1382,7 +1441,7 @@ function countGameIds(gameIds) {
     }
 
     return String(gameIds)
-        .split(",")
+        .split(/[;,]/)
         .reduce((count, value) => {
             const gameId = value.trim();
 
@@ -1705,6 +1764,7 @@ async function loadPaymentsRegistry() {
 
         completedGamesSection.style.display = "none";
         gameBulkControls.style.display = "none";
+        backToCompletedBtn.style.display = "none";
         paymentRegistrySection.style.display = "block";
 
         if (payments.length === 0) {
@@ -1734,9 +1794,16 @@ async function loadPaymentsRegistry() {
     }
 }
 
-function renderGames(games) {
+function renderGames(
+    games,
+    options = {}
+) {
     const tbody =
         document.getElementById("gamesBody");
+
+    const selectable = options.selectable !== false;
+    const emptyMessage = options.emptyMessage ||
+        "No completed games are available for payment.";
 
     tbody.innerHTML = "";
 
@@ -1747,7 +1814,7 @@ function renderGames(games) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="17">
-                    No completed games are available for payment.
+                    ${escapeHtml(emptyMessage)}
                 </td>
             </tr>
         `;
@@ -1777,11 +1844,16 @@ function renderGames(games) {
         return `
             <tr>
                 <td>
-                    <input
-                        type="checkbox"
-                        class="game-check"
-                        value="${game.GameId}"
-                    >
+                    ${selectable
+                        ? `
+                            <input
+                                type="checkbox"
+                                class="game-check"
+                                value="${game.GameId}"
+                            >
+                        `
+                        : ""
+                    }
                 </td>
 
                 <td>${game.GameId}</td>
@@ -1813,6 +1885,323 @@ function renderGames(games) {
     tbody.innerHTML = rows;
 }
 
+function normalizeGameIds(gameIds) {
+    const sourceValues = Array.isArray(gameIds)
+        ? gameIds
+        : [gameIds];
+
+    /*
+     * Payment game IDs may be separated by commas or semicolons, including
+     * values such as "777;888". Flatten all supported storage formats before
+     * matching against dashboard game IDs.
+     */
+    const values = sourceValues.flatMap(value =>
+        String(value ?? "").split(/[;,]/)
+    );
+
+    const ids = [];
+
+    values.forEach(value => {
+        const text = String(value).trim();
+
+        if (text === "") {
+            return;
+        }
+
+        const rangeMatch = text.match(/^(\d+)\s*[-–—]\s*(\d+)$/);
+
+        if (rangeMatch) {
+            const first = Number(rangeMatch[1]);
+            const last = Number(rangeMatch[2]);
+            const step = first <= last ? 1 : -1;
+
+            for (
+                let gameId = first;
+                gameId !== last + step;
+                gameId += step
+            ) {
+                ids.push(String(gameId));
+            }
+
+            return;
+        }
+
+        ids.push(text);
+    });
+
+    return ids;
+}
+
+function getPaymentGameIds(payment) {
+    const knownNames = [
+        "GameIds",
+        "GameIDs",
+        "gameIds",
+        "gameids",
+        "GameId",
+        "GameID",
+        "gameId",
+        "gameid",
+        "Games",
+        "games"
+    ];
+
+    const directValue = getPaymentValue(
+        payment,
+        ...knownNames
+    );
+
+    if (
+        directValue !== "" &&
+        directValue !== null &&
+        directValue !== undefined
+    ) {
+        return directValue;
+    }
+
+    const acceptedKeys = new Set([
+        "gameids",
+        "gameid",
+        "games"
+    ]);
+
+    for (const [key, value] of Object.entries(payment || {})) {
+        const normalizedKey = key
+            .toLowerCase()
+            .replace(/[^a-z]/g, "");
+
+        if (
+            acceptedKeys.has(normalizedKey) ||
+            (
+                normalizedKey.includes("game") &&
+                normalizedKey.includes("id")
+            )
+        ) {
+            return value;
+        }
+    }
+
+    return [];
+}
+
+async function findPaymentGames() {
+    const paymentId = document
+        .getElementById("paymentid")
+        .value
+        .trim();
+
+    const association = document
+        .getElementById("association")
+        .value;
+
+    if (paymentId === "") {
+        showMessage(
+            "Enter a Payment ID before selecting Find.",
+            "error"
+        );
+        return;
+    }
+
+    if (association === "") {
+        showMessage(
+            "Select an association before selecting Find.",
+            "error"
+        );
+        return;
+    }
+
+    findPaymentBtn.disabled = true;
+    showMessage("Finding payment and associated games...", "info");
+
+    try {
+        const paymentParams = new URLSearchParams({
+            paymentId,
+            association,
+            t: Date.now().toString()
+        });
+
+        const paymentResponse = await fetch(
+            `/api/payment-registry?${paymentParams.toString()}`
+        );
+
+        if (
+            paymentResponse.status === 401 ||
+            paymentResponse.redirected
+        ) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (!paymentResponse.ok) {
+            const errorText = (await paymentResponse.text()).trim();
+            throw new Error(
+                errorText || `HTTP ${paymentResponse.status}`
+            );
+        }
+
+        const paymentResult = await paymentResponse.json();
+        const payments = Array.isArray(paymentResult)
+            ? paymentResult
+            : (paymentResult?.payments || paymentResult?.Payments || []);
+
+        const payment = payments.find(item => {
+            const foundId = getPaymentValue(
+                item,
+                "PaymentId",
+                "PaymentID",
+                "paymentId",
+                "paymentid"
+            );
+
+            const foundAssociation = getPaymentValue(
+                item,
+                "Association",
+                "association"
+            );
+
+            return String(foundId).trim() === paymentId &&
+                String(foundAssociation).trim() === association;
+        });
+
+        if (!payment) {
+            renderGames([], {
+                selectable: false,
+                emptyMessage:
+                    `No payment ${paymentId} was found for ${association}.`
+            });
+
+            paymentRegistrySection.style.display = "none";
+            completedGamesSection.style.display = "block";
+            gameBulkControls.style.display = "none";
+            backToCompletedBtn.style.display = "inline-block";
+            document.getElementById("gamesSectionTitle").textContent =
+                `Games for Payment ${paymentId} — ${association}`;
+
+            showMessage(
+                `No payment ${paymentId} was found for ${association}.`,
+                "info"
+            );
+            return;
+        }
+
+        const rawGameIds = getPaymentGameIds(payment);
+
+        const normalizedPaymentGameIds = normalizeGameIds(rawGameIds);
+
+        const paymentGameIds = new Set(
+            normalizedPaymentGameIds
+                .map(gameId => Number(gameId))
+                .filter(gameId => Number.isFinite(gameId))
+        );
+
+        if (paymentGameIds.size === 0) {
+            const paymentFields = Object.keys(payment || {}).join(", ");
+
+            renderGames([], {
+                selectable: false,
+                emptyMessage:
+                    "The payment was found, but it did not provide any game IDs."
+            });
+
+            paymentRegistrySection.style.display = "none";
+            completedGamesSection.style.display = "block";
+            gameBulkControls.style.display = "none";
+            backToCompletedBtn.style.display = "inline-block";
+            document.getElementById("gamesSectionTitle").textContent =
+                `Games for Payment ${paymentId} — ${association}`;
+
+            showMessage(
+                `Payment ${paymentId} was found for ${association}, ` +
+                "but no game IDs were returned. " +
+                `Payment fields received: ${paymentFields || "none"}.`,
+                "error"
+            );
+            return;
+        }
+
+        const gamesParams = new URLSearchParams();
+        gamesParams.append("status", "Paid");
+        gamesParams.append("association", association);
+        gamesParams.append("t", Date.now().toString());
+
+        const gamesResponse = await fetch(
+            `/api/dashboard?${gamesParams.toString()}`
+        );
+
+        if (!gamesResponse.ok) {
+            throw new Error(`HTTP ${gamesResponse.status}`);
+        }
+
+        const gamesResult = await gamesResponse.json();
+        const allGames = Array.isArray(gamesResult) ? gamesResult : [];
+
+        const normalizedAssociation =
+            String(association).trim().toLowerCase();
+
+        const paymentGames = allGames.filter(game => {
+            const gameId = game.GameId ?? game.gameId;
+            const gameAssociation =
+                game.Association ?? game.association ?? "";
+
+            return paymentGameIds.has(Number(gameId)) &&
+                String(gameAssociation).trim().toLowerCase() ===
+                    normalizedAssociation;
+        });
+
+        renderGames(paymentGames, {
+            selectable: false,
+            emptyMessage:
+                "The payment was found, but none of its games could be loaded."
+        });
+
+        paymentRegistrySection.style.display = "none";
+        completedGamesSection.style.display = "block";
+        gameBulkControls.style.display = "none";
+        backToCompletedBtn.style.display = "inline-block";
+        document.getElementById("gamesSectionTitle").textContent =
+            `Games for Payment ${paymentId} — ${association}`;
+
+        const missingCount =
+            Math.max(paymentGameIds.size - paymentGames.length, 0);
+
+        let resultMessage =
+            `Payment ${paymentId} found for ${association}. ` +
+            `${paymentGames.length} associated game(s) displayed.`;
+
+        if (missingCount > 0) {
+            resultMessage +=
+                ` ${missingCount} recorded game(s) could not be loaded.`;
+
+            if (paymentGames.length === 0) {
+                const dashboardGameIds = allGames
+                    .map(game => game.GameId ?? game.gameId)
+                    .filter(gameId => gameId !== undefined && gameId !== null);
+
+                resultMessage +=
+                    ` Payment game IDs received: ` +
+                    `${normalizedPaymentGameIds.join(", ") || "none"}. ` +
+                    `Paid ${association} game IDs received: ` +
+                    `${dashboardGameIds.join(", ") || "none"}.`;
+            }
+        }
+
+        showMessage(
+            resultMessage,
+            paymentGames.length === 0
+                ? "error"
+                : (missingCount > 0 ? "info" : "success")
+        );
+    } catch (error) {
+        console.error("Error finding payment games:", error);
+        showMessage(
+            `Unable to find the payment games: ${error.message}`,
+            "error"
+        );
+    } finally {
+        findPaymentBtn.disabled = false;
+    }
+}
+
 function formatCurrency(amount) {
     return Number(amount || 0).toLocaleString(
         "en-US",
@@ -1826,6 +2215,9 @@ function formatCurrency(amount) {
 async function loadCompletedGames(
     displayCountMessage = true
 ) {
+    document.getElementById("gamesSectionTitle").textContent =
+        "Completed Games Available for Payment";
+
     const params =
         new URLSearchParams();
 
