@@ -2750,8 +2750,7 @@ func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 
 func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 
-	var tId string = database.TenantId
-	var err error
+	tId := database.TenantId
 
 	if r.Method != http.MethodPost {
 		writeJSONError(
@@ -2763,10 +2762,15 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if tId == "na" {
-		tId, err = getTenantId(r)
+		var err error
 
+		tId, err = getTenantId(r)
 		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
 			return
 		}
 	}
@@ -2788,8 +2792,12 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	request.PreviewToken = strings.TrimSpace(request.PreviewToken)
-	request.DuplicateAction = strings.ToLower(strings.TrimSpace(request.DuplicateAction))
+	request.PreviewToken =
+		strings.TrimSpace(request.PreviewToken)
+
+	request.DuplicateAction = strings.ToLower(
+		strings.TrimSpace(request.DuplicateAction),
+	)
 
 	if request.PreviewToken == "" {
 		writeJSONError(
@@ -2804,7 +2812,9 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		request.DuplicateAction = "skip"
 	}
 
-	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+	if request.DuplicateAction != "skip" &&
+		request.DuplicateAction != "stop" {
+
 		writeJSONError(
 			w,
 			http.StatusBadRequest,
@@ -2813,7 +2823,9 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	preview, found := getGamesPreview(request.PreviewToken)
+	preview, found :=
+		getGamesPreview(request.PreviewToken)
+
 	if !found {
 		writeJSONError(
 			w,
@@ -2834,6 +2846,7 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 
 	if time.Now().After(preview.ExpiresAt) {
 		deleteGamesPreview(request.PreviewToken)
+
 		writeJSONError(
 			w,
 			http.StatusBadRequest,
@@ -2842,8 +2855,12 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if oc.Coll == nil {
-		log.Printf("CommitGamesImportHandler: games collection is nil")
+	// This must check the games collection, not the officials collection.
+	if gc.Coll == nil {
+		log.Printf(
+			"CommitGamesImportHandler: games collection is nil",
+		)
+
 		writeJSONError(
 			w,
 			http.StatusInternalServerError,
@@ -2855,19 +2872,31 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 	added := 0
 	skipped := 0
 	failed := 0
-	rowResults := make([]GamesCommitRowResult, 0)
+
+	rowResults := make(
+		[]GamesCommitRowResult,
+		0,
+	)
 
 	for _, previewRow := range preview.Rows {
+
 		if !previewRow.Valid {
 			continue
 		}
-		data := previewRow.Data
 
-		exists, err := gc.Exists(data.Association, utils.ConvertInt64ToStr(data.GameId), tId)
+		data := previewRow.Data
+		gameIDText := utils.ConvertInt64ToStr(data.GameId)
+
+		exists, err := gc.Exists(
+			data.Association,
+			gameIDText,
+			tId,
+		)
 
 		if err != nil {
 			log.Printf(
-				"CommitGamesImportHandler: "+"duplicate lookup failed: tenant=%s row=%d game=%d error=%v",
+				"CommitGamesImportHandler: duplicate lookup failed: "+
+					"tenant=%s row=%d game=%d error=%v",
 				tId,
 				previewRow.RowNumber,
 				data.GameId,
@@ -2881,9 +2910,11 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 				GamesCommitRowResult{
 					RowNumber: previewRow.RowNumber,
 					Status:    "failed",
-					Message:   "Unable to check whether the game already exists.",
+					Message: "Unable to check whether " +
+						"the game already exists.",
 				},
 			)
+
 			continue
 		}
 
@@ -2922,17 +2953,55 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			)
 
 			continue
+		}
 
+		/*
+			The CSV contains the site name. Convert it to the
+			stored site ID before constructing the game.
+		*/
+		siteID, err := sc.GetSiteId(
+			data.Site,
+			tId,
+		)
+
+		if err != nil {
+			log.Printf(
+				"CommitGamesImportHandler: site lookup failed: "+
+					"tenant=%s row=%d game=%d site=%q error=%v",
+				tId,
+				previewRow.RowNumber,
+				data.GameId,
+				data.Site,
+				err,
+			)
+
+			failed++
+
+			rowResults = append(
+				rowResults,
+				GamesCommitRowResult{
+					RowNumber: previewRow.RowNumber,
+					Status:    "failed",
+					Message: fmt.Sprintf(
+						"Unable to find site %q.",
+						data.Site,
+					),
+				},
+			)
+
+			continue
 		}
 
 		game := model.GameDescriptor{
-			GameId:      utils.ConvertInt64ToStr(data.GameId),
-			Date:        data.Date,
-			Time:        data.Time,
-			Sport:       data.Sport,
-			Site:        data.Site,
-			Field:       data.Field,
-			NumOfGames:  utils.ConvertInt64ToStr(data.NumOfGames),
+			GameId: gameIDText,
+			Date:   data.Date,
+			Time:   data.Time,
+			Sport:  data.Sport,
+			Site:   siteID,
+			Field:  data.Field,
+			NumOfGames: utils.ConvertInt64ToStr(
+				data.NumOfGames,
+			),
 			Level:       data.Level,
 			Home:        data.Home,
 			Visitor:     data.Visitor,
@@ -2951,7 +3020,9 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 
 		err = gc.Add(tId, game)
 		if err != nil {
+
 			if mongo.IsDuplicateKeyError(err) {
+
 				if request.DuplicateAction == "stop" {
 					writeJSON(
 						w,
@@ -2967,6 +3038,7 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 							Rows: rowResults,
 						},
 					)
+
 					return
 				}
 
@@ -2985,11 +3057,11 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 				)
 
 				continue
-
 			}
 
 			log.Printf(
-				"CommitGamesImportHandler: "+"insert failed: tenant=%s row=%d game=%d error=%v",
+				"CommitGamesImportHandler: insert failed: "+
+					"tenant=%s row=%d game=%d error=%v",
 				tId,
 				previewRow.RowNumber,
 				data.GameId,
@@ -3003,19 +3075,28 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 				GamesCommitRowResult{
 					RowNumber: previewRow.RowNumber,
 					Status:    "failed",
-					Message:   "Unable to insert game.",
+					Message: fmt.Sprintf(
+						"Unable to insert game %d: %v",
+						data.GameId,
+						err,
+					),
 				},
 			)
 
 			continue
 		}
+
 		added++
+
 		rowResults = append(
 			rowResults,
 			GamesCommitRowResult{
 				RowNumber: previewRow.RowNumber,
 				Status:    "added",
-				Message:   fmt.Sprintf("Game %d was added.", data.GameId),
+				Message: fmt.Sprintf(
+					"Game %d was added.",
+					data.GameId,
+				),
 			},
 		)
 	}

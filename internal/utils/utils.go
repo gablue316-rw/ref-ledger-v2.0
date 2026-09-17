@@ -840,6 +840,40 @@ func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
 	return doc
 }
 
+func ConvertDateStringToTime(
+	dateValue string,
+	timeValue string,
+) (time.Time, error) {
+
+	dateValue = strings.TrimSpace(dateValue)
+	timeValue = strings.TrimSpace(timeValue)
+
+	if dateValue == "" {
+		return time.Time{}, fmt.Errorf("game date is required")
+	}
+
+	if timeValue == "" {
+		return time.Time{}, fmt.Errorf("game time is required")
+	}
+
+	dateTimeText := dateValue + " " + timeValue
+
+	gameDateTime, err := time.ParseInLocation(
+		"1/2/2006 3:04 PM",
+		dateTimeText,
+		time.Local,
+	)
+	if err != nil {
+		return time.Time{}, fmt.Errorf(
+			"unable to parse game date and time %q: %w",
+			dateTimeText,
+			err,
+		)
+	}
+
+	return gameDateTime, nil
+}
+
 func CenterText(text string, length int) string {
 
 	midPoint := length / 2

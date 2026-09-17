@@ -3243,19 +3243,42 @@ func (gc *GameCollection) Exists(association string, gameId string, tenantId str
 	return true, nil
 }
 
-func (gc *GameCollection) Add(tenantId string, game model.GameDescriptor) error {
+func (gc *GameCollection) Add(
+	tenantId string,
+	game model.GameDescriptor,
+) error {
 
-	var result *mongo.InsertOneResult
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(
+		context.TODO(),
+		10*time.Second,
+	)
 	defer cancel()
 
 	doc := utils.ConvertGameDescrToGameDoc(game)
 	doc.TenantId = tenantId
 
-	result, gc.LastError = gc.Coll.InsertOne(ctx, doc)
-	if gc.LastError != nil {
-		return fmt.Errorf("Insert failed.  Reason: %v", gc.LastError)
+	gameDateTime, err := utils.ConvertDateStringToTime(
+		game.Date,
+		game.Time,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"invalid game date or time: date=%q time=%q: %w",
+			game.Date,
+			game.Time,
+			err,
+		)
 	}
+
+	doc.GameDateTime = gameDateTime
+
+	result, err := gc.Coll.InsertOne(ctx, doc)
+	if err != nil {
+		gc.LastError = err
+		return fmt.Errorf("insert failed: %w", err)
+	}
+
+	gc.LastError = nil
 	fmt.Println("Inserted ID:", result.InsertedID)
 
 	return nil

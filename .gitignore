@@ -39,3 +39,6 @@ values.yaml.local
 # Report JSON and BSON files
 *Report*.json
 *Report*.bson
+
+# bugs directory
+bugs
