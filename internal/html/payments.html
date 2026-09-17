@@ -544,10 +544,14 @@
                 <th>Field</th>
                 <th>Num of Games</th>
                 <th>Level</th>
+                <th>Home</th>
+                <th>Visitor</th>
                 <th>Game Fee</th>
                 <th>Assoc</th>
                 <th>Status</th>
                 <th>Officials</th>
+                <th>ECO</th>
+                <th>Assignor</th>
             </tr>
         </thead>
 
@@ -1742,7 +1746,7 @@ function renderGames(games) {
     if (!games || games.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="13">
+                <td colspan="17">
                     No completed games are available for payment.
                 </td>
             </tr>
@@ -1788,6 +1792,8 @@ function renderGames(games) {
                 <td>${game.Field}</td>
                 <td>${game.NumOfGames}</td>
                 <td>${game.Level}</td>
+                <td>${game.Home || ""}</td>
+                <td>${game.Visitor || ""}</td>
                 <td>${game.GameFee}</td>
                 <td>${game.Association}</td>
 
@@ -1798,6 +1804,8 @@ function renderGames(games) {
                 </td>
 
                 <td>${officialsHtml}</td>
+                <td>${game.ECO || game.Eco || ""}</td>
+                <td>${game.Assignor || ""}</td>
             </tr>
         `;
     }).join("");
