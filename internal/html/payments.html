@@ -1286,12 +1286,17 @@ selectAllPayments.addEventListener(
     }
 );
 
-async function deleteRegistryPayment(paymentId) {
+async function deleteRegistryPayment(paymentId, association) {
     const params = new URLSearchParams();
 
     params.append(
         "paymentId",
         paymentId
+    );
+
+    params.append(
+        "association",
+        association
     );
 
     return fetch(
@@ -1302,9 +1307,9 @@ async function deleteRegistryPayment(paymentId) {
     );
 }
 
-async function deletePaymentAndHandleResponse(paymentId) {
+async function deletePaymentAndHandleResponse(paymentId, association) {
     const response =
-        await deleteRegistryPayment(paymentId);
+        await deleteRegistryPayment(paymentId, association);
 
     if (
         response.status === 401 ||
@@ -1380,7 +1385,8 @@ deleteSelectedPaymentsBtn.addEventListener(
         for (const checkbox of selected) {
             try {
                 const result = await deletePaymentAndHandleResponse(
-                    checkbox.dataset.paymentId
+                    checkbox.dataset.paymentId,
+                    checkbox.dataset.association
                 );
 
                 if (result.stopped) {
@@ -1565,6 +1571,7 @@ function renderPayments(payments) {
                         type="checkbox"
                         class="payment-select"
                         data-payment-id="${escapeHtml(paymentId)}"
+                        data-association="${escapeHtml(association)}"
                         aria-label="Select payment ${escapeHtml(paymentId)}"
                     >
                 </td>
@@ -1583,6 +1590,7 @@ function renderPayments(payments) {
                         type="button"
                         class="btn-row-delete"
                         data-payment-id="${escapeHtml(paymentId)}"
+                        data-association="${escapeHtml(association)}"
                         title="Delete payment"
                         aria-label="Delete payment ${escapeHtml(paymentId)}"
                     >
@@ -1629,10 +1637,13 @@ function renderPayments(payments) {
                     const paymentId =
                         deleteButton.dataset.paymentId;
 
+                    const association =
+                        deleteButton.dataset.association;
+
                     const confirmed =
                         await confirmPaymentDeletion(
                             "You are about to permanently delete this payment.",
-                            `Payment ID: ${paymentId}`
+                            `Payment ID: ${paymentId} — ${association}`
                         );
 
                     if (!confirmed) {
@@ -1645,7 +1656,8 @@ function renderPayments(payments) {
                     try {
                         const result =
                             await deletePaymentAndHandleResponse(
-                                paymentId
+                                paymentId,
+                                association
                             );
 
                         if (result.stopped) {

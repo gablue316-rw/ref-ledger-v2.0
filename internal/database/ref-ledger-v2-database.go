@@ -668,9 +668,9 @@ func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDesc
 	return paymentRecords, nil
 }
 
-func DeletePayment(paymentId string) error {
+func DeletePayment(paymentId, association string) error {
 
-	doc, err := GetPayment(paymentId)
+	doc, err := GetPayment(paymentId, association)
 	if err != nil {
 		return fmt.Errorf(
 			"DeletePayment failure getting payment: %w",
@@ -1568,7 +1568,7 @@ func GetOfficialsCollection(parentCtx context.Context) ([]model.OfficialDoc, err
 	return results, nil
 }
 
-func GetPayment(paymentId string) (model.PaymentDoc, error) {
+func GetPayment(paymentId, association string) (model.PaymentDoc, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
@@ -1576,8 +1576,9 @@ func GetPayment(paymentId string) (model.PaymentDoc, error) {
 	coll := db.Collection("payments")
 
 	filter := bson.M{
-		"paymentId": paymentId,
-		"tenantId":  TenantId,
+		"paymentId":   paymentId,
+		"association": association,
+		"tenantId":    TenantId,
 	}
 
 	var result model.PaymentDoc

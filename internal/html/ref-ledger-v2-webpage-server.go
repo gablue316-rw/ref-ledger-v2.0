@@ -5025,7 +5025,20 @@ func DeletePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := database.DeletePayment(paymentID)
+	association := strings.TrimSpace(
+		r.URL.Query().Get("association"),
+	)
+
+	if association == "" {
+		http.Error(
+			w,
+			"association is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	err := database.DeletePayment(paymentID, association)
 	if err != nil {
 		http.Error(
 			w,
