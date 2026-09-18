@@ -827,7 +827,14 @@ backToCompletedBtn.addEventListener(
         document.getElementById("gamesSectionTitle").textContent =
             "Completed Games Available for Payment";
 
-        await loadCompletedGames(true);
+        document.getElementById("gamesBody").innerHTML = "";
+
+        showMessage(
+            "Ready to enter games.",
+            "info"
+        );
+
+        await loadCompletedGames(false);
     }
 );
 
