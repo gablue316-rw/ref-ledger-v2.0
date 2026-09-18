@@ -4872,12 +4872,17 @@ func formatCurrency(cents int64) string {
 	return "$" + formatInt64Hundredths(cents)
 }
 
-func GetReconciliationReports(tId string, associations []string) (map[string]model.ReconciliationReportResponse, error) {
+func GetReconciliationReports(
+	tId string,
+	associations []string,
+) (map[string]model.ReconciliationReportResponse, error) {
 
-	reconciliationRecords := make(map[string]model.ReconciliationReport)
 	ctx := context.Background()
 
-	// Remove empty values and duplicates.
+	reconciliationRecords :=
+		make(map[string]model.ReconciliationReport)
+
+	// Remove empty association values and duplicates.
 	selectedAssociations := make([]string, 0, len(associations))
 	seenAssociations := make(map[string]struct{})
 
@@ -4893,82 +4898,19 @@ func GetReconciliationReports(tId string, associations []string) (map[string]mod
 		}
 
 		seenAssociations[associationName] = struct{}{}
+
 		selectedAssociations = append(
 			selectedAssociations,
 			associationName,
 		)
 	}
 
-	if len(selectedAssociations) > 0 {
-		// The user selected specific associations.
-		for _, associationName := range selectedAssociations {
-			reconciliationRecords[associationName] = model.ReconciliationReport{
-				Association: associationName,
-			}
-		}
-	} else {
-		// No associations were selected, so load every association
-		// belonging to this tenant.
-		associationFilter := bson.M{
-			"tenantId": tId,
-		}
+	/*
+		Load payments for the tenant.
 
-		associationsColl :=
-			Client.Database(Database).Collection("associations")
-
-		associationCursor, err :=
-			associationsColl.Find(ctx, associationFilter)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"GetReconciliationReports associations query failed: %w",
-				err,
-			)
-		}
-
-		for associationCursor.Next(ctx) {
-			var associationDoc AssociationDoc
-
-			if err := associationCursor.Decode(&associationDoc); err != nil {
-				associationCursor.Close(ctx)
-
-				return nil, fmt.Errorf(
-					"GetReconciliationReports association decode failed: %w",
-					err,
-				)
-			}
-
-			associationName := strings.TrimSpace(
-				associationDoc.Name,
-			)
-
-			if associationName == "" {
-				continue
-			}
-
-			reconciliationRecords[associationName] =
-				model.ReconciliationReport{
-					Association: associationName,
-				}
-		}
-
-		if err := associationCursor.Err(); err != nil {
-			associationCursor.Close(ctx)
-
-			return nil, fmt.Errorf(
-				"GetReconciliationReports associations cursor failed: %w",
-				err,
-			)
-		}
-
-		if err := associationCursor.Close(ctx); err != nil {
-			return nil, fmt.Errorf(
-				"GetReconciliationReports failed to close associations cursor: %w",
-				err,
-			)
-		}
-	}
-
-	// Load Payments.
+		If associations were selected, only include payments
+		belonging to one of those associations.
+	*/
 	paymentFilter := bson.M{
 		"tenantId": tId,
 	}
@@ -4979,7 +4921,9 @@ func GetReconciliationReports(tId string, associations []string) (map[string]mod
 		}
 	}
 
-	paymentColl := Client.Database(Database).Collection("payments")
+	database := Client.Database(Database)
+	paymentColl := database.Collection("payments")
+	gamesColl := database.Collection("games")
 
 	paymentCursor, err := paymentColl.Find(ctx, paymentFilter)
 	if err != nil {
@@ -4989,32 +4933,29 @@ func GetReconciliationReports(tId string, associations []string) (map[string]mod
 		)
 	}
 
+	defer paymentCursor.Close(ctx)
+
 	for paymentCursor.Next(ctx) {
 		var payment model.PaymentDoc
 
 		if err := paymentCursor.Decode(&payment); err != nil {
-			paymentCursor.Close(ctx)
-
 			return nil, fmt.Errorf(
 				"GetReconciliationReports payment decode failed: %w",
 				err,
 			)
 		}
 
-		record, exists := reconciliationRecords[payment.Association]
-		if !exists {
-			// Ignore games whose association is not in the
-			// associations collection for this tenant.
-			continue
+		// PaymentId is already a string, so use it directly as the map key.
+		paymentKey := payment.PaymentId
+
+		record := model.ReconciliationReport{
+			Association:    payment.Association,
+			PaymentId:      payment.PaymentId,
+			PaymentAmt:     payment.PaymentAmt,
+			PaymentGameIds: payment.GameIds,
 		}
 
-		record.PaymentId = payment.PaymentId
-		record.PaymentAmt = payment.PaymentAmt
-		record.PaymentGameIds = payment.GameIds
-
-		for _, gameID := range record.PaymentGameIds {
-
-			// Load games.
+		for _, gameID := range payment.GameIds {
 			gameFilter := bson.M{
 				"tenantId":    tId,
 				"association": payment.Association,
@@ -5023,60 +4964,69 @@ func GetReconciliationReports(tId string, associations []string) (map[string]mod
 
 			var game model.GameDoc
 
-			gamesColl := Client.Database(Database).Collection("games")
+			err := gamesColl.FindOne(
+				ctx,
+				gameFilter,
+			).Decode(&game)
 
-			err := gamesColl.FindOne(ctx, gameFilter).Decode(&game)
-			if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				// The payment references a game that could not be found.
 				continue
 			}
 
-			record.CalculatedAmt += game.NumOfGames*game.GameFee + game.TravelPay - game.Deductions - game.AssignorFee
+			if err != nil {
+				return nil, fmt.Errorf(
+					"GetReconciliationReports game query failed "+
+						"for payment %s, game %d: %w",
+					payment.PaymentId,
+					gameID,
+					err,
+				)
+			}
+
+			record.CalculatedAmt +=
+				game.NumOfGames*game.GameFee +
+					game.TravelPay -
+					game.Deductions -
+					game.AssignorFee
 		}
 
-		if record.CalculatedAmt == record.PaymentAmt {
+		switch {
+		case record.CalculatedAmt == record.PaymentAmt:
 			record.Status = "Reconciled"
-		} else if record.CalculatedAmt > record.PaymentAmt {
+
+		case record.CalculatedAmt > record.PaymentAmt:
 			record.Status = "Under Paid"
-		} else {
+
+		default:
 			record.Status = "Over Paid"
 		}
 
-		reconciliationRecords[payment.Association] = record
+		reconciliationRecords[paymentKey] = record
 	}
 
 	if err := paymentCursor.Err(); err != nil {
-		paymentCursor.Close(ctx)
-
 		return nil, fmt.Errorf(
-			"GetReconciliationReports games cursor failed: %w",
+			"GetReconciliationReports payment cursor failed: %w",
 			err,
 		)
 	}
 
-	if err := paymentCursor.Close(ctx); err != nil {
-		return nil, fmt.Errorf(
-			"GetReconciliationReports failed to close payment cursor: %w",
-			err,
-		)
-	}
-
-	// Build the web response.
+	// Build the response while retaining the payment ID as the map key.
 	response := make(
 		map[string]model.ReconciliationReportResponse,
 		len(reconciliationRecords),
 	)
 
-	for associationName, record := range reconciliationRecords {
-		if record.PaymentAmt == 0 {
-			continue
-		}
-		response[associationName] =
+	for paymentKey, record := range reconciliationRecords {
+		response[paymentKey] =
 			model.ReconciliationReportResponse{
-				Association:   record.Association,
-				PaymentId:     record.PaymentId,
-				PaymentAmt:    formatCurrency(record.PaymentAmt),
-				CalculatedAmt: formatCurrency(record.CalculatedAmt),
-				Status:        record.Status,
+				Association:    record.Association,
+				PaymentId:      record.PaymentId,
+				PaymentAmt:     formatCurrency(record.PaymentAmt),
+				CalculatedAmt:  formatCurrency(record.CalculatedAmt),
+				PaymentGameIds: record.PaymentGameIds,
+				Status:         record.Status,
 			}
 	}
 
@@ -5621,7 +5571,8 @@ func GetAccountsReceivableReport(
 
 	ctx := context.Background()
 
-	acctsReceivableRecords := make(map[string]model.AccountsReceivableReport)
+	acctsReceivableRecords :=
+		make(map[string]model.AccountsReceivableReport)
 
 	// Remove empty association names and duplicates.
 	selectedAssociations := make([]string, 0, len(associations))
@@ -5639,6 +5590,7 @@ func GetAccountsReceivableReport(
 		}
 
 		seenAssociations[associationName] = struct{}{}
+
 		selectedAssociations = append(
 			selectedAssociations,
 			associationName,
@@ -5649,9 +5601,11 @@ func GetAccountsReceivableReport(
 		// Pre-fill the report with the associations selected
 		// by the customer.
 		for _, associationName := range selectedAssociations {
-			acctsReceivableRecords[associationName] = model.AccountsReceivableReport{
-				Association: associationName,
-			}
+			acctsReceivableRecords[associationName] =
+				model.AccountsReceivableReport{
+					Association: associationName,
+					GameIds:     make([]int64, 0),
+				}
 		}
 	} else {
 		// No associations were selected, so load every
@@ -5684,17 +5638,18 @@ func GetAccountsReceivableReport(
 				)
 			}
 
-			associationName := strings.TrimSpace(
-				associationDoc.Name,
-			)
+			associationName :=
+				strings.TrimSpace(associationDoc.Name)
 
 			if associationName == "" {
 				continue
 			}
 
-			acctsReceivableRecords[associationName] = model.AccountsReceivableReport{
-				Association: associationName,
-			}
+			acctsReceivableRecords[associationName] =
+				model.AccountsReceivableReport{
+					Association: associationName,
+					GameIds:     make([]int64, 0),
+				}
 		}
 
 		if err := associationCursor.Err(); err != nil {
@@ -5714,7 +5669,7 @@ func GetAccountsReceivableReport(
 		}
 	}
 
-	// Load games.
+	// Load completed games.
 	gameFilter := bson.M{
 		"tenantId": tId,
 		"status":   "Completed",
@@ -5726,7 +5681,8 @@ func GetAccountsReceivableReport(
 		}
 	}
 
-	gamesColl := Client.Database(Database).Collection("games")
+	gamesColl :=
+		Client.Database(Database).Collection("games")
 
 	gameCursor, err := gamesColl.Find(ctx, gameFilter)
 	if err != nil {
@@ -5748,16 +5704,29 @@ func GetAccountsReceivableReport(
 			)
 		}
 
-		record, exists := acctsReceivableRecords[game.Association]
+		associationName :=
+			strings.TrimSpace(game.Association)
+
+		record, exists :=
+			acctsReceivableRecords[associationName]
 		if !exists {
 			// Ignore games whose association is not in the
 			// associations collection for this tenant.
 			continue
 		}
 
-		record.AccountsReceivable += game.NumOfGames*game.GameFee + game.TravelPay - game.AssignorFee - game.Deductions
+		record.AccountsReceivable +=
+			game.NumOfGames*game.GameFee +
+				game.TravelPay -
+				game.AssignorFee -
+				game.Deductions
 
-		acctsReceivableRecords[game.Association] = record
+		record.GameIds = append(
+			record.GameIds,
+			game.GameId,
+		)
+
+		acctsReceivableRecords[associationName] = record
 	}
 
 	if err := gameCursor.Err(); err != nil {
@@ -5776,7 +5745,7 @@ func GetAccountsReceivableReport(
 		)
 	}
 
-	// Convert the database totals into values formatted
+	// Convert the database records into values formatted
 	// for the web response.
 	response := make(
 		map[string]model.AccountsReceivableReportResponse,
@@ -5784,10 +5753,15 @@ func GetAccountsReceivableReport(
 	)
 
 	for associationName, record := range acctsReceivableRecords {
-		response[associationName] = model.AccountsReceivableReportResponse{
-			Association:        record.Association,
-			AccountsReceivable: formatCurrency(record.AccountsReceivable),
-		}
+
+		response[associationName] =
+			model.AccountsReceivableReportResponse{
+				Association: record.Association,
+				AccountsReceivable: formatCurrency(
+					record.AccountsReceivable,
+				),
+				GameIds: record.GameIds,
+			}
 	}
 
 	return response, nil
