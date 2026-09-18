@@ -801,6 +801,45 @@ const backToCompletedBtn =
     document.getElementById("backToCompletedBtn");
 
 let resetAfterSuccessfulSave = false;
+let completedGamesTotalCount = 0;
+let completedGamesTotalFees = 0;
+
+function updateCompletedGamesSelectionSummary() {
+    const gameCheckboxes = Array.from(
+        document.querySelectorAll(".game-check")
+    );
+
+    if (completedGamesTotalCount === 0 || gameCheckboxes.length === 0) {
+        document.getElementById("amount").value = "";
+
+        showMessage(
+            "Ready to enter payments.",
+            "info"
+        );
+        return;
+    }
+
+    const selectedCheckboxes = gameCheckboxes.filter(
+        checkbox => checkbox.checked
+    );
+
+    const selectedGameFees = selectedCheckboxes.reduce(
+        (total, checkbox) =>
+            total + Number(checkbox.dataset.gameFee || 0),
+        0
+    );
+
+    document.getElementById("amount").value =
+        selectedGameFees.toFixed(2);
+
+    showMessage(
+        `${completedGamesTotalCount} completed game id(s) available for payment. ` +
+        `Total game fees: ${formatCurrency(completedGamesTotalFees)}.  ` +
+        `${selectedCheckboxes.length} Games selected. ` +
+        `Total Game Fees selected: ${formatCurrency(selectedGameFees)}.`,
+        "info"
+    );
+}
 
 registryBtn.addEventListener(
     "click",
@@ -856,11 +895,13 @@ paymentForm.addEventListener(
     async function(event) {
         event.preventDefault();
 
-        const selectedGameIds = Array.from(
+        const selectedGameCheckboxes = Array.from(
             document.querySelectorAll(
                 ".game-check:checked"
             )
-        ).map(
+        );
+
+        const selectedGameIds = selectedGameCheckboxes.map(
             checkbox => Number(checkbox.value)
         );
 
@@ -884,6 +925,35 @@ paymentForm.addEventListener(
         const association = document
             .getElementById("association")
             .value;
+
+        const selectedAssociations = new Set(
+            selectedGameCheckboxes.map(
+                checkbox => checkbox.dataset.association
+            )
+        );
+
+        if (selectedAssociations.size !== 1) {
+            showMessage(
+                "Selected games must all belong to the same association.",
+                "error"
+            );
+            return;
+        }
+
+        const selectedAssociation =
+            Array.from(selectedAssociations)[0];
+
+        if (
+            association !== "" &&
+            association !== selectedAssociation
+        ) {
+            showMessage(
+                `The selected games belong to ${selectedAssociation}. ` +
+                `Select ${selectedAssociation} as the payment association.`,
+                "error"
+            );
+            return;
+        }
 
         const amount = parseFloat(
             document.getElementById("amount").value
@@ -1068,13 +1138,66 @@ paymentForm.addEventListener(
 selectAllCheckbox.addEventListener(
     "change",
     function() {
-        const gameCheckboxes =
-            document.querySelectorAll(".game-check");
+        const gameCheckboxes = Array.from(
+            document.querySelectorAll(".game-check")
+        );
+
+        if (!selectAllCheckbox.checked) {
+            gameCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+
+            selectAllCheckbox.indeterminate = false;
+            updateCompletedGamesSelectionSummary();
+            return;
+        }
+
+        const alreadySelected = gameCheckboxes.find(
+            checkbox => checkbox.checked
+        );
+
+        const availableAssociations = new Set(
+            gameCheckboxes.map(
+                checkbox => checkbox.dataset.association
+            )
+        );
+
+        if (!alreadySelected && availableAssociations.size > 1) {
+            selectAllCheckbox.checked = false;
+            selectAllCheckbox.indeterminate = false;
+
+            showMessage(
+                "Completed games belong to multiple associations. " +
+                "Select one game first, then Select All will select only games " +
+                "from that association.",
+                "error"
+            );
+            return;
+        }
+
+        const targetAssociation = alreadySelected
+            ? alreadySelected.dataset.association
+            : Array.from(availableAssociations)[0];
+
+        document.getElementById("association").value =
+            targetAssociation;
 
         gameCheckboxes.forEach(checkbox => {
             checkbox.checked =
-                selectAllCheckbox.checked;
+                checkbox.dataset.association === targetAssociation;
         });
+
+        const selectedCount = gameCheckboxes.filter(
+            checkbox => checkbox.checked
+        ).length;
+
+        selectAllCheckbox.checked =
+            selectedCount === gameCheckboxes.length;
+        selectAllCheckbox.indeterminate =
+            selectedCount > 0 &&
+            selectedCount < gameCheckboxes.length;
+
+        updateCompletedGamesSelectionSummary();
     }
 );
 
@@ -1089,6 +1212,36 @@ document
                 )
             ) {
                 return;
+            }
+
+            if (event.target.checked) {
+                const selectedAssociation =
+                    event.target.dataset.association;
+
+                const conflictingSelection = Array.from(
+                    document.querySelectorAll(".game-check:checked")
+                ).find(
+                    checkbox =>
+                        checkbox !== event.target &&
+                        checkbox.dataset.association !== selectedAssociation
+                );
+
+                if (conflictingSelection) {
+                    event.target.checked = false;
+                    updateCompletedGamesSelectionSummary();
+
+                    showMessage(
+                        `You already selected games for ` +
+                        `${conflictingSelection.dataset.association}. ` +
+                        "Games from multiple associations cannot be included " +
+                        "in the same payment.",
+                        "error"
+                    );
+                    return;
+                }
+
+                document.getElementById("association").value =
+                    selectedAssociation;
             }
 
             const gameCheckboxes = Array.from(
@@ -1109,6 +1262,8 @@ document
                 checkedCheckboxes.length > 0 &&
                 checkedCheckboxes.length <
                     gameCheckboxes.length;
+
+            updateCompletedGamesSelectionSummary();
         }
     );
 
@@ -1129,8 +1284,7 @@ paymentForm.addEventListener(
             selectAllCheckbox.indeterminate = false;
 
             if (showResetMessage) {
-                messageBox.innerText =
-                    "Payment form cleared.";
+                updateCompletedGamesSelectionSummary();
             }
         }, 0);
     }
@@ -1840,6 +1994,14 @@ function renderGames(
         const statusClass =
             getStatusClass(game.Status);
 
+        const numericGameFee = Number(
+            String(
+                game.GameFee ??
+                game.gameFee ??
+                0
+            ).replace(/[$,\s]/g, "")
+        ) || 0;
+
         const officialsHtml =
             Array.isArray(game.Officials)
                 ? game.Officials
@@ -1864,6 +2026,8 @@ function renderGames(
                                 type="checkbox"
                                 class="game-check"
                                 value="${game.GameId}"
+                                data-game-fee="${numericGameFee}"
+                                data-association="${escapeHtml(game.Association)}"
                             >
                         `
                         : ""
@@ -2246,6 +2410,8 @@ async function loadCompletedGames(
         );
 
         if (response.status === 404) {
+            completedGamesTotalCount = 0;
+            completedGamesTotalFees = 0;
             renderGames([]);
 
             if (displayCountMessage) {
@@ -2281,14 +2447,15 @@ async function loadCompletedGames(
                 return total + gameFee;
             }, 0)
             : 0;        
+
+        completedGamesTotalCount = games.length;
+        completedGamesTotalFees = totalGameFees;
+
+        renderGames(games);
         
         if (displayCountMessage) {
             if (games.length > 0) {
-                showMessage(
-                    `${games.length} completed game id(s) available for payment. ` +
-                    `Total game fees: ${formatCurrency(totalGameFees)}`,
-                    "info"
-                );
+                updateCompletedGamesSelectionSummary();
             } else {
                 showMessage(
                     "Ready to enter payments.",
@@ -2296,8 +2463,6 @@ async function loadCompletedGames(
                 );
             }
         }
-
-        renderGames(games);
 
     } catch (error) {
         console.error(error);

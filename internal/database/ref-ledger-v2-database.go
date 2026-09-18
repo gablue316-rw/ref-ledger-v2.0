@@ -4847,3 +4847,292 @@ func (sc *SportsCollection) Delete(sportID string, tenantID string) error {
 
 	return nil
 }
+
+func formatInt64Hundredths(value int64) string {
+	sign := ""
+
+	if value < 0 {
+		sign = "-"
+		value = -value
+	}
+
+	return fmt.Sprintf(
+		"%s%d.%02d",
+		sign,
+		value/100,
+		value%100,
+	)
+}
+
+func formatCurrency(cents int64) string {
+	if cents < 0 {
+		return "-$" + formatInt64Hundredths(-cents)
+	}
+
+	return "$" + formatInt64Hundredths(cents)
+}
+
+func GetFinancialReports(tId string, associations []string) (map[string]model.FinancialReportResponse, error) {
+
+	financialRecords := make(map[string]model.FinancialReport)
+	ctx := context.Background()
+
+	// Remove empty values and duplicates.
+	selectedAssociations := make([]string, 0, len(associations))
+	seenAssociations := make(map[string]struct{})
+
+	for _, associationName := range associations {
+		associationName = strings.TrimSpace(associationName)
+
+		if associationName == "" {
+			continue
+		}
+
+		if _, exists := seenAssociations[associationName]; exists {
+			continue
+		}
+
+		seenAssociations[associationName] = struct{}{}
+		selectedAssociations = append(
+			selectedAssociations,
+			associationName,
+		)
+	}
+
+	if len(selectedAssociations) > 0 {
+		// The user selected specific associations.
+		for _, associationName := range selectedAssociations {
+			financialRecords[associationName] = model.FinancialReport{
+				Association: associationName,
+			}
+		}
+	} else {
+		// No associations were selected, so load every association
+		// belonging to this tenant.
+		associationFilter := bson.M{
+			"tenantId": tId,
+		}
+
+		associationsColl :=
+			Client.Database(Database).Collection("associations")
+
+		associationCursor, err :=
+			associationsColl.Find(ctx, associationFilter)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"GetFinancialReports associations query failed: %w",
+				err,
+			)
+		}
+
+		for associationCursor.Next(ctx) {
+			var associationDoc AssociationDoc
+
+			if err := associationCursor.Decode(&associationDoc); err != nil {
+				associationCursor.Close(ctx)
+
+				return nil, fmt.Errorf(
+					"GetFinancialReports association decode failed: %w",
+					err,
+				)
+			}
+
+			associationName := strings.TrimSpace(
+				associationDoc.Name,
+			)
+
+			if associationName == "" {
+				continue
+			}
+
+			financialRecords[associationName] =
+				model.FinancialReport{
+					Association: associationName,
+				}
+		}
+
+		if err := associationCursor.Err(); err != nil {
+			associationCursor.Close(ctx)
+
+			return nil, fmt.Errorf(
+				"GetFinancialReports associations cursor failed: %w",
+				err,
+			)
+		}
+
+		if err := associationCursor.Close(ctx); err != nil {
+			return nil, fmt.Errorf(
+				"GetFinancialReports failed to close associations cursor: %w",
+				err,
+			)
+		}
+	}
+
+	fmt.Printf(
+		"Tenant ID: %q, incoming associations: %#v, selected associations: %#v\n",
+		tId,
+		associations,
+		selectedAssociations,
+	)
+
+	fmt.Printf(
+		"Pre-filled financial records: %#v\n",
+		financialRecords,
+	)
+
+	// Load games.
+	gameFilter := bson.M{
+		"tenantId": tId,
+	}
+
+	if len(selectedAssociations) > 0 {
+		gameFilter["association"] = bson.M{
+			"$in": selectedAssociations,
+		}
+	}
+
+	gamesColl := Client.Database(Database).Collection("games")
+
+	gameCursor, err := gamesColl.Find(ctx, gameFilter)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"GetFinancialReports games query failed: %w",
+			err,
+		)
+	}
+
+	for gameCursor.Next(ctx) {
+		var game model.GameDoc
+
+		if err := gameCursor.Decode(&game); err != nil {
+			gameCursor.Close(ctx)
+
+			return nil, fmt.Errorf(
+				"GetFinancialReports game decode failed: %w",
+				err,
+			)
+		}
+
+		if game.Status != "Paid" {
+			continue
+		}
+
+		record, exists := financialRecords[game.Association]
+		if !exists {
+			// Ignore games whose association is not in the
+			// associations collection for this tenant.
+			continue
+		}
+
+		record.GrossIncome +=
+			game.NumOfGames*game.GameFee +
+				game.TravelPay -
+				game.AssignorFee
+
+		record.TotalDeductions += game.Deductions
+
+		financialRecords[game.Association] = record
+	}
+
+	if err := gameCursor.Err(); err != nil {
+		gameCursor.Close(ctx)
+
+		return nil, fmt.Errorf(
+			"GetFinancialReports games cursor failed: %w",
+			err,
+		)
+	}
+
+	if err := gameCursor.Close(ctx); err != nil {
+		return nil, fmt.Errorf(
+			"GetFinancialReports failed to close games cursor: %w",
+			err,
+		)
+	}
+
+	// Load expenses for every association in the map.
+	expensesColl :=
+		Client.Database(Database).Collection("expenses")
+
+	for associationName, record := range financialRecords {
+		expenseFilter := bson.M{
+			"tenantId":    tId,
+			"association": associationName,
+		}
+
+		expenseCursor, err :=
+			expensesColl.Find(ctx, expenseFilter)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"GetFinancialReports expenses query failed for %s: %w",
+				associationName,
+				err,
+			)
+		}
+
+		for expenseCursor.Next(ctx) {
+			var expense model.ExpenseDoc
+
+			if err := expenseCursor.Decode(&expense); err != nil {
+				expenseCursor.Close(ctx)
+
+				return nil, fmt.Errorf(
+					"GetFinancialReports expense decode failed for %s: %w",
+					associationName,
+					err,
+				)
+			}
+
+			if expense.Type == "Mileage" {
+				record.TotalMileage += expense.Amount
+			} else {
+				record.TotalExpenses += expense.Amount
+			}
+		}
+
+		if err := expenseCursor.Err(); err != nil {
+			expenseCursor.Close(ctx)
+
+			return nil, fmt.Errorf(
+				"GetFinancialReports expenses cursor failed for %s: %w",
+				associationName,
+				err,
+			)
+		}
+
+		if err := expenseCursor.Close(ctx); err != nil {
+			return nil, fmt.Errorf(
+				"GetFinancialReports failed to close expenses cursor for %s: %w",
+				associationName,
+				err,
+			)
+		}
+
+		record.NetIncome =
+			record.GrossIncome -
+				record.TotalExpenses -
+				record.TotalDeductions
+
+		financialRecords[associationName] = record
+	}
+
+	// Build the web response.
+	response := make(
+		map[string]model.FinancialReportResponse,
+		len(financialRecords),
+	)
+
+	for associationName, record := range financialRecords {
+		response[associationName] =
+			model.FinancialReportResponse{
+				Association:     record.Association,
+				GrossIncome:     formatCurrency(record.GrossIncome),
+				TotalExpenses:   formatCurrency(record.TotalExpenses),
+				TotalDeductions: formatCurrency(record.TotalDeductions),
+				NetIncome:       formatCurrency(record.NetIncome),
+				TotalMileage:    formatInt64Hundredths(record.TotalMileage),
+			}
+	}
+
+	return response, nil
+}

@@ -4540,6 +4540,68 @@ func generateGamesReport(gameFilter bson.M) []string {
 
 }
 
+func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GenerateFinancialReport is called")
+	LogVisitor(r)
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tId := database.TenantId
+
+	if tId == "na" {
+		var err error
+
+		tId, err = getTenantId(r)
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	// Supports:
+	// ?association=MSO
+	// ?association=MSO&association=GOLLC
+	associations := r.URL.Query()["association"]
+
+	financialReports, err :=
+		database.GetFinancialReports(tId, associations)
+	if err != nil {
+		fmt.Printf(
+			"GenerateFinancialReport failed: %v\n",
+			err,
+		)
+
+		http.Error(
+			w,
+			"Unable to generate financial report",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	fmt.Println("===== Financial Reports Returned", financialReports, "=====")
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(financialReports); err != nil {
+		fmt.Printf(
+			"GenerateFinancialReport JSON encoding failed: %v\n",
+			err,
+		)
+		return
+	}
+}
+
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("GenerateReport is called")
@@ -6755,8 +6817,8 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/gameStatus.html")
 	}))
 
-	mux.HandleFunc("/reports", authRequired(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./internal/html/reports.html")
+	mux.HandleFunc("/reports_v2", authRequired(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./internal/html/reports_v2.html")
 	}))
 
 	mux.HandleFunc("/games", authRequired(func(w http.ResponseWriter, r *http.Request) {
@@ -6870,6 +6932,7 @@ func main() {
 	mux.HandleFunc("/api/sites-update", authRequired(readOnlyForbidden(UpdateSite)))
 	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))
 	mux.HandleFunc("/api/reports", GenerateReport)
+	mux.HandleFunc("/api/financial-report", GenerateFinancialReport)
 	mux.HandleFunc("/api/game-save", authRequired(readOnlyForbidden(SaveGame)))
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
