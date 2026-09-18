@@ -829,12 +829,7 @@ backToCompletedBtn.addEventListener(
 
         document.getElementById("gamesBody").innerHTML = "";
 
-        showMessage(
-            "Ready to enter games.",
-            "info"
-        );
-
-        await loadCompletedGames(false);
+        await loadCompletedGames(true);
     }
 );
 
@@ -2252,6 +2247,14 @@ async function loadCompletedGames(
 
         if (response.status === 404) {
             renderGames([]);
+
+            if (displayCountMessage) {
+                showMessage(
+                    "Ready to enter payments.",
+                    "info"
+                );
+            }
+
             return;
         }
 
@@ -2280,9 +2283,18 @@ async function loadCompletedGames(
             : 0;        
         
         if (displayCountMessage) {
-            messageBox.innerText =
-                `${games.length} completed game id(s) available for payment. ` +
-                `Total game fees: ${formatCurrency(totalGameFees)}`;
+            if (games.length > 0) {
+                showMessage(
+                    `${games.length} completed game id(s) available for payment. ` +
+                    `Total game fees: ${formatCurrency(totalGameFees)}`,
+                    "info"
+                );
+            } else {
+                showMessage(
+                    "Ready to enter payments.",
+                    "info"
+                );
+            }
         }
 
         renderGames(games);
