@@ -214,9 +214,25 @@
         }
 
         .select-column,
+        .view-games-column,
         .delete-column {
             width: 70px;
             text-align: center !important;
+        }
+
+        .btn-view-games {
+            border: none;
+            background: transparent;
+            color: #2563eb;
+            padding: 6px 9px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .btn-view-games:hover {
+            color: white;
+            background-color: #2563eb;
         }
 
         .btn-row-delete {
@@ -636,6 +652,7 @@
                         <th>Association</th>
                         <th>Amount</th>
                         <th>Game IDs</th>
+                        <th class="view-games-column">Games</th>
                         <th class="delete-column">Delete</th>
                     </tr>
                 </thead>
@@ -1642,7 +1659,7 @@ function renderPayments(payments) {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="7">
+                <td colspan="8">
                     No payments are currently in the registry.
                 </td>
             </tr>
@@ -1734,6 +1751,19 @@ function renderPayments(payments) {
                     ${escapeHtml(displayGameIds)}
                 </td>
 
+                <td class="view-games-column">
+                    <button
+                        type="button"
+                        class="btn-view-games"
+                        data-payment-id="${escapeHtml(paymentId)}"
+                        data-association="${escapeHtml(association)}"
+                        title="View games associated with this payment"
+                        aria-label="View games associated with payment ${escapeHtml(paymentId)}"
+                    >
+                        <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                    </button>
+                </td>
+
                 <td class="delete-column">
                     <button
                         type="button"
@@ -1774,6 +1804,20 @@ function renderPayments(payments) {
             checkbox.addEventListener(
                 "change",
                 updatePaymentSelection
+            );
+        });
+
+    document
+        .querySelectorAll(".btn-view-games")
+        .forEach(function(viewGamesButton) {
+            viewGamesButton.addEventListener(
+                "click",
+                function() {
+                    findPaymentGames(
+                        viewGamesButton.dataset.paymentId,
+                        viewGamesButton.dataset.association
+                    );
+                }
             );
         });
 
@@ -2162,15 +2206,22 @@ function getPaymentGameIds(payment) {
     return [];
 }
 
-async function findPaymentGames() {
-    const paymentId = document
-        .getElementById("paymentid")
-        .value
-        .trim();
+async function findPaymentGames(
+    paymentIdOverride = null,
+    associationOverride = null
+) {
+    const paymentId = typeof paymentIdOverride === "string"
+        ? paymentIdOverride.trim()
+        : document
+            .getElementById("paymentid")
+            .value
+            .trim();
 
-    const association = document
-        .getElementById("association")
-        .value;
+    const association = typeof associationOverride === "string"
+        ? associationOverride.trim()
+        : document
+            .getElementById("association")
+            .value;
 
     if (paymentId === "") {
         showMessage(

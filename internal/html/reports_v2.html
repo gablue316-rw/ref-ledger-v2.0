@@ -334,6 +334,135 @@
         </div>
     </section>
 
+    <section class="report-block" aria-labelledby="expenseReportTitle">
+        <div class="report-block-header">
+            <h2 id="expenseReportTitle">Expense Report</h2>
+            <p>Generate an expense summary for one, multiple, or all associations.</p>
+        </div>
+
+        <div class="report-controls">
+            <div class="filter-group">
+                <label>Associations</label>
+                <div class="checkbox-dropdown" id="expenseAssociationDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('expenseAssociationDropdown')">
+                        <span id="expenseAssociationSummary">All Associations</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="expenseAssociationOptions">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="button"
+                    class="btn btn-create"
+                    onclick="generateExpenseReport()">
+                    Create Report
+                </button>
+
+                <button
+                    type="button"
+                    class="btn btn-clear"
+                    onclick="clearExpenseReport()">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section class="report-block" aria-labelledby="accountsReceivableReportTitle">
+        <div class="report-block-header">
+            <h2 id="accountsReceivableReportTitle">Accounts Receivable</h2>
+            <p>Generate an accounts receivable summary for one, multiple, or all associations.</p>
+        </div>
+
+        <div class="report-controls">
+            <div class="filter-group">
+                <label>Associations</label>
+                <div class="checkbox-dropdown" id="accountsReceivableAssociationDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('accountsReceivableAssociationDropdown')">
+                        <span id="accountsReceivableAssociationSummary">All Associations</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="accountsReceivableAssociationOptions">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="button"
+                    class="btn btn-create"
+                    onclick="generateAccountsReceivableReport()">
+                    Create Report
+                </button>
+
+                <button
+                    type="button"
+                    class="btn btn-clear"
+                    onclick="clearAccountsReceivableReport()">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section class="report-block" aria-labelledby="reconciliationReportTitle">
+        <div class="report-block-header">
+            <h2 id="reconciliationReportTitle">Reconciliation Report</h2>
+            <p>Compare recorded payments with calculated game amounts for one, multiple, or all associations.</p>
+        </div>
+
+        <div class="report-controls">
+            <div class="filter-group">
+                <label>Associations</label>
+                <div class="checkbox-dropdown" id="reconciliationAssociationDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('reconciliationAssociationDropdown')">
+                        <span id="reconciliationAssociationSummary">All Associations</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="reconciliationAssociationOptions">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="button"
+                    class="btn btn-create"
+                    onclick="generateReconciliationReport()">
+                    Create Report
+                </button>
+
+                <button
+                    type="button"
+                    class="btn btn-clear"
+                    onclick="clearReconciliationReport()">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
+
     <!-- REPORT OUTPUT -->
     <div class="report-container">
 
@@ -440,6 +569,34 @@ async function loadAssociations() {
             }))
         );
         setupCheckboxDropdown("financialAssociation");
+
+        fillCheckboxOptions("expenseAssociation", "expenseAssociationOptions",
+            financialAssociations.map(association => ({
+                value: association,
+                text: association
+            }))
+        );
+        setupCheckboxDropdown("expenseAssociation");
+
+        fillCheckboxOptions(
+            "accountsReceivableAssociation",
+            "accountsReceivableAssociationOptions",
+            financialAssociations.map(association => ({
+                value: association,
+                text: association
+            }))
+        );
+        setupCheckboxDropdown("accountsReceivableAssociation");
+
+        fillCheckboxOptions(
+            "reconciliationAssociation",
+            "reconciliationAssociationOptions",
+            financialAssociations.map(association => ({
+                value: association,
+                text: association
+            }))
+        );
+        setupCheckboxDropdown("reconciliationAssociation");
 
     } catch (err) {
         console.error("Error loading associations:", err);
@@ -575,6 +732,208 @@ function renderFinancialReport(report) {
     container.replaceChildren(table);
 }
 
+function renderExpenseReport(report) {
+    const rows = getFinancialReportRows(report)
+        .filter(row => row && typeof row === "object")
+        .sort((a, b) => String(a.association ?? "").localeCompare(
+            String(b.association ?? "")
+        ));
+
+    if (rows.length === 0) {
+        setReportMessage("No expense records were returned.");
+        return;
+    }
+
+    const columns = [
+        { label: "Association", field: "association" },
+        { label: "Food", field: "food" },
+        { label: "Dues", field: "dues" },
+        { label: "Camp Fees", field: "campFees" },
+        { label: "Equipment", field: "equipment" },
+        { label: "Deductions", field: "deductions" },
+        { label: "Total Expenses", field: "totalExpenses" },
+        { label: "Mileage", field: "mileage" }
+    ];
+
+    const totalFields = columns.slice(1).map(column => column.field);
+    const totals = Object.fromEntries(totalFields.map(field => [field, 0]));
+    const table = document.createElement("table");
+    table.className = "financial-report-table";
+
+    const headerRow = table.createTHead().insertRow();
+
+    columns.forEach(column => {
+        const th = document.createElement("th");
+        th.scope = "col";
+        th.textContent = column.label;
+        headerRow.appendChild(th);
+    });
+
+    const tbody = table.createTBody();
+
+    rows.forEach(row => {
+        const tableRow = tbody.insertRow();
+
+        columns.forEach(column => {
+            const cell = tableRow.insertCell();
+
+            if (column.field === "association") {
+                cell.textContent = String(row[column.field] ?? "");
+                return;
+            }
+
+            const value = column.field === "totalExpenses"
+                ? parseReportNumber(row.food) +
+                    parseReportNumber(row.dues) +
+                    parseReportNumber(row.campFees) +
+                    parseReportNumber(row.equipment) +
+                    parseReportNumber(row.deductions)
+                : parseReportNumber(row[column.field]);
+            totals[column.field] += value;
+
+            cell.textContent = column.field === "mileage"
+                ? formatMileage(value)
+                : formatCurrency(value);
+        });
+    });
+
+    const totalRow = table.createTFoot().insertRow();
+    totalRow.insertCell().textContent = "Grand Total";
+
+    totalFields.forEach(field => {
+        const cell = totalRow.insertCell();
+        cell.textContent = field === "mileage"
+            ? formatMileage(totals[field])
+            : formatCurrency(totals[field]);
+    });
+
+    const container = document.getElementById("reportContainer");
+    container.className = "";
+    container.replaceChildren(table);
+}
+
+function renderAccountsReceivableReport(report) {
+    const rows = getFinancialReportRows(report)
+        .filter(row => row && typeof row === "object")
+        .sort((a, b) => String(a.association ?? "").localeCompare(
+            String(b.association ?? "")
+        ));
+
+    if (rows.length === 0) {
+        setReportMessage("No accounts receivable records were returned.");
+        return;
+    }
+
+    const table = document.createElement("table");
+    table.className = "financial-report-table";
+
+    const headerRow = table.createTHead().insertRow();
+
+    ["Association", "Accounts Receivable"].forEach(label => {
+        const th = document.createElement("th");
+        th.scope = "col";
+        th.textContent = label;
+        headerRow.appendChild(th);
+    });
+
+    const tbody = table.createTBody();
+    let grandTotal = 0;
+
+    rows.forEach(row => {
+        const tableRow = tbody.insertRow();
+        const accountsReceivable = parseReportNumber(
+            row.accountsReceivable
+        );
+
+        tableRow.insertCell().textContent = String(
+            row.association ?? ""
+        );
+        tableRow.insertCell().textContent = formatCurrency(
+            accountsReceivable
+        );
+
+        grandTotal += accountsReceivable;
+    });
+
+    const totalRow = table.createTFoot().insertRow();
+    totalRow.insertCell().textContent = "Grand Total";
+    totalRow.insertCell().textContent = formatCurrency(grandTotal);
+
+    const container = document.getElementById("reportContainer");
+    container.className = "";
+    container.replaceChildren(table);
+}
+
+function renderReconciliationReport(report) {
+    const rows = getFinancialReportRows(report)
+        .filter(row => row && typeof row === "object")
+        .sort((a, b) => {
+            const associationCompare = String(a.association ?? "").localeCompare(
+                String(b.association ?? "")
+            );
+
+            if (associationCompare !== 0) return associationCompare;
+
+            return parseReportNumber(a.paymentId) -
+                parseReportNumber(b.paymentId);
+        });
+
+    if (rows.length === 0) {
+        setReportMessage("No reconciliation records were returned.");
+        return;
+    }
+
+    const columns = [
+        { label: "Association", field: "association" },
+        { label: "Payment ID", field: "paymentId" },
+        { label: "Payment Amount", field: "paymentAmt" },
+        { label: "Calculated Amount", field: "calculatedAmt" },
+        { label: "Status", field: "status" }
+    ];
+
+    const table = document.createElement("table");
+    table.className = "financial-report-table";
+
+    const headerRow = table.createTHead().insertRow();
+
+    columns.forEach(column => {
+        const th = document.createElement("th");
+        th.scope = "col";
+        th.textContent = column.label;
+        headerRow.appendChild(th);
+    });
+
+    const tbody = table.createTBody();
+    let totalPaymentAmt = 0;
+    let totalCalculatedAmt = 0;
+
+    rows.forEach(row => {
+        const tableRow = tbody.insertRow();
+        const paymentAmt = parseReportNumber(row.paymentAmt);
+        const calculatedAmt = parseReportNumber(row.calculatedAmt);
+
+        tableRow.insertCell().textContent = String(row.association ?? "");
+        tableRow.insertCell().textContent = String(row.paymentId ?? "");
+        tableRow.insertCell().textContent = formatCurrency(paymentAmt);
+        tableRow.insertCell().textContent = formatCurrency(calculatedAmt);
+        tableRow.insertCell().textContent = String(row.status ?? "");
+
+        totalPaymentAmt += paymentAmt;
+        totalCalculatedAmt += calculatedAmt;
+    });
+
+    const totalRow = table.createTFoot().insertRow();
+    totalRow.insertCell().textContent = "Grand Total";
+    totalRow.insertCell().textContent = "";
+    totalRow.insertCell().textContent = formatCurrency(totalPaymentAmt);
+    totalRow.insertCell().textContent = formatCurrency(totalCalculatedAmt);
+    totalRow.insertCell().textContent = "";
+
+    const container = document.getElementById("reportContainer");
+    container.className = "";
+    container.replaceChildren(table);
+}
+
 
 async function generateFinancialReport() {
 
@@ -618,6 +977,134 @@ async function generateFinancialReport() {
     }
 }
 
+async function generateExpenseReport() {
+
+    const selectedAssociations = selectedValues("expenseAssociation");
+    const allCheckbox = document.querySelector(
+        'input[data-all-for="expenseAssociation"]'
+    );
+
+    const associations = allCheckbox?.checked
+        ? financialAssociations
+        : selectedAssociations;
+
+    const params = new URLSearchParams();
+
+    params.append("type", "Expense");
+
+    associations.forEach(association => params.append("association", association));
+
+    try {
+        setReportMessage("Generating expense report...");
+
+        const response =
+            await fetch(`/api/expense-report?${params.toString()}`);
+
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+            );
+        }
+
+        const report = await response.json();
+        renderExpenseReport(report);
+    }
+    catch (err) {
+        console.error(err);
+        setReportMessage("Failed to generate expense report.\n\n" + err.message);
+    }
+}
+
+async function generateAccountsReceivableReport() {
+
+    const selectedAssociations = selectedValues(
+        "accountsReceivableAssociation"
+    );
+    const allCheckbox = document.querySelector(
+        'input[data-all-for="accountsReceivableAssociation"]'
+    );
+
+    const associations = allCheckbox?.checked
+        ? financialAssociations
+        : selectedAssociations;
+
+    const params = new URLSearchParams();
+
+    params.append("type", "AccountsReceivable");
+
+    associations.forEach(association =>
+        params.append("association", association)
+    );
+
+    try {
+        setReportMessage("Generating accounts receivable report...");
+
+        const response = await fetch(
+            `/api/accounts-receivable-report?${params.toString()}`
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+            );
+        }
+
+        const report = await response.json();
+        renderAccountsReceivableReport(report);
+    }
+    catch (err) {
+        console.error(err);
+        setReportMessage(
+            "Failed to generate accounts receivable report.\n\n" +
+            err.message
+        );
+    }
+}
+
+async function generateReconciliationReport() {
+    const selectedAssociations = selectedValues(
+        "reconciliationAssociation"
+    );
+    const allCheckbox = document.querySelector(
+        'input[data-all-for="reconciliationAssociation"]'
+    );
+
+    const associations = allCheckbox?.checked
+        ? financialAssociations
+        : selectedAssociations;
+
+    const params = new URLSearchParams();
+    params.append("type", "Reconciliation");
+
+    associations.forEach(association =>
+        params.append("association", association)
+    );
+
+    try {
+        setReportMessage("Generating reconciliation report...");
+
+        const response = await fetch(
+            `/api/reconciliation-report?${params.toString()}`
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+            );
+        }
+
+        const report = await response.json();
+        renderReconciliationReport(report);
+    }
+    catch (err) {
+        console.error(err);
+        setReportMessage(
+            "Failed to generate reconciliation report.\n\n" +
+            err.message
+        );
+    }
+}
+
 function clearFinancialReport() {
 
     document.querySelectorAll('input[name="financialAssociation"]').forEach(
@@ -637,6 +1124,76 @@ function clearFinancialReport() {
         ?.setAttribute("aria-expanded", "false");
 
     setReportMessage('Select Financial Report options and click "Create Report".');
+}
+
+function clearExpenseReport() {
+
+    document.querySelectorAll('input[name="expenseAssociation"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+
+    const all = document.querySelector(
+        'input[data-all-for="expenseAssociation"]'
+    );
+
+    if (all) all.checked = true;
+    updateCheckboxSummary("expenseAssociation");
+
+    const dropdown = document.getElementById("expenseAssociationDropdown");
+    dropdown.classList.remove("open");
+    dropdown.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    setReportMessage('Select Expense Report options and click "Create Report".');
+}
+
+function clearAccountsReceivableReport() {
+
+    document.querySelectorAll(
+        'input[name="accountsReceivableAssociation"]'
+    ).forEach(checkbox => checkbox.checked = false);
+
+    const all = document.querySelector(
+        'input[data-all-for="accountsReceivableAssociation"]'
+    );
+
+    if (all) all.checked = true;
+    updateCheckboxSummary("accountsReceivableAssociation");
+
+    const dropdown = document.getElementById(
+        "accountsReceivableAssociationDropdown"
+    );
+    dropdown.classList.remove("open");
+    dropdown.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    setReportMessage(
+        'Select Accounts Receivable options and click "Create Report".'
+    );
+}
+
+function clearReconciliationReport() {
+    document.querySelectorAll(
+        'input[name="reconciliationAssociation"]'
+    ).forEach(checkbox => checkbox.checked = false);
+
+    const all = document.querySelector(
+        'input[data-all-for="reconciliationAssociation"]'
+    );
+
+    if (all) all.checked = true;
+    updateCheckboxSummary("reconciliationAssociation");
+
+    const dropdown = document.getElementById(
+        "reconciliationAssociationDropdown"
+    );
+    dropdown.classList.remove("open");
+    dropdown.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    setReportMessage(
+        'Select Reconciliation Report options and click "Create Report".'
+    );
 }
 
 </script>

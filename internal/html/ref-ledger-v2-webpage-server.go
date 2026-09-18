@@ -4540,6 +4540,130 @@ func generateGamesReport(gameFilter bson.M) []string {
 
 }
 
+func GenerateAccountsReceivableReport(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GenerateAccountsReceivableReport is called")
+	LogVisitor(r)
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tId := database.TenantId
+
+	if tId == "na" {
+		var err error
+
+		tId, err = getTenantId(r)
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	// Supports:
+	// ?association=MSO
+	// ?association=MSO&association=GOLLC
+	associations := r.URL.Query()["association"]
+
+	acctsRecvReports, err :=
+		database.GetAccountsReceivableReport(tId, associations)
+	if err != nil {
+		fmt.Printf(
+			"GenerateAccountsReceivableReport failed: %v\n",
+			err,
+		)
+
+		http.Error(
+			w,
+			"Unable to generate financial report",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	fmt.Println("===== Accounts Receivable Reports Returned", acctsRecvReports, "=====")
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(acctsRecvReports); err != nil {
+		fmt.Printf(
+			"GenerateAccountsReceivableReport JSON encoding failed: %v\n",
+			err,
+		)
+		return
+	}
+}
+
+func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GenerateReconciliationReport is called")
+	LogVisitor(r)
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tId := database.TenantId
+
+	if tId == "na" {
+		var err error
+
+		tId, err = getTenantId(r)
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	// Supports:
+	// ?association=MSO
+	// ?association=MSO&association=GOLLC
+	associations := r.URL.Query()["association"]
+
+	acctsRecvReports, err :=
+		database.GetReconciliationReports(tId, associations)
+	if err != nil {
+		fmt.Printf(
+			"GenerateReconciliationReport failed: %v\n",
+			err,
+		)
+
+		http.Error(
+			w,
+			"Unable to generate financial report",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	fmt.Println("===== Reconciliation Reports Returned", acctsRecvReports, "=====")
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(acctsRecvReports); err != nil {
+		fmt.Printf(
+			"GenerateReconciliationReport JSON encoding failed: %v\n",
+			err,
+		)
+		return
+	}
+}
+
 func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("GenerateFinancialReport is called")
 	LogVisitor(r)
@@ -4596,6 +4720,68 @@ func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(financialReports); err != nil {
 		fmt.Printf(
 			"GenerateFinancialReport JSON encoding failed: %v\n",
+			err,
+		)
+		return
+	}
+}
+
+func GenerateExpenseReport(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GenerateExpenseReport is called")
+	LogVisitor(r)
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tId := database.TenantId
+
+	if tId == "na" {
+		var err error
+
+		tId, err = getTenantId(r)
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	// Supports:
+	// ?association=MSO
+	// ?association=MSO&association=GOLLC
+	associations := r.URL.Query()["association"]
+
+	expenseReports, err :=
+		database.GetExpenseReports(tId, associations)
+	if err != nil {
+		fmt.Printf(
+			"GenerateExpenseReport failed: %v\n",
+			err,
+		)
+
+		http.Error(
+			w,
+			"Unable to generate expense report",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	fmt.Println("===== Expense Reports Returned", expenseReports, "=====")
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(expenseReports); err != nil {
+		fmt.Printf(
+			"GenerateExpenseReport JSON encoding failed: %v\n",
 			err,
 		)
 		return
@@ -6933,6 +7119,9 @@ func main() {
 	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))
 	mux.HandleFunc("/api/reports", GenerateReport)
 	mux.HandleFunc("/api/financial-report", GenerateFinancialReport)
+	mux.HandleFunc("/api/expense-report", GenerateExpenseReport)
+	mux.HandleFunc("/api/accounts-receivable-report", GenerateAccountsReceivableReport)
+	mux.HandleFunc("/api/reconciliation-report", GenerateReconciliationReport)
 	mux.HandleFunc("/api/game-save", authRequired(readOnlyForbidden(SaveGame)))
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)

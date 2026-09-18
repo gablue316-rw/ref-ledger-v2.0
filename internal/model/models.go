@@ -323,3 +323,55 @@ type FinancialReportResponse struct {
 	NetIncome       string `json:"netIncome"`
 	TotalMileage    string `json:"totalMileage"`
 }
+
+type ExpenseReport struct {
+	Association string `json:"association"`
+	Food        int64  `json:"food"`
+	Dues        int64  `json:"dues"`
+	CampFees    int64  `json:"campFees"`
+	Equipment   int64  `json:"equipment"`
+	Mileage     int64  `json:"mileage"`
+	Deductions  int64  `json:"deductions"`
+}
+
+type ExpenseReportResponse struct {
+	Association string `json:"association"`
+	Food        string `json:"food"`
+	Dues        string `json:"dues"`
+	CampFees    string `json:"campFees"`
+	Equipment   string `json:"equipment"`
+	Mileage     string `json:"mileage"`
+	Deductions  string `json:"deductions"`
+}
+
+type AccountsReceivableReport struct {
+	Association        string `json:"association"`
+	AccountsReceivable int64  `json:"accountsReceivable"`
+}
+
+type AccountsReceivableReportResponse struct {
+	Association        string `json:"association"`
+	AccountsReceivable string `json:"accountsReceivable"`
+}
+
+type ReconciliationReport struct {
+	Association    string  `json:"association"`
+	PaymentId      string  `json:"paymentId"`
+	PaymentAmt     int64   `json:"paymentAmt"`
+	CalculatedAmt  int64   `json:"calculatedAmt"`
+	Status         string  `json:"status"`
+	PaymentGameIds []int64 `json:"paymentGameIds"`
+	LinkedGames    []int64 `json:"linkedGames"`
+	UnlinkeGames   []int64 `json:"unlinkedGames"`
+}
+
+type ReconciliationReportResponse struct {
+	Association    string  `json:"association"`
+	PaymentId      string  `json:"paymentId"`
+	PaymentAmt     string  `json:"paymentAmt"`
+	CalculatedAmt  string  `json:"calculatedAmt"`
+	Status         string  `json:"status"`
+	PaymentGameIds []int64 `json:"paymentGameIds"`
+	LinkedGames    []int64 `json:"linkedGames"`
+	UnlinkeGames   []int64 `json:"unlinkedGames"`
+}
