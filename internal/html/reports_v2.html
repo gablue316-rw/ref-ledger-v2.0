@@ -829,7 +829,7 @@ function renderAccountsReceivableReport(report) {
 
     const headerRow = table.createTHead().insertRow();
 
-    ["Association", "Accounts Receivable"].forEach(label => {
+    ["Association", "Game IDs", "Accounts Receivable"].forEach(label => {
         const th = document.createElement("th");
         th.scope = "col";
         th.textContent = label;
@@ -848,6 +848,9 @@ function renderAccountsReceivableReport(report) {
         tableRow.insertCell().textContent = String(
             row.association ?? ""
         );
+        tableRow.insertCell().textContent = Array.isArray(row.gameIds)
+            ? row.gameIds.join(", ")
+            : String(row.gameIds ?? "");
         tableRow.insertCell().textContent = formatCurrency(
             accountsReceivable
         );
@@ -857,6 +860,7 @@ function renderAccountsReceivableReport(report) {
 
     const totalRow = table.createTFoot().insertRow();
     totalRow.insertCell().textContent = "Grand Total";
+    totalRow.insertCell().textContent = "";
     totalRow.insertCell().textContent = formatCurrency(grandTotal);
 
     const container = document.getElementById("reportContainer");
@@ -886,6 +890,7 @@ function renderReconciliationReport(report) {
     const columns = [
         { label: "Association", field: "association" },
         { label: "Payment ID", field: "paymentId" },
+        { label: "Game IDs", field: "gameIds" },
         { label: "Payment Amount", field: "paymentAmt" },
         { label: "Calculated Amount", field: "calculatedAmt" },
         { label: "Status", field: "status" }
@@ -911,9 +916,13 @@ function renderReconciliationReport(report) {
         const tableRow = tbody.insertRow();
         const paymentAmt = parseReportNumber(row.paymentAmt);
         const calculatedAmt = parseReportNumber(row.calculatedAmt);
+        const gameIds = row.gameIds ?? row.paymentGameIds ?? [];
 
         tableRow.insertCell().textContent = String(row.association ?? "");
         tableRow.insertCell().textContent = String(row.paymentId ?? "");
+        tableRow.insertCell().textContent = Array.isArray(gameIds)
+            ? gameIds.join(", ")
+            : String(gameIds);
         tableRow.insertCell().textContent = formatCurrency(paymentAmt);
         tableRow.insertCell().textContent = formatCurrency(calculatedAmt);
         tableRow.insertCell().textContent = String(row.status ?? "");
@@ -924,6 +933,7 @@ function renderReconciliationReport(report) {
 
     const totalRow = table.createTFoot().insertRow();
     totalRow.insertCell().textContent = "Grand Total";
+    totalRow.insertCell().textContent = "";
     totalRow.insertCell().textContent = "";
     totalRow.insertCell().textContent = formatCurrency(totalPaymentAmt);
     totalRow.insertCell().textContent = formatCurrency(totalCalculatedAmt);

@@ -345,13 +345,15 @@ type ExpenseReportResponse struct {
 }
 
 type AccountsReceivableReport struct {
-	Association        string `json:"association"`
-	AccountsReceivable int64  `json:"accountsReceivable"`
+	Association        string  `json:"association"`
+	AccountsReceivable int64   `json:"accountsReceivable"`
+	GameIds            []int64 `json:"gameIds"`
 }
 
 type AccountsReceivableReportResponse struct {
-	Association        string `json:"association"`
-	AccountsReceivable string `json:"accountsReceivable"`
+	Association        string  `json:"association"`
+	AccountsReceivable string  `json:"accountsReceivable"`
+	GameIds            []int64 `json:"gameIds"`
 }
 
 type ReconciliationReport struct {
