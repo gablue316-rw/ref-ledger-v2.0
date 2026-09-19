@@ -4596,6 +4596,22 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
 		return fmt.Errorf("tenant ID is required")
 	}
 
+	gamesFilter := bson.M{
+		"tenantId": tenantID,
+		"level":    levelID,
+	}
+
+	gamesCollection := Client.Database(Database).Collection("games")
+
+	count, err := gamesCollection.CountDocuments(context.Background(), gamesFilter)
+	if err != nil {
+		return fmt.Errorf("failed to query games collection: %w", err)
+	}
+
+	if count > 0 {
+		return fmt.Errorf("Failed to delete level as it is assigned to games.")
+	}
+
 	filter := bson.M{
 		"id":       levelID,
 		"tenantId": tenantID,
@@ -4825,6 +4841,22 @@ func (sc *SportsCollection) Delete(sportID string, tenantID string) error {
 
 	if tenantID == "" {
 		return fmt.Errorf("tenant ID is required")
+	}
+
+	gamesFilter := bson.M{
+		"tenantId": tenantID,
+		"sport":    sportID,
+	}
+
+	gamesCollection := Client.Database(Database).Collection("games")
+
+	count, err := gamesCollection.CountDocuments(context.Background(), gamesFilter)
+	if err != nil {
+		return fmt.Errorf("failed to query games collection: %w", err)
+	}
+
+	if count > 0 {
+		return fmt.Errorf("Failed to delete sport as it is assigned to games.")
 	}
 
 	filter := bson.M{
