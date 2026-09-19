@@ -78,6 +78,7 @@ type PaymentRegistryFilter struct {
 	Date        string
 	Association string
 	Amount      int64
+	GameIds     []int64
 	TenantId    string
 }
 

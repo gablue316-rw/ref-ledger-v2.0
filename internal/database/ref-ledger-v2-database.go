@@ -643,6 +643,12 @@ func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDesc
 		paymentFilter["paymentAmt"] = filter.Amount
 	}
 
+	if len(filter.GameIds) > 0 {
+		paymentFilter["gameIds"] = bson.M{
+			"$in": filter.GameIds,
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 

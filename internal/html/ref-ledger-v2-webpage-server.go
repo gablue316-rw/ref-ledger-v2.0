@@ -5301,6 +5301,106 @@ func DeletePayment(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Payment deleted successfully"))
 }
 
+func ParseGameIds(value string) ([]int64, error) {
+	value = strings.TrimSpace(value)
+
+	if value == "" {
+		return nil, nil
+	}
+
+	gameIds := make([]int64, 0)
+	seen := make(map[int64]struct{})
+
+	parts := strings.Split(value, ",")
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+
+		if part == "" {
+			return nil, fmt.Errorf(
+				"game IDs cannot contain empty values",
+			)
+		}
+
+		/*
+			A hyphen indicates a range, such as 1992-1996.
+		*/
+		if strings.Contains(part, "-") {
+			rangeParts := strings.Split(part, "-")
+
+			if len(rangeParts) != 2 {
+				return nil, fmt.Errorf(
+					"invalid game ID range %q",
+					part,
+				)
+			}
+
+			firstId, err := strconv.ParseInt(
+				strings.TrimSpace(rangeParts[0]),
+				10,
+				64,
+			)
+			if err != nil || firstId <= 0 {
+				return nil, fmt.Errorf(
+					"invalid starting game ID in range %q",
+					part,
+				)
+			}
+
+			lastId, err := strconv.ParseInt(
+				strings.TrimSpace(rangeParts[1]),
+				10,
+				64,
+			)
+			if err != nil || lastId <= 0 {
+				return nil, fmt.Errorf(
+					"invalid ending game ID in range %q",
+					part,
+				)
+			}
+
+			if firstId > lastId {
+				return nil, fmt.Errorf(
+					"game ID range %q must be in ascending order",
+					part,
+				)
+			}
+
+			for gameId := firstId; gameId <= lastId; gameId++ {
+				if _, exists := seen[gameId]; exists {
+					continue
+				}
+
+				seen[gameId] = struct{}{}
+				gameIds = append(gameIds, gameId)
+			}
+
+			continue
+		}
+
+		gameId, err := strconv.ParseInt(
+			part,
+			10,
+			64,
+		)
+		if err != nil || gameId <= 0 {
+			return nil, fmt.Errorf(
+				"invalid game ID %q",
+				part,
+			)
+		}
+
+		if _, exists := seen[gameId]; exists {
+			continue
+		}
+
+		seen[gameId] = struct{}{}
+		gameIds = append(gameIds, gameId)
+	}
+
+	return gameIds, nil
+}
+
 func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 
 	paymentId := strings.TrimSpace(
@@ -5341,6 +5441,18 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 		r.URL.Query().Get("amount"),
 	)
 
+	gameIdsText := strings.TrimSpace(r.URL.Query().Get("gameIdFilter"))
+
+	gameIds, err := ParseGameIds(gameIdsText)
+	if err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
 	var amount int64
 
 	if amountText != "" {
@@ -5375,6 +5487,7 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 		Date:        date,
 		Association: association,
 		Amount:      amount,
+		GameIds:     gameIds,
 		TenantId:    database.TenantId,
 	}
 
