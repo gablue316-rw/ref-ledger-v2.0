@@ -4615,7 +4615,37 @@ func (lc *LevelsCollection) Add(level Level, tenantId string) error {
 		return fmt.Errorf("tenant ID is required")
 	}
 
-	_, err := lc.Coll.InsertOne(
+	duplicateFilter := bson.M{
+		"tenantId": level.TenantID,
+		"$or": bson.A{
+			bson.M{"id": level.ID},
+			bson.M{"name": level.Name},
+		},
+	}
+
+	var existingLevel Level
+
+	err := lc.Coll.FindOne(
+		context.Background(),
+		duplicateFilter,
+	).Decode(&existingLevel)
+
+	if err == nil {
+		return fmt.Errorf(
+			"level %q already exists",
+			level.Name,
+		)
+	}
+
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf(
+			"failed to check for duplicate level %q: %w",
+			level.Name,
+			err,
+		)
+	}
+
+	_, err = lc.Coll.InsertOne(
 		context.Background(),
 		level,
 	)
@@ -4932,6 +4962,7 @@ func (sc *SportsCollection) Add(sport Sport, tenantId string) error {
 
 	sport.ID = strings.TrimSpace(sport.ID)
 	sport.Name = strings.TrimSpace(sport.Name)
+	sport.Active = true
 
 	// Use the authenticated tenant ID.
 	sport.TenantID = strings.TrimSpace(tenantId)
@@ -4948,7 +4979,37 @@ func (sc *SportsCollection) Add(sport Sport, tenantId string) error {
 		return fmt.Errorf("tenant ID is required")
 	}
 
-	_, err := sc.Coll.InsertOne(
+	duplicateFilter := bson.M{
+		"tenantId": sport.TenantID,
+		"$or": bson.A{
+			bson.M{"id": sport.ID},
+			bson.M{"name": sport.Name},
+		},
+	}
+
+	var existingSport Sport
+
+	err := sc.Coll.FindOne(
+		context.Background(),
+		duplicateFilter,
+	).Decode(&existingSport)
+
+	if err == nil {
+		return fmt.Errorf(
+			"sport %q already exists",
+			sport.Name,
+		)
+	}
+
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf(
+			"failed to check for duplicate sport %q: %w",
+			sport.Name,
+			err,
+		)
+	}
+
+	_, err = sc.Coll.InsertOne(
 		context.Background(),
 		sport,
 	)
