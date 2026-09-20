@@ -4530,6 +4530,7 @@ func (uc *UsersCollection) GetNumOfUserAccounts() (int64, error) {
 type Level struct {
 	ID       string `bson:"id" json:"id"`
 	Name     string `bson:"name" json:"name"`
+	Active   bool   `bson:"active" json:"active"`
 	TenantID string `bson:"tenantId" json:"tenantId"`
 }
 
@@ -4552,6 +4553,7 @@ func (lc *LevelsCollection) Add(level Level, tenantId string) error {
 
 	level.ID = strings.TrimSpace(level.ID)
 	level.Name = strings.TrimSpace(level.Name)
+	level.Active = true
 
 	// Use the authenticated tenant ID.
 	level.TenantID = strings.TrimSpace(tenantId)
@@ -4581,6 +4583,84 @@ func (lc *LevelsCollection) Add(level Level, tenantId string) error {
 	}
 
 	return nil
+}
+
+func (lc *LevelsCollection) Activate(level Level, tenantId string) error {
+
+	level.ID = strings.TrimSpace(level.ID)
+	level.Name = strings.TrimSpace(level.Name)
+
+	fmt.Println("Level:", level)
+	filter := bson.M{
+		"id":       level.ID,
+		"tenantId": tenantId,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"active": true,
+		},
+	}
+
+	result, err := lc.Coll.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return fmt.Errorf("Attempt to activate %s failed.  Reason: %s", level.Name, err)
+	}
+
+	fmt.Println("Activate Results: ", result)
+
+	if result.ModifiedCount == 1 {
+		return nil
+	}
+
+	if result.MatchedCount != 1 {
+		return fmt.Errorf("%s not found.", level.Name)
+	}
+
+	if result.MatchedCount == 1 && result.ModifiedCount == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Generic error attempting to activate %s", level.Name)
+
+}
+
+func (lc *LevelsCollection) Deactivate(level Level, tenantId string) error {
+
+	level.ID = strings.TrimSpace(level.ID)
+	level.Name = strings.TrimSpace(level.Name)
+
+	fmt.Println("Level:", level)
+	filter := bson.M{
+		"id":       level.ID,
+		"tenantId": tenantId,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"active": false,
+		},
+	}
+
+	result, err := lc.Coll.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return fmt.Errorf("Attempt to deactivate %s failed.  Reason: %s", level.Name, err)
+	}
+
+	fmt.Println("Deactivate Results: ", result)
+	if result.ModifiedCount == 1 {
+		return nil
+	}
+
+	if result.MatchedCount != 1 {
+		return fmt.Errorf("%s not found.", level.Name)
+	}
+
+	if result.MatchedCount == 1 && result.ModifiedCount == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Generic error attempting to deactivate %s", level.Name)
 }
 
 func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
@@ -4639,12 +4719,16 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
 	return nil
 }
 
-func (lc *LevelsCollection) GetLevels(tenantId string) ([]Level, error) {
+func (lc *LevelsCollection) GetLevels(tenantId string, activeOnly bool) ([]Level, error) {
 
 	ctx := context.TODO()
 
 	filter := bson.M{
 		"tenantId": tenantId,
+	}
+
+	if activeOnly {
+		filter["active"] = true
 	}
 
 	fmt.Println("Searching for Levels for tenantId", tenantId)
@@ -4738,6 +4822,7 @@ func (lc *LevelsCollection) LevelExists(
 type Sport struct {
 	ID       string `bson:"id" json:"id"`
 	Name     string `bson:"name" json:"name"`
+	Active   bool   `bson:"active" json:"active"`
 	TenantID string `bson:"tenantId" json:"tenantId"`
 }
 
@@ -4756,7 +4841,7 @@ func (sc *SportsCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
-func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
+func (sc *SportsCollection) GetSports(tenantId string, activeOnly bool) ([]Sport, error) {
 
 	ctx := context.TODO()
 
@@ -4764,6 +4849,9 @@ func (sc *SportsCollection) GetSports(tenantId string) ([]Sport, error) {
 		"tenantId": tenantId,
 	}
 
+	if activeOnly {
+		filter["active"] = true
+	}
 	fmt.Println("Searching for Sports for tenantId", tenantId)
 
 	opts := options.Find().
@@ -4884,6 +4972,84 @@ func (sc *SportsCollection) Delete(sportID string, tenantID string) error {
 	}
 
 	return nil
+}
+
+func (sc *SportsCollection) Activate(sport Sport, tenantId string) error {
+
+	sport.ID = strings.TrimSpace(sport.ID)
+	sport.Name = strings.TrimSpace(sport.Name)
+
+	fmt.Println("Sport:", sport)
+	filter := bson.M{
+		"id":       sport.ID,
+		"tenantId": tenantId,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"active": true,
+		},
+	}
+
+	result, err := sc.Coll.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return fmt.Errorf("Attempt to activate %s failed.  Reason: %s", sport.Name, err)
+	}
+
+	fmt.Println("Activate Results: ", result)
+
+	if result.ModifiedCount == 1 {
+		return nil
+	}
+
+	if result.MatchedCount != 1 {
+		return fmt.Errorf("%s not found.", sport.Name)
+	}
+
+	if result.MatchedCount == 1 && result.ModifiedCount == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Generic error attempting to activate %s", sport.Name)
+
+}
+
+func (sc *SportsCollection) Deactivate(sport Sport, tenantId string) error {
+
+	sport.ID = strings.TrimSpace(sport.ID)
+	sport.Name = strings.TrimSpace(sport.Name)
+
+	fmt.Println("Sport:", sport)
+	filter := bson.M{
+		"id":       sport.ID,
+		"tenantId": tenantId,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"active": false,
+		},
+	}
+
+	result, err := sc.Coll.UpdateOne(context.Background(), filter, update)
+	if err != nil {
+		return fmt.Errorf("Attempt to deactivate %s failed.  Reason: %s", sport.Name, err)
+	}
+
+	fmt.Println("Deactivate Results: ", result)
+	if result.ModifiedCount == 1 {
+		return nil
+	}
+
+	if result.MatchedCount != 1 {
+		return fmt.Errorf("%s not found.", sport.Name)
+	}
+
+	if result.MatchedCount == 1 && result.ModifiedCount == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("Generic error attempting to deactivate %s", sport.Name)
 }
 
 func formatInt64Hundredths(value int64) string {
