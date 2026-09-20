@@ -59,6 +59,7 @@ type AssignorName struct {
 
 type SiteName struct {
 	Name string `json:"name"`
+	Id   string `json:"id"`
 }
 
 func convertDateStringToTime(date, gameTime string) (time.Time, error) {
@@ -2924,34 +2925,78 @@ func (sc *SiteCollection) GetSiteId(name, tenantId string) (string, error) {
 	return site.Id, nil
 }
 
-func (sc *SiteCollection) GetSiteNames(tenantId string) ([]SiteName, error) {
-	var sites []SiteName = []SiteName{}
+func (sc *SiteCollection) GetSiteNames(
+	tenantId string,
+) ([]SiteName, error) {
+
+	sites := make([]SiteName, 0)
 
 	filter := bson.M{
 		"tenantId": tenantId,
 	}
 
-	fmt.Println("Retrieving site names for tenant:", tenantId)
-	cursor, err := sc.Coll.Find(context.TODO(), filter)
+	fmt.Println(
+		"Retrieving site names for tenant:",
+		tenantId,
+	)
+
+	cursor, err := sc.Coll.Find(
+		context.TODO(),
+		filter,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to query sites.  Reason: %v", err)
+		return nil, fmt.Errorf(
+			"failed to query sites: %w",
+			err,
+		)
 	}
 	defer cursor.Close(context.TODO())
 
-	var totalSites int64 = 0
+	var totalSites int64
+
 	for cursor.Next(context.TODO()) {
 		var doc SiteDoc
+
 		if err := cursor.Decode(&doc); err != nil {
-			return nil, fmt.Errorf("Failed to decode site document.  Reason: %v", err)
+			return nil, fmt.Errorf(
+				"failed to decode site document: %w",
+				err,
+			)
 		}
+
 		totalSites++
 
 		for part := range strings.SplitSeq(doc.Name, ",") {
-			sites = append(sites, SiteName{Name: strings.TrimSpace(part)})
+			siteName := strings.TrimSpace(part)
+
+			if siteName == "" {
+				continue
+			}
+
+			sites = append(
+				sites,
+				SiteName{
+					Name: siteName,
+					Id:   doc.Id,
+				},
+			)
 		}
 	}
 
-	fmt.Println("Total sites found for tenant", tenantId, ":", totalSites)
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf(
+			"failed while reading site documents: %w",
+			err,
+		)
+	}
+
+	fmt.Println(
+		"Total sites found for tenant",
+		tenantId,
+		":",
+		totalSites,
+	)
+
 	return sites, nil
 }
 

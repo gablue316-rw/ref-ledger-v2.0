@@ -7519,16 +7519,25 @@ func main() {
 		),
 	)
 
+	mux.HandleFunc("/home", authRequired(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(
+			w,
+			r,
+			"./internal/html/index.html",
+		)
+	}))
+
 	mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
 
-		http.ServeFile(
+		http.Redirect(
 			w,
 			r,
-			"./internal/html/index.html",
+			"/dashboard",
+			http.StatusSeeOther,
 		)
 	}))
 

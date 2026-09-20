@@ -303,6 +303,26 @@ body {
     cursor: pointer;
 }
 
+.edit-game-btn {
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.edit-game-btn:hover {
+    color: #1d4ed8;
+    transform: scale(1.1);
+}
+
+.edit-game-btn:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
 .game-actions-cell {
     white-space: nowrap;
     text-align: center;
@@ -471,6 +491,78 @@ body {
     background: #15803d;
 }
 
+.edit-game-modal {
+    max-width: 900px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+}
+
+.edit-game-form-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.edit-game-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.edit-game-field label {
+    color: #334155;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.edit-game-field input,
+.edit-game-field select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #0f172a;
+}
+
+.edit-game-field input:focus,
+.edit-game-field select:focus {
+    outline: 2px solid #93c5fd;
+    border-color: #2563eb;
+}
+
+.edit-game-field input[readonly] {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.edit-game-error {
+    display: none;
+    margin: 18px 0 0;
+    padding: 12px;
+    border: 1px solid #fca5a5;
+    border-radius: 7px;
+    background: #fee2e2;
+    color: #991b1b;
+    font-weight: 700;
+}
+
+.save-game-btn {
+    border: 1px solid #2563eb;
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.save-game-btn:hover {
+    border-color: #1d4ed8;
+    background: #1d4ed8;
+}
+
+.save-game-btn:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
 .bulk-controls {
     margin-bottom: 15px;
     display: flex;
@@ -527,6 +619,10 @@ body {
 
     .games-table {
         font-size: 14px;
+    }
+
+    .edit-game-form-grid {
+        grid-template-columns: 1fr;
     }
 }
 </style>
@@ -906,9 +1002,70 @@ body {
     </div>
 </div>
 
+<div
+    id="editGameModalOverlay"
+    class="completion-modal-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="editGameModalTitle">
+    <div class="completion-modal edit-game-modal">
+        <form id="editGameForm">
+            <div class="completion-modal-content">
+                <div class="completion-modal-heading">
+                    <div class="completion-modal-icon">
+                        <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                    </div>
+                    <div>
+                        <h2 id="editGameModalTitle">Update game</h2>
+                        <p>Change the game information, then select Save.</p>
+                    </div>
+                </div>
+
+                <div class="edit-game-form-grid">
+                    <div class="edit-game-field"><label for="editGameId">Game ID</label><input id="editGameId" readonly></div>
+                    <div class="edit-game-field"><label for="editAssociation">Association</label><input id="editAssociation" readonly></div>
+                    <div class="edit-game-field"><label for="editStatus">Status</label><select id="editStatus" required><option>Pending</option><option>Completed</option><option>Paid</option><option>Cancelled</option></select></div>
+                    <div class="edit-game-field"><label for="editDate">Date</label><input type="date" id="editDate" required></div>
+                    <div class="edit-game-field"><label for="editTime">Time</label><input type="time" id="editTime" required></div>
+                    <div class="edit-game-field"><label for="editSport">Sport</label><select id="editSport" required><option value="">Select Sport</option></select></div>
+                    <div class="edit-game-field"><label for="editSite">Site</label><select id="editSite" required><option value="">Select Site</option></select></div>
+                    <div class="edit-game-field"><label for="editField">Field</label><input id="editField"></div>
+                    <div class="edit-game-field"><label for="editLevel">Level</label><select id="editLevel" required><option value="">Select Level</option></select></div>
+                    <div class="edit-game-field"><label for="editHome">Home</label><input id="editHome"></div>
+                    <div class="edit-game-field"><label for="editVisitor">Visitor</label><input id="editVisitor"></div>
+                    <div class="edit-game-field"><label for="editNumOfGames">Number of Games</label><input type="number" min="1" step="1" id="editNumOfGames" required></div>
+                    <div class="edit-game-field"><label for="editGameFee">Game Fee</label><input type="number" min="0" step="0.01" id="editGameFee" required></div>
+                    <div class="edit-game-field"><label for="editTravelPay">Travel Pay</label><input type="number" min="0" step="0.01" id="editTravelPay"></div>
+                    <div class="edit-game-field"><label for="editAssignorFee">Assignor Fee</label><input type="number" min="0" step="0.01" id="editAssignorFee"></div>
+                    <div class="edit-game-field"><label for="editDeductions">Deductions</label><input type="number" min="0" step="0.01" id="editDeductions"></div>
+                    <div class="edit-game-field"><label for="editReferee">Referee</label><select id="editReferee"><option value="">Select Official</option></select></div>
+                    <div class="edit-game-field"><label for="editU1">U1</label><select id="editU1"><option value="">Select Official</option></select></div>
+                    <div class="edit-game-field"><label for="editU2">U2</label><select id="editU2"><option value="">Select Official</option></select></div>
+                    <div class="edit-game-field"><label for="editEco">ECO</label><select id="editEco"><option value="">Select Official</option></select></div>
+                    <div class="edit-game-field"><label for="editAssignor">Assignor</label><select id="editAssignor"><option value="">Select Assignor</option></select></div>
+                </div>
+
+                <div id="editGameError" class="edit-game-error" role="alert"></div>
+            </div>
+
+            <div class="completion-modal-actions">
+                <button type="button" id="cancelEditGameButton" class="completion-modal-cancel">Cancel</button>
+                <button type="submit" id="saveEditGameButton" class="save-game-btn">
+                    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                    Save
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
+let displayedDashboardGames = [];
+let gameBeingEdited = null;
+let dashboardSites = [];
+
 function getStatusClass(status) {
     if (status === "Completed") {
         return "completed";
@@ -964,11 +1121,64 @@ function formatCurrency(amount) {
     );
 }
 
+function populateEditSelect(selectId, records, placeholder, valueProperty = "name") {
+    const select = document.getElementById(selectId);
+
+    if (!select) {
+        return;
+    }
+
+    select.innerHTML = "";
+
+    const placeholderOption = document.createElement("option");
+    placeholderOption.value = "";
+    placeholderOption.textContent = placeholder;
+    select.appendChild(placeholderOption);
+
+    (Array.isArray(records) ? records : []).forEach(record => {
+        const value = typeof record === "string"
+            ? record
+            : record?.[valueProperty] ?? record?.name ?? record?.id ?? "";
+
+        if (!value) {
+            return;
+        }
+
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+    });
+}
+
+function setEditSelectValue(selectId, value) {
+    const select = document.getElementById(selectId);
+    const normalizedValue = String(value ?? "").trim();
+
+    if (!select) {
+        return;
+    }
+
+    const hasValue = Array.from(select.options).some(
+        option => option.value === normalizedValue
+    );
+
+    if (normalizedValue && !hasValue) {
+        const currentOption = document.createElement("option");
+        currentOption.value = normalizedValue;
+        currentOption.textContent = normalizedValue;
+        select.appendChild(currentOption);
+    }
+
+    select.value = normalizedValue;
+}
+
 function renderGames(
     games,
     emptyMessage = "No games were found matching your search criteria.",
     messageType = "info"
 ) {
+    displayedDashboardGames = Array.isArray(games) ? games : [];
     const tbody = document.getElementById("gamesBody");
     const displayedGameCount =
         Array.isArray(games) ? games.length : 0;
@@ -1005,6 +1215,8 @@ function renderGames(
         const row = document.createElement("tr");
 
         const gameId = game.GameId ?? game.gameId ?? "";
+        const encodedGameId = encodeURIComponent(String(gameId))
+            .replace(/'/g, "%27");
         const association =
             game.Association ?? game.association ?? "";
         const encodedAssociation = encodeURIComponent(
@@ -1060,6 +1272,17 @@ function renderGames(
                 </button>
             `;
 
+        const editGameButton = `
+            <button
+                type="button"
+                class="edit-game-btn"
+                title="Update game ${gameId}"
+                aria-label="Update game ${gameId}"
+                onclick="openEditGame(decodeURIComponent('${encodedGameId}'), decodeURIComponent('${encodedAssociation}'))">
+                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+            </button>
+        `;
+
         const officialsHtml = Array.isArray(game.Officials)
             ? game.Officials
                 .map(official => `
@@ -1078,6 +1301,7 @@ function renderGames(
                 <span class="game-actions">
                     ${gameSelectionCheckbox}
                     ${completeGameButton}
+                    ${editGameButton}
                     ${deleteGameButton}
                 </span>
             </td>
@@ -1281,6 +1505,11 @@ async function loadAssignors() {
         }
 
         const assignors = await response.json();
+        populateEditSelect(
+            "editAssignor",
+            assignors,
+            "Select Assignor"
+        );
         const assignorOptions =
             document.getElementById("assignorOptions");
 
@@ -1589,7 +1818,7 @@ async function fetchGames(
 async function loadLevels() {
 
     try {
-        const response = await fetch("/api/loadLevels");
+        const response = await fetch("/api/levels?active=true");
 
         if (!response.ok) {
             const text = await response.text();
@@ -1612,6 +1841,11 @@ async function loadLevels() {
         }
 
         const levels = await response.json();
+        populateEditSelect(
+            "editLevel",
+            levels,
+            "Select Level"
+        );
         const levelOptions =
             document.getElementById("levelOptions");
 
@@ -1834,7 +2068,7 @@ document.addEventListener("keydown", function (event) {
 async function loadSports() {
 
     try {
-        const response = await fetch("/api/loadSports");
+        const response = await fetch("/api/loadSports?active=true");
 
         if (!response.ok) {
             const text = await response.text();
@@ -1857,6 +2091,11 @@ async function loadSports() {
         }
 
         const sports = await response.json();
+        populateEditSelect(
+            "editSport",
+            sports,
+            "Select Sport"
+        );
         const sportOptions = document.getElementById("sportOptions");
 
         sportOptions.innerHTML = "";
@@ -1928,6 +2167,12 @@ async function loadSites() {
         }
 
         const sites = await response.json();
+        dashboardSites = Array.isArray(sites) ? sites : [];
+        populateEditSelect(
+            "editSite",
+            dashboardSites,
+            "Select Site"
+        );
         const siteOptions = document.getElementById("siteOptions");
 
         siteOptions.innerHTML = "";
@@ -1948,7 +2193,7 @@ async function loadSites() {
         allLabel.appendChild(allText);
         siteOptions.appendChild(allLabel);
 
-        sites.forEach(site => {
+        dashboardSites.forEach(site => {
             const label = document.createElement("label");
             label.className = "site-option";
 
@@ -1962,14 +2207,17 @@ async function loadSites() {
             siteOptions.appendChild(label);
         });
 
-        if (sites.length === 0) {
+        if (dashboardSites.length === 0) {
             siteOptions.textContent = "No sites found";
         }
 
         updateDropdownText("site");
 
+        return dashboardSites;
+
     } catch (err) {
         console.error("Error loading sites:", err);
+        return [];
     }
 }
 
@@ -1985,6 +2233,13 @@ async function loadOfficials() {
         }
 
         const officials = await response.json();
+        ["editReferee", "editU1", "editU2", "editEco"].forEach(
+            selectId => populateEditSelect(
+                selectId,
+                officials,
+                "Select Official"
+            )
+        );
         populateOfficialFilter("official", officials);
         populateOfficialFilter("eco", officials);
 
@@ -2247,6 +2502,272 @@ function confirmGameCompletion(gameId) {
         cancelButton.focus();
     });
 }
+
+function gameValue(game, pascalName, camelName = null) {
+    return game?.[pascalName] ?? game?.[camelName ||
+        pascalName.charAt(0).toLowerCase() + pascalName.slice(1)] ?? "";
+}
+
+function currencyInputValue(value) {
+    const parsed = Number(String(value ?? "").replace(/[$,\s]/g, ""));
+    return Number.isFinite(parsed) ? parsed.toFixed(2) : "0.00";
+}
+
+function dateInputValue(value) {
+    const text = String(value || "").trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        return text;
+    }
+
+    const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+\([^)]*\))?$/);
+    return match
+        ? `${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`
+        : "";
+}
+
+function displayDateValue(value) {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match
+        ? `${Number(match[2])}/${Number(match[3])}/${match[1]}`
+        : value;
+}
+
+function timeInputValue(value) {
+    const text = String(value || "").trim();
+
+    if (/^\d{2}:\d{2}$/.test(text)) {
+        return text;
+    }
+
+    const match = text.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+
+    if (!match) {
+        return "";
+    }
+
+    let hours = Number(match[1]);
+    const minutes = match[2];
+    const modifier = match[3].toUpperCase();
+
+    if (modifier === "PM" && hours !== 12) {
+        hours += 12;
+    } else if (modifier === "AM" && hours === 12) {
+        hours = 0;
+    }
+
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+}
+
+async function openEditGame(gameId, association) {
+    gameBeingEdited = displayedDashboardGames.find(game =>
+        String(gameValue(game, "GameId")) === String(gameId) &&
+        String(gameValue(game, "Association")) === String(association)
+    );
+
+    if (!gameBeingEdited) {
+        showMessage(`Game ${gameId} could not be loaded for editing.`, "error");
+        return;
+    }
+
+    const officials = Array.isArray(gameBeingEdited.Officials)
+        ? gameBeingEdited.Officials
+        : [];
+    const officialName = (position, fallbackIndex) => {
+        const match = officials.find(official =>
+            String(
+                official.Position ??
+                official.position ??
+                official.Role ??
+                official.role ??
+                official.Assignment ??
+                official.assignment ??
+                ""
+            ).toLowerCase() ===
+            position.toLowerCase()
+        );
+
+        if (match) {
+            return match.Name ?? match.name ?? "";
+        }
+
+        const fallbackOfficial = officials[fallbackIndex];
+        return fallbackOfficial?.Name ?? fallbackOfficial?.name ?? "";
+    };
+
+    document.getElementById("editGameId").value = gameValue(gameBeingEdited, "GameId");
+    document.getElementById("editAssociation").value = gameValue(gameBeingEdited, "Association");
+    if (dashboardSites.length === 0) {
+        await loadSites();
+    }
+
+    document.getElementById("editStatus").value = gameValue(gameBeingEdited, "Status") || "Pending";
+    document.getElementById("editDate").value = dateInputValue(gameValue(gameBeingEdited, "Date"));
+    document.getElementById("editTime").value = timeInputValue(gameValue(gameBeingEdited, "Time"));
+    setEditSelectValue("editSport", gameValue(gameBeingEdited, "Sport"));
+    const storedSite = String(gameValue(gameBeingEdited, "Site") || "").trim();
+    const normalizedStoredSite = storedSite.toLowerCase();
+    const matchingSite = dashboardSites.find(site => {
+        const siteId = String(site?.id ?? "").trim().toLowerCase();
+        const siteName = String(site?.name ?? "").trim().toLowerCase();
+
+        return siteId === normalizedStoredSite ||
+            siteName === normalizedStoredSite;
+    });
+
+    if (matchingSite) {
+        setEditSelectValue("editSite", matchingSite.name);
+    } else {
+        setEditSelectValue("editSite", "");
+        console.warn(
+            `No site name found for stored site ID: ${storedSite}`
+        );
+    }
+    document.getElementById("editField").value = gameValue(gameBeingEdited, "Field");
+    setEditSelectValue("editLevel", gameValue(gameBeingEdited, "Level"));
+    document.getElementById("editHome").value = gameValue(gameBeingEdited, "Home");
+    document.getElementById("editVisitor").value = gameValue(gameBeingEdited, "Visitor");
+    document.getElementById("editNumOfGames").value = gameValue(gameBeingEdited, "NumOfGames") || 1;
+    document.getElementById("editGameFee").value = currencyInputValue(gameValue(gameBeingEdited, "GameFee"));
+    document.getElementById("editTravelPay").value = currencyInputValue(gameValue(gameBeingEdited, "TravelPay"));
+    document.getElementById("editAssignorFee").value = currencyInputValue(gameValue(gameBeingEdited, "AssignorFee"));
+    document.getElementById("editDeductions").value = currencyInputValue(gameValue(gameBeingEdited, "Deductions"));
+    setEditSelectValue(
+        "editReferee",
+        gameValue(gameBeingEdited, "Referee") ||
+            officialName("referee", 0) ||
+            "Unassigned"
+    );
+    setEditSelectValue(
+        "editU1",
+        gameValue(gameBeingEdited, "U1") ||
+            officialName("u1", 1) ||
+            "Unassigned"
+    );
+    setEditSelectValue(
+        "editU2",
+        gameValue(gameBeingEdited, "U2") ||
+            officialName("u2", 2) ||
+            "Unassigned"
+    );
+    setEditSelectValue(
+        "editEco",
+        gameValue(gameBeingEdited, "ECO", "eco") ||
+            "Unassigned"
+    );
+    setEditSelectValue("editAssignor", gameValue(gameBeingEdited, "Assignor"));
+    document.getElementById("editGameError").style.display = "none";
+    document.getElementById("editGameModalOverlay").classList.add("show");
+    document.getElementById("editTime").focus();
+}
+
+function closeEditGame() {
+    document.getElementById("editGameModalOverlay").classList.remove("show");
+    document.getElementById("editGameForm").reset();
+    document.getElementById("editGameError").style.display = "none";
+    gameBeingEdited = null;
+}
+
+function showEditGameError(message) {
+    const error = document.getElementById("editGameError");
+    error.textContent = message;
+    error.style.display = "block";
+}
+
+async function saveEditedGame(event) {
+    event.preventDefault();
+
+    if (!gameBeingEdited) {
+        return;
+    }
+
+    const gameId = document.getElementById("editGameId").value;
+    const association = document.getElementById("editAssociation").value;
+    const saveButton = document.getElementById("saveEditGameButton");
+    const payload = {
+        gameId: Number(gameId),
+        association,
+        date: document.getElementById("editDate").value,
+        time: document.getElementById("editTime").value.trim(),
+        sport: document.getElementById("editSport").value.trim(),
+        site: document.getElementById("editSite").value.trim(),
+        field: document.getElementById("editField").value.trim(),
+        home: document.getElementById("editHome").value.trim(),
+        visitor: document.getElementById("editVisitor").value.trim(),
+        numOfGames: Number(document.getElementById("editNumOfGames").value),
+        level: document.getElementById("editLevel").value.trim(),
+        gameFee: Number.parseFloat(document.getElementById("editGameFee").value),
+        travelPay: Number.parseFloat(document.getElementById("editTravelPay").value || 0),
+        assignorFee: Number.parseFloat(document.getElementById("editAssignorFee").value || 0),
+        deductions: Number.parseFloat(document.getElementById("editDeductions").value || 0),
+        status: document.getElementById("editStatus").value,
+        referee: document.getElementById("editReferee").value.trim() || "Unassigned",
+        u1: document.getElementById("editU1").value.trim() || "Unassigned",
+        u2: document.getElementById("editU2").value.trim() || "Unassigned",
+        eco: document.getElementById("editEco").value.trim() || "Unassigned",
+        assignor: document.getElementById("editAssignor").value.trim()
+    };
+
+    if (payload.status === "Cancelled") {
+        payload.gameFee = 0;
+        payload.travelPay = 0;
+        payload.assignorFee = 0;
+        payload.deductions = 0;
+    }
+
+    saveButton.disabled = true;
+
+    try {
+        const response = await fetch("/api/game-update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (response.status === 401) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (response.status === 403) {
+            showEditGameError("Permission denied. Read-only users cannot update games.");
+            return;
+        }
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || `HTTP ${response.status}`);
+        }
+
+        closeEditGame();
+        await loadGames();
+
+        if (typeof loadPendingGames === "function") {
+            await loadPendingGames();
+        }
+
+        showMessage(`Game ${gameId} updated successfully.`, "info");
+    } catch (err) {
+        console.error("Failed to update game:", err);
+        showEditGameError(err.message || `Failed to update game ${gameId}.`);
+    } finally {
+        saveButton.disabled = false;
+    }
+}
+
+document.getElementById("editGameForm").addEventListener("submit", saveEditedGame);
+document.getElementById("cancelEditGameButton").addEventListener("click", closeEditGame);
+document.getElementById("editGameModalOverlay").addEventListener("click", event => {
+    if (event.target === event.currentTarget) {
+        closeEditGame();
+    }
+});
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape" &&
+        document.getElementById("editGameModalOverlay").classList.contains("show")) {
+        closeEditGame();
+    }
+});
 
 async function deleteSelectedGames(selectedCheckboxes) {
     const selectedGames = selectedCheckboxes.map(checkbox => ({
