@@ -335,7 +335,7 @@ async function loadAssociations() {
 
 async function loadLevels() {
     try {
-        const response = await fetch("/api/loadLevels");
+        const response = await fetch("/api/levels?active=true")
 
         if (!response.ok) {
             throw new Error("Failed to load levels");
@@ -406,7 +406,7 @@ async function loadSites() {
 
 async function loadSports() {
     try {
-        const response = await fetch("/api/loadSports");
+        const response = await fetch("/api/loadSports?active=true");
 
         if (!response.ok) {
             throw new Error("Failed to load sports");

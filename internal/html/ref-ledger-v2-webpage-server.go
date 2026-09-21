@@ -530,23 +530,46 @@ func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if tId == "na" {
 		tId, err = getTenantId(r)
-
 		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
 			return
 		}
 	}
 
-	levels, err := lc.GetLevels(tId)
+	/*
+		/api/levels returns every level.
+		/api/levels?active=true returns only active levels.
+	*/
+	activeOnly := r.URL.Query().Get("active") == "true"
+
+	levels, err := lc.GetLevels(tId, activeOnly)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
-	fmt.Println("Number of levels returned", len(levels), "for tenantId", tId)
+	fmt.Println(
+		"Number of levels returned",
+		len(levels),
+		"for tenantId",
+		tId,
+		"activeOnly",
+		activeOnly,
+	)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(levels)
+
+	if err := json.NewEncoder(w).Encode(levels); err != nil {
+		fmt.Println("Unable to encode levels:", err)
+	}
 }
 
 func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
@@ -571,13 +594,26 @@ func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sports, err := spc.GetSports(tId)
+	/*
+		/api/sports returns every sports.
+		/api/sports?active=true returns only active sports.
+	*/
+	activeOnly := r.URL.Query().Get("active") == "true"
+
+	sports, err := spc.GetSports(tId, activeOnly)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Println("Number of sports returned", len(sports), "for tenantId", tId)
+	fmt.Println(
+		"Number of sports returned",
+		len(sports),
+		"for tenantId",
+		tId,
+		"activeOnly",
+		activeOnly,
+	)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(sports)
@@ -5301,6 +5337,106 @@ func DeletePayment(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Payment deleted successfully"))
 }
 
+func ParseGameIds(value string) ([]int64, error) {
+	value = strings.TrimSpace(value)
+
+	if value == "" {
+		return nil, nil
+	}
+
+	gameIds := make([]int64, 0)
+	seen := make(map[int64]struct{})
+
+	parts := strings.Split(value, ",")
+
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+
+		if part == "" {
+			return nil, fmt.Errorf(
+				"game IDs cannot contain empty values",
+			)
+		}
+
+		/*
+			A hyphen indicates a range, such as 1992-1996.
+		*/
+		if strings.Contains(part, "-") {
+			rangeParts := strings.Split(part, "-")
+
+			if len(rangeParts) != 2 {
+				return nil, fmt.Errorf(
+					"invalid game ID range %q",
+					part,
+				)
+			}
+
+			firstId, err := strconv.ParseInt(
+				strings.TrimSpace(rangeParts[0]),
+				10,
+				64,
+			)
+			if err != nil || firstId <= 0 {
+				return nil, fmt.Errorf(
+					"invalid starting game ID in range %q",
+					part,
+				)
+			}
+
+			lastId, err := strconv.ParseInt(
+				strings.TrimSpace(rangeParts[1]),
+				10,
+				64,
+			)
+			if err != nil || lastId <= 0 {
+				return nil, fmt.Errorf(
+					"invalid ending game ID in range %q",
+					part,
+				)
+			}
+
+			if firstId > lastId {
+				return nil, fmt.Errorf(
+					"game ID range %q must be in ascending order",
+					part,
+				)
+			}
+
+			for gameId := firstId; gameId <= lastId; gameId++ {
+				if _, exists := seen[gameId]; exists {
+					continue
+				}
+
+				seen[gameId] = struct{}{}
+				gameIds = append(gameIds, gameId)
+			}
+
+			continue
+		}
+
+		gameId, err := strconv.ParseInt(
+			part,
+			10,
+			64,
+		)
+		if err != nil || gameId <= 0 {
+			return nil, fmt.Errorf(
+				"invalid game ID %q",
+				part,
+			)
+		}
+
+		if _, exists := seen[gameId]; exists {
+			continue
+		}
+
+		seen[gameId] = struct{}{}
+		gameIds = append(gameIds, gameId)
+	}
+
+	return gameIds, nil
+}
+
 func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 
 	paymentId := strings.TrimSpace(
@@ -5341,6 +5477,18 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 		r.URL.Query().Get("amount"),
 	)
 
+	gameIdsText := strings.TrimSpace(r.URL.Query().Get("gameIdFilter"))
+
+	gameIds, err := ParseGameIds(gameIdsText)
+	if err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
 	var amount int64
 
 	if amountText != "" {
@@ -5375,6 +5523,7 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 		Date:        date,
 		Association: association,
 		Amount:      amount,
+		GameIds:     gameIds,
 		TenantId:    database.TenantId,
 	}
 
@@ -6817,6 +6966,210 @@ func AddLevel(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func ActivateSport(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tenantId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to determine tenant ID",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	var sport database.Sport
+
+	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
+		http.Error(
+			w,
+			"Invalid level data",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := spc.Activate(sport, tenantId); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Sport activated successfully.",
+	})
+}
+
+func DeactivateSport(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tenantId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to determine tenant ID",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	var sport database.Sport
+
+	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
+		http.Error(
+			w,
+			"Invalid level data",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := spc.Deactivate(sport, tenantId); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Sport deactivated successfully.",
+	})
+}
+
+func ActivateLevel(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tenantId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to determine tenant ID",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	var level database.Level
+
+	if err := json.NewDecoder(r.Body).Decode(&level); err != nil {
+		http.Error(
+			w,
+			"Invalid level data",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := lc.Activate(level, tenantId); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Level activated successfully.",
+	})
+}
+
+func DeactivateLevel(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tenantId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Unable to determine tenant ID",
+			http.StatusUnauthorized,
+		)
+		return
+	}
+
+	var level database.Level
+
+	if err := json.NewDecoder(r.Body).Decode(&level); err != nil {
+		http.Error(
+			w,
+			"Invalid level data",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if err := lc.Deactivate(level, tenantId); err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Level deactivated successfully.",
+	})
+}
+
 func LevelsHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
@@ -7070,7 +7423,10 @@ func main() {
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
 	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficials)
-	//mux.HandleFunc("/api/deleteAssociation/{assocId}", DeleteAssociation)
+	mux.HandleFunc("/api/sport-active", ActivateSport)
+	mux.HandleFunc("/api/sport-inactive", DeactivateSport)
+	mux.HandleFunc("/api/level-active", ActivateLevel)
+	mux.HandleFunc("/api/level-inactive", DeactivateLevel)
 
 	mux.HandleFunc("/api/import/officials/template", authRequired(readOnlyForbidden(DownloadOfficialsTemplateHandler)))
 	mux.HandleFunc("/api/import/associations/template", authRequired(readOnlyForbidden(DownloadAssociationsTemplateHandler)))
@@ -7163,16 +7519,25 @@ func main() {
 		),
 	)
 
+	mux.HandleFunc("/home", authRequired(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(
+			w,
+			r,
+			"./internal/html/index.html",
+		)
+	}))
+
 	mux.Handle("/", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
 
-		http.ServeFile(
+		http.Redirect(
 			w,
 			r,
-			"./internal/html/index.html",
+			"/dashboard",
+			http.StatusSeeOther,
 		)
 	}))
 

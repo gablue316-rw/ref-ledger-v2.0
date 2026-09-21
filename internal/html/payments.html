@@ -58,6 +58,78 @@
             margin-bottom: 20px;
         }
 
+        .payment-workspace {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: start;
+        }
+
+        .payment-workspace .form-card {
+            margin-bottom: 0;
+            height: 100%;
+        }
+
+        .card-title {
+            color: #0f2747;
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .card-help {
+            color: #475569;
+            line-height: 1.45;
+            margin-bottom: 20px;
+        }
+
+        .field-help {
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.4;
+            margin-top: 6px;
+        }
+
+        .btn-search {
+            background-color: #3b82f6;
+        }
+
+        .btn-search:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-secondary {
+            background-color: #1d4f91;
+        }
+
+        .btn-secondary:hover {
+            background-color: #173f74;
+        }
+
+        .btn.btn-outline {
+            background-color: #dc2626;
+            color: white;
+            border: 1px solid #dc2626;
+        }
+
+        .btn.btn-outline:hover {
+            background-color: #b91c1c;
+            color: white;
+            border-color: #b91c1c;
+        }
+
+        .games-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin: 0 0 10px;
+        }
+
+        .games-section-header .bulk-controls {
+            margin-bottom: 0;
+        }
+
         .row {
             display: flex;
             gap: 20px;
@@ -96,6 +168,7 @@
 
         .button-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             margin-top: 20px;
         }
@@ -405,6 +478,10 @@
         }
 
         @media (max-width: 768px) {
+            .payment-workspace {
+                grid-template-columns: 1fr;
+            }
+
             .row {
                 flex-direction: column;
             }
@@ -436,7 +513,15 @@
         <p>Record and track your received payments.</p>
     </div>
 
+    <div class="payment-workspace">
+
     <div class="form-card">
+
+        <h2 class="card-title">Enter a Payment</h2>
+        <p class="card-help">
+            Enter the payment details, select the completed games below,
+            then save the payment.
+        </p>
 
         <form id="paymentForm">
 
@@ -505,25 +590,7 @@
                     type="reset"
                     class="btn btn-clear"
                 >
-                    Clear Form
-                </button>
-
-                <button
-                    type="button"
-                    id="registryBtn"
-                    class="btn btn-registry"
-                >
-                    <i class="fa-solid fa-money-check"></i>
-                    Registry
-                </button>
-
-                <button
-                    type="button"
-                    id="findPaymentBtn"
-                    class="btn btn-registry"
-                >
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    Find Payment and Associated Games
+                    Clear Entry
                 </button>
 
                 <button
@@ -536,23 +603,100 @@
                     Back to Completed Games
                 </button>
 
-                <div
-                    class="bulk-controls"
-                    id="gameBulkControls"
-                >
-                    <label>
-                        <input
-                            type="checkbox"
-                            id="selectAll"
-                        >
-
-                        <strong>Select All Games</strong>
-                    </label>
-                </div>
-
             </div>
 
         </form>
+
+    </div>
+
+    <div class="form-card">
+        <h2 class="card-title">Find Payments</h2>
+        <p class="card-help">
+            Enter any combination of filters and select Search Payments.
+            Show All Payments clears the filters and displays the full registry.
+        </p>
+
+        <form id="paymentFilterForm">
+            <div class="row">
+                <div class="col">
+                    <label for="filterPaymentId">Payment ID</label>
+                    <input
+                        type="text"
+                        id="filterPaymentId"
+                        placeholder="Payment ID"
+                    >
+                </div>
+
+                <div class="col">
+                    <label for="filterDate">Date</label>
+                    <input type="date" id="filterDate">
+                </div>
+
+                <div class="col">
+                    <label for="filterAssociation">Association</label>
+                    <select id="filterAssociation">
+                        <option value="">Loading associations...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="filterAmount">Amount</label>
+                <input
+                    type="number"
+                    id="filterAmount"
+                    step="0.01"
+                    min="0"
+                    placeholder="Amount"
+                >
+            </div>
+
+            <div class="form-group">
+                <label for="filterGameIds">Game IDs</label>
+                <input
+                    type="text"
+                    id="filterGameIds"
+                    placeholder="Example: 1965,1983,1992-1999"
+                    aria-describedby="filterGameIdsHelp"
+                >
+                <p class="field-help" id="filterGameIdsHelp">
+                    Enter one Game ID, multiple IDs separated by commas, a
+                    range separated by a hyphen, or a combination.
+                </p>
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="submit"
+                    id="searchPaymentsBtn"
+                    class="btn btn-search"
+                >
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    Search Payments
+                </button>
+
+                <button
+                    type="button"
+                    id="registryBtn"
+                    class="btn btn-secondary"
+                    title="Clear all filters and display every payment"
+                    aria-label="Show all payments and ignore the current filters"
+                >
+                    <i class="fa-solid fa-money-check"></i>
+                    Show All Payments (Ignore Filters)
+                </button>
+
+                <button
+                    type="button"
+                    id="clearPaymentFiltersBtn"
+                    class="btn btn-outline"
+                >
+                    <i class="fa-solid fa-eraser"></i>
+                    Clear Filters
+                </button>
+            </div>
+        </form>
+    </div>
 
     </div>
 
@@ -567,7 +711,15 @@
         class="table-wrapper"
         id="completedGamesSection"
     >
-    <h2 id="gamesSectionTitle">Completed Games Available for Payment</h2>
+    <div class="games-section-header">
+        <h2 id="gamesSectionTitle">Completed Games Available for Payment</h2>
+        <div class="bulk-controls" id="gameBulkControls">
+            <label for="selectAll">
+                <input type="checkbox" id="selectAll">
+                <strong>Select All Games</strong>
+            </label>
+        </div>
+    </div>
     <table class="games-table">
         <thead>
             <tr>
@@ -726,6 +878,9 @@ async function loadAssociations() {
     const associationSelect =
         document.getElementById("association");
 
+    const filterAssociationSelect =
+        document.getElementById("filterAssociation");
+
     try {
         const response =
             await fetch("/api/loadAssociations");
@@ -741,15 +896,24 @@ async function loadAssociations() {
         associationSelect.innerHTML =
             '<option value="">Select Association</option>';
 
+        filterAssociationSelect.innerHTML =
+            '<option value="">All Associations</option>';
+
         associations.forEach(assoc => {
             const option = document.createElement("option");
             option.value = assoc.id;
             option.textContent = assoc.id;
             associationSelect.appendChild(option);
+
+            const filterOption = option.cloneNode(true);
+            filterAssociationSelect.appendChild(filterOption);
         });
 
         if (associations.length === 0) {
             associationSelect.innerHTML =
+                '<option value="">No associations found</option>';
+
+            filterAssociationSelect.innerHTML =
                 '<option value="">No associations found</option>';
         }
 
@@ -758,11 +922,17 @@ async function loadAssociations() {
 
         associationSelect.innerHTML =
             '<option value="">Unable to load associations</option>';
+
+        filterAssociationSelect.innerHTML =
+            '<option value="">Unable to load associations</option>';
     }
 }
 
 const paymentForm =
     document.getElementById("paymentForm");
+
+const paymentFilterForm =
+    document.getElementById("paymentFilterForm");
 
 const messageBox =
     document.getElementById("message");
@@ -778,8 +948,8 @@ const selectAllCheckbox =
 const registryBtn =
     document.getElementById("registryBtn");
 
-const findPaymentBtn =
-    document.getElementById("findPaymentBtn");
+const clearPaymentFiltersBtn =
+    document.getElementById("clearPaymentFiltersBtn");
 
 const closeRegistryBtn =
     document.getElementById("closeRegistryBtn");
@@ -860,12 +1030,35 @@ function updateCompletedGamesSelectionSummary() {
 
 registryBtn.addEventListener(
     "click",
-    loadPaymentsRegistry
+    function() {
+        paymentFilterForm.reset();
+        loadPaymentsRegistry();
+    }
 );
 
-findPaymentBtn.addEventListener(
+paymentFilterForm.addEventListener(
+    "submit",
+    function(event) {
+        event.preventDefault();
+        loadPaymentsRegistry();
+    }
+);
+
+clearPaymentFiltersBtn.addEventListener(
     "click",
-    findPaymentGames
+    function() {
+        paymentFilterForm.reset();
+
+        showMessage(
+            "Payment filters cleared. Enter new filters or select Search Payments " +
+            "to display all payments.",
+            "info"
+        );
+
+        document
+            .getElementById("filterPaymentId")
+            .focus();
+    }
 );
 
 backToCompletedBtn.addEventListener(
@@ -1892,29 +2085,68 @@ function renderPayments(payments) {
         });
 }
 
+function filterPaymentsByGameIds(payments, gameIdFilter) {
+    const filterText = String(gameIdFilter || "").trim();
+
+    if (filterText === "") {
+        return payments;
+    }
+
+    if (!/^\s*\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)*\s*$/.test(filterText)) {
+        throw new Error(
+            "Enter Game IDs as a single ID, comma-separated IDs, ranges, " +
+            "or a combination such as 1965,1983,1992-1999."
+        );
+    }
+
+    const requestedGameIds = new Set(
+        normalizeGameIds(filterText).map(String)
+    );
+
+    return payments.filter(payment => {
+        const paymentGameIds = new Set(
+            normalizeGameIds(getPaymentGameIds(payment)).map(String)
+        );
+
+        return Array.from(requestedGameIds).some(
+            gameId => paymentGameIds.has(gameId)
+        );
+    });
+}
+
 async function loadPaymentsRegistry() {
     messageBox.innerText =
         "Loading payment registry...";
 
     registryBtn.disabled = true;
 
+    const searchPaymentsBtn =
+        document.getElementById("searchPaymentsBtn");
+
+    searchPaymentsBtn.disabled = true;
+
     const params = new URLSearchParams();
 
     const paymentId = document
-        .getElementById("paymentid")
+        .getElementById("filterPaymentId")
         .value
         .trim();
 
     const date = document
-        .getElementById("date")
+        .getElementById("filterDate")
         .value;
 
     const association = document
-        .getElementById("association")
+        .getElementById("filterAssociation")
         .value;
 
     const amountText = document
-        .getElementById("amount")
+        .getElementById("filterAmount")
+        .value
+        .trim();
+
+    const gameIdFilter = document
+        .getElementById("filterGameIds")
         .value
         .trim();
 
@@ -1934,6 +2166,10 @@ async function loadPaymentsRegistry() {
         params.append("amount", amountText);
     }
 
+    if (gameIdFilter != "") {
+        params.append("gameIdFilter", gameIdFilter);
+    }
+    
     params.append("t", Date.now());
 
     try {
@@ -1964,13 +2200,18 @@ async function loadPaymentsRegistry() {
 
         const result = await response.json();
 
-        const payments = Array.isArray(result)
+        const returnedPayments = Array.isArray(result)
             ? result
             : (
                 result?.payments ||
                 result?.Payments ||
                 []
             );
+
+        const payments = filterPaymentsByGameIds(
+            returnedPayments,
+            gameIdFilter
+        );
 
         renderPayments(payments);
 
@@ -2003,6 +2244,7 @@ async function loadPaymentsRegistry() {
         );
     } finally {
         registryBtn.disabled = false;
+        searchPaymentsBtn.disabled = false;
     }
 }
 
@@ -2239,7 +2481,6 @@ async function findPaymentGames(
         return;
     }
 
-    findPaymentBtn.disabled = true;
     showMessage("Finding payment and associated games...", "info");
 
     try {
@@ -2426,8 +2667,6 @@ async function findPaymentGames(
             `Unable to find the payment games: ${error.message}`,
             "error"
         );
-    } finally {
-        findPaymentBtn.disabled = false;
     }
 }
 

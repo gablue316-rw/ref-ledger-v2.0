@@ -1,28 +1,19 @@
-//
 // Ref Ledger shared navbar
-//
 
 document.addEventListener("DOMContentLoaded", initializeNavbar);
 
-//
 // Load and initialize the shared navbar
-//
-
 async function initializeNavbar() {
-
-    const container =
-        document.getElementById("navbar-container");
+    const container = document.getElementById("navbar-container");
 
     if (!container) {
         return;
     }
 
     try {
-
-        const response =
-            await fetch("/components/navbar.html", {
-                cache: "no-cache"
-            });
+        const response = await fetch("/components/navbar.html", {
+            cache: "no-cache"
+        });
 
         if (!response.ok) {
             throw new Error(
@@ -30,8 +21,7 @@ async function initializeNavbar() {
             );
         }
 
-        container.innerHTML =
-            await response.text();
+        container.innerHTML = await response.text();
 
         highlightCurrentPage();
         initializeLogout();
@@ -41,90 +31,58 @@ async function initializeNavbar() {
             loadPendingGames(),
             loadEnvironment()
         ]);
-
     } catch (error) {
-
-        console.error(
-            "Unable to initialize navbar:",
-            error
-        );
-
+        console.error("Unable to initialize navbar:", error);
     }
-
 }
 
-//
 // Highlight the current navigation link
-//
-
 function highlightCurrentPage() {
-
-    const pathname =
-        window.location.pathname;
+    const pathname = window.location.pathname;
 
     let page;
 
-    if (pathname === "/") {
-
+    if (pathname === "/" || pathname === "/dashboard") {
+        page = "dashboard";
+    } else if (pathname === "/home") {
         page = "home";
-
     } else {
-
         page = pathname
             .replace(/^\/+/, "")
             .replace(/\/+$/, "");
-
     }
 
-    const navigationLinks =
-        document.querySelectorAll(
-            ".nav-links a[data-page]"
-        );
+    const navigationLinks = document.querySelectorAll(
+        ".nav-links a[data-page]"
+    );
 
     navigationLinks.forEach(function (link) {
-
-        const linkPage =
-            link.getAttribute("data-page");
+        const linkPage = link.getAttribute("data-page");
 
         link.classList.toggle(
             "active",
             linkPage === page
         );
-
     });
-
 }
 
-//
 // Load the logged-in user
-//
-
 async function loadCurrentUser() {
-
-    const userName =
-        document.getElementById("userName");
-
-    const userRole =
-        document.getElementById("userRole");
+    const userName = document.getElementById("userName");
+    const userRole = document.getElementById("userRole");
 
     if (!userName || !userRole) {
         return;
     }
 
     try {
-
-        const response =
-            await fetch("/api/session", {
-                cache: "no-cache"
-            });
+        const response = await fetch("/api/session", {
+            cache: "no-cache"
+        });
 
         if (response.status === 401) {
-
-            window.location.href =
-                "/login";
-
+            window.location.href = "/login";
             return;
-
         }
 
         if (!response.ok) {
@@ -133,8 +91,7 @@ async function loadCurrentUser() {
             );
         }
 
-        const session =
-            await response.json();
+        const session = await response.json();
 
         userName.textContent =
             session.name ||
@@ -142,45 +99,27 @@ async function loadCurrentUser() {
             session.email ||
             "Unknown User";
 
-        userRole.textContent =
-            formatRole(session.role);
-
+        userRole.textContent = formatRole(session.role);
     } catch (error) {
-
-        console.error(
-            "Unable to load user information:",
-            error
-        );
-
-        userName.textContent =
-            "Unknown User";
-
-        userRole.textContent =
-            "";
-
+        console.error("Unable to load user information:", error);
+        userName.textContent = "Unknown User";
+        userRole.textContent = "";
     }
-
 }
 
-//
 // Load environment information
-//
 async function loadEnvironment() {
-    const navbar =
-        document.getElementById("main-navbar");
-
-    const environmentLabel =
-        document.getElementById("environment-label");
+    const navbar = document.getElementById("main-navbar");
+    const environmentLabel = document.getElementById("environment-label");
 
     if (!navbar || !environmentLabel) {
         return;
     }
 
     try {
-        const response =
-            await fetch("/api/environment", {
-                cache: "no-cache"
-            });
+        const response = await fetch("/api/environment", {
+            cache: "no-cache"
+        });
 
         if (!response.ok) {
             throw new Error(
@@ -188,28 +127,19 @@ async function loadEnvironment() {
             );
         }
 
-        const environmentInfo =
-            await response.json();
-
-        const environment =
-            String(environmentInfo.environment || "")
-                .trim()
-                .toLowerCase();
+        const environmentInfo = await response.json();
+        const environment = String(environmentInfo.environment || "")
+            .trim()
+            .toLowerCase();
 
         if (environment !== "development") {
-            navbar.classList.remove(
-                "navbar-development"
-            );
-
+            navbar.classList.remove("navbar-development");
             environmentLabel.replaceChildren();
             environmentLabel.hidden = true;
             return;
         }
 
-        navbar.classList.add(
-            "navbar-development"
-        );
-
+        navbar.classList.add("navbar-development");
         environmentLabel.hidden = false;
         environmentLabel.replaceChildren();
 
@@ -219,54 +149,34 @@ async function loadEnvironment() {
             environmentInfo.database || "Unknown Database",
             environmentInfo.release || "Unknown Release"
         ].forEach(function (value) {
-            const line =
-                document.createElement("div");
-
+            const line = document.createElement("div");
             line.textContent = value;
             environmentLabel.appendChild(line);
         });
-
     } catch (error) {
-        console.error(
-            "Unable to load environment information:",
-            error
-        );
-
+        console.error("Unable to load environment information:", error);
         environmentLabel.replaceChildren();
         environmentLabel.hidden = true;
     }
 }
 
-//
 // Load pending-game counts
-//
-// Display format:
-//
-//     today / next 7 days
-//
-// Example:
-//
-//     2/8
-//
-
+// Display format: today / tomorrow / next 7 days
+// Example: 2/3/8
 async function loadPendingGames() {
-
-    const badge =
-        document.getElementById("pendingGames");
+    const badge = document.getElementById("pendingGames");
 
     if (!badge) {
         return;
     }
 
     try {
-
-        const response =
-            await fetch(
-                "/api/games/pending-games/count",
-                {
-                    cache: "no-cache"
-                }
-            );
+        const response = await fetch(
+            "/api/games/pending-games/count",
+            {
+                cache: "no-cache"
+            }
+        );
 
         if (!response.ok) {
             throw new Error(
@@ -274,86 +184,46 @@ async function loadPendingGames() {
             );
         }
 
-        const result =
-            await response.json();
-
-        const todaysCount =
-            Number(result.todaysCount ?? 0);
-        
-        const tomorrowsCount =
-            Number(result.tomorrowsCount ?? 0);
-
-        const sevenDayCount =
-            Number(result.sevenDayCount ?? 0);
+        const result = await response.json();
+        const todaysCount = Number(result.todaysCount ?? 0);
+        const tomorrowsCount = Number(result.tomorrowsCount ?? 0);
+        const sevenDayCount = Number(result.sevenDayCount ?? 0);
 
         const todayText =
             `${todaysCount} pending ` +
             `game${todaysCount === 1 ? "" : "s"} today`;
 
-       const tomorrowText =
+        const tomorrowText =
             `${tomorrowsCount} pending ` +
             `game${tomorrowsCount === 1 ? "" : "s"} tomorrow`;
 
         const sevenDayText =
             `${sevenDayCount} total pending ` +
             `game${sevenDayCount === 1 ? "" : "s"} ` +
-            `through the next 7 days`;
+            "through the next 7 days";
 
         badge.textContent =
             `${todaysCount}/${tomorrowsCount}/${sevenDayCount}`;
 
- 
         badge.title =
             `${todayText} / ${tomorrowText} / ${sevenDayText}`;
 
-        badge.setAttribute(
-            "aria-label",
-            badge.title
-        );
-
+        badge.setAttribute("aria-label", badge.title);
     } catch (error) {
-
-        console.error(
-            "Unable to load pending-game counts:",
-            error
-        );
-
-        badge.textContent =
-            "—";
-
-        badge.title =
-            "Unable to load pending-game counts";
-
-        badge.setAttribute(
-            "aria-label",
-            badge.title
-        );
-
+        console.error("Unable to load pending-game counts:", error);
+        badge.textContent = "—";
+        badge.title = "Unable to load pending-game counts";
+        badge.setAttribute("aria-label", badge.title);
     }
-
 }
 
-//
 // Make the pending-games function available to other pages.
-//
-// A page can refresh the navbar count after adding,
-// updating, or deleting a game by calling:
-//
-//     await loadPendingGames();
-//
+// A page can refresh the count with: await loadPendingGames();
+window.loadPendingGames = loadPendingGames;
 
-window.loadPendingGames =
-    loadPendingGames;
-
-//
-// Format roles such as:
-//
-//     site_admin  -> Site Admin
-//     head-admin  -> Head Admin
-//
-
+// Format roles such as site_admin -> Site Admin
+// and head-admin -> Head Admin.
 function formatRole(role) {
-
     if (!role) {
         return "";
     }
@@ -361,49 +231,30 @@ function formatRole(role) {
     return String(role)
         .replaceAll("_", " ")
         .replaceAll("-", " ")
-        .replace(
-            /\b\w/g,
-            function (character) {
-                return character.toUpperCase();
-            }
-        );
-
+        .replace(/\b\w/g, function (character) {
+            return character.toUpperCase();
+        });
 }
 
-//
 // Initialize logout
-//
-
 function initializeLogout() {
-
-    const logoutButton =
-        document.getElementById("logoutBtn");
+    const logoutButton = document.getElementById("logoutBtn");
 
     if (!logoutButton) {
         return;
     }
 
-    logoutButton.addEventListener(
-        "click",
-        logoutUser
-    );
-
+    logoutButton.addEventListener("click", logoutUser);
 }
 
-//
 // Log out the current user
-//
-
 async function logoutUser(event) {
-
     event.preventDefault();
 
     try {
-
-        const response =
-            await fetch("/api/logout", {
-                method: "POST"
-            });
+        const response = await fetch("/api/logout", {
+            method: "POST"
+        });
 
         if (!response.ok) {
             throw new Error(
@@ -411,18 +262,9 @@ async function logoutUser(event) {
             );
         }
 
-        window.location.href =
-            "/login";
-
+        window.location.href = "/login";
     } catch (error) {
-
-        console.error(
-            "Unable to log out:",
-            error
-        );
-
+        console.error("Unable to log out:", error);
         alert("Logout failed. Please try again.");
-
     }
-
 }
