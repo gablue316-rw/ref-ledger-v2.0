@@ -624,6 +624,78 @@ func QueryOfficials(parentCtx context.Context, dbase, collection, assoc, officia
 	return officialRecords, nil
 }
 
+func GetExpenseRegistry(
+	filter model.ExpenseRegistryFilter,
+) ([]model.ExpenseDescriptor, error) {
+
+	expenseFilter := bson.M{
+		"tenantId": filter.TenantId,
+	}
+
+	if filter.ExpenseId != "" {
+		expenseFilter["expenseId"] = filter.ExpenseId
+	}
+
+	if filter.Association != "" {
+		expenseFilter["association"] = filter.Association
+	}
+
+	if filter.Type != "" {
+		expenseFilter["type"] = filter.Type
+	}
+
+	if filter.Date != "" {
+		expenseFilter["date"] = filter.Date
+	}
+
+	if filter.Description != "" {
+		expenseFilter["description"] = filter.Description
+	}
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
+	defer cancel()
+
+	coll := Client.
+		Database(Database).
+		Collection("expenses")
+
+	cursor, err := coll.Find(ctx, expenseFilter)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to find expenses: %w",
+			err,
+		)
+	}
+	defer cursor.Close(ctx)
+
+	var results []model.ExpenseDoc
+
+	if err := cursor.All(ctx, &results); err != nil {
+		return nil, fmt.Errorf(
+			"failed to read expenses: %w",
+			err,
+		)
+	}
+
+	expenseRecords := make(
+		[]model.ExpenseDescriptor,
+		0,
+		len(results),
+	)
+
+	for _, record := range results {
+		expenseRecords = append(
+			expenseRecords,
+			utils.ConvertExpenseDocToExpenseDescr(record),
+		)
+	}
+
+	return expenseRecords, nil
+}
+
 func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDescriptor, error) {
 
 	paymentFilter := bson.M{"tenantId": filter.TenantId}
@@ -4349,6 +4421,155 @@ func (ec *ExpensesCollection) GenerateExpenseId(expense Expense) string {
 
 }
 
+func (ec *ExpensesCollection) Delete(expenseId, association, tId string) error {
+
+	//fmt.Println("Deleting expense")
+	fmt.Println("===== Attempting to delete Expense Id", expenseId, "for Association", association, "and tenant id", tId, "=====")
+
+	expenseId = strings.TrimSpace(expenseId)
+	association = strings.TrimSpace(association)
+	tId = strings.TrimSpace(tId)
+
+	if expenseId == "" {
+		return fmt.Errorf("expense ID is required")
+	}
+
+	if association == "" {
+		return fmt.Errorf("association is required")
+	}
+
+	if tId == "" {
+		return fmt.Errorf("tenant ID is required")
+	}
+
+	filter := bson.M{
+		"expenseId":   expenseId,
+		"association": association,
+		"tenantId":    tId,
+	}
+
+	result, err := ec.Coll.DeleteOne(
+		context.Background(),
+		filter,
+	)
+
+	if err != nil {
+		return fmt.Errorf(
+			"failed to delete expense %q for association %q: %w",
+			expenseId,
+			association,
+			err,
+		)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf(
+			"expense %q for association %q was not found",
+			expenseId,
+			association,
+		)
+	}
+
+	return nil
+}
+
+func (ec *ExpensesCollection) Update(
+	expense Expense,
+	expenseId string,
+	association string,
+	tenantId string,
+) error {
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
+	defer cancel()
+
+	expenseId = strings.TrimSpace(expenseId)
+	association = strings.TrimSpace(association)
+	tenantId = strings.TrimSpace(tenantId)
+
+	if expenseId == "" {
+		return fmt.Errorf("expense ID is required")
+	}
+
+	if association == "" {
+		return fmt.Errorf("association is required")
+	}
+
+	if tenantId == "" {
+		return fmt.Errorf("tenant ID is required")
+	}
+
+	dt, err := time.Parse("2006-01-02", expense.Date)
+	if err != nil {
+		return fmt.Errorf(
+			"invalid expense date %q: %w",
+			expense.Date,
+			err,
+		)
+	}
+
+	formattedDate := dt.Format("1/2/2006")
+
+	filter := bson.M{
+		"expenseId":   expenseId,
+		"association": association,
+		"tenantId":    tenantId,
+	}
+
+	expenseAmt, err := utils.ConvertAmtStrToInt64(expense.Amount)
+	if err != nil {
+		return fmt.Errorf(
+			"Error converting Amount: %w",
+			err,
+		)
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"date":        formattedDate,
+			"description": strings.TrimSpace(expense.Description),
+			"amount":      expenseAmt,
+			"expenseType": strings.TrimSpace(expense.Type),
+		},
+	}
+
+	result, err := ec.Coll.UpdateOne(
+		ctx,
+		filter,
+		update,
+	)
+	if err != nil {
+		ec.LastError = err
+
+		return fmt.Errorf(
+			"failed to update expense %q for association %q: %w",
+			expenseId,
+			association,
+			err,
+		)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf(
+			"expense %q for association %q was not found",
+			expenseId,
+			association,
+		)
+	}
+
+	fmt.Printf(
+		"Expense %s updated. Matched: %d, Modified: %d\n",
+		expenseId,
+		result.MatchedCount,
+		result.ModifiedCount,
+	)
+
+	return nil
+}
+
 func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
 
 	fmt.Println("Adding expense:", expense)
@@ -6075,4 +6296,33 @@ func GetAccountsReceivableReport(
 	}
 
 	return response, nil
+}
+
+type ExpenseType struct {
+	ExpenseType string `json:"expenseType"`
+}
+
+func GetExpenseTypes() []ExpenseType {
+	return []ExpenseType{
+		{ExpenseType: "Food"},
+		{ExpenseType: "Hotel"},
+		{ExpenseType: "Equipment"},
+		{ExpenseType: "Mileage"},
+		{ExpenseType: "Camp Fees"},
+		{ExpenseType: "Association Dues"},
+	}
+}
+
+type StatusType struct {
+	Status string `json:"status"`
+}
+
+func GetStatusTypes() []StatusType {
+	return []StatusType{
+		{Status: "Cancelled"},
+		{Status: "Completed"},
+		{Status: "Delete"},
+		{Status: "Paid"},
+		{Status: "Pending"},
+	}
 }

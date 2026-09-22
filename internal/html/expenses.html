@@ -60,6 +60,31 @@
             margin-bottom: 20px;
         }
 
+        .expense-workspace {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: start;
+        }
+
+        .expense-workspace .form-card {
+            margin-bottom: 0;
+            height: 100%;
+        }
+
+        .card-title {
+            color: #0f2747;
+            font-size: 24px;
+            margin-bottom: 6px;
+        }
+
+        .card-help {
+            color: #475569;
+            line-height: 1.45;
+            margin-bottom: 20px;
+        }
+
         .row {
             display: flex;
             gap: 20px;
@@ -98,6 +123,7 @@
 
         .button-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             margin-top: 20px;
         }
@@ -128,6 +154,298 @@
             background-color: #b91c1c;
         }
 
+        .btn-search,
+        .btn-registry {
+            background-color: #3b82f6;
+        }
+
+        .btn-search:hover,
+        .btn-registry:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-secondary {
+            background-color: #1d4f91;
+        }
+
+        .btn-secondary:hover {
+            background-color: #173f74;
+        }
+
+        .registry-section {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .registry-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .registry-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-delete-selected {
+            background-color: #dc2626;
+        }
+
+        .btn-delete-selected:hover:not(:disabled) {
+            background-color: #b91c1c;
+        }
+
+        .btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .expense-select,
+        #selectAllExpenses {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .select-column {
+            width: 52px;
+            text-align: center !important;
+        }
+
+        .registry-header h2 {
+            color: #1e293b;
+        }
+
+        .registry-count {
+            color: #475569;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .expenses-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .expenses-table th,
+        .expenses-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .expenses-table th {
+            color: white;
+            background-color: #1e293b;
+            white-space: nowrap;
+        }
+
+        .expenses-table tbody tr:hover {
+            background-color: #f8fafc;
+        }
+
+        .row-action-btn {
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 5px 8px;
+            border-radius: 5px;
+        }
+
+        .edit-expense-btn {
+            color: #2563eb;
+        }
+
+        .edit-expense-btn:hover {
+            color: white;
+            background-color: #2563eb;
+        }
+
+        .delete-expense-btn {
+            color: #dc2626;
+        }
+
+        .delete-expense-btn:hover {
+            color: white;
+            background-color: #dc2626;
+        }
+
+        .delete-modal {
+            width: min(460px, calc(100% - 32px));
+            padding: 0;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.3);
+            overflow: hidden;
+        }
+
+        .delete-modal::backdrop {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(3px);
+        }
+
+        .delete-modal-content {
+            background: white;
+        }
+
+        .delete-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 22px 24px 16px;
+        }
+
+        .delete-modal-icon {
+            display: grid;
+            place-items: center;
+            flex: 0 0 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #fee2e2;
+            color: #dc2626;
+            font-size: 21px;
+        }
+
+        .delete-modal-header h2 {
+            color: #1e293b;
+            font-size: 21px;
+            margin-bottom: 3px;
+        }
+
+        .delete-modal-header p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .delete-modal-body {
+            padding: 4px 24px 22px;
+            color: #475569;
+            line-height: 1.55;
+        }
+
+        .delete-modal-target {
+            margin-top: 14px;
+            padding: 12px 14px;
+            border: 1px solid #fecaca;
+            border-radius: 9px;
+            background: #fff7f7;
+            color: #991b1b;
+            font-weight: bold;
+        }
+
+        .delete-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .btn-modal-cancel {
+            background: white;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn-modal-delete {
+            background: #dc2626;
+        }
+
+        .btn-modal-delete:hover {
+            background: #b91c1c;
+        }
+
+        .edit-modal {
+            width: min(620px, calc(100% - 32px));
+            padding: 0;
+            border: none;
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.3);
+            overflow: hidden;
+        }
+
+        .edit-modal::backdrop {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(3px);
+        }
+
+        .edit-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 22px 24px 16px;
+        }
+
+        .edit-modal-icon {
+            display: grid;
+            place-items: center;
+            flex: 0 0 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #dbeafe;
+            color: #2563eb;
+            font-size: 21px;
+        }
+
+        .edit-modal-header h2 {
+            color: #1e293b;
+            font-size: 21px;
+            margin-bottom: 3px;
+        }
+
+        .edit-modal-header p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .edit-modal-body {
+            padding: 4px 24px 22px;
+        }
+
+        .edit-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .readonly-field {
+            background-color: #f1f5f9;
+            color: #64748b;
+            cursor: not-allowed;
+        }
+
+        .btn-modal-save {
+            background-color: #16a34a;
+        }
+
+        .btn-modal-save:hover:not(:disabled) {
+            background-color: #15803d;
+        }
+
+        .empty-row {
+            text-align: center !important;
+            color: #64748b;
+            padding: 25px !important;
+        }
+
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -156,6 +474,10 @@
         }
 
         @media (max-width: 768px) {
+            .expense-workspace {
+                grid-template-columns: 1fr;
+            }
+
             .row {
                 flex-direction: column;
             }
@@ -166,6 +488,15 @@
 
             .btn {
                 width: 100%;
+            }
+
+            .registry-header {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .registry-actions {
+                flex-direction: column;
             }
         }
     </style>
@@ -182,7 +513,14 @@
         <p>Record and track your officiating expenses.</p>
     </div>
 
+    <div class="expense-workspace">
+
     <div class="form-card">
+
+        <h2 class="card-title">Add Expense</h2>
+        <p class="card-help">
+            Enter the expense details, then save the expense.
+        </p>
 
         <form id="expenseForm">
 
@@ -223,27 +561,7 @@
                     required
                 >
                     <option value="">
-                        Select Expense Type
-                    </option>
-
-                    <option value="Mileage">
-                        Mileage
-                    </option>
-
-                    <option value="Food">
-                        Food
-                    </option>
-
-                    <option value="Equipment">
-                        Equipment
-                    </option>
-
-                    <option value="Camp Fees">
-                        Camp Fees
-                    </option>
-
-                    <option value="Association Dues">
-                        Association Dues
+                        Loading expense types...
                     </option>
                 </select>
             </div>
@@ -261,17 +579,6 @@
                         step="0.01"
                         min="0"
                         required
-                    >
-                </div>
-
-                <div class="col">
-                    <label for="gameId">
-                        Game ID
-                    </label>
-
-                    <input
-                        type="number"
-                        id="gameId"
                     >
                 </div>
 
@@ -310,6 +617,107 @@
 
     </div>
 
+    <div class="form-card">
+
+        <h2 class="card-title">Find Expenses</h2>
+        <p class="card-help">
+            Enter any combination of filters and select Search Expenses.
+            Show All Expenses clears the filters and displays the full registry.
+        </p>
+
+        <form id="expenseFilterForm">
+
+            <div class="row">
+                <div class="col">
+                    <label for="filterExpenseId">Expense ID</label>
+                    <input
+                        type="text"
+                        id="filterExpenseId"
+                        placeholder="Expense ID"
+                    >
+                </div>
+
+                <div class="col">
+                    <label for="filterDate">Date</label>
+                    <input type="date" id="filterDate">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <label for="filterAssociation">Association</label>
+                    <select id="filterAssociation">
+                        <option value="">Loading associations...</option>
+                    </select>
+                </div>
+
+                <div class="col">
+                    <label for="filterExpenseType">Expense Type</label>
+                    <select id="filterExpenseType">
+                        <option value="">Loading expense types...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <label for="filterAmount">Amount / Miles</label>
+                    <input
+                        type="number"
+                        id="filterAmount"
+                        step="0.01"
+                        min="0"
+                        placeholder="Amount or miles"
+                    >
+                </div>
+
+                <div class="col">
+                    <label for="filterDescription">Description</label>
+                    <input
+                        type="text"
+                        id="filterDescription"
+                        placeholder="Description"
+                    >
+                </div>
+
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="submit"
+                    id="searchExpensesBtn"
+                    class="btn btn-search"
+                >
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    Search Expenses
+                </button>
+
+                <button
+                    type="button"
+                    id="showAllExpensesBtn"
+                    class="btn btn-secondary"
+                    title="Clear all filters and display every expense"
+                >
+                    <i class="fa-solid fa-receipt"></i>
+                    Show All Expenses (Ignore Filters)
+                </button>
+
+                <button
+                    type="button"
+                    id="clearExpenseFiltersBtn"
+                    class="btn btn-clear"
+                >
+                    <i class="fa-solid fa-eraser"></i>
+                    Clear Filters
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+    </div>
+
     <div
         class="message-box"
         id="message"
@@ -317,7 +725,196 @@
         Ready to enter expenses.
     </div>
 
+    <section
+        id="expenseRegistrySection"
+        class="registry-section"
+    >
+        <div class="registry-header">
+            <div>
+                <h2>Expense Registry</h2>
+                <p
+                    class="registry-count"
+                    id="expenseRegistryCount"
+                ></p>
+            </div>
+
+            <div class="registry-actions">
+                <button
+                    type="button"
+                    id="deleteSelectedExpensesBtn"
+                    class="btn btn-delete-selected"
+                    disabled
+                >
+                    <i class="fa-solid fa-trash-can"></i>
+                    Delete Selected (0)
+                </button>
+
+                <button
+                    type="button"
+                    id="closeRegistryBtn"
+                    class="btn btn-registry"
+                >
+                    <i class="fa-solid fa-arrow-left"></i>
+                    Close Expense Registry
+                </button>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="expenses-table">
+                <thead>
+                    <tr>
+                        <th class="select-column">
+                            <input
+                                type="checkbox"
+                                id="selectAllExpenses"
+                                title="Select all expenses"
+                                aria-label="Select all expenses"
+                            >
+                        </th>
+                        <th>Expense ID</th>
+                        <th>Date</th>
+                        <th>Association</th>
+                        <th>Expense Type</th>
+                        <th>Amount / Miles</th>
+                        <th>Description</th>
+                        <th>Edit</th>
+                        <th>Delete</th>
+                    </tr>
+                </thead>
+
+                <tbody id="expensesBody"></tbody>
+            </table>
+        </div>
+    </section>
+
 </div>
+
+<dialog
+    id="deleteExpenseModal"
+    class="delete-modal"
+    aria-labelledby="deleteExpenseModalTitle"
+    aria-describedby="deleteExpenseModalMessage"
+>
+    <div class="delete-modal-content">
+        <div class="delete-modal-header">
+            <div class="delete-modal-icon" aria-hidden="true">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+
+            <div>
+                <h2 id="deleteExpenseModalTitle">
+                    Confirm deletion
+                </h2>
+                <p>This action cannot be undone.</p>
+            </div>
+        </div>
+
+        <div class="delete-modal-body">
+            <p id="deleteExpenseModalMessage">
+                Are you sure you want to delete this expense?
+            </p>
+
+            <div
+                id="deleteExpenseModalTarget"
+                class="delete-modal-target"
+            ></div>
+        </div>
+
+        <div class="delete-modal-actions">
+            <button
+                type="button"
+                id="cancelExpenseDeleteBtn"
+                class="btn btn-modal-cancel"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="button"
+                id="confirmExpenseDeleteBtn"
+                class="btn btn-modal-delete"
+            >
+                <i class="fa-solid fa-trash-can"></i>
+                Delete
+            </button>
+        </div>
+    </div>
+</dialog>
+
+<dialog
+    id="editExpenseModal"
+    class="edit-modal"
+    aria-labelledby="editExpenseModalTitle"
+>
+    <form id="editExpenseForm">
+        <div class="edit-modal-header">
+            <div class="edit-modal-icon" aria-hidden="true">
+                <i class="fa-solid fa-pen-to-square"></i>
+            </div>
+
+            <div>
+                <h2 id="editExpenseModalTitle">Edit Expense</h2>
+                <p>Expense ID and association cannot be changed.</p>
+            </div>
+        </div>
+
+        <div class="edit-modal-body">
+            <div class="row">
+                <div class="col">
+                    <label for="editExpenseId">Expense ID</label>
+                    <input id="editExpenseId" class="readonly-field" readonly>
+                </div>
+
+                <div class="col">
+                    <label for="editAssociation">Association</label>
+                    <input id="editAssociation" class="readonly-field" readonly>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col">
+                    <label for="editDate">Date</label>
+                    <input type="date" id="editDate" required>
+                </div>
+
+                <div class="col">
+                    <label for="editExpenseType">Expense Type</label>
+                    <select id="editExpenseType" required></select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="editAmount">Amount / Miles</label>
+                <input type="number" id="editAmount" step="0.01" min="0" required>
+            </div>
+
+            <div class="form-group">
+                <label for="editDescription">Description</label>
+                <textarea id="editDescription" rows="4"></textarea>
+            </div>
+        </div>
+
+        <div class="edit-modal-actions">
+            <button
+                type="button"
+                id="cancelExpenseEditBtn"
+                class="btn btn-modal-cancel"
+            >
+                Cancel
+            </button>
+
+            <button
+                type="submit"
+                id="saveExpenseEditBtn"
+                class="btn btn-modal-save"
+            >
+                <i class="fa-solid fa-floppy-disk"></i>
+                Save Changes
+            </button>
+        </div>
+    </form>
+</dialog>
 
 <script src="/components/navbar.js?v=12"></script>
 
@@ -331,10 +928,94 @@ const messageBox =
 const associationSelect =
     document.getElementById("association");
 
+const expenseTypeSelect =
+    document.getElementById("expenseType");
+
+const expenseFilterForm =
+    document.getElementById("expenseFilterForm");
+
+const filterAssociationSelect =
+    document.getElementById("filterAssociation");
+
+const filterExpenseTypeSelect =
+    document.getElementById("filterExpenseType");
+
+const expenseRegistrySection =
+    document.getElementById("expenseRegistrySection");
+
+const expensesBody =
+    document.getElementById("expensesBody");
+
+const expenseRegistryCount =
+    document.getElementById("expenseRegistryCount");
+
+const showAllExpensesBtn =
+    document.getElementById("showAllExpensesBtn");
+
+const clearExpenseFiltersBtn =
+    document.getElementById("clearExpenseFiltersBtn");
+
+const closeRegistryBtn =
+    document.getElementById("closeRegistryBtn");
+
+const selectAllExpenses =
+    document.getElementById("selectAllExpenses");
+
+const deleteSelectedExpensesBtn =
+    document.getElementById("deleteSelectedExpensesBtn");
+
+const deleteExpenseModal =
+    document.getElementById("deleteExpenseModal");
+
+const deleteExpenseModalMessage =
+    document.getElementById("deleteExpenseModalMessage");
+
+const deleteExpenseModalTarget =
+    document.getElementById("deleteExpenseModalTarget");
+
+const confirmExpenseDeleteBtn =
+    document.getElementById("confirmExpenseDeleteBtn");
+
+const cancelExpenseDeleteBtn =
+    document.getElementById("cancelExpenseDeleteBtn");
+
+const editExpenseModal =
+    document.getElementById("editExpenseModal");
+
+const editExpenseForm =
+    document.getElementById("editExpenseForm");
+
+const editExpenseId =
+    document.getElementById("editExpenseId");
+
+const editAssociation =
+    document.getElementById("editAssociation");
+
+const editDate =
+    document.getElementById("editDate");
+
+const editExpenseType =
+    document.getElementById("editExpenseType");
+
+const editAmount =
+    document.getElementById("editAmount");
+
+const editDescription =
+    document.getElementById("editDescription");
+
+const saveExpenseEditBtn =
+    document.getElementById("saveExpenseEditBtn");
+
+const cancelExpenseEditBtn =
+    document.getElementById("cancelExpenseEditBtn");
+
 document.addEventListener(
     "DOMContentLoaded",
     function() {
-        loadAssociations();
+        Promise.all([
+            loadAssociations(),
+            loadExpenseTypes()
+        ]);
     }
 );
 
@@ -371,6 +1052,9 @@ async function loadAssociations() {
         associationSelect.innerHTML =
             '<option value="">Select Association</option>';
 
+        filterAssociationSelect.innerHTML =
+            '<option value="">All Associations</option>';
+
         associations.forEach(assoc => {
             const option =
                 document.createElement("option");
@@ -379,10 +1063,17 @@ async function loadAssociations() {
             option.textContent = assoc.id;
 
             associationSelect.appendChild(option);
+
+            filterAssociationSelect.appendChild(
+                option.cloneNode(true)
+            );
         });
 
         if (associations.length === 0) {
             associationSelect.innerHTML =
+                '<option value="">No associations found</option>';
+
+            filterAssociationSelect.innerHTML =
                 '<option value="">No associations found</option>';
 
             showMessage(
@@ -400,8 +1091,98 @@ async function loadAssociations() {
         associationSelect.innerHTML =
             '<option value="">Unable to load associations</option>';
 
+        filterAssociationSelect.innerHTML =
+            '<option value="">Unable to load associations</option>';
+
         showMessage(
             "Unable to load associations.",
+            "error"
+        );
+    }
+}
+
+async function loadExpenseTypes() {
+    try {
+        const response =
+            await fetch("/api/loadExpenseTypes");
+
+        if (
+            response.status === 401 ||
+            response.redirected
+        ) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                "Failed to load expense types"
+            );
+        }
+
+        const expenseTypes =
+            await response.json();
+
+        expenseTypeSelect.innerHTML =
+            '<option value="">Select Expense Type</option>';
+
+        filterExpenseTypeSelect.innerHTML =
+            '<option value="">All Expense Types</option>';
+
+        editExpenseType.innerHTML =
+            '<option value="">Select Expense Type</option>';
+
+        expenseTypes.forEach(expense => {
+            const option =
+                document.createElement("option");
+
+            option.value = expense.expenseType;
+            option.textContent = expense.expenseType;
+
+            expenseTypeSelect.appendChild(option);
+
+            filterExpenseTypeSelect.appendChild(
+                option.cloneNode(true)
+            );
+
+            editExpenseType.appendChild(
+                option.cloneNode(true)
+            );
+        });
+
+        if (expenseTypes.length === 0) {
+            expenseTypeSelect.innerHTML =
+                '<option value="">No expense types found</option>';
+
+            filterExpenseTypeSelect.innerHTML =
+                '<option value="">No expense types found</option>';
+
+            editExpenseType.innerHTML =
+                '<option value="">No expense types found</option>';
+
+            showMessage(
+                "No expense types were found.",
+                "info"
+            );
+        }
+
+    } catch (error) {
+        console.error(
+            "Error loading expense types:",
+            error
+        );
+
+        expenseTypeSelect.innerHTML =
+            '<option value="">Unable to load expense types</option>';
+
+        filterExpenseTypeSelect.innerHTML =
+            '<option value="">Unable to load expense types</option>';
+
+        editExpenseType.innerHTML =
+            '<option value="">Unable to load expense types</option>';
+
+        showMessage(
+            "Unable to load expense types.",
             "error"
         );
     }
@@ -456,13 +1237,7 @@ expenseForm.addEventListener(
                     .value
                     .trim(),
 
-            association: association,
-
-            gameId:
-                parseInt(
-                    document.getElementById("gameId").value,
-                    10
-                ) || 0
+            association: association
         };
 
         try {
@@ -527,6 +1302,797 @@ expenseForm.addEventListener(
                 "error"
             );
         }
+    }
+);
+
+expenseFilterForm.addEventListener(
+    "submit",
+    async function(event) {
+        event.preventDefault();
+        await loadExpenseRegistry();
+    }
+);
+
+showAllExpensesBtn.addEventListener(
+    "click",
+    async function() {
+        expenseFilterForm.reset();
+        await loadExpenseRegistry();
+    }
+);
+
+clearExpenseFiltersBtn.addEventListener(
+    "click",
+    function() {
+        expenseFilterForm.reset();
+
+        showMessage(
+            "Expense filters cleared. Ready for another search.",
+            "info"
+        );
+    }
+);
+
+closeRegistryBtn.addEventListener(
+    "click",
+    function() {
+        expenseRegistrySection.style.display = "none";
+
+        showMessage(
+            "Ready to enter expenses.",
+            "info"
+        );
+    }
+);
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function getExpenseValue(expense, ...names) {
+    for (const name of names) {
+        if (
+            expense[name] !== undefined &&
+            expense[name] !== null
+        ) {
+            return expense[name];
+        }
+    }
+
+    return "";
+}
+
+function formatExpenseAmount(rawAmount, expenseType) {
+    const amount = Number(rawAmount);
+
+    if (!Number.isFinite(amount)) {
+        return "";
+    }
+
+    const isMileage =
+        String(expenseType).toLowerCase() === "mileage";
+
+    const formatted = isMileage
+        ? amount.toFixed(0)
+        : amount.toFixed(2);
+
+    return isMileage
+        ? `${formatted} miles`
+        : `$${formatted}`;
+}
+
+function toDateInputValue(value) {
+    const text = String(value || "").trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+        return text;
+    }
+
+    const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+
+    if (!match) {
+        return "";
+    }
+
+    return `${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+}
+
+function openExpenseEditor(expense) {
+    editExpenseId.value = String(expense.expenseId || "");
+    editAssociation.value = String(expense.association || "");
+    editDate.value = toDateInputValue(expense.date);
+    editExpenseType.value = String(expense.expenseType || "");
+    editAmount.value = String(expense.amount ?? "");
+    editDescription.value = String(expense.description || "");
+    editExpenseModal.showModal();
+    editDate.focus();
+}
+
+function getExpenseCheckboxes() {
+    return Array.from(
+        expensesBody.querySelectorAll(".expense-select")
+    );
+}
+
+function updateExpenseSelection() {
+    const checkboxes = getExpenseCheckboxes();
+    const selectedCount = checkboxes.filter(
+        checkbox => checkbox.checked
+    ).length;
+
+    selectAllExpenses.checked =
+        checkboxes.length > 0 &&
+        selectedCount === checkboxes.length;
+
+    selectAllExpenses.indeterminate =
+        selectedCount > 0 &&
+        selectedCount < checkboxes.length;
+
+    selectAllExpenses.disabled = checkboxes.length === 0;
+    deleteSelectedExpensesBtn.disabled = selectedCount === 0;
+    deleteSelectedExpensesBtn.innerHTML = `
+        <i class="fa-solid fa-trash-can"></i>
+        Delete Selected (${selectedCount})
+    `;
+}
+
+selectAllExpenses.addEventListener("change", function() {
+    getExpenseCheckboxes().forEach(checkbox => {
+        checkbox.checked = selectAllExpenses.checked;
+    });
+
+    updateExpenseSelection();
+});
+
+function renderExpenses(expenses) {
+    expensesBody.innerHTML = "";
+
+    if (expenses.length === 0) {
+        expensesBody.innerHTML = `
+            <tr>
+                <td colspan="9" class="empty-row">
+                    No expenses found.
+                </td>
+            </tr>
+        `;
+
+        expenseRegistryCount.textContent = "0 expenses found";
+        updateExpenseSelection();
+        return;
+    }
+
+    let totalAmount = 0;
+    let totalMileage = 0;
+
+    expenses.forEach(expense => {
+        const expenseId = getExpenseValue(
+            expense,
+            "expenseId",
+            "ExpenseId",
+            "id",
+            "ID"
+        );
+
+        const date = getExpenseValue(
+            expense,
+            "date",
+            "Date"
+        );
+
+        const association = getExpenseValue(
+            expense,
+            "association",
+            "Association"
+        );
+
+        const expenseType = getExpenseValue(
+            expense,
+            "expenseType",
+            "ExpenseType",
+            "type",
+            "Type"
+        );
+
+        const amount = getExpenseValue(
+            expense,
+            "amount",
+            "Amount"
+        );
+
+        const description = getExpenseValue(
+            expense,
+            "description",
+            "Description"
+        );
+
+        const numericAmount = Number(amount);
+
+        if (Number.isFinite(numericAmount)) {
+            if (String(expenseType).toLowerCase() === "mileage") {
+                totalMileage += numericAmount;
+            } else {
+                totalAmount += numericAmount;
+            }
+        }
+
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td class="select-column">
+                <input
+                    type="checkbox"
+                    class="expense-select"
+                    aria-label="Select expense ${escapeHtml(expenseId)}"
+                >
+            </td>
+            <td>${escapeHtml(expenseId)}</td>
+            <td>${escapeHtml(date)}</td>
+            <td>${escapeHtml(association)}</td>
+            <td>${escapeHtml(expenseType)}</td>
+            <td>${escapeHtml(
+                formatExpenseAmount(amount, expenseType)
+            )}</td>
+            <td>${escapeHtml(description)}</td>
+            <td>
+                <button
+                    type="button"
+                    class="row-action-btn edit-expense-btn"
+                    title="Edit expense ${escapeHtml(expenseId)}"
+                    aria-label="Edit expense ${escapeHtml(expenseId)}"
+                >
+                    <i class="fa-solid fa-pen-to-square"></i>
+                </button>
+            </td>
+            <td>
+                <button
+                    type="button"
+                    class="row-action-btn delete-expense-btn"
+                    title="Delete expense ${escapeHtml(expenseId)}"
+                    aria-label="Delete expense ${escapeHtml(expenseId)}"
+                >
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </td>
+        `;
+
+        const expenseCheckbox =
+            row.querySelector(".expense-select");
+
+        expenseCheckbox.expenseRecord = {
+            expenseId: String(expenseId),
+            association: String(association || "")
+        };
+
+        expenseCheckbox.addEventListener(
+            "change",
+            updateExpenseSelection
+        );
+
+        const editableExpense = {
+            expenseId: String(expenseId),
+            association: String(association || ""),
+            date: String(date || ""),
+            expenseType: String(expenseType || ""),
+            amount: amount,
+            description: String(description || "")
+        };
+
+        row.querySelector(".edit-expense-btn").addEventListener(
+            "click",
+            function() {
+                openExpenseEditor(editableExpense);
+            }
+        );
+
+        row.querySelector(".delete-expense-btn").addEventListener(
+            "click",
+            async function() {
+                await deleteExpense(expenseId, association);
+            }
+        );
+
+        expensesBody.appendChild(row);
+    });
+
+    updateExpenseSelection();
+
+    expenseRegistryCount.textContent =
+        `${expenses.length} expense(s) found — ` +
+        `$${(totalAmount).toFixed(2)} total expenses — ` +
+        `${(totalMileage).toFixed(0)} total miles`;
+}
+
+async function loadExpenseRegistry() {
+    const searchExpensesBtn =
+        document.getElementById("searchExpensesBtn");
+
+    const params = new URLSearchParams();
+
+    const expenseId = document
+        .getElementById("filterExpenseId")
+        .value
+        .trim();
+
+    const date = document
+        .getElementById("filterDate")
+        .value;
+
+    const association =
+        filterAssociationSelect.value;
+
+    const expenseType =
+        filterExpenseTypeSelect.value;
+
+    const amount = document
+        .getElementById("filterAmount")
+        .value
+        .trim();
+
+    const description = document
+        .getElementById("filterDescription")
+        .value
+        .trim();
+
+    if (expenseId !== "") {
+        params.append("expenseId", expenseId);
+    }
+
+    if (date !== "") {
+        params.append("date", date);
+    }
+
+    if (association !== "") {
+        params.append("association", association);
+    }
+
+    if (expenseType !== "") {
+        params.append("expenseType", expenseType);
+    }
+
+    if (amount !== "") {
+        params.append("amount", amount);
+    }
+
+    if (description !== "") {
+        params.append("description", description);
+    }
+
+    params.append("t", Date.now());
+
+    searchExpensesBtn.disabled = true;
+    showAllExpensesBtn.disabled = true;
+
+    showMessage(
+        "Loading expense registry...",
+        "info"
+    );
+
+    try {
+        const response = await fetch(
+            `/api/expense-registry?${params.toString()}`
+        );
+
+        if (
+            response.status === 401 ||
+            response.redirected
+        ) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (!response.ok) {
+            const errorMessage =
+                (await response.text()).trim();
+
+            showMessage(
+                errorMessage ||
+                    `Unable to load expenses. HTTP ${response.status}`,
+                "error"
+            );
+            return;
+        }
+
+        const result = await response.json();
+
+        const expenses = Array.isArray(result)
+            ? result
+            : (
+                result?.expenses ||
+                result?.Expenses ||
+                []
+            );
+
+        renderExpenses(expenses);
+        expenseRegistrySection.style.display = "block";
+
+        showMessage(
+            expenses.length === 0
+                ? "No expenses found."
+                : `${expenses.length} expense(s) loaded successfully.`,
+            expenses.length === 0 ? "info" : "success"
+        );
+
+    } catch (error) {
+        console.error(
+            "Error loading expense registry:",
+            error
+        );
+
+        showMessage(
+            "Unable to load the expense registry.",
+            "error"
+        );
+    } finally {
+        searchExpensesBtn.disabled = false;
+        showAllExpensesBtn.disabled = false;
+    }
+}
+
+cancelExpenseEditBtn.addEventListener("click", function() {
+    editExpenseModal.close();
+});
+
+editExpenseModal.addEventListener("click", function(event) {
+    if (event.target === editExpenseModal) {
+        editExpenseModal.close();
+    }
+});
+
+editExpenseForm.addEventListener(
+    "submit",
+    async function(event) {
+        event.preventDefault();
+
+        const enteredAmount = Number(editAmount.value);
+
+        if (!Number.isFinite(enteredAmount) || enteredAmount < 0) {
+            showMessage(
+                "Enter a valid amount or number of miles.",
+                "error"
+            );
+            return;
+        }
+
+        const expenseId = editExpenseId.value.trim();
+        const association = editAssociation.value.trim();
+
+        // Only editable ExpenseJson fields belong in the JSON body.
+        // Expense ID and association are immutable lookup values sent
+        // in the URL query string.
+        const expenseChanges = {
+            date: editDate.value,
+            description: editDescription.value.trim(),
+            amount: Math.round(enteredAmount * 100),
+            expenseType: editExpenseType.value
+        };
+
+        const params = new URLSearchParams({
+            expenseId: expenseId,
+            association: association
+        });
+
+        saveExpenseEditBtn.disabled = true;
+
+        showMessage(
+            `Updating expense ${expenseId}...`,
+            "info"
+        );
+
+        try {
+            const response = await fetch(
+                `/api/updateExpense?${params.toString()}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(expenseChanges)
+                }
+            );
+
+            if (response.status === 401 || response.redirected) {
+                window.location.href = "/login";
+                return;
+            }
+
+            if (response.status === 403) {
+                showMessage(
+                    "Permission denied. Read-only users cannot update expenses.",
+                    "error"
+                );
+                return;
+            }
+
+            const responseMessage = (await response.text()).trim();
+
+            if (!response.ok) {
+                showMessage(
+                    responseMessage ||
+                        `Error updating expense ${expenseId}.`,
+                    "error"
+                );
+                return;
+            }
+
+            editExpenseModal.close();
+            await loadExpenseRegistry();
+
+            showMessage(
+                responseMessage ||
+                    `Expense ${expenseId} updated successfully.`,
+                "success"
+            );
+
+        } catch (error) {
+            console.error("Error updating expense:", error);
+
+            showMessage(
+                `Unable to update expense ${expenseId}.`,
+                "error"
+            );
+        } finally {
+            saveExpenseEditBtn.disabled = false;
+        }
+    }
+);
+
+function confirmExpenseDeletion(message, target) {
+    deleteExpenseModalMessage.textContent = message;
+    deleteExpenseModalTarget.textContent = target;
+    deleteExpenseModal.showModal();
+
+    return new Promise(function(resolve) {
+        function finish(confirmed) {
+            confirmExpenseDeleteBtn.removeEventListener(
+                "click",
+                confirmDeletion
+            );
+
+            cancelExpenseDeleteBtn.removeEventListener(
+                "click",
+                cancelDeletion
+            );
+
+            deleteExpenseModal.removeEventListener(
+                "cancel",
+                cancelWithEscape
+            );
+
+            deleteExpenseModal.removeEventListener(
+                "click",
+                cancelFromBackdrop
+            );
+
+            deleteExpenseModal.close();
+            resolve(confirmed);
+        }
+
+        function confirmDeletion() {
+            finish(true);
+        }
+
+        function cancelDeletion() {
+            finish(false);
+        }
+
+        function cancelWithEscape(event) {
+            event.preventDefault();
+            finish(false);
+        }
+
+        function cancelFromBackdrop(event) {
+            if (event.target === deleteExpenseModal) {
+                finish(false);
+            }
+        }
+
+        confirmExpenseDeleteBtn.addEventListener(
+            "click",
+            confirmDeletion
+        );
+
+        cancelExpenseDeleteBtn.addEventListener(
+            "click",
+            cancelDeletion
+        );
+
+        deleteExpenseModal.addEventListener(
+            "cancel",
+            cancelWithEscape
+        );
+
+        deleteExpenseModal.addEventListener(
+            "click",
+            cancelFromBackdrop
+        );
+
+        confirmExpenseDeleteBtn.focus();
+    });
+}
+
+async function deleteExpense(expenseId, association) {
+    if (String(expenseId).trim() === "") {
+        showMessage(
+            "This expense does not have an Expense ID and cannot be deleted.",
+            "error"
+        );
+        return;
+    }
+
+    const confirmed = await confirmExpenseDeletion(
+        "You are about to permanently delete this expense.",
+        `Expense ID: ${expenseId} — ${association}`
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const result = await sendDeleteExpenseRequest(
+        expenseId,
+        association
+    );
+
+    if (result.redirected) {
+        return;
+    }
+
+    if (!result.ok) {
+        showMessage(result.message, "error");
+        return;
+    }
+
+    showMessage(result.message, "success");
+    await loadExpenseRegistry();
+}
+
+async function sendDeleteExpenseRequest(expenseId, association) {
+    const deleteRequest = {
+        expenseId: String(expenseId).trim(),
+        association: String(association || "").trim()
+    };
+
+    const params = new URLSearchParams({
+        expenseId: deleteRequest.expenseId,
+        association: deleteRequest.association
+    });
+
+    try {
+        const response = await fetch(
+            `/api/deleteExpense?${params.toString()}`,
+            {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(deleteRequest)
+            }
+        );
+
+        if (
+            response.status === 401 ||
+            response.redirected
+        ) {
+            window.location.href = "/login";
+            return { ok: false, redirected: true, message: "" };
+        }
+
+        if (response.status === 403) {
+            return {
+                ok: false,
+                message: "Permission denied. Read-only users cannot delete expenses."
+            };
+        }
+
+        const responseMessage =
+            (await response.text()).trim();
+
+        if (!response.ok) {
+            return {
+                ok: false,
+                message: responseMessage ||
+                    `Error deleting expense ${expenseId}.`
+            };
+        }
+
+        return {
+            ok: true,
+            message: responseMessage ||
+                `Expense ${expenseId} deleted successfully.`
+        };
+
+    } catch (error) {
+        console.error(
+            "Error deleting expense:",
+            error
+        );
+
+        return {
+            ok: false,
+            message: `Unable to delete expense ${expenseId}.`
+        };
+    }
+}
+
+deleteSelectedExpensesBtn.addEventListener(
+    "click",
+    async function() {
+        const selectedExpenses = getExpenseCheckboxes()
+            .filter(checkbox => checkbox.checked)
+            .map(checkbox => checkbox.expenseRecord);
+
+        if (selectedExpenses.length === 0) {
+            showMessage("Select at least one expense to delete.", "error");
+            return;
+        }
+
+        const confirmed = await confirmExpenseDeletion(
+            `You are about to permanently delete ${selectedExpenses.length} selected expense(s).`,
+            selectedExpenses
+                .map(expense =>
+                    `${expense.expenseId} — ${expense.association}`
+                )
+                .join(", ")
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        deleteSelectedExpensesBtn.disabled = true;
+        selectAllExpenses.disabled = true;
+        showMessage(
+            `Deleting ${selectedExpenses.length} selected expense(s)...`,
+            "info"
+        );
+
+        let deletedCount = 0;
+        const failedExpenses = [];
+
+        for (const expense of selectedExpenses) {
+            const result = await sendDeleteExpenseRequest(
+                expense.expenseId,
+                expense.association
+            );
+
+            if (result.redirected) {
+                return;
+            }
+
+            if (result.ok) {
+                deletedCount++;
+            } else {
+                failedExpenses.push({
+                    ...expense,
+                    message: result.message
+                });
+            }
+        }
+
+        await loadExpenseRegistry();
+
+        if (failedExpenses.length === 0) {
+            showMessage(
+                `${deletedCount} expense(s) deleted successfully.`,
+                "success"
+            );
+            return;
+        }
+
+        const failedIds = failedExpenses
+            .map(expense => expense.expenseId)
+            .join(", ");
+
+        showMessage(
+            `${deletedCount} expense(s) deleted. ` +
+            `${failedExpenses.length} failed: ${failedIds}.`,
+            "error"
+        );
     }
 );
 </script>

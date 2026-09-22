@@ -143,7 +143,12 @@ body{padding:10px;}
 <div class="card">
 <div class="card-title">Officials</div>
 <div class="form-grid">
-<div class="form-group"><label for="status">Status</label><select id="status"><option></option><option>Cancelled</option><option>Completed</option><option>Delete</option><option>Paid</option><option>Pending</option></select></div>
+<div class="form-group">
+    <label for="status">Status</label>
+    <select id="status">
+        <option value="">Loading statuses...</option>
+    </select>
+</div>
 <div class="form-group">
     <label for="referee">Referee</label>
     <select id="referee">
@@ -477,13 +482,74 @@ async function loadOfficials() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", function() {
-    loadOfficials();
-    loadSites();
-    loadAssociations();
-    loadLevels();
-    loadSports();
-    loadAssignors();
+function getStatusTypeName(statusType) {
+    if (typeof statusType === "string") {
+        return statusType.trim();
+    }
+
+    return String(
+        statusType.statusType ??
+        statusType.StatusType ??
+        statusType.name ??
+        statusType.Name ??
+        statusType.status ??
+        statusType.Status ??
+        ""
+    ).trim();
+}
+
+async function loadStatusTypes() {
+    const statusSelect = document.getElementById("status");
+
+    try {
+        const response = await fetch("/api/loadStatusTypes");
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(
+                `Unable to load status types: ${response.status} ${text}`
+            );
+        }
+
+        const responseData = await response.json();
+        const statusTypes = Array.isArray(responseData)
+            ? responseData
+            : responseData.statusTypes ?? responseData.statuses ?? [];
+
+        const statuses = statusTypes
+            .map(getStatusTypeName)
+            .filter((status, index, values) =>
+                status && values.indexOf(status) === index
+            );
+
+        statusSelect.innerHTML =
+            '<option value="">Select Status</option>';
+
+        statuses.forEach(status => {
+            statusSelect.add(new Option(status, status));
+        });
+
+        if (statuses.length === 0) {
+            statusSelect.innerHTML =
+                '<option value="">No statuses found</option>';
+        }
+    } catch (err) {
+        console.error("Error loading status types:", err);
+        statusSelect.innerHTML =
+            '<option value="">Unable to load statuses</option>';
+    }
+}
+
+document.addEventListener("DOMContentLoaded", async function() {
+    await Promise.all([
+        loadStatusTypes(),
+        loadOfficials(),
+        loadSites(),
+        loadAssociations(),
+        loadLevels(),
+        loadSports(),
+        loadAssignors()
+    ]);
 
     setUpdateMode(false);
 });

@@ -82,6 +82,16 @@ type PaymentRegistryFilter struct {
 	TenantId    string
 }
 
+type ExpenseRegistryFilter struct {
+	ExpenseId   string
+	Date        string
+	Type        string
+	Association string
+	Amount      int64
+	Description string
+	TenantId    string
+}
+
 type OfficialDescriptor struct {
 	OfficialId  int
 	FirstName   string

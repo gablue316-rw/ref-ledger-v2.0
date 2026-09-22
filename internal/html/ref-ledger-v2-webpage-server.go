@@ -4385,6 +4385,27 @@ func PreviewOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response)
 }
 
+func GetExpenseTypes(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+
+	expenseTypes := database.GetExpenseTypes()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(expenseTypes)
+
+}
+
+func GetStatusTypes(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+
+	expenseTypes := database.GetStatusTypes()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(expenseTypes)
+
+}
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
@@ -5551,6 +5572,117 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
+
+	expenseId := strings.TrimSpace(
+		r.URL.Query().Get("expenseId"),
+	)
+
+	expenseType := strings.TrimSpace(
+		r.URL.Query().Get("expenseType"),
+	)
+
+	date := strings.TrimSpace(
+		r.URL.Query().Get("date"),
+	)
+
+	if date != "" {
+		parsedDate, err := time.Parse(
+			"2006-01-02",
+			date,
+		)
+		if err != nil {
+			http.Error(
+				w,
+				"Date must be a valid date.",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		date = fmt.Sprintf(
+			"%d/%d/%d",
+			int(parsedDate.Month()),
+			parsedDate.Day(),
+			parsedDate.Year(),
+		)
+	}
+
+	association := strings.TrimSpace(
+		r.URL.Query().Get("association"),
+	)
+
+	description := strings.TrimSpace(
+		r.URL.Query().Get("description"),
+	)
+
+	amountText := strings.TrimSpace(
+		r.URL.Query().Get("amount"),
+	)
+
+	var amount int64
+
+	if amountText != "" {
+		parsedAmount, err := strconv.ParseFloat(
+			amountText,
+			64,
+		)
+
+		if err != nil {
+			http.Error(
+				w,
+				"Amount must be a valid dollar amount.",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		if parsedAmount < 0 {
+			http.Error(
+				w,
+				"Amount cannot be negative.",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		amount = int64(math.Round(parsedAmount * 100))
+	}
+
+	expenseFilter := model.ExpenseRegistryFilter{
+		ExpenseId:   expenseId,
+		Date:        date,
+		Association: association,
+		Type:        expenseType,
+		Amount:      amount,
+		Description: description,
+		TenantId:    database.TenantId,
+	}
+
+	fmt.Println("Expense Filter:", expenseFilter)
+	expenses, err := database.GetExpenseRegistry(expenseFilter)
+	fmt.Println("Expenses:", expenses, " Error:", err)
+	if err != nil {
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(expenses); err != nil {
+		fmt.Println(
+			"Failed to encode expense registry response:",
+			err,
+		)
+	}
+
+}
+
 func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
@@ -5822,6 +5954,223 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Official created successfully"))
 }
 
+type DeleteExpenseRequest struct {
+	ExpenseId   string `json:"expenseId"`
+	Association string `json:"association"`
+}
+
+func DeleteExpenseHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(r)
+
+	if r.Method != http.MethodDelete {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	var tId = database.TenantId
+	var err error
+
+	if tId == "na" {
+		tId, err = getTenantId(r)
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	var request DeleteExpenseRequest
+
+	err = json.NewDecoder(r.Body).Decode(&request)
+	if err != nil && !errors.Is(err, io.EOF) {
+		http.Error(
+			w,
+			"Invalid delete expense request",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	// Fall back to URL parameters when no JSON value was provided.
+	if strings.TrimSpace(request.ExpenseId) == "" {
+		request.ExpenseId = r.URL.Query().Get("expenseId")
+	}
+
+	if strings.TrimSpace(request.Association) == "" {
+		request.Association = r.URL.Query().Get("association")
+	}
+
+	request.ExpenseId = strings.TrimSpace(request.ExpenseId)
+	request.Association = strings.TrimSpace(request.Association)
+	tId = strings.TrimSpace(tId)
+
+	fmt.Printf(
+		"===== Attempting to delete Expense Id %s "+
+			"for Association %s and tenant id %s =====\n",
+		request.ExpenseId,
+		request.Association,
+		tId,
+	)
+
+	if request.ExpenseId == "" {
+		http.Error(
+			w,
+			"Delete failed: expense ID is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if request.Association == "" {
+		http.Error(
+			w,
+			"Delete failed: association is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	err = ec.Delete(
+		request.ExpenseId,
+		request.Association,
+		tId,
+	)
+	if err != nil {
+		http.Error(
+			w,
+			"Delete failed: "+err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	fmt.Fprintf(
+		w,
+		"Expense %s deleted successfully.",
+		request.ExpenseId,
+	)
+}
+
+func UpdateExpense(w http.ResponseWriter, r *http.Request) {
+
+	LogVisitor(r)
+
+	if r.Method != http.MethodPut {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	expenseId := strings.TrimSpace(
+		r.URL.Query().Get("expenseId"),
+	)
+
+	association := strings.TrimSpace(
+		r.URL.Query().Get("association"),
+	)
+
+	if expenseId == "" {
+		http.Error(
+			w,
+			"Expense ID is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if association == "" {
+		http.Error(
+			w,
+			"Association is required",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	tenantId := strings.TrimSpace(database.TenantId)
+
+	if tenantId == "" || tenantId == "na" {
+		var err error
+
+		tenantId, err = getTenantId(r)
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	var expenseJSON database.ExpenseJson
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&expenseJSON); err != nil {
+		fmt.Println("JSON error:", err)
+
+		http.Error(
+			w,
+			"Invalid JSON: "+err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	fmt.Printf(
+		"Updating Expense ID %s for Association %s and Tenant ID %s\n",
+		expenseId,
+		association,
+		tenantId,
+	)
+
+	expense := ec.ConvJsonToExpense(expenseJSON)
+
+	err := ec.Update(
+		expense,
+		expenseId,
+		association,
+		tenantId,
+	)
+	if err != nil {
+		fmt.Println("Failed to update expense:", err)
+
+		// If Update returns a typed or sentinel not-found error,
+		// this can instead return http.StatusNotFound.
+		http.Error(
+			w,
+			err.Error(),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"text/plain; charset=utf-8",
+	)
+
+	w.WriteHeader(http.StatusOK)
+
+	_, _ = w.Write(
+		[]byte("Expense updated successfully"),
+	)
+}
+
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
@@ -5850,7 +6199,7 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Expense updated successfully"))
+	w.Write([]byte("Expense added successfully"))
 }
 
 func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
@@ -7410,6 +7759,8 @@ func main() {
 	mux.HandleFunc("/api/import/games/commit", authRequired(readOnlyForbidden(CommitGamesImportHandler)))
 
 	mux.HandleFunc("/api/loadOfficials", GetOfficialsHandler)
+	mux.HandleFunc("/api/loadExpenseTypes", GetExpenseTypes)
+	mux.HandleFunc("/api/loadStatusTypes", GetStatusTypes)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadLevels", GetLevelsHandler)
 	mux.HandleFunc("/api/loadSports", GetSportsHandler)
@@ -7427,11 +7778,13 @@ func main() {
 	mux.HandleFunc("/api/sport-inactive", DeactivateSport)
 	mux.HandleFunc("/api/level-active", ActivateLevel)
 	mux.HandleFunc("/api/level-inactive", DeactivateLevel)
+	mux.HandleFunc("/api/updateExpense", authRequired(readOnlyForbidden(UpdateExpense)))
 
 	mux.HandleFunc("/api/import/officials/template", authRequired(readOnlyForbidden(DownloadOfficialsTemplateHandler)))
 	mux.HandleFunc("/api/import/associations/template", authRequired(readOnlyForbidden(DownloadAssociationsTemplateHandler)))
 	mux.HandleFunc("/api/import/sites/template", authRequired(readOnlyForbidden(DownloadSitesTemplateHandler)))
 	mux.HandleFunc("/api/import/games/template", authRequired(readOnlyForbidden(DownloadGamesTemplateHandler)))
+	mux.HandleFunc("/api/deleteExpense", authRequired(readOnlyForbidden(DeleteExpenseHandler)))
 
 	mux.HandleFunc("/api/deleteAssociation/{assocId}",
 		authRequired(readOnlyForbidden(DeleteAssociation)))
@@ -7483,6 +7836,7 @@ func main() {
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
 	mux.HandleFunc("/api/payment-registry", authRequired(readOnlyForbidden(LoadPaymentRegistry)))
+	mux.HandleFunc("/api/expense-registry", authRequired(readOnlyForbidden(LoadExpenseRegistry)))
 	mux.HandleFunc("/api/deletePayment", authRequired(readOnlyForbidden(DeletePayment)))
 	mux.HandleFunc("/api/login", ValidateLogin)
 	mux.HandleFunc("/api/logout", Logout)
