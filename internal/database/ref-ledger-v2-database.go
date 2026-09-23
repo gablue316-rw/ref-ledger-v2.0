@@ -624,6 +624,78 @@ func QueryOfficials(parentCtx context.Context, dbase, collection, assoc, officia
 	return officialRecords, nil
 }
 
+func GetExpenseRegistry(
+	filter model.ExpenseRegistryFilter,
+) ([]model.ExpenseDescriptor, error) {
+
+	expenseFilter := bson.M{
+		"tenantId": filter.TenantId,
+	}
+
+	if filter.ExpenseId != "" {
+		expenseFilter["expenseId"] = filter.ExpenseId
+	}
+
+	if filter.Association != "" {
+		expenseFilter["association"] = filter.Association
+	}
+
+	if filter.Type != "" {
+		expenseFilter["type"] = filter.Type
+	}
+
+	if filter.Date != "" {
+		expenseFilter["date"] = filter.Date
+	}
+
+	if filter.Description != "" {
+		expenseFilter["description"] = filter.Description
+	}
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
+	defer cancel()
+
+	coll := Client.
+		Database(Database).
+		Collection("expenses")
+
+	cursor, err := coll.Find(ctx, expenseFilter)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"failed to find expenses: %w",
+			err,
+		)
+	}
+	defer cursor.Close(ctx)
+
+	var results []model.ExpenseDoc
+
+	if err := cursor.All(ctx, &results); err != nil {
+		return nil, fmt.Errorf(
+			"failed to read expenses: %w",
+			err,
+		)
+	}
+
+	expenseRecords := make(
+		[]model.ExpenseDescriptor,
+		0,
+		len(results),
+	)
+
+	for _, record := range results {
+		expenseRecords = append(
+			expenseRecords,
+			utils.ConvertExpenseDocToExpenseDescr(record),
+		)
+	}
+
+	return expenseRecords, nil
+}
+
 func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDescriptor, error) {
 
 	paymentFilter := bson.M{"tenantId": filter.TenantId}
@@ -971,6 +1043,28 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 		}
 	}
 
+	if len(filter.Assignor) > 0 {
+		fmt.Println("Adding Assignors...")
+		mongoFilter["assignor"] = bson.M{
+			"$in": filter.Assignor,
+		}
+	}
+
+	if len(filter.Official) > 0 {
+		fmt.Println("Adding Officials...")
+		mongoFilter["$or"] = bson.A{
+			bson.M{"referee": bson.M{"$in": filter.Official}},
+			bson.M{"u1": bson.M{"$in": filter.Official}},
+			bson.M{"u2": bson.M{"$in": filter.Official}},
+		}
+	}
+
+	if len(filter.ECO) > 0 {
+		fmt.Println("Adding ECOs...")
+		mongoFilter["eco"] = bson.M{
+			"$in": filter.ECO,
+		}
+	}
 	if strings.TrimSpace(filter.Home) != "" {
 		fmt.Println("Adding Home...")
 		mongoFilter["home"] = strings.TrimSpace(filter.Home)
@@ -998,6 +1092,37 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
 	if len(officials) > 0 {
 		mongoFilter["$or"] = officials
+	}
+
+	// Filter by gameDateTime. Dates are supplied as M/D/YYYY.
+	location, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		fmt.Println("Unable to load game timezone:", err)
+	} else {
+		dateRange := bson.M{}
+
+		if begin := strings.TrimSpace(filter.BeginDate); begin != "" {
+			beginDate, err := time.ParseInLocation("1/2/2006", begin, location)
+			if err != nil {
+				fmt.Println("Invalid Begin Date:", err)
+			} else {
+				dateRange["$gte"] = beginDate
+			}
+		}
+
+		if end := strings.TrimSpace(filter.EndDate); end != "" {
+			endDate, err := time.ParseInLocation("1/2/2006", end, location)
+			if err != nil {
+				fmt.Println("Invalid End Date:", err)
+			} else {
+				// Exclude midnight after End Date, including every game on End Date.
+				dateRange["$lt"] = endDate.AddDate(0, 0, 1)
+			}
+		}
+
+		if len(dateRange) > 0 {
+			mongoFilter["gameDateTime"] = dateRange
+		}
 	}
 
 	// Date handling (your format: M/D/YYYY)
@@ -1072,7 +1197,7 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 	text := fmt.Sprintf("%v", mongoFilter)
 
 	// Write BSON bytes to file
-	err := os.WriteFile("gamesReportFilters.bson", []byte(text), 0644)
+	err = os.WriteFile("gamesReportFilters.bson", []byte(text), 0644)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -4349,6 +4474,155 @@ func (ec *ExpensesCollection) GenerateExpenseId(expense Expense) string {
 
 }
 
+func (ec *ExpensesCollection) Delete(expenseId, association, tId string) error {
+
+	//fmt.Println("Deleting expense")
+	fmt.Println("===== Attempting to delete Expense Id", expenseId, "for Association", association, "and tenant id", tId, "=====")
+
+	expenseId = strings.TrimSpace(expenseId)
+	association = strings.TrimSpace(association)
+	tId = strings.TrimSpace(tId)
+
+	if expenseId == "" {
+		return fmt.Errorf("expense ID is required")
+	}
+
+	if association == "" {
+		return fmt.Errorf("association is required")
+	}
+
+	if tId == "" {
+		return fmt.Errorf("tenant ID is required")
+	}
+
+	filter := bson.M{
+		"expenseId":   expenseId,
+		"association": association,
+		"tenantId":    tId,
+	}
+
+	result, err := ec.Coll.DeleteOne(
+		context.Background(),
+		filter,
+	)
+
+	if err != nil {
+		return fmt.Errorf(
+			"failed to delete expense %q for association %q: %w",
+			expenseId,
+			association,
+			err,
+		)
+	}
+
+	if result.DeletedCount == 0 {
+		return fmt.Errorf(
+			"expense %q for association %q was not found",
+			expenseId,
+			association,
+		)
+	}
+
+	return nil
+}
+
+func (ec *ExpensesCollection) Update(
+	expense Expense,
+	expenseId string,
+	association string,
+	tenantId string,
+) error {
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
+	defer cancel()
+
+	expenseId = strings.TrimSpace(expenseId)
+	association = strings.TrimSpace(association)
+	tenantId = strings.TrimSpace(tenantId)
+
+	if expenseId == "" {
+		return fmt.Errorf("expense ID is required")
+	}
+
+	if association == "" {
+		return fmt.Errorf("association is required")
+	}
+
+	if tenantId == "" {
+		return fmt.Errorf("tenant ID is required")
+	}
+
+	dt, err := time.Parse("2006-01-02", expense.Date)
+	if err != nil {
+		return fmt.Errorf(
+			"invalid expense date %q: %w",
+			expense.Date,
+			err,
+		)
+	}
+
+	formattedDate := dt.Format("1/2/2006")
+
+	filter := bson.M{
+		"expenseId":   expenseId,
+		"association": association,
+		"tenantId":    tenantId,
+	}
+
+	expenseAmt, err := utils.ConvertAmtStrToInt64(expense.Amount)
+	if err != nil {
+		return fmt.Errorf(
+			"Error converting Amount: %w",
+			err,
+		)
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"date":        formattedDate,
+			"description": strings.TrimSpace(expense.Description),
+			"amount":      expenseAmt,
+			"expenseType": strings.TrimSpace(expense.Type),
+		},
+	}
+
+	result, err := ec.Coll.UpdateOne(
+		ctx,
+		filter,
+		update,
+	)
+	if err != nil {
+		ec.LastError = err
+
+		return fmt.Errorf(
+			"failed to update expense %q for association %q: %w",
+			expenseId,
+			association,
+			err,
+		)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf(
+			"expense %q for association %q was not found",
+			expenseId,
+			association,
+		)
+	}
+
+	fmt.Printf(
+		"Expense %s updated. Matched: %d, Modified: %d\n",
+		expenseId,
+		result.MatchedCount,
+		result.ModifiedCount,
+	)
+
+	return nil
+}
+
 func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
 
 	fmt.Println("Adding expense:", expense)
@@ -6075,4 +6349,127 @@ func GetAccountsReceivableReport(
 	}
 
 	return response, nil
+}
+
+func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
+
+	ctx := context.Background()
+	gameReportRecords := []model.GameView{}
+
+	var oc OfficialCollection
+
+	oc.DB = Client.Database(Database)
+	oc.Coll = oc.DB.Collection("officials")
+	//
+	// Create Filter
+	//
+	gameFilter := BuildMongoGameFilter(filter)
+
+	fmt.Println("===== GetGameReport:", gameFilter, "=====")
+
+	//
+	// Get Game Documents
+	//
+	cursor := QueryCollection(gameFilter, Database, "games")
+
+	var results []model.GameDoc
+
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.GameView{}, err
+	}
+
+	for _, r := range results {
+
+		view := model.GameView{
+			GameId:      r.GameId,
+			Time:        r.Time,
+			Sport:       r.Sport,
+			Site:        r.Site,
+			Field:       r.Field,
+			NumOfGames:  r.NumOfGames,
+			Level:       r.Level,
+			Home:        r.Home,
+			Visitor:     r.Visitor,
+			Status:      r.Status,
+			Association: r.Association,
+			Assignor:    r.Assignor,
+			ECO:         r.ECO,
+		}
+
+		gameRec := model.GameDescriptor{
+			GameFee:     utils.ConvertInt64ToAmtStr(r.GameFee),
+			NumOfGames:  utils.ConvertInt64ToStr(r.NumOfGames),
+			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),
+			Deductions:  utils.ConvertInt64ToAmtStr(r.Deductions),
+			AssignorFee: utils.ConvertInt64ToAmtStr(r.AssignorFee),
+		}
+
+		gameFee := utils.CalculateGameFee(gameRec)
+		view.GameFee = utils.ConvertInt64ToAmtStr(gameFee)
+
+		abbrev := utils.DayOfWeekAbbreviation(r.Date)
+		view.Date = fmt.Sprintf("%s (%s)", r.Date, abbrev)
+
+		if r.Referee != "" && r.Referee != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(r.Referee, r.TenantId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		if r.U1 != "" && r.U1 != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(r.U1, r.TenantId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		if r.U2 != "" && r.U2 != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(r.U2, r.TenantId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		gameReportRecords = append(gameReportRecords, view)
+
+	}
+
+	fmt.Println("Game Report Records:", gameReportRecords)
+
+	return gameReportRecords, nil
+}
+
+type ExpenseType struct {
+	ExpenseType string `json:"expenseType"`
+}
+
+func GetExpenseTypes() []ExpenseType {
+	return []ExpenseType{
+		{ExpenseType: "Food"},
+		{ExpenseType: "Hotel"},
+		{ExpenseType: "Equipment"},
+		{ExpenseType: "Mileage"},
+		{ExpenseType: "Camp Fees"},
+		{ExpenseType: "Association Dues"},
+	}
+}
+
+type StatusType struct {
+	Status string `json:"status"`
+}
+
+func GetStatusTypes() []StatusType {
+	return []StatusType{
+		{Status: "Cancelled"},
+		{Status: "Completed"},
+		{Status: "Delete"},
+		{Status: "Paid"},
+		{Status: "Pending"},
+	}
 }

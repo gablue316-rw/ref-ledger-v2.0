@@ -665,13 +665,8 @@ body {
                     <span id="statusDropdownText">Pending</span>
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </button>
-                <div class="status-options checkbox-options" role="group" aria-label="Game statuses">
-                    <label class="status-option"><input type="checkbox" id="statusAll"
-                        onchange="setAllFilterOptions('status', this.checked)"><strong>All</strong></label>
-                    <label class="status-option"><input type="checkbox" name="status" value="Completed">Completed</label>
-                    <label class="status-option"><input type="checkbox" name="status" value="Pending" checked>Pending</label>
-                    <label class="status-option"><input type="checkbox" name="status" value="Paid">Paid</label>
-                    <label class="status-option"><input type="checkbox" name="status" value="Cancelled">Cancelled</label>
+                <div id="statusOptions" class="status-options checkbox-options" role="group" aria-label="Game statuses">
+                    <span>Loading statuses...</span>
                 </div>
             </div>
         </div>
@@ -846,10 +841,6 @@ body {
 
             <select id="bulkStatus">
                 <option value="">Select Status</option>
-                <option value="Pending">Pending</option>
-                <option value="Completed">Completed</option>
-                <option value="Cancelled">Cancelled</option>
-                <option value="Delete">Delete</option>
             </select>
         </div>
         
@@ -1024,7 +1015,7 @@ body {
                 <div class="edit-game-form-grid">
                     <div class="edit-game-field"><label for="editGameId">Game ID</label><input id="editGameId" readonly></div>
                     <div class="edit-game-field"><label for="editAssociation">Association</label><input id="editAssociation" readonly></div>
-                    <div class="edit-game-field"><label for="editStatus">Status</label><select id="editStatus" required><option>Pending</option><option>Completed</option><option>Paid</option><option>Cancelled</option></select></div>
+                    <div class="edit-game-field"><label for="editStatus">Status</label><select id="editStatus" required><option value="">Loading statuses...</option></select></div>
                     <div class="edit-game-field"><label for="editDate">Date</label><input type="date" id="editDate" required></div>
                     <div class="edit-game-field"><label for="editTime">Time</label><input type="time" id="editTime" required></div>
                     <div class="edit-game-field"><label for="editSport">Sport</label><select id="editSport" required><option value="">Select Sport</option></select></div>
@@ -1065,6 +1056,114 @@ body {
 let displayedDashboardGames = [];
 let gameBeingEdited = null;
 let dashboardSites = [];
+
+function getStatusTypeName(statusType) {
+    if (typeof statusType === "string") {
+        return statusType.trim();
+    }
+
+    return String(
+        statusType.statusType ??
+        statusType.StatusType ??
+        statusType.name ??
+        statusType.Name ??
+        statusType.status ??
+        statusType.Status ??
+        ""
+    ).trim();
+}
+
+async function loadStatusTypes() {
+    const statusOptions = document.getElementById("statusOptions");
+    const bulkStatus = document.getElementById("bulkStatus");
+    const editStatus = document.getElementById("editStatus");
+
+    try {
+        const response = await fetch("/api/loadStatusTypes");
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(
+                `Unable to load status types: ${response.status} ${text}`
+            );
+        }
+
+        const responseData = await response.json();
+        const statusTypes = Array.isArray(responseData)
+            ? responseData
+            : responseData.statusTypes ?? responseData.statuses ?? [];
+
+        const statuses = statusTypes
+            .map(getStatusTypeName)
+            .filter((status, index, values) =>
+                status && values.indexOf(status) === index
+            );
+
+        statusOptions.innerHTML = "";
+
+        const allLabel = document.createElement("label");
+        allLabel.className = "status-option";
+
+        const allCheckbox = document.createElement("input");
+        allCheckbox.type = "checkbox";
+        allCheckbox.id = "statusAll";
+        allCheckbox.addEventListener("change", function () {
+            setAllFilterOptions("status", this.checked);
+        });
+
+        const allText = document.createElement("strong");
+        allText.textContent = "All";
+        allLabel.appendChild(allCheckbox);
+        allLabel.appendChild(allText);
+        statusOptions.appendChild(allLabel);
+
+        const filterStatuses = statuses.filter(
+            status => status.toLowerCase() !== "delete"
+        );
+
+        filterStatuses.forEach(status => {
+            const label = document.createElement("label");
+            label.className = "status-option";
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.name = "status";
+            checkbox.value = status;
+            checkbox.checked = status.toLowerCase() === "pending";
+
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(status));
+            statusOptions.appendChild(label);
+        });
+
+        bulkStatus.innerHTML = '<option value="">Select Status</option>';
+        statuses
+            .filter(status => status.toLowerCase() !== "paid")
+            .forEach(status => {
+                bulkStatus.add(new Option(status, status));
+            });
+
+        editStatus.innerHTML = '<option value="">Select Status</option>';
+        statuses
+            .filter(status => status.toLowerCase() !== "paid")
+            .forEach(status => {
+                editStatus.add(new Option(status, status));
+            });
+
+        if (filterStatuses.length === 0) {
+            statusOptions.textContent = "No statuses found";
+        }
+
+        updateAllFilterCheckbox("status");
+        updateDropdownText("status");
+    } catch (err) {
+        console.error("Error loading status types:", err);
+        statusOptions.textContent = "Unable to load statuses";
+        bulkStatus.innerHTML = '<option value="">Unable to load statuses</option>';
+        editStatus.innerHTML = '<option value="">Unable to load statuses</option>';
+        showMessage("Unable to load status types.", "error");
+    }
+}
 
 function getStatusClass(status) {
     if (status === "Completed") {
@@ -1151,7 +1250,7 @@ function populateEditSelect(selectId, records, placeholder, valueProperty = "nam
     });
 }
 
-function setEditSelectValue(selectId, value) {
+function setEditSelectValue(selectId, value, addMissingOption = true) {
     const select = document.getElementById(selectId);
     const normalizedValue = String(value ?? "").trim();
 
@@ -1163,14 +1262,16 @@ function setEditSelectValue(selectId, value) {
         option => option.value === normalizedValue
     );
 
-    if (normalizedValue && !hasValue) {
+    if (normalizedValue && !hasValue && addMissingOption) {
         const currentOption = document.createElement("option");
         currentOption.value = normalizedValue;
         currentOption.textContent = normalizedValue;
         select.appendChild(currentOption);
     }
 
-    select.value = normalizedValue;
+    select.value = hasValue || addMissingOption
+        ? normalizedValue
+        : "";
 }
 
 function renderGames(
@@ -1818,20 +1919,26 @@ async function fetchGames(
 async function loadLevels() {
 
     try {
-        const response = await fetch("/api/levels?active=true");
+        const [searchResponse, editResponse] = await Promise.all([
+            fetch("/api/levels"),
+            fetch("/api/levels?active=true")
+        ]);
 
-        if (!response.ok) {
-            const text = await response.text();
+        if (!searchResponse.ok || !editResponse.ok) {
+            const failedResponse = !searchResponse.ok
+                ? searchResponse
+                : editResponse;
+            const text = await failedResponse.text();
 
             console.error(
                 "loadLevels failed:",
-                response.status,
+                failedResponse.status,
                 text
             );
 
             showMessage(
                 "loadLevels failed: " +
-                response.status +
+                failedResponse.status +
                 "\n" +
                 text,
                 "error"
@@ -1840,10 +1947,13 @@ async function loadLevels() {
             return;
         }
 
-        const levels = await response.json();
+        const [levels, activeLevels] = await Promise.all([
+            searchResponse.json(),
+            editResponse.json()
+        ]);
         populateEditSelect(
             "editLevel",
-            levels,
+            activeLevels,
             "Select Level"
         );
         const levelOptions =
@@ -2068,20 +2178,26 @@ document.addEventListener("keydown", function (event) {
 async function loadSports() {
 
     try {
-        const response = await fetch("/api/loadSports?active=true");
+        const [searchResponse, editResponse] = await Promise.all([
+            fetch("/api/loadSports"),
+            fetch("/api/loadSports?active=true")
+        ]);
 
-        if (!response.ok) {
-            const text = await response.text();
+        if (!searchResponse.ok || !editResponse.ok) {
+            const failedResponse = !searchResponse.ok
+                ? searchResponse
+                : editResponse;
+            const text = await failedResponse.text();
 
             console.error(
                 "loadSports failed:",
-                response.status,
+                failedResponse.status,
                 text
             );
 
             showMessage(
                 "loadSports failed: " +
-                response.status +
+                failedResponse.status +
                 "\n" +
                 text,
                 "error"
@@ -2090,10 +2206,13 @@ async function loadSports() {
             return;
         }
 
-        const sports = await response.json();
+        const [sports, activeSports] = await Promise.all([
+            searchResponse.json(),
+            editResponse.json()
+        ]);
         populateEditSelect(
             "editSport",
-            sports,
+            activeSports,
             "Select Sport"
         );
         const sportOptions = document.getElementById("sportOptions");
@@ -2294,7 +2413,8 @@ function populateOfficialFilter(groupName, officials) {
     updateDropdownText(groupName);
 }
 
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", async function () {
+    await loadStatusTypes();
     loadSites();
     loadAssociations();
     loadAssignors();
@@ -2604,7 +2724,11 @@ async function openEditGame(gameId, association) {
     document.getElementById("editStatus").value = gameValue(gameBeingEdited, "Status") || "Pending";
     document.getElementById("editDate").value = dateInputValue(gameValue(gameBeingEdited, "Date"));
     document.getElementById("editTime").value = timeInputValue(gameValue(gameBeingEdited, "Time"));
-    setEditSelectValue("editSport", gameValue(gameBeingEdited, "Sport"));
+    setEditSelectValue(
+        "editSport",
+        gameValue(gameBeingEdited, "Sport"),
+        false
+    );
     const storedSite = String(gameValue(gameBeingEdited, "Site") || "").trim();
     const normalizedStoredSite = storedSite.toLowerCase();
     const matchingSite = dashboardSites.find(site => {
@@ -2624,7 +2748,11 @@ async function openEditGame(gameId, association) {
         );
     }
     document.getElementById("editField").value = gameValue(gameBeingEdited, "Field");
-    setEditSelectValue("editLevel", gameValue(gameBeingEdited, "Level"));
+    setEditSelectValue(
+        "editLevel",
+        gameValue(gameBeingEdited, "Level"),
+        false
+    );
     document.getElementById("editHome").value = gameValue(gameBeingEdited, "Home");
     document.getElementById("editVisitor").value = gameValue(gameBeingEdited, "Visitor");
     document.getElementById("editNumOfGames").value = gameValue(gameBeingEdited, "NumOfGames") || 1;

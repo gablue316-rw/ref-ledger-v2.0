@@ -788,6 +788,40 @@ func ConvertExpenseDescrToExpenseDoc(expenseDescr model.ExpenseDescriptor) model
 	return doc
 }
 
+func ConvertHTMLDate(dateValue string) (string, error) {
+
+	if dateValue == "" {
+		return "", nil
+	}
+
+	parsedDate, err := time.Parse("2006-01-02", dateValue)
+	if err != nil {
+		return "", fmt.Errorf("invalid date %q: %w", dateValue, err)
+	}
+
+	return parsedDate.Format("1/2/2006"), nil
+}
+
+func CalculateGameFee(gameRec model.GameDescriptor) int64 {
+
+	var gameFee int64
+	var gFee int64
+	var numOfGames int64
+	var travelPay int64
+	var deductions int64
+	var assignorFee int64
+
+	gFee, _ = ConvertAmtStrToInt64(gameRec.GameFee)
+	numOfGames, _ = ConvertStrToInt64(gameRec.NumOfGames)
+	travelPay, _ = ConvertAmtStrToInt64(gameRec.TravelPay)
+	deductions, _ = ConvertAmtStrToInt64(gameRec.Deductions)
+	assignorFee, _ = ConvertAmtStrToInt64(gameRec.AssignorFee)
+
+	gameFee = gFee*numOfGames + travelPay - deductions - assignorFee
+
+	return gameFee
+}
+
 func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescriptor {
 
 	expenseAmt := ConvertInt64ToAmtStr(doc.Amount)

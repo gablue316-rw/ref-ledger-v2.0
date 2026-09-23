@@ -316,26 +316,6 @@ func PrintReport(report []string) {
 
 }
 
-func CalculateGameFee(gameRec model.GameDescriptor) int64 {
-
-	var gameFee int64
-	var gFee int64
-	var numOfGames int64
-	var travelPay int64
-	var deductions int64
-	var assignorFee int64
-
-	gFee, _ = utils.ConvertAmtStrToInt64(gameRec.GameFee)
-	numOfGames, _ = utils.ConvertStrToInt64(gameRec.NumOfGames)
-	travelPay, _ = utils.ConvertAmtStrToInt64(gameRec.TravelPay)
-	deductions, _ = utils.ConvertAmtStrToInt64(gameRec.Deductions)
-	assignorFee, _ = utils.ConvertAmtStrToInt64(gameRec.AssignorFee)
-
-	gameFee = gFee*numOfGames + travelPay - deductions - assignorFee
-
-	return gameFee
-}
-
 func GenerateReconciliationReport(records []model.PaymentDescriptor, tid string) []string {
 
 	var totalPayments int64 = 0
@@ -1067,7 +1047,7 @@ func GenerateGameReport(records []model.GameDescriptor) []string {
 		numOfGames, _ := utils.ConvertStrToInt64(rec.NumOfGames)
 		totalGames += numOfGames
 
-		gameFee := CalculateGameFee(rec)
+		gameFee := utils.CalculateGameFee(rec)
 		ReportAssocGameTotals.Update(rec.Association, rec.Status, numOfGames, gameFee)
 
 		grandTot += gameFee
