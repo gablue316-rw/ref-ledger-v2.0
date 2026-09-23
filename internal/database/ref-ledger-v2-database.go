@@ -479,7 +479,7 @@ func GetGameFee(gameIds []int64) (int64, error) {
 }
 
 // Used by HTML Web Pages
-func GetGameByGameIdAndAssoc(assoc string, gameId string) (model.GameDescriptor, error) {
+func GetGameByGameIdAndAssoc(assoc, gameId, tId string) (model.GameDescriptor, error) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
@@ -497,6 +497,7 @@ func GetGameByGameIdAndAssoc(assoc string, gameId string) (model.GameDescriptor,
 	filter := bson.M{
 		"gameId":      id,
 		"association": assoc,
+		"tenantId":    tId,
 	}
 
 	db := Client.Database(Database)

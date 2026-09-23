@@ -6525,17 +6525,25 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
 
-	var tId string = database.TenantId
-
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(
+			w,
+			"Invalid tenant ID",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	association := r.PathValue("association")
 	gameID := r.PathValue("gameid")
 
-	game, err := database.GetGameByGameIdAndAssoc(association, gameID)
+	game, err := database.GetGameByGameIdAndAssoc(association, gameID, tId)
 	if err != nil {
 		http.Error(w, "Game not found", http.StatusNotFound)
 		return

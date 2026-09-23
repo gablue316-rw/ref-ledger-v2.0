@@ -2680,13 +2680,30 @@ function timeInputValue(value) {
 }
 
 async function openEditGame(gameId, association) {
-    gameBeingEdited = displayedDashboardGames.find(game =>
-        String(gameValue(game, "GameId")) === String(gameId) &&
-        String(gameValue(game, "Association")) === String(association)
-    );
+    gameBeingEdited = null;
 
-    if (!gameBeingEdited) {
-        showMessage(`Game ${gameId} could not be loaded for editing.`, "error");
+    try {
+        const response = await fetch(
+            `/api/game/${encodeURIComponent(association)}/${encodeURIComponent(gameId)}`
+        );
+
+        if (response.status === 401) {
+            window.location.href = "/login";
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                response.status === 404
+                    ? `Game ${gameId} was not found.`
+                    : `Unable to load game ${gameId} (HTTP ${response.status}).`
+            );
+        }
+
+        gameBeingEdited = await response.json();
+    } catch (error) {
+        console.error("Failed to load game for editing:", error);
+        showMessage(error.message || `Game ${gameId} could not be loaded for editing.`, "error");
         return;
     }
 
@@ -2756,10 +2773,10 @@ async function openEditGame(gameId, association) {
     document.getElementById("editHome").value = gameValue(gameBeingEdited, "Home");
     document.getElementById("editVisitor").value = gameValue(gameBeingEdited, "Visitor");
     document.getElementById("editNumOfGames").value = gameValue(gameBeingEdited, "NumOfGames") || 1;
-    document.getElementById("editGameFee").value = currencyInputValue(gameValue(gameBeingEdited, "GameFee"));
-    document.getElementById("editTravelPay").value = currencyInputValue(gameValue(gameBeingEdited, "TravelPay"));
-    document.getElementById("editAssignorFee").value = currencyInputValue(gameValue(gameBeingEdited, "AssignorFee"));
-    document.getElementById("editDeductions").value = currencyInputValue(gameValue(gameBeingEdited, "Deductions"));
+    document.getElementById("editGameFee").value = gameValue(gameBeingEdited, "GameFee");
+    document.getElementById("editTravelPay").value = gameValue(gameBeingEdited, "TravelPay");
+    document.getElementById("editAssignorFee").value = gameValue(gameBeingEdited, "AssignorFee");
+    document.getElementById("editDeductions").value = gameValue(gameBeingEdited, "Deductions");
     setEditSelectValue(
         "editReferee",
         gameValue(gameBeingEdited, "Referee") ||
