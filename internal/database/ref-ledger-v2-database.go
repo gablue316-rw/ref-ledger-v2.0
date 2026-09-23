@@ -5986,7 +5986,6 @@ func GetExpenseReports(
 	// Load games.
 	gameFilter := bson.M{
 		"tenantId": tId,
-		"status":   "Paid",
 	}
 
 	if len(selectedAssociations) > 0 {
@@ -6095,7 +6094,7 @@ func GetExpenseReports(
 		case "food":
 			record.Food += expense.Amount
 
-		case "dues":
+		case "dues", "association dues":
 			record.Dues += expense.Amount
 
 		case "camp fees", "camp fee", "campfees":
