@@ -256,6 +256,26 @@
             font-weight: bold;
         }
 
+        .game-report-summary {
+            margin-bottom: 12px;
+            color: #334155;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .game-report-table th,
+        .game-report-table td {
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        .game-report-table th:nth-child(9),
+        .game-report-table td:nth-child(9),
+        .game-report-table th:nth-child(11),
+        .game-report-table td:nth-child(11) {
+            text-align: right;
+        }
+
         .report-message {
             white-space: pre-wrap;
             font-family: Consolas, Monaco, monospace;
@@ -290,6 +310,260 @@
         <h1>Ref Ledger V2.0 Reports</h1>
         <p>Select a report below and choose the filters for that report.</p>
     </div>
+
+    <section class="report-block" aria-labelledby="gameReportTitle">
+        <div class="report-block-header">
+            <h2 id="gameReportTitle">Game Report</h2>
+            <p>Generate a detailed game report for one, multiple, or all associations.</p>
+        </div>
+
+        <div class="report-controls">
+            <div class="filter-group">
+                <label>Associations</label>
+                <div class="checkbox-dropdown" id="gameAssociationDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameAssociationDropdown')">
+                        <span id="gameAssociationSummary">All Associations</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="gameAssociationOptions">
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="filter-group">
+                <label>Status</label>
+                <div
+                    class="checkbox-dropdown"
+                    id="gameStatusDropdown"
+                >
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameStatusDropdown')"
+                    >
+                        <span id="gameStatusSummary">All Statuses</span>
+                    </button>
+
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="gameStatusOptions"
+                    ></div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Sites</label>
+                <div
+                    class="checkbox-dropdown"
+                    id="gameSiteDropdown"
+                >
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameSiteDropdown')"
+                    >
+                        <span id="gameSiteSummary">All Sites</span>
+                    </button>
+
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="gameSiteOptions"
+                    ></div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Levels</label>
+                <div
+                    class="checkbox-dropdown"
+                    id="gameLevelDropdown"
+                >
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameLevelDropdown')"
+                    >
+                        <span id="gameLevelSummary">All Levels</span>
+                    </button>
+
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="gameLevelOptions"
+                    ></div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Sports</label>
+                <div
+                    class="checkbox-dropdown"
+                    id="gameSportDropdown"
+                >
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameSportDropdown')"
+                    >
+                        <span id="gameSportSummary">All Sports</span>
+                    </button>
+
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="gameSportOptions"
+                    ></div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Officials</label>
+                <div class="checkbox-dropdown" id="gameOfficialDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameOfficialDropdown')">
+                        <span id="gameOfficialSummary">All Officials</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="gameOfficialOptions">
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>ECOs</label>
+                <div class="checkbox-dropdown" id="gameEcoDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameEcoDropdown')">
+                        <span id="gameEcoSummary">All ECOs</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="gameEcoOptions">
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Assignors</label>
+                <div class="checkbox-dropdown" id="gameAssignorDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameAssignorDropdown')">
+                        <span id="gameAssignorSummary">All Assignors</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="gameAssignorOptions">
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label>Date Range</label>
+                <div class="checkbox-dropdown" id="gameDateRangeDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('gameDateRangeDropdown')">
+                        <span id="gameDateRangeSummary">Select Date Range</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        role="group"
+                        aria-label="Game report date ranges">
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="yesterday" onchange="selectGameDateRange(this)">Yesterday</label>
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="today" onchange="selectGameDateRange(this)">Today</label>
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="tomorrow" onchange="selectGameDateRange(this)">Tomorrow</label>
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="lastWeek" onchange="selectGameDateRange(this)">Last Week</label>
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="thisWeek" onchange="selectGameDateRange(this)">This Week</label>
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="nextWeek" onchange="selectGameDateRange(this)">Next Week</label>
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="lastMonth" onchange="selectGameDateRange(this)">Last Month</label>
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="thisMonth" onchange="selectGameDateRange(this)">This Month</label>
+                        <label class="checkbox-option"><input type="checkbox" name="gameDateRange" value="nextMonth" onchange="selectGameDateRange(this)">Next Month</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label for="gameBeginDate">Begin Date</label>
+                <input
+                    type="date"
+                    id="gameBeginDate"
+                    onchange="clearGameDateRangeSelection()">
+            </div>
+
+            <div class="filter-group">
+                <label for="gameEndDate">End Date</label>
+                <input
+                    type="date"
+                    id="gameEndDate"
+                    onchange="clearGameDateRangeSelection()">
+            </div>
+
+            <div class="filter-group">
+                <label for="gameHome">Home</label>
+                <input
+                    type="text"
+                    id="gameHome"
+                    placeholder="Enter home team"
+                    autocomplete="off"
+                >
+            </div>
+
+            <div class="filter-group">
+                <label for="gameVisitor">Visitor</label>
+                <input
+                    type="text"
+                    id="gameVisitor"
+                    placeholder="Enter visiting team"
+                    autocomplete="off"
+                >
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="button"
+                    class="btn btn-create"
+                    onclick="generateGameReport()">
+                    Create Report
+                </button>
+
+                <button
+                    type="button"
+                    class="btn btn-clear"
+                    onclick="clearGameReport()">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
 
     <section class="report-block" aria-labelledby="financialReportTitle">
         <div class="report-block-header">
@@ -529,10 +803,30 @@ function selectedValues(name) {
 function updateCheckboxSummary(name) {
     const values = selectedValues(name);
     const summary = document.getElementById(`${name}Summary`);
-    const allLabel = "All Associations";
-    summary.textContent = values.length === 0
-        ? allLabel
-        : values.length === 1 ? values[0] : `${values.length} selected`;
+
+    const allLabels = {
+        gameAssociation: "All Associations",
+        financialAssociation: "All Associations",
+        expenseAssociation: "All Associations",
+        accountsReceivableAssociation: "All Associations",
+        reconciliationAssociation: "All Associations",
+        gameStatus: "All Statuses",
+        gameSite: "All Sites",
+        gameLevel: "All Levels",
+        gameSport: "All Sports",
+        gameOfficial: "All Officials",
+        gameEco: "All ECOs",
+        gameAssignor: "All Assignors"
+    };
+
+    const allLabel = allLabels[name] ?? "All";
+
+    summary.textContent =
+        values.length === 0
+            ? allLabel
+            : values.length === 1
+                ? values[0]
+                : `${values.length} selected`;
 }
 
 function setupCheckboxDropdown(name) {
@@ -570,6 +864,14 @@ async function loadAssociations() {
         );
         setupCheckboxDropdown("financialAssociation");
 
+        fillCheckboxOptions("gameAssociation", "gameAssociationOptions",
+            financialAssociations.map(association => ({
+                value: association,
+                text: association
+            }))
+        );
+        setupCheckboxDropdown("gameAssociation");
+
         fillCheckboxOptions("expenseAssociation", "expenseAssociationOptions",
             financialAssociations.map(association => ({
                 value: association,
@@ -604,11 +906,551 @@ async function loadAssociations() {
     }
 }
 
+function getStatusTypeName(statusType) {
+    if (typeof statusType === "string") {
+        return statusType.trim();
+    }
+
+    if (!statusType || typeof statusType !== "object") {
+        return "";
+    }
+
+    return String(
+        statusType.statusType ??
+        statusType.StatusType ??
+        statusType.status ??
+        statusType.Status ??
+        statusType.name ??
+        statusType.Name ??
+        ""
+    ).trim();
+}
+
+async function loadStatusTypes() {
+    try {
+        const response = await fetch("/api/loadStatusTypes");
+
+        if (!response.ok) {
+            const text = await response.text();
+
+            throw new Error(
+                `Unable to load status types: ` +
+                `${response.status} ${text}`
+            );
+        }
+
+        const responseData = await response.json();
+
+        const statusTypes = Array.isArray(responseData)
+            ? responseData
+            : responseData.statusTypes ??
+                responseData.statuses ??
+                [];
+
+        const statuses = statusTypes
+            .map(getStatusTypeName)
+            .filter((status, index, values) =>
+                status &&
+                values.indexOf(status) === index
+            );
+
+        const reportStatuses = statuses.filter(
+            status => status.toLowerCase() !== "delete"
+        );
+
+        fillCheckboxOptions(
+            "gameStatus",
+            "gameStatusOptions",
+            reportStatuses.map(status => ({
+                value: status,
+                text: status
+            }))
+        );
+
+        setupCheckboxDropdown("gameStatus");
+    }
+    catch (err) {
+        console.error(
+            "Error loading status types:",
+            err
+        );
+
+        const options = document.getElementById(
+            "gameStatusOptions"
+        );
+
+        options.textContent = "Unable to load statuses";
+    }
+}
+
+async function loadSites() {
+    try {
+        const response = await fetch("/api/loadSites");
+
+        if (!response.ok) {
+            const text = await response.text();
+
+            throw new Error(
+                `Unable to load sites: ${response.status} ${text}`
+            );
+        }
+
+        const responseData = await response.json();
+        const siteRecords = Array.isArray(responseData)
+            ? responseData
+            : responseData.sites ?? responseData.data ?? [];
+
+        const seenSites = new Set();
+        const sites = [];
+
+        siteRecords.forEach(site => {
+            let value = "";
+            let text = "";
+
+            if (typeof site === "string") {
+                value = site.trim();
+                text = value;
+            }
+            else if (site && typeof site === "object") {
+                value = String(
+                    site.id ??
+                    site.ID ??
+                    site.siteId ??
+                    site.SiteId ??
+                    site.siteID ??
+                    site.SiteID ??
+                    site.name ??
+                    site.Name ??
+                    site.site ??
+                    site.Site ??
+                    ""
+                ).trim();
+
+                text = String(
+                    site.name ??
+                    site.Name ??
+                    site.site ??
+                    site.Site ??
+                    value
+                ).trim();
+            }
+
+            if (value !== "" && !seenSites.has(value)) {
+                seenSites.add(value);
+                sites.push({ value, text: text || value });
+            }
+        });
+
+        fillCheckboxOptions(
+            "gameSite",
+            "gameSiteOptions",
+            sites
+        );
+
+        setupCheckboxDropdown("gameSite");
+    }
+    catch (err) {
+        console.error("Error loading sites:", err);
+
+        const options = document.getElementById("gameSiteOptions");
+
+        if (options) {
+            options.textContent = "Unable to load sites";
+        }
+    }
+}
+
+async function loadLevels() {
+    try {
+        const response = await fetch("/api/levels");
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(
+                `Unable to load levels: ${response.status} ${text}`
+            );
+        }
+
+        const responseData = await response.json();
+        const levelRecords = Array.isArray(responseData)
+            ? responseData
+            : responseData.levels ?? responseData.data ?? [];
+
+        const seenLevels = new Set();
+        const levels = [];
+
+        levelRecords.forEach(level => {
+            let value = "";
+            let text = "";
+
+            if (typeof level === "string") {
+                value = level.trim();
+                text = value;
+            }
+            else if (level && typeof level === "object") {
+                value = String(
+                    level.id ??
+                    level.ID ??
+                    level.levelId ??
+                    level.LevelId ??
+                    level.levelID ??
+                    level.LevelID ??
+                    level.name ??
+                    level.Name ??
+                    level.level ??
+                    level.Level ??
+                    ""
+                ).trim();
+
+                text = String(
+                    level.name ??
+                    level.Name ??
+                    level.level ??
+                    level.Level ??
+                    value
+                ).trim();
+            }
+
+            if (value !== "" && !seenLevels.has(value)) {
+                seenLevels.add(value);
+                levels.push({ value, text: text || value });
+            }
+        });
+
+        fillCheckboxOptions(
+            "gameLevel",
+            "gameLevelOptions",
+            levels
+        );
+
+        setupCheckboxDropdown("gameLevel");
+    }
+    catch (err) {
+        console.error("Error loading levels:", err);
+
+        const options = document.getElementById("gameLevelOptions");
+
+        if (options) {
+            options.textContent = "Unable to load levels";
+        }
+    }
+}
+
+async function loadSports() {
+    try {
+        const response = await fetch("/api/loadSports");
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(
+                `Unable to load sports: ${response.status} ${text}`
+            );
+        }
+
+        const responseData = await response.json();
+        const sportRecords = Array.isArray(responseData)
+            ? responseData
+            : responseData.sports ?? responseData.data ?? [];
+
+        const seenSports = new Set();
+        const sports = [];
+
+        sportRecords.forEach(sport => {
+            let value = "";
+            let text = "";
+
+            if (typeof sport === "string") {
+                value = sport.trim();
+                text = value;
+            }
+            else if (sport && typeof sport === "object") {
+                value = String(
+                    sport.id ??
+                    sport.ID ??
+                    sport.sportId ??
+                    sport.SportId ??
+                    sport.sportID ??
+                    sport.SportID ??
+                    sport.name ??
+                    sport.Name ??
+                    sport.sport ??
+                    sport.Sport ??
+                    ""
+                ).trim();
+
+                text = String(
+                    sport.name ??
+                    sport.Name ??
+                    sport.sport ??
+                    sport.Sport ??
+                    value
+                ).trim();
+            }
+
+            if (value !== "" && !seenSports.has(value)) {
+                seenSports.add(value);
+                sports.push({ value, text: text || value });
+            }
+        });
+
+        fillCheckboxOptions(
+            "gameSport",
+            "gameSportOptions",
+            sports
+        );
+
+        setupCheckboxDropdown("gameSport");
+    }
+    catch (err) {
+        console.error("Error loading sports:", err);
+
+        const options = document.getElementById("gameSportOptions");
+
+        if (options) {
+            options.textContent = "Unable to load sports";
+        }
+    }
+}
+
+function namedOptions(records, fields) {
+    const seen = new Set();
+    const options = [];
+
+    (Array.isArray(records) ? records : []).forEach(record => {
+        let value = "";
+
+        if (typeof record === "string") {
+            value = record.trim();
+        }
+        else if (record && typeof record === "object") {
+            for (const field of fields) {
+                const candidate = record[field];
+
+                if (candidate !== undefined && candidate !== null) {
+                    value = String(candidate).trim();
+
+                    if (value !== "") {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (value !== "" && !seen.has(value)) {
+            seen.add(value);
+            options.push({ value, text: value });
+        }
+    });
+
+    return options;
+}
+
+function formatGameDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+}
+
+function addGameReportDays(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
+
+function selectGameDateRange(selectedCheckbox) {
+    document.querySelectorAll('input[name="gameDateRange"]').forEach(
+        checkbox => {
+            checkbox.checked =
+                checkbox === selectedCheckbox && selectedCheckbox.checked;
+        }
+    );
+
+    if (!selectedCheckbox.checked) {
+        document.getElementById("gameDateRangeSummary").textContent =
+            "Select Date Range";
+        document.getElementById("gameBeginDate").value = "";
+        document.getElementById("gameEndDate").value = "";
+        return;
+    }
+
+    applyGameDateRange(selectedCheckbox.value);
+
+    document.getElementById("gameDateRangeSummary").textContent =
+        selectedCheckbox.parentElement.textContent.trim();
+
+    const dropdown = document.getElementById("gameDateRangeDropdown");
+    dropdown?.classList.remove("open");
+    dropdown
+        ?.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+}
+
+function applyGameDateRange(dateRange) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let beginDate;
+    let endDate;
+
+    switch (dateRange) {
+        case "yesterday":
+            beginDate = endDate = addGameReportDays(today, -1);
+            break;
+        case "today":
+            beginDate = endDate = new Date(today);
+            break;
+        case "tomorrow":
+            beginDate = endDate = addGameReportDays(today, 1);
+            break;
+        case "lastWeek": {
+            const thisSunday = addGameReportDays(today, -today.getDay());
+            beginDate = addGameReportDays(thisSunday, -7);
+            endDate = addGameReportDays(thisSunday, -1);
+            break;
+        }
+        case "thisWeek":
+            beginDate = addGameReportDays(today, -today.getDay());
+            endDate = addGameReportDays(beginDate, 6);
+            break;
+        case "nextWeek":
+            beginDate = addGameReportDays(today, 7 - today.getDay());
+            endDate = addGameReportDays(beginDate, 6);
+            break;
+        case "lastMonth":
+            beginDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case "thisMonth":
+            beginDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            break;
+        case "nextMonth":
+            beginDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+            break;
+        default:
+            return;
+    }
+
+    document.getElementById("gameBeginDate").value =
+        formatGameDateForInput(beginDate);
+    document.getElementById("gameEndDate").value =
+        formatGameDateForInput(endDate);
+}
+
+function clearGameDateRangeSelection() {
+    document.querySelectorAll('input[name="gameDateRange"]').forEach(
+        checkbox => {
+            checkbox.checked = false;
+        }
+    );
+
+    document.getElementById("gameDateRangeSummary").textContent =
+        "Select Date Range";
+}
+
+async function loadOfficials() {
+    try {
+        const response = await fetch("/api/loadOfficials");
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(
+                `Unable to load officials: ${response.status} ${text}`
+            );
+        }
+
+        const responseData = await response.json();
+        const officialRecords = Array.isArray(responseData)
+            ? responseData
+            : responseData.officials ?? responseData.data ?? [];
+
+        const officials = namedOptions(
+            officialRecords,
+            ["name", "Name", "official", "Official"]
+        );
+
+        fillCheckboxOptions(
+            "gameOfficial",
+            "gameOfficialOptions",
+            officials
+        );
+        setupCheckboxDropdown("gameOfficial");
+
+        fillCheckboxOptions(
+            "gameEco",
+            "gameEcoOptions",
+            officials
+        );
+        setupCheckboxDropdown("gameEco");
+    }
+    catch (err) {
+        console.error("Error loading officials and ECOs:", err);
+
+        ["gameOfficialOptions", "gameEcoOptions"].forEach(id => {
+            const options = document.getElementById(id);
+
+            if (options) {
+                options.textContent = "Unable to load officials";
+            }
+        });
+    }
+}
+
+async function loadAssignors() {
+    try {
+        const response = await fetch("/api/loadAssignors");
+
+        if (!response.ok) {
+            const text = await response.text();
+            throw new Error(
+                `Unable to load assignors: ${response.status} ${text}`
+            );
+        }
+
+        const responseData = await response.json();
+        const assignorRecords = Array.isArray(responseData)
+            ? responseData
+            : responseData.assignors ?? responseData.data ?? [];
+
+        const assignors = namedOptions(
+            assignorRecords,
+            ["name", "Name", "assignor", "Assignor"]
+        );
+
+        fillCheckboxOptions(
+            "gameAssignor",
+            "gameAssignorOptions",
+            assignors
+        );
+        setupCheckboxDropdown("gameAssignor");
+    }
+    catch (err) {
+        console.error("Error loading assignors:", err);
+
+        const options = document.getElementById("gameAssignorOptions");
+
+        if (options) {
+            options.textContent = "Unable to load assignors";
+        }
+    }
+}
+
 let financialAssociations = [];
 
-document.addEventListener("DOMContentLoaded", function() {
-    loadAssociations();
-})
+document.addEventListener("DOMContentLoaded", async function() {
+    await Promise.all([
+        loadAssociations(),
+        loadStatusTypes(),
+        loadSites(),
+        loadLevels(),
+        loadSports(),
+        loadOfficials(),
+        loadAssignors()
+    ]);
+});
 
 document.addEventListener("click", function(event) {
     if (!event.target.closest(".checkbox-dropdown")) {
@@ -647,6 +1489,163 @@ function formatMileage(value) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     }).format(value);
+}
+
+function gameField(row, ...names) {
+    for (const name of names) {
+        if (row[name] !== undefined && row[name] !== null) {
+            return row[name];
+        }
+    }
+
+    return "";
+}
+
+function parseGameFee(value) {
+    if (typeof value === "number") {
+        return Number.isFinite(value) ? value / 100 : 0;
+    }
+
+    return parseReportNumber(value);
+}
+
+function formatGameDate(value) {
+    if (!value) return "";
+
+    const text = String(value);
+
+    // Game report dates are already formatted by the Go backend,
+    // for example: "9/17/2026 (Thu)".
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}(?:\s+\([A-Za-z]{3}\))?$/.test(text)) {
+        return text;
+    }
+
+    const date = new Date(text);
+
+    if (Number.isNaN(date.getTime())) {
+        return text;
+    }
+
+    return date.toLocaleDateString("en-US");
+}
+
+function getOfficials(row) {
+    const officials = gameField(row, "officials", "Officials");
+
+    if (Array.isArray(officials)) {
+        const names = officials
+            .map(official => {
+                if (typeof official === "string") {
+                    return official.trim();
+                }
+
+                if (official && typeof official === "object") {
+                    return String(
+                        official.Name ?? official.name ?? ""
+                    ).trim();
+                }
+
+                return "";
+            })
+            .filter(Boolean);
+
+        return names.join(", ") || "Unassigned";
+    }
+
+    if (officials) return String(officials);
+
+    return [
+        gameField(row, "referee", "Referee"),
+        gameField(row, "u1", "U1"),
+        gameField(row, "u2", "U2")
+    ]
+        .filter(value => value && value !== "Unassigned")
+        .join(", ") || "Unassigned";
+}
+
+function renderGameReport(report) {
+    const rows = getFinancialReportRows(report)
+        .filter(row => row && typeof row === "object")
+        .sort((a, b) => {
+            const dateA = new Date(gameField(
+                a, "gameDateTime", "GameDateTime", "date", "Date"
+            ) || 0).getTime();
+            const dateB = new Date(gameField(
+                b, "gameDateTime", "GameDateTime", "date", "Date"
+            ) || 0).getTime();
+
+            if (dateA !== dateB) return dateA - dateB;
+            return String(gameField(a, "gameId", "gameID", "GameId", "GameID"))
+                .localeCompare(
+                String(gameField(b, "gameId", "gameID", "GameId", "GameID")),
+                undefined,
+                { numeric: true }
+            );
+        });
+
+    if (rows.length === 0) {
+        setReportMessage("No game records were returned.");
+        return;
+    }
+
+    const columns = [
+        { label: "Game ID", value: row => gameField(row, "gameId", "gameID", "GameId", "GameID") },
+        { label: "Date", value: row => formatGameDate(gameField(row, "date", "Date", "gameDateTime", "GameDateTime")) },
+        { label: "Time", value: row => gameField(row, "time", "Time") },
+        { label: "Sport", value: row => gameField(row, "sport", "Sport") },
+        { label: "Site", value: row => gameField(row, "siteName", "SiteName", "site", "Site") },
+        { label: "Field", value: row => gameField(row, "field", "Field") },
+        { label: "Home", value: row => gameField(row, "home", "Home") },
+        { label: "Visitor", value: row => gameField(row, "visitor", "Visitor") },
+        { label: "Num of Games", value: row => gameField(row, "numOfGames", "NumOfGames") || 1 },
+        { label: "Level", value: row => gameField(row, "level", "Level") },
+        { label: "Game Fee", value: row => formatCurrency(parseGameFee(gameField(row, "gameFee", "GameFee"))) },
+        { label: "Assoc", value: row => gameField(row, "association", "Association") },
+        { label: "Status", value: row => gameField(row, "status", "Status") },
+        { label: "Officials", value: row => getOfficials(row) },
+        { label: "ECO", value: row => gameField(row, "eco", "Eco", "ECO") || "Unassigned" },
+        { label: "Assignor", value: row => gameField(row, "assignor", "Assignor") || "Unassigned" }
+    ];
+
+    let totalGames = 0;
+    let totalGameFees = 0;
+    const table = document.createElement("table");
+    table.className = "financial-report-table game-report-table";
+    const headerRow = table.createTHead().insertRow();
+
+    columns.forEach(column => {
+        const th = document.createElement("th");
+        th.scope = "col";
+        th.textContent = column.label;
+        headerRow.appendChild(th);
+    });
+
+    const tbody = table.createTBody();
+
+    rows.forEach(row => {
+        const numberOfGames = Math.max(
+            0,
+            parseReportNumber(gameField(row, "numOfGames", "NumOfGames")) || 1
+        );
+        const gameFee = parseGameFee(gameField(row, "gameFee", "GameFee"));
+        totalGames += numberOfGames;
+        totalGameFees += numberOfGames * gameFee;
+
+        const tableRow = tbody.insertRow();
+        columns.forEach(column => {
+            tableRow.insertCell().textContent = String(column.value(row) ?? "");
+        });
+    });
+
+    const summary = document.createElement("div");
+    summary.className = "game-report-summary";
+    summary.textContent = `${rows.length} assignments displayed — ` +
+        `Total number of games: ${totalGames} — ` +
+        `Total game fees: ${formatCurrency(totalGameFees)}`;
+
+    const container = document.getElementById("reportContainer");
+    container.className = "";
+    container.replaceChildren(summary, table);
 }
 
 function getFinancialReportRows(report) {
@@ -987,6 +1986,169 @@ async function generateFinancialReport() {
     }
 }
 
+async function generateGameReport() {
+    const selectedAssociations =
+        selectedValues("gameAssociation");
+
+    const allAssociationCheckbox = document.querySelector(
+        'input[data-all-for="gameAssociation"]'
+    );
+
+    const associations = allAssociationCheckbox?.checked
+        ? financialAssociations
+        : selectedAssociations;
+
+    const selectedStatuses =
+        selectedValues("gameStatus");
+
+    const allStatusCheckbox = document.querySelector(
+        'input[data-all-for="gameStatus"]'
+    );
+
+    const selectedSites = selectedValues("gameSite");
+
+    const allSiteCheckbox = document.querySelector(
+        'input[data-all-for="gameSite"]'
+    );
+
+    const selectedLevels = selectedValues("gameLevel");
+
+    const allLevelCheckbox = document.querySelector(
+        'input[data-all-for="gameLevel"]'
+    );
+
+    const selectedSports = selectedValues("gameSport");
+
+    const allSportCheckbox = document.querySelector(
+        'input[data-all-for="gameSport"]'
+    );
+
+    const selectedOfficials = selectedValues("gameOfficial");
+    const allOfficialCheckbox = document.querySelector(
+        'input[data-all-for="gameOfficial"]'
+    );
+
+    const selectedEcos = selectedValues("gameEco");
+    const allEcoCheckbox = document.querySelector(
+        'input[data-all-for="gameEco"]'
+    );
+
+    const selectedAssignors = selectedValues("gameAssignor");
+    const allAssignorCheckbox = document.querySelector(
+        'input[data-all-for="gameAssignor"]'
+    );
+
+    const home = document.getElementById("gameHome").value.trim();
+    const visitor = document.getElementById("gameVisitor").value.trim();
+    const beginDate = document.getElementById("gameBeginDate").value;
+    const endDate = document.getElementById("gameEndDate").value;
+
+    const params = new URLSearchParams();
+
+    params.append("type", "Game");
+
+    associations.forEach(association => {
+        params.append("association", association);
+    });
+
+    // An empty status filter means include all statuses.
+    if (!allStatusCheckbox?.checked) {
+        selectedStatuses.forEach(status => {
+            params.append("status", status);
+        });
+    }
+
+    // An empty site filter means include all sites.
+    if (!allSiteCheckbox?.checked) {
+        selectedSites.forEach(site => {
+            params.append("site", site);
+        });
+    }
+
+    // An empty level filter means include all levels.
+    if (!allLevelCheckbox?.checked) {
+        selectedLevels.forEach(level => {
+            params.append("level", level);
+        });
+    }
+
+    // An empty sport filter means include all sports.
+    if (!allSportCheckbox?.checked) {
+        selectedSports.forEach(sport => {
+            params.append("sport", sport);
+        });
+    }
+
+    // An empty official filter means include all officials.
+    if (!allOfficialCheckbox?.checked) {
+        selectedOfficials.forEach(official => {
+            params.append("official", official);
+        });
+    }
+
+    // An empty ECO filter means include all ECOs.
+    if (!allEcoCheckbox?.checked) {
+        selectedEcos.forEach(eco => {
+            params.append("eco", eco);
+        });
+    }
+
+    // An empty assignor filter means include all assignors.
+    if (!allAssignorCheckbox?.checked) {
+        selectedAssignors.forEach(assignor => {
+            params.append("assignor", assignor);
+        });
+    }
+
+    if (home !== "") {
+        params.append("home", home);
+    }
+
+    if (visitor !== "") {
+        params.append("visitor", visitor);
+    }
+
+    if (beginDate !== "") {
+        params.append("begindate", beginDate);
+    }
+
+    if (endDate !== "") {
+        params.append("enddate", endDate);
+    }
+
+    try {
+        setReportMessage("Generating game report...");
+
+        const response = await fetch(
+            `/api/game-report?${params.toString()}`
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+
+            throw new Error(
+                `HTTP ${response.status}: ` +
+                `${errorText || response.statusText}`
+            );
+        }
+
+        const report = await response.json();
+
+        renderGameReport(report);
+    }
+    catch (err) {
+        console.error(
+            "Error generating game report:",
+            err
+        );
+
+        setReportMessage(
+            "Failed to generate game report.\n\n" +
+            err.message
+        );
+    }
+}
+
 async function generateExpenseReport() {
 
     const selectedAssociations = selectedValues("expenseAssociation");
@@ -1134,6 +2296,211 @@ function clearFinancialReport() {
         ?.setAttribute("aria-expanded", "false");
 
     setReportMessage('Select Financial Report options and click "Create Report".');
+}
+
+function clearGameReport() {
+    // Clear individual association selections.
+    document.querySelectorAll(
+        'input[name="gameAssociation"]'
+    ).forEach(checkbox => {
+        checkbox.checked = false;
+    });
+
+    // Select "All Associations".
+    const allAssociations = document.querySelector(
+        'input[data-all-for="gameAssociation"]'
+    );
+
+    if (allAssociations) {
+        allAssociations.checked = true;
+    }
+
+    updateCheckboxSummary("gameAssociation");
+
+    // Close the Association dropdown.
+    const associationDropdown = document.getElementById(
+        "gameAssociationDropdown"
+    );
+
+    associationDropdown?.classList.remove("open");
+
+    associationDropdown
+        ?.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    // Clear individual status selections.
+    document.querySelectorAll(
+        'input[name="gameStatus"]'
+    ).forEach(checkbox => {
+        checkbox.checked = false;
+    });
+
+    // Select "All Statuses".
+    const allStatuses = document.querySelector(
+        'input[data-all-for="gameStatus"]'
+    );
+
+    if (allStatuses) {
+        allStatuses.checked = true;
+    }
+
+    updateCheckboxSummary("gameStatus");
+
+    // Close the Status dropdown.
+    const statusDropdown = document.getElementById(
+        "gameStatusDropdown"
+    );
+
+    statusDropdown?.classList.remove("open");
+
+    statusDropdown
+        ?.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    // Clear individual site selections.
+    document.querySelectorAll(
+        'input[name="gameSite"]'
+    ).forEach(checkbox => {
+        checkbox.checked = false;
+    });
+
+    // Select "All Sites".
+    const allSites = document.querySelector(
+        'input[data-all-for="gameSite"]'
+    );
+
+    if (allSites) {
+        allSites.checked = true;
+    }
+
+    updateCheckboxSummary("gameSite");
+
+    // Close the Sites dropdown.
+    const siteDropdown = document.getElementById(
+        "gameSiteDropdown"
+    );
+
+    siteDropdown?.classList.remove("open");
+
+    siteDropdown
+        ?.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    // Clear individual level selections.
+    document.querySelectorAll(
+        'input[name="gameLevel"]'
+    ).forEach(checkbox => {
+        checkbox.checked = false;
+    });
+
+    // Select "All Levels".
+    const allLevels = document.querySelector(
+        'input[data-all-for="gameLevel"]'
+    );
+
+    if (allLevels) {
+        allLevels.checked = true;
+    }
+
+    updateCheckboxSummary("gameLevel");
+
+    // Close the Levels dropdown.
+    const levelDropdown = document.getElementById(
+        "gameLevelDropdown"
+    );
+
+    levelDropdown?.classList.remove("open");
+
+    levelDropdown
+        ?.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    // Clear individual sport selections.
+    document.querySelectorAll(
+        'input[name="gameSport"]'
+    ).forEach(checkbox => {
+        checkbox.checked = false;
+    });
+
+    // Select "All Sports".
+    const allSports = document.querySelector(
+        'input[data-all-for="gameSport"]'
+    );
+
+    if (allSports) {
+        allSports.checked = true;
+    }
+
+    updateCheckboxSummary("gameSport");
+
+    // Close the Sports dropdown.
+    const sportDropdown = document.getElementById(
+        "gameSportDropdown"
+    );
+
+    sportDropdown?.classList.remove("open");
+
+    sportDropdown
+        ?.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    [
+        ["gameOfficial", "gameOfficialDropdown"],
+        ["gameEco", "gameEcoDropdown"],
+        ["gameAssignor", "gameAssignorDropdown"]
+    ].forEach(([name, dropdownId]) => {
+        document.querySelectorAll(
+            `input[name="${name}"]`
+        ).forEach(checkbox => {
+            checkbox.checked = false;
+        });
+
+        const allCheckbox = document.querySelector(
+            `input[data-all-for="${name}"]`
+        );
+
+        if (allCheckbox) {
+            allCheckbox.checked = true;
+        }
+
+        updateCheckboxSummary(name);
+
+        const dropdown = document.getElementById(dropdownId);
+        dropdown?.classList.remove("open");
+        dropdown
+            ?.querySelector(".checkbox-dropdown-button")
+            ?.setAttribute("aria-expanded", "false");
+    });
+
+    document.getElementById("gameBeginDate").value = "";
+    document.getElementById("gameEndDate").value = "";
+    clearGameDateRangeSelection();
+
+    const dateRangeDropdown = document.getElementById(
+        "gameDateRangeDropdown"
+    );
+
+    dateRangeDropdown?.classList.remove("open");
+    dateRangeDropdown
+        ?.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    // Clear the single-value team filters.
+    const home = document.getElementById("gameHome");
+    const visitor = document.getElementById("gameVisitor");
+
+    if (home) {
+        home.value = "";
+    }
+
+    if (visitor) {
+        visitor.value = "";
+    }
+
+    // Clear the displayed report.
+    setReportMessage(
+        'Select Game Report options and click "Create Report".'
+    );
 }
 
 function clearExpenseReport() {

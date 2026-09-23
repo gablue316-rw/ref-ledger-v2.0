@@ -221,6 +221,11 @@ type GameFilter struct {
 	Level       []string `json:"level,omitempty"`
 	Home        string   `json:"home,omitempty"`
 	Visitor     string   `json:"visitor,omitempty"`
+	Assignor    []string `json:"assignor,omitempty"`
+	Official    []string `json:"official,omitempty"`
+	ECO         []string `json:"eco,omitempty"`
+	BeginDate   string   `json:"beginDate,omitempty"`
+	EndDate     string   `json:"endDate,omitempty"`
 	TenantId    string   `json:"tenantId"`
 }
 

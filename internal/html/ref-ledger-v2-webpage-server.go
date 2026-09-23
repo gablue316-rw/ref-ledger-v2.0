@@ -4597,6 +4597,122 @@ func generateGamesReport(gameFilter bson.M) []string {
 
 }
 
+func GenerateGameReport(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	fmt.Println("GenerateGameReport is called")
+	LogVisitor(r)
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(
+			w,
+			"Invalid tenant ID",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	/*
+		A request such as:
+
+		/api/game-report?
+			association=MSO&
+			association=GOLLC&
+			status=Pending&
+			status=Completed
+
+		produces:
+
+		associations = []string{"MSO", "GOLLC"}
+		statuses     = []string{"Pending", "Completed"}
+	*/
+	query := r.URL.Query()
+
+	associations := query["association"]
+	statuses := query["status"]
+	home := strings.TrimSpace(r.URL.Query().Get("home"))
+	visitor := strings.TrimSpace(r.URL.Query().Get("visitor"))
+	sites := r.URL.Query()["site"]
+	levels := r.URL.Query()["level"]
+	sports := r.URL.Query()["sport"]
+	assignors := r.URL.Query()["assignor"]
+	officials := r.URL.Query()["official"]
+	ecos := r.URL.Query()["eco"]
+
+	bDate, eDate, err := utils.FormatDateFilter(r.URL.Query().Get("begindate"), r.URL.Query().Get("enddate"))
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println("Begin Date:", bDate, "End Date:", eDate)
+
+	filter := model.GameFilter{
+		TenantId:    tId,
+		Association: associations,
+		Status:      statuses,
+		Home:        home,
+		Visitor:     visitor,
+		Site:        sites,
+		Level:       levels,
+		Sport:       sports,
+		Assignor:    assignors,
+		Official:    officials,
+		ECO:         ecos,
+		BeginDate:   bDate,
+		EndDate:     eDate,
+	}
+
+	fmt.Printf(
+		"Game report filters — Associations: %v, Statuses: %v\n",
+		associations,
+		statuses,
+	)
+
+	gameReports, err := database.GetGameReport(filter)
+	if err != nil {
+		fmt.Printf(
+			"GenerateGameReport failed: %v\n",
+			err,
+		)
+
+		http.Error(
+			w,
+			"Unable to generate game report",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	fmt.Println(
+		"===== Game Report Returned",
+		gameReports,
+		"=====",
+	)
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	if err := json.NewEncoder(w).Encode(gameReports); err != nil {
+		fmt.Printf(
+			"GenerateGameReport JSON encoding failed: %v\n",
+			err,
+		)
+	}
+}
+
 func GenerateAccountsReceivableReport(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("GenerateAccountsReceivableReport is called")
 	LogVisitor(r)
@@ -6811,7 +6927,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			AssignorFee: utils.ConvertInt64ToAmtStr(game.AssignorFee),
 		}
 
-		gameFee := reports.CalculateGameFee(gameRec)
+		gameFee := utils.CalculateGameFee(gameRec)
 		HtmlAssocGameTotals.Update(game.Association, game.Status, game.NumOfGames, gameFee)
 
 		view := model.GameView{
@@ -7830,6 +7946,7 @@ func main() {
 	mux.HandleFunc("/api/financial-report", GenerateFinancialReport)
 	mux.HandleFunc("/api/expense-report", GenerateExpenseReport)
 	mux.HandleFunc("/api/accounts-receivable-report", GenerateAccountsReceivableReport)
+	mux.HandleFunc("/api/game-report", GenerateGameReport)
 	mux.HandleFunc("/api/reconciliation-report", GenerateReconciliationReport)
 	mux.HandleFunc("/api/game-save", authRequired(readOnlyForbidden(SaveGame)))
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))

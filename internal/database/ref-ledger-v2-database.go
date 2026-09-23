@@ -1043,6 +1043,28 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 		}
 	}
 
+	if len(filter.Assignor) > 0 {
+		fmt.Println("Adding Assignors...")
+		mongoFilter["assignor"] = bson.M{
+			"$in": filter.Assignor,
+		}
+	}
+
+	if len(filter.Official) > 0 {
+		fmt.Println("Adding Officials...")
+		mongoFilter["$or"] = bson.A{
+			bson.M{"referee": bson.M{"$in": filter.Official}},
+			bson.M{"u1": bson.M{"$in": filter.Official}},
+			bson.M{"u2": bson.M{"$in": filter.Official}},
+		}
+	}
+
+	if len(filter.ECO) > 0 {
+		fmt.Println("Adding ECOs...")
+		mongoFilter["eco"] = bson.M{
+			"$in": filter.ECO,
+		}
+	}
 	if strings.TrimSpace(filter.Home) != "" {
 		fmt.Println("Adding Home...")
 		mongoFilter["home"] = strings.TrimSpace(filter.Home)
@@ -1070,6 +1092,37 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
 	if len(officials) > 0 {
 		mongoFilter["$or"] = officials
+	}
+
+	// Filter by gameDateTime. Dates are supplied as M/D/YYYY.
+	location, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		fmt.Println("Unable to load game timezone:", err)
+	} else {
+		dateRange := bson.M{}
+
+		if begin := strings.TrimSpace(filter.BeginDate); begin != "" {
+			beginDate, err := time.ParseInLocation("1/2/2006", begin, location)
+			if err != nil {
+				fmt.Println("Invalid Begin Date:", err)
+			} else {
+				dateRange["$gte"] = beginDate
+			}
+		}
+
+		if end := strings.TrimSpace(filter.EndDate); end != "" {
+			endDate, err := time.ParseInLocation("1/2/2006", end, location)
+			if err != nil {
+				fmt.Println("Invalid End Date:", err)
+			} else {
+				// Exclude midnight after End Date, including every game on End Date.
+				dateRange["$lt"] = endDate.AddDate(0, 0, 1)
+			}
+		}
+
+		if len(dateRange) > 0 {
+			mongoFilter["gameDateTime"] = dateRange
+		}
 	}
 
 	// Date handling (your format: M/D/YYYY)
@@ -1144,7 +1197,7 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 	text := fmt.Sprintf("%v", mongoFilter)
 
 	// Write BSON bytes to file
-	err := os.WriteFile("gamesReportFilters.bson", []byte(text), 0644)
+	err = os.WriteFile("gamesReportFilters.bson", []byte(text), 0644)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -6296,6 +6349,100 @@ func GetAccountsReceivableReport(
 	}
 
 	return response, nil
+}
+
+func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
+
+	ctx := context.Background()
+	gameReportRecords := []model.GameView{}
+
+	var oc OfficialCollection
+
+	oc.DB = Client.Database(Database)
+	oc.Coll = oc.DB.Collection("officials")
+	//
+	// Create Filter
+	//
+	gameFilter := BuildMongoGameFilter(filter)
+
+	fmt.Println("===== GetGameReport:", gameFilter, "=====")
+
+	//
+	// Get Game Documents
+	//
+	cursor := QueryCollection(gameFilter, Database, "games")
+
+	var results []model.GameDoc
+
+	err := cursor.All(ctx, &results)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.GameView{}, err
+	}
+
+	for _, r := range results {
+
+		view := model.GameView{
+			GameId:      r.GameId,
+			Time:        r.Time,
+			Sport:       r.Sport,
+			Site:        r.Site,
+			Field:       r.Field,
+			NumOfGames:  r.NumOfGames,
+			Level:       r.Level,
+			Home:        r.Home,
+			Visitor:     r.Visitor,
+			Status:      r.Status,
+			Association: r.Association,
+			Assignor:    r.Assignor,
+			ECO:         r.ECO,
+		}
+
+		gameRec := model.GameDescriptor{
+			GameFee:     utils.ConvertInt64ToAmtStr(r.GameFee),
+			NumOfGames:  utils.ConvertInt64ToStr(r.NumOfGames),
+			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),
+			Deductions:  utils.ConvertInt64ToAmtStr(r.Deductions),
+			AssignorFee: utils.ConvertInt64ToAmtStr(r.AssignorFee),
+		}
+
+		gameFee := utils.CalculateGameFee(gameRec)
+		view.GameFee = utils.ConvertInt64ToAmtStr(gameFee)
+
+		abbrev := utils.DayOfWeekAbbreviation(r.Date)
+		view.Date = fmt.Sprintf("%s (%s)", r.Date, abbrev)
+
+		if r.Referee != "" && r.Referee != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(r.Referee, r.TenantId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		if r.U1 != "" && r.U1 != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(r.U1, r.TenantId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		if r.U2 != "" && r.U2 != "Unassigned" {
+
+			ov, error := oc.GetOfficialView(r.U2, r.TenantId)
+			if error == nil {
+				view.Officials = append(view.Officials, ov)
+			}
+		}
+
+		gameReportRecords = append(gameReportRecords, view)
+
+	}
+
+	fmt.Println("Game Report Records:", gameReportRecords)
+
+	return gameReportRecords, nil
 }
 
 type ExpenseType struct {

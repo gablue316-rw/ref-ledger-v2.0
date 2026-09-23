@@ -1250,7 +1250,7 @@ function populateEditSelect(selectId, records, placeholder, valueProperty = "nam
     });
 }
 
-function setEditSelectValue(selectId, value) {
+function setEditSelectValue(selectId, value, addMissingOption = true) {
     const select = document.getElementById(selectId);
     const normalizedValue = String(value ?? "").trim();
 
@@ -1262,14 +1262,16 @@ function setEditSelectValue(selectId, value) {
         option => option.value === normalizedValue
     );
 
-    if (normalizedValue && !hasValue) {
+    if (normalizedValue && !hasValue && addMissingOption) {
         const currentOption = document.createElement("option");
         currentOption.value = normalizedValue;
         currentOption.textContent = normalizedValue;
         select.appendChild(currentOption);
     }
 
-    select.value = normalizedValue;
+    select.value = hasValue || addMissingOption
+        ? normalizedValue
+        : "";
 }
 
 function renderGames(
@@ -1917,20 +1919,26 @@ async function fetchGames(
 async function loadLevels() {
 
     try {
-        const response = await fetch("/api/levels?active=true");
+        const [searchResponse, editResponse] = await Promise.all([
+            fetch("/api/levels"),
+            fetch("/api/levels?active=true")
+        ]);
 
-        if (!response.ok) {
-            const text = await response.text();
+        if (!searchResponse.ok || !editResponse.ok) {
+            const failedResponse = !searchResponse.ok
+                ? searchResponse
+                : editResponse;
+            const text = await failedResponse.text();
 
             console.error(
                 "loadLevels failed:",
-                response.status,
+                failedResponse.status,
                 text
             );
 
             showMessage(
                 "loadLevels failed: " +
-                response.status +
+                failedResponse.status +
                 "\n" +
                 text,
                 "error"
@@ -1939,10 +1947,13 @@ async function loadLevels() {
             return;
         }
 
-        const levels = await response.json();
+        const [levels, activeLevels] = await Promise.all([
+            searchResponse.json(),
+            editResponse.json()
+        ]);
         populateEditSelect(
             "editLevel",
-            levels,
+            activeLevels,
             "Select Level"
         );
         const levelOptions =
@@ -2167,20 +2178,26 @@ document.addEventListener("keydown", function (event) {
 async function loadSports() {
 
     try {
-        const response = await fetch("/api/loadSports?active=true");
+        const [searchResponse, editResponse] = await Promise.all([
+            fetch("/api/loadSports"),
+            fetch("/api/loadSports?active=true")
+        ]);
 
-        if (!response.ok) {
-            const text = await response.text();
+        if (!searchResponse.ok || !editResponse.ok) {
+            const failedResponse = !searchResponse.ok
+                ? searchResponse
+                : editResponse;
+            const text = await failedResponse.text();
 
             console.error(
                 "loadSports failed:",
-                response.status,
+                failedResponse.status,
                 text
             );
 
             showMessage(
                 "loadSports failed: " +
-                response.status +
+                failedResponse.status +
                 "\n" +
                 text,
                 "error"
@@ -2189,10 +2206,13 @@ async function loadSports() {
             return;
         }
 
-        const sports = await response.json();
+        const [sports, activeSports] = await Promise.all([
+            searchResponse.json(),
+            editResponse.json()
+        ]);
         populateEditSelect(
             "editSport",
-            sports,
+            activeSports,
             "Select Sport"
         );
         const sportOptions = document.getElementById("sportOptions");
@@ -2704,7 +2724,11 @@ async function openEditGame(gameId, association) {
     document.getElementById("editStatus").value = gameValue(gameBeingEdited, "Status") || "Pending";
     document.getElementById("editDate").value = dateInputValue(gameValue(gameBeingEdited, "Date"));
     document.getElementById("editTime").value = timeInputValue(gameValue(gameBeingEdited, "Time"));
-    setEditSelectValue("editSport", gameValue(gameBeingEdited, "Sport"));
+    setEditSelectValue(
+        "editSport",
+        gameValue(gameBeingEdited, "Sport"),
+        false
+    );
     const storedSite = String(gameValue(gameBeingEdited, "Site") || "").trim();
     const normalizedStoredSite = storedSite.toLowerCase();
     const matchingSite = dashboardSites.find(site => {
@@ -2724,7 +2748,11 @@ async function openEditGame(gameId, association) {
         );
     }
     document.getElementById("editField").value = gameValue(gameBeingEdited, "Field");
-    setEditSelectValue("editLevel", gameValue(gameBeingEdited, "Level"));
+    setEditSelectValue(
+        "editLevel",
+        gameValue(gameBeingEdited, "Level"),
+        false
+    );
     document.getElementById("editHome").value = gameValue(gameBeingEdited, "Home");
     document.getElementById("editVisitor").value = gameValue(gameBeingEdited, "Visitor");
     document.getElementById("editNumOfGames").value = gameValue(gameBeingEdited, "NumOfGames") || 1;
