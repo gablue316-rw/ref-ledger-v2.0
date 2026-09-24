@@ -828,7 +828,7 @@ body {
             </div>
         </div>
 
-        <button class="btn" onclick="loadGames()">Search</button>
+        <button id="dashboardSearchBtn" class="btn" onclick="loadGames()">Search</button>
         <button class="btn" onclick="clearFilters()">Clear</button>
 
     </div>
@@ -1733,6 +1733,18 @@ async function loadPendingGamesTable() {
 }
 
 async function loadGames() {
+    const searchButton = document.getElementById("dashboardSearchBtn");
+    if (searchButton.disabled) return;
+
+    searchButton.disabled = true;
+    searchButton.textContent = "Searching...";
+    searchButton.setAttribute("aria-busy", "true");
+
+    // Let the browser paint the loading state before building the request.
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    try {
+
     const gameId =
         document.getElementById("gameId").value.trim();
 
@@ -1847,6 +1859,11 @@ async function loadGames() {
     });
 
     await fetchGames(params);
+    } finally {
+        searchButton.disabled = false;
+        searchButton.textContent = "Search";
+        searchButton.removeAttribute("aria-busy");
+    }
 }
 
 async function fetchGames(

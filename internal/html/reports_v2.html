@@ -740,12 +740,12 @@
     <!-- REPORT OUTPUT -->
     <div class="report-container">
 
-        <div class="report-title">
+        <div id="reportOutputTitle" class="report-title">
             Report Output
         </div>
 
         <div id="reportContainer" class="report-message">
-Select Financial Report options and click "Create Report".
+Select Report type, enter options and click "Create Report".
         </div>
 
     </div>
@@ -1458,7 +1458,17 @@ document.addEventListener("click", function(event) {
     }
 });
 
+function setReportTitle(title) {
+    const heading = document.getElementById("reportOutputTitle");
+    const generatedAt = new Intl.DateTimeFormat("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short"
+    }).format(new Date());
+    heading.textContent = `${title} — Generated ${generatedAt}`;
+}
+
 function setReportMessage(message) {
+    document.getElementById("reportOutputTitle").textContent = "Report Output";
     const container = document.getElementById("reportContainer");
     container.className = "report-message";
     container.textContent = message;
@@ -1599,7 +1609,7 @@ function renderGameReport(report) {
         { label: "Visitor", value: row => gameField(row, "visitor", "Visitor") },
         { label: "Num of Games", value: row => gameField(row, "numOfGames", "NumOfGames") || 1 },
         { label: "Level", value: row => gameField(row, "level", "Level") },
-        { label: "Game Fee", value: row => formatCurrency(parseGameFee(gameField(row, "gameFee", "GameFee"))) },
+        { label: "Assignment Earnings", value: row => formatCurrency(parseGameFee(gameField(row, "gameFee", "GameFee"))) },
         { label: "Assoc", value: row => gameField(row, "association", "Association") },
         { label: "Status", value: row => gameField(row, "status", "Status") },
         { label: "Officials", value: row => getOfficials(row) },
@@ -1608,7 +1618,7 @@ function renderGameReport(report) {
     ];
 
     let totalGames = 0;
-    let totalGameFees = 0;
+    let totalAssignmentEarnings = 0;
     const table = document.createElement("table");
     table.className = "financial-report-table game-report-table";
     const headerRow = table.createTHead().insertRow();
@@ -1629,7 +1639,7 @@ function renderGameReport(report) {
         );
         const gameFee = parseGameFee(gameField(row, "gameFee", "GameFee"));
         totalGames += numberOfGames;
-        totalGameFees += gameFee;
+        totalAssignmentEarnings += gameFee;
 
         const tableRow = tbody.insertRow();
         columns.forEach(column => {
@@ -1641,7 +1651,7 @@ function renderGameReport(report) {
     summary.className = "game-report-summary";
     summary.textContent = `${rows.length} assignments displayed — ` +
         `Total number of games: ${totalGames} — ` +
-        `Total game fees: ${formatCurrency(totalGameFees)}`;
+        `Total assignment earnings: ${formatCurrency(totalAssignmentEarnings)}`
 
     const container = document.getElementById("reportContainer");
     container.className = "";
@@ -1977,6 +1987,7 @@ async function generateFinancialReport() {
 
         const report = await response.json();
         renderFinancialReport(report);
+        setReportTitle("Financial Report");
     }
     catch (err) {
 
@@ -2135,6 +2146,7 @@ async function generateGameReport() {
         const report = await response.json();
 
         renderGameReport(report);
+        setReportTitle("Game Report");
     }
     catch (err) {
         console.error(
@@ -2180,6 +2192,7 @@ async function generateExpenseReport() {
 
         const report = await response.json();
         renderExpenseReport(report);
+        setReportTitle("Expense Report");
     }
     catch (err) {
         console.error(err);
@@ -2223,6 +2236,7 @@ async function generateAccountsReceivableReport() {
 
         const report = await response.json();
         renderAccountsReceivableReport(report);
+        setReportTitle("Accounts Receivable Report");
     }
     catch (err) {
         console.error(err);
@@ -2267,6 +2281,7 @@ async function generateReconciliationReport() {
 
         const report = await response.json();
         renderReconciliationReport(report);
+        setReportTitle("Reconciliation Report");
     }
     catch (err) {
         console.error(err);
