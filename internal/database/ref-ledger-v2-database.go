@@ -3807,6 +3807,11 @@ func SetGamesCompleted(tenantId string, gameIDs []int64) error {
 	return nil
 }
 
+var officialNameCollation = &options.Collation{
+	Locale:   "en",
+	Strength: 2,
+}
+
 // Official Collection, Documents and API Code
 type OfficialJson struct {
 	FirstName string `json:"firstName"`
@@ -4057,60 +4062,53 @@ func (oc *OfficialCollection) GetById(officialId int64, tenantId string) (Offici
 }
 
 func (oc *OfficialCollection) Get(firstName, lastName, tenantId string) (Official, error) {
-
-	var filter bson.M
 	var doc OfficialDoc
 
-	filter = bson.M{
+	filter := bson.M{
 		"firstName": firstName,
 		"lastName":  lastName,
 		"tenantId":  tenantId,
 	}
 
-	err := oc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+	opts := options.FindOne().SetCollation(officialNameCollation)
 
+	err := oc.Coll.FindOne(context.TODO(), filter, opts).Decode(&doc)
 	if err != nil {
 		fmt.Println("Error:", err)
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return Official{}, fmt.Errorf("official not found")
 		}
-		return Official{}, fmt.Errorf("Failed to get official.  Reason: %w", err)
+		return Official{}, fmt.Errorf("failed to get official: %w", err)
 	}
 
-	official := oc.convDocToOfficial(doc)
-	return official, nil
+	return oc.convDocToOfficial(doc), nil
 }
 
 func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantId string) ([]Official, error) {
 
 	var officials []Official
 
+	firstName = strings.TrimSpace(firstName)
+	lastName = strings.TrimSpace(lastName)
+
 	filter := bson.M{
 		"tenantId": tenantId,
 	}
 
-	firstName = strings.TrimSpace(firstName)
-	lastName = strings.TrimSpace(lastName)
-
 	if firstName != "" {
-		filter["firstName"] = bson.M{
-			"$regex":   firstName,
-			"$options": "i",
-		}
+		filter["firstName"] = firstName
 	}
 
 	if lastName != "" {
-		filter["lastName"] = bson.M{
-			"$regex":   lastName,
-			"$options": "i",
-		}
+		filter["lastName"] = lastName
 	}
 
 	opts := options.Find().
 		SetSort(bson.D{
 			{Key: "lastName", Value: 1},
 			{Key: "firstName", Value: 1},
-		})
+		}).
+		SetCollation(officialNameCollation)
 
 	cursor, err := oc.Coll.Find(context.TODO(), filter, opts)
 	if err != nil {

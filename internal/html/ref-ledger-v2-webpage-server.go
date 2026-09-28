@@ -6467,7 +6467,7 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func GetOfficials(w http.ResponseWriter, r *http.Request) {
+func GetOfficial(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
 	if r.Method != http.MethodGet {
@@ -7897,7 +7897,7 @@ func main() {
 	mux.HandleFunc("/api/loadAssignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
-	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficials)
+	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficial)
 	mux.HandleFunc("/api/sport-active", ActivateSport)
 	mux.HandleFunc("/api/sport-inactive", DeactivateSport)
 	mux.HandleFunc("/api/level-active", ActivateLevel)
