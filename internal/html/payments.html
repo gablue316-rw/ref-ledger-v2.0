@@ -874,7 +874,7 @@
         </div>
         <div class="col">
             <label for="editPaymentAssociation">Association</label>
-            <select id="editPaymentAssociation" required></select>
+            <input id="editPaymentAssociation" type="text" readonly>
         </div>
         <div class="col">
             <label for="editPaymentAmount">Payment Amount</label>
@@ -882,8 +882,7 @@
         </div>
         <div class="col">
             <label for="editPaymentGameIds">Game IDs</label>
-            <input id="editPaymentGameIds" type="text" required
-                placeholder="Comma-separated game IDs">
+            <input id="editPaymentGameIds" type="text" readonly>
         </div>
         <div class="button-row">
             <button type="button" id="cancelEditPaymentBtn" class="btn btn-modal-cancel">Cancel</button>
@@ -1055,6 +1054,7 @@ const editPaymentForm =
     document.getElementById("editPaymentForm");
 
 let originalEditAssociation = "";
+let originalEditGameIds = [];
 
 function paymentDateForInput(value) {
     const text = String(value ?? "").trim();
@@ -1075,23 +1075,18 @@ function openEditPayment(payment) {
             payment, "Association", "association"
         ));
 
-        const associationOptions = document.getElementById("association");
-        const editAssociation = document.getElementById("editPaymentAssociation");
-        editAssociation.innerHTML = associationOptions.innerHTML;
-        if (!Array.from(editAssociation.options).some(option => option.value === association)) {
-            editAssociation.add(new Option(association, association));
-        }
         document.getElementById("editPaymentId").value = paymentId;
         document.getElementById("editPaymentDate").value = paymentDateForInput(
             getPaymentValue(payment, "PaymentDate", "paymentDate", "Date", "date")
         );
-        editAssociation.value = association;
+        document.getElementById("editPaymentAssociation").value = association;
         originalEditAssociation = association;
         const amount = getPaymentValue(payment, "PaymentAmt", "paymentAmt", "Amount", "amount");
         document.getElementById("editPaymentAmount").value =
             Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : "";
+        originalEditGameIds = normalizeGameIds(getPaymentGameIds(payment));
         document.getElementById("editPaymentGameIds").value =
-            normalizeGameIds(getPaymentGameIds(payment)).join(", ");
+            originalEditGameIds.join(", ");
         document.getElementById("saveEditPaymentBtn").disabled = false;
         editPaymentModal.showModal();
     } catch (error) {
@@ -1109,27 +1104,25 @@ editPaymentForm.addEventListener("submit", async function(event) {
     const saveButton = document.getElementById("saveEditPaymentBtn");
     const paymentId = document.getElementById("editPaymentId").value;
     const date = document.getElementById("editPaymentDate").value;
-    const association = document.getElementById("editPaymentAssociation").value;
+    const association = originalEditAssociation;
     const amount = Number(document.getElementById("editPaymentAmount").value);
-    const rawGameIds = document.getElementById("editPaymentGameIds").value;
-    const gameids = normalizeGameIds(rawGameIds);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !association ||
-        !Number.isFinite(amount) || amount <= 0 ||
-        gameids.length === 0 || gameids.some(id => !/^\d+$/.test(id)) ||
-        new Set(gameids).size !== gameids.length) {
-        showMessage("Enter a date, association, positive amount, and unique numeric game IDs.", "error");
+        !Number.isFinite(amount) || amount <= 0) {
+        showMessage("Enter a date and positive amount.", "error");
         return;
     }
     saveButton.disabled = true;
+    let outcome = "";
+    let outcomeType = "error";
     try {
-        const response = await fetch("/api/update-payment", {
+        const response = await fetch("/api/payments", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 paymentid: paymentId,
                 originalAssociation: originalEditAssociation,
                 date, association, amount,
-                gameids: gameids.map(Number)
+                gameids: originalEditGameIds.map(Number)
             })
         });
         if (response.status === 401 || response.redirected) {
@@ -1140,12 +1133,18 @@ editPaymentForm.addEventListener("submit", async function(event) {
             const message = (await response.text()).trim();
             throw new Error(message || `HTTP ${response.status}`);
         }
-        await loadPaymentsRegistry();
         await loadCompletedGames(false);
-        showMessage(`Payment ${paymentId} updated successfully.`, "success");
+        outcome = `Payment ${paymentId} updated successfully.`;
+        outcomeType = "success";
     } catch (error) {
-        showMessage(`Unable to update payment: ${error.message}`, "error");
+        outcome = `Unable to update payment: ${error.message}`;
     } finally {
+        try {
+            await loadPaymentsRegistry();
+        } catch (error) {
+            console.error("Unable to refresh payment registry:", error);
+        }
+        showMessage(outcome, outcomeType);
         saveButton.disabled = false;
     }
 });
