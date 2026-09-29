@@ -5361,7 +5361,13 @@ func CreatePayment(
 ) {
 	var payment Payment
 
-	err := json.NewDecoder(r.Body).Decode(&payment)
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&payment)
 	if err != nil {
 		fmt.Println("Invalid JSON. Error:", err)
 
@@ -5392,6 +5398,7 @@ func CreatePayment(
 			paymentDescr,
 			database.Database,
 			"payments",
+			tId,
 		)
 
 	errorMessages :=
@@ -5406,6 +5413,90 @@ func CreatePayment(
 
 	response := map[string]interface{}{
 		"totalAdded":         totalAdded,
+		"totalErrors":        totalErrors,
+		"totalUpdatedToPaid": totalUpdatedToPaid,
+		"errors":             errorMessages,
+	}
+
+	w.Header().Set(
+		"Content-Type",
+		"application/json",
+	)
+
+	if totalErrors > 0 {
+		w.WriteHeader(http.StatusInternalServerError)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
+
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
+		fmt.Println(
+			"Unable to encode payment response. Error:",
+			err,
+		)
+	}
+}
+
+func UpdatePayment(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	var payment Payment
+
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&payment)
+	if err != nil {
+		fmt.Println("Invalid JSON. Error:", err)
+
+		http.Error(
+			w,
+			"invalid JSON",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	singlePayment :=
+		PaymentDocToPaymentDescr(payment)
+
+	paymentDescr :=
+		[]model.PaymentDescriptor{
+			singlePayment,
+		}
+
+	fmt.Println(
+		"Payment Descr:",
+		singlePayment,
+	)
+
+	totalUpdated, totalErrors, totalUpdatedToPaid, updateErrors :=
+		database.UpdatePaymentDocs(
+			r.Context(),
+			paymentDescr,
+			database.Database,
+			"payments",
+			tId,
+		)
+
+	errorMessages :=
+		make([]string, 0, len(updateErrors))
+
+	for _, updateError := range updateErrors {
+		errorMessages = append(
+			errorMessages,
+			updateError.Error(),
+		)
+	}
+
+	response := map[string]interface{}{
+		"totalUpdated": totalUpdated,
+
 		"totalErrors":        totalErrors,
 		"totalUpdatedToPaid": totalUpdatedToPaid,
 		"errors":             errorMessages,
@@ -6467,7 +6558,7 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func GetOfficials(w http.ResponseWriter, r *http.Request) {
+func GetOfficial(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
 	if r.Method != http.MethodGet {
@@ -7897,7 +7988,7 @@ func main() {
 	mux.HandleFunc("/api/loadAssignors", GetAssignorsHandler)
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
-	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficials)
+	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficial)
 	mux.HandleFunc("/api/sport-active", ActivateSport)
 	mux.HandleFunc("/api/sport-inactive", DeactivateSport)
 	mux.HandleFunc("/api/level-active", ActivateLevel)
@@ -7960,6 +8051,7 @@ func main() {
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
+	mux.HandleFunc("/api/update-payment", authRequired(readOnlyForbidden(UpdatePayment)))
 	mux.HandleFunc("/api/payment-registry", authRequired(readOnlyForbidden(LoadPaymentRegistry)))
 	mux.HandleFunc("/api/expense-registry", authRequired(readOnlyForbidden(LoadExpenseRegistry)))
 	mux.HandleFunc("/api/deletePayment", authRequired(readOnlyForbidden(DeletePayment)))

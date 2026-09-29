@@ -359,7 +359,7 @@ func GetTotalAssignorFee(assoc string) (int64, error) {
 
 }
 
-func GetTotalDeductions(assoc string) (int64, error) {
+func GetTotalDeductions(assoc, tId string) (int64, error) {
 
 	totalDeductions := int64(0)
 
@@ -373,6 +373,7 @@ func GetTotalDeductions(assoc string) (int64, error) {
 	filter := bson.M{
 		"association": assoc,
 		"status":      "Paid",
+		"tenantId":    tId,
 	}
 
 	db := Client.Database(Database)
@@ -439,14 +440,20 @@ func GetTotalGrossGameFee(assoc string) (int64, error) {
 
 }
 
-func GetGameFee(gameIds []int64) (int64, error) {
+func GetGameFee(gameIds []int64, tId string, status string) (int64, error) {
 
 	totGameFee := int64(0)
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
-	filter := bson.M{}
+	filter := bson.M{
+		"tenantId": tId,
+	}
+
+	if status != "" {
+		filter["status"] = status
+	}
 
 	if len(gameIds) > 0 {
 		filter["gameId"] = bson.M{
@@ -1975,6 +1982,41 @@ func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) int {
 	return recordsUpdated
 }
 
+func VerifyGameStatus(gameIds []int64, association, tenantId string) []error {
+
+	var gameErrors []error
+	db := Client.Database(Database)
+	coll := db.Collection("games")
+	ctx := context.Background()
+
+	for _, gameID := range gameIds {
+
+		filter := bson.M{
+			"gameId":      gameID,
+			"tenantId":    tenantId,
+			"association": association,
+			"status":      "Completed",
+		}
+
+		result := coll.FindOne(ctx, filter)
+
+		err := result.Err()
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			gameErrors = append(gameErrors, fmt.Errorf("game %d was not found assigned to association %s in Completed Status", gameID, association))
+			continue
+		}
+
+		if err != nil {
+			gameErrors = append(gameErrors, fmt.Errorf("VerifyGameStatus failure.  Reason: %s", err))
+			continue
+		}
+
+	}
+
+	return gameErrors
+}
+
 func VerifyGameMatchesAssociation(gameIds []int64, association, tenantId string) []error {
 
 	ctx := context.TODO()
@@ -2001,7 +2043,7 @@ func VerifyGameMatchesAssociation(gameIds []int64, association, tenantId string)
 		}
 
 		if err != nil {
-			gameErrors = append(gameErrors, fmt.Errorf("GetGameByAssocAndId failure.  Reason: %s", err))
+			gameErrors = append(gameErrors, fmt.Errorf("VerifyGameMatchesAssociation failure.  Reason: %s", err))
 			continue
 		}
 
@@ -2010,7 +2052,7 @@ func VerifyGameMatchesAssociation(gameIds []int64, association, tenantId string)
 	return gameErrors
 }
 
-func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection string) (int, int, int, []error) {
+func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection, tId string) (int, int, int, []error) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -2031,7 +2073,7 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 	for _, v := range payment {
 
 		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-		doc.TenantId = TenantId
+		doc.TenantId = tId
 		paymentExists, err := PaymentExists(doc)
 
 		if paymentExists {
@@ -2057,14 +2099,20 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			continue
 		}
 
-		gameErrors := VerifyGameMatchesAssociation(gameIds, v.Association, TenantId)
+		gameErrors := VerifyGameMatchesAssociation(gameIds, v.Association, tId)
 
 		if gameErrors != nil {
 			importErrors = append(importErrors, gameErrors...)
 			continue
 		}
 
-		totalGameFee, err := GetGameFee(gameIds)
+		statusErrors := VerifyGameStatus(gameIds, v.Association, tId)
+		if gameErrors != nil {
+			importErrors = append(importErrors, statusErrors...)
+			continue
+		}
+
+		totalGameFee, err := GetGameFee(gameIds, tId, "")
 		if err != nil {
 			utils.AuditLog.Printf("Failed to get game fee for Game Ids %v.  Reason: %v", gameIds, err)
 			fmt.Println("Failed to get game fee.  Reason:", err)
@@ -2100,6 +2148,137 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 
 }
 
+func UpdatePaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection, tId string) (int, int, int, []error) {
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(dbase)
+	coll := db.Collection(collection)
+	collectionName := coll.Name()
+	utils.AuditLog.Printf("UpdatePaymentDocs: Updating %d payment records into collection %s", len(payment), collection)
+	fmt.Println("Updating records into", collectionName)
+
+	recordsUpdated := 0
+	totalErrors := 0
+	var gameIds []int64
+	var gamesUpdatedToPaid int = 0
+
+	importErrors := make([]error, 0)
+
+	for _, v := range payment {
+
+		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
+		doc.TenantId = tId
+		paymentExists, err := PaymentExists(doc)
+
+		if !paymentExists {
+			totalErrors++
+			fmt.Println("Payment with id does not exist")
+			importErrors = append(importErrors, errors.New("Payment with ID does not exist"))
+			continue
+		}
+
+		if err != nil {
+			totalErrors++
+			fmt.Println(err)
+			importErrors = append(importErrors, err)
+			continue
+		}
+
+		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
+
+		fmt.Println("Game Ids:", gameIds)
+
+		if err != nil {
+			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
+			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
+			importErrors = append(importErrors, err)
+			continue
+		}
+
+		gameErrors := VerifyGameMatchesAssociation(gameIds, v.Association, TenantId)
+
+		if gameErrors != nil {
+			importErrors = append(importErrors, gameErrors...)
+			continue
+		}
+
+		statusErrors := VerifyGameStatus(gameIds, v.Association, tId)
+		if gameErrors != nil {
+			importErrors = append(importErrors, statusErrors...)
+			continue
+		}
+
+		//
+		// If the user modified the game ids those that have been removed need to be set back to Completed.
+		// Those added need to be set to Paid.   Also make sure the Game Ids are not associated with another payment.
+		//
+
+		totalGameFee, err := GetGameFee(gameIds, tId, "")
+		if err != nil {
+			utils.AuditLog.Printf("Failed to get game fee for Game Ids %v.  Reason: %v", gameIds, err)
+			fmt.Println("Failed to get game fee.  Reason:", err)
+			importErrors = append(importErrors, err)
+			continue
+		}
+
+		if totalGameFee != doc.PaymentAmt {
+			errStr := fmt.Sprintf("Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s", doc.PaymentId, utils.ConvertInt64ToAmtStr(totalGameFee), utils.ConvertInt64ToAmtStr(doc.PaymentAmt))
+			utils.AuditLog.Println(errStr)
+			fmt.Println(errStr)
+			totalErrors++
+			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			continue
+		}
+
+		filter := bson.M{
+			"paymentId": doc.PaymentId,
+			"tenantId":  tId,
+		}
+
+		update := bson.M{
+			"$set": doc,
+		}
+
+		fmt.Println("Update filter:", filter, "update:", update)
+		result, err := coll.UpdateOne(ctx, filter, update)
+		if err != nil {
+			errStr := fmt.Sprintf("Payment Update Failed")
+			utils.AuditLog.Println(errStr)
+			fmt.Println(errStr)
+			totalErrors++
+			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			continue
+		}
+
+		fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
+
+		if result.MatchedCount == 0 {
+			errStr := fmt.Sprintf("Payment not found")
+			utils.AuditLog.Println(errStr)
+			fmt.Println(errStr)
+			totalErrors++
+			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			continue
+		} else if result.ModifiedCount == 0 {
+			errStr := fmt.Sprintf("No changes")
+			utils.AuditLog.Println(errStr)
+			fmt.Println(errStr)
+			totalErrors++
+			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			continue
+		}
+
+		recordsUpdated++
+
+		gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
+	}
+
+	fmt.Println("Total Records updated into", collectionName, ":", recordsUpdated, "Total Errors:", totalErrors, "Games Updated to Paid:", gamesUpdatedToPaid)
+	return recordsUpdated, totalErrors, gamesUpdatedToPaid, importErrors
+
+}
 func InsertExpenseDocs(parentCtx context.Context, expense []model.ExpenseDescriptor, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -3807,6 +3986,11 @@ func SetGamesCompleted(tenantId string, gameIDs []int64) error {
 	return nil
 }
 
+var officialNameCollation = &options.Collation{
+	Locale:   "en",
+	Strength: 2,
+}
+
 // Official Collection, Documents and API Code
 type OfficialJson struct {
 	FirstName string `json:"firstName"`
@@ -4057,60 +4241,53 @@ func (oc *OfficialCollection) GetById(officialId int64, tenantId string) (Offici
 }
 
 func (oc *OfficialCollection) Get(firstName, lastName, tenantId string) (Official, error) {
-
-	var filter bson.M
 	var doc OfficialDoc
 
-	filter = bson.M{
+	filter := bson.M{
 		"firstName": firstName,
 		"lastName":  lastName,
 		"tenantId":  tenantId,
 	}
 
-	err := oc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
+	opts := options.FindOne().SetCollation(officialNameCollation)
 
+	err := oc.Coll.FindOne(context.TODO(), filter, opts).Decode(&doc)
 	if err != nil {
 		fmt.Println("Error:", err)
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return Official{}, fmt.Errorf("official not found")
 		}
-		return Official{}, fmt.Errorf("Failed to get official.  Reason: %w", err)
+		return Official{}, fmt.Errorf("failed to get official: %w", err)
 	}
 
-	official := oc.convDocToOfficial(doc)
-	return official, nil
+	return oc.convDocToOfficial(doc), nil
 }
 
 func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantId string) ([]Official, error) {
 
 	var officials []Official
 
+	firstName = strings.TrimSpace(firstName)
+	lastName = strings.TrimSpace(lastName)
+
 	filter := bson.M{
 		"tenantId": tenantId,
 	}
 
-	firstName = strings.TrimSpace(firstName)
-	lastName = strings.TrimSpace(lastName)
-
 	if firstName != "" {
-		filter["firstName"] = bson.M{
-			"$regex":   firstName,
-			"$options": "i",
-		}
+		filter["firstName"] = firstName
 	}
 
 	if lastName != "" {
-		filter["lastName"] = bson.M{
-			"$regex":   lastName,
-			"$options": "i",
-		}
+		filter["lastName"] = lastName
 	}
 
 	opts := options.Find().
 		SetSort(bson.D{
 			{Key: "lastName", Value: 1},
 			{Key: "firstName", Value: 1},
-		})
+		}).
+		SetCollation(officialNameCollation)
 
 	cursor, err := oc.Coll.Find(context.TODO(), filter, opts)
 	if err != nil {
@@ -5775,8 +5952,6 @@ func GetFinancialReports(tId string, associations []string) (map[string]model.Fi
 				game.TravelPay -
 				game.AssignorFee
 
-		record.TotalDeductions += game.Deductions
-
 		financialRecords[game.Association] = record
 	}
 
@@ -5815,6 +5990,13 @@ func GetFinancialReports(tId string, associations []string) (map[string]model.Fi
 				err,
 			)
 		}
+
+		totalDeductions, err := GetTotalDeductions(associationName, tId)
+		if err != nil {
+			totalDeductions = 0
+		}
+
+		record.TotalExpenses = totalDeductions
 
 		for expenseCursor.Next(ctx) {
 			var expense model.ExpenseDoc
@@ -5856,8 +6038,7 @@ func GetFinancialReports(tId string, associations []string) (map[string]model.Fi
 
 		record.NetIncome =
 			record.GrossIncome -
-				record.TotalExpenses -
-				record.TotalDeductions
+				record.TotalExpenses
 
 		financialRecords[associationName] = record
 	}
@@ -5871,12 +6052,11 @@ func GetFinancialReports(tId string, associations []string) (map[string]model.Fi
 	for associationName, record := range financialRecords {
 		response[associationName] =
 			model.FinancialReportResponse{
-				Association:     record.Association,
-				GrossIncome:     formatCurrency(record.GrossIncome),
-				TotalExpenses:   formatCurrency(record.TotalExpenses),
-				TotalDeductions: formatCurrency(record.TotalDeductions),
-				NetIncome:       formatCurrency(record.NetIncome),
-				TotalMileage:    formatInt64Hundredths(record.TotalMileage),
+				Association:   record.Association,
+				GrossIncome:   formatCurrency(record.GrossIncome),
+				TotalExpenses: formatCurrency(record.TotalExpenses),
+				NetIncome:     formatCurrency(record.NetIncome),
+				TotalMileage:  formatInt64Hundredths(record.TotalMileage),
 			}
 	}
 

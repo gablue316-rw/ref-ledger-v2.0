@@ -361,7 +361,7 @@ func GenerateReconciliationReport(records []model.PaymentDescriptor, tid string)
 			continue
 		}
 
-		calcPayment, err = database.GetGameFee(gameIds)
+		calcPayment, err = database.GetGameFee(gameIds, tid, "")
 		if err != nil {
 			utils.AuditLog.Printf("Failed to get game fee for PaymentId %s.  Reason: %v", record.PaymentId, err)
 			continue
@@ -718,7 +718,7 @@ func GenerateIncomeReport(assoc []string, tid string) []string {
 			return []string{}
 		}
 
-		deductions, err := database.GetTotalDeductions(a)
+		deductions, err := database.GetTotalDeductions(a, tid)
 		if err != nil {
 			fmt.Println(err)
 			return []string{}

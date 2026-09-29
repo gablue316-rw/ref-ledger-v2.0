@@ -525,7 +525,7 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 
 func AddPayments(parentCtx context.Context, payment []model.PaymentDescriptor) {
 
-	database.InsertPaymentDocs(parentCtx, payment, database.Database, "payments")
+	database.InsertPaymentDocs(parentCtx, payment, database.Database, "payments", database.TenantId)
 }
 
 func AddExpenses(parentCtx context.Context, expense []model.ExpenseDescriptor) {
