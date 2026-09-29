@@ -323,21 +323,19 @@ type UserRequest struct {
 }
 
 type FinancialReport struct {
-	Association     string `json:"association"`
-	GrossIncome     int64  `json:"grossIncome"`
-	TotalExpenses   int64  `json:"totalExpenses"`
-	TotalDeductions int64  `json:"totalDeductions"`
-	NetIncome       int64  `json:"netIncome"`
-	TotalMileage    int64  `json:"totalMileage"`
+	Association   string `json:"association"`
+	GrossIncome   int64  `json:"grossIncome"`
+	TotalExpenses int64  `json:"totalExpenses"`
+	NetIncome     int64  `json:"netIncome"`
+	TotalMileage  int64  `json:"totalMileage"`
 }
 
 type FinancialReportResponse struct {
-	Association     string `json:"association"`
-	GrossIncome     string `json:"grossIncome"`
-	TotalExpenses   string `json:"totalExpenses"`
-	TotalDeductions string `json:"totalDeductions"`
-	NetIncome       string `json:"netIncome"`
-	TotalMileage    string `json:"totalMileage"`
+	Association   string `json:"association"`
+	GrossIncome   string `json:"grossIncome"`
+	TotalExpenses string `json:"totalExpenses"`
+	NetIncome     string `json:"netIncome"`
+	TotalMileage  string `json:"totalMileage"`
 }
 
 type ExpenseReport struct {

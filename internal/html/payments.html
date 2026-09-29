@@ -288,6 +288,7 @@
 
         .select-column,
         .view-games-column,
+        .edit-column,
         .delete-column {
             width: 70px;
             text-align: center !important;
@@ -306,6 +307,49 @@
         .btn-view-games:hover {
             color: white;
             background-color: #2563eb;
+        }
+
+        .btn-row-edit {
+            border: none;
+            background: transparent;
+            color: #1d4f91;
+            padding: 6px 9px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .btn-row-edit:hover {
+            color: white;
+            background-color: #1d4f91;
+        }
+
+        .edit-payment-modal {
+            width: min(540px, calc(100% - 32px));
+            border: none;
+            border-radius: 12px;
+            padding: 24px;
+            margin: auto;
+        }
+
+        .edit-payment-modal::backdrop {
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        .edit-payment-modal h2 {
+            margin-bottom: 18px;
+        }
+
+        .edit-payment-modal .col {
+            margin-bottom: 14px;
+        }
+
+        .edit-payment-modal .button-row {
+            justify-content: flex-end;
+        }
+
+        .edit-payment-modal [readonly] {
+            background: #f1f5f9;
         }
 
         .btn-row-delete {
@@ -799,13 +843,14 @@
                 <thead>
                     <tr>
                         <th class="select-column">Select</th>
+                        <th class="view-games-column">Games</th>
+                        <th class="edit-column">Edit</th>
+                        <th class="delete-column">Delete</th>
                         <th>Payment ID</th>
                         <th>Date</th>
                         <th>Association</th>
                         <th>Amount</th>
                         <th>Game IDs</th>
-                        <th class="view-games-column">Games</th>
-                        <th class="delete-column">Delete</th>
                     </tr>
                 </thead>
 
@@ -815,6 +860,37 @@
     </section>
 
 </div>
+
+<dialog id="editPaymentModal" class="edit-payment-modal" aria-labelledby="editPaymentTitle">
+    <form id="editPaymentForm" novalidate>
+        <h2 id="editPaymentTitle">Edit Payment</h2>
+        <div class="col">
+            <label for="editPaymentId">Payment ID</label>
+            <input id="editPaymentId" type="text" readonly>
+        </div>
+        <div class="col">
+            <label for="editPaymentDate">Date</label>
+            <input id="editPaymentDate" type="date" required>
+        </div>
+        <div class="col">
+            <label for="editPaymentAssociation">Association</label>
+            <select id="editPaymentAssociation" required></select>
+        </div>
+        <div class="col">
+            <label for="editPaymentAmount">Payment Amount</label>
+            <input id="editPaymentAmount" type="number" min="0.01" step="0.01" required>
+        </div>
+        <div class="col">
+            <label for="editPaymentGameIds">Game IDs</label>
+            <input id="editPaymentGameIds" type="text" required
+                placeholder="Comma-separated game IDs">
+        </div>
+        <div class="button-row">
+            <button type="button" id="cancelEditPaymentBtn" class="btn btn-modal-cancel">Cancel</button>
+            <button type="submit" id="saveEditPaymentBtn" class="btn btn-save">Save</button>
+        </div>
+    </form>
+</dialog>
 
 <dialog
     id="deletePaymentModal"
@@ -971,6 +1047,108 @@ const deleteSelectedPaymentsBtn =
 
 const deletePaymentModal =
     document.getElementById("deletePaymentModal");
+
+const editPaymentModal =
+    document.getElementById("editPaymentModal");
+
+const editPaymentForm =
+    document.getElementById("editPaymentForm");
+
+let originalEditAssociation = "";
+
+function paymentDateForInput(value) {
+    const text = String(value ?? "").trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    return match
+        ? `${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`
+        : "";
+}
+
+function openEditPayment(payment) {
+    try {
+        if (!payment) throw new Error("Payment could not be found.");
+        const paymentId = String(getPaymentValue(
+            payment, "PaymentId", "PaymentID", "paymentId", "paymentid"
+        ));
+        const association = String(getPaymentValue(
+            payment, "Association", "association"
+        ));
+
+        const associationOptions = document.getElementById("association");
+        const editAssociation = document.getElementById("editPaymentAssociation");
+        editAssociation.innerHTML = associationOptions.innerHTML;
+        if (!Array.from(editAssociation.options).some(option => option.value === association)) {
+            editAssociation.add(new Option(association, association));
+        }
+        document.getElementById("editPaymentId").value = paymentId;
+        document.getElementById("editPaymentDate").value = paymentDateForInput(
+            getPaymentValue(payment, "PaymentDate", "paymentDate", "Date", "date")
+        );
+        editAssociation.value = association;
+        originalEditAssociation = association;
+        const amount = getPaymentValue(payment, "PaymentAmt", "paymentAmt", "Amount", "amount");
+        document.getElementById("editPaymentAmount").value =
+            Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : "";
+        document.getElementById("editPaymentGameIds").value =
+            normalizeGameIds(getPaymentGameIds(payment)).join(", ");
+        document.getElementById("saveEditPaymentBtn").disabled = false;
+        editPaymentModal.showModal();
+    } catch (error) {
+        showMessage(`Unable to load payment: ${error.message}`, "error");
+    }
+}
+
+document.getElementById("cancelEditPaymentBtn").addEventListener("click", () => {
+    editPaymentModal.close();
+});
+
+editPaymentForm.addEventListener("submit", async function(event) {
+    event.preventDefault();
+    editPaymentModal.close();
+    const saveButton = document.getElementById("saveEditPaymentBtn");
+    const paymentId = document.getElementById("editPaymentId").value;
+    const date = document.getElementById("editPaymentDate").value;
+    const association = document.getElementById("editPaymentAssociation").value;
+    const amount = Number(document.getElementById("editPaymentAmount").value);
+    const rawGameIds = document.getElementById("editPaymentGameIds").value;
+    const gameids = normalizeGameIds(rawGameIds);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !association ||
+        !Number.isFinite(amount) || amount <= 0 ||
+        gameids.length === 0 || gameids.some(id => !/^\d+$/.test(id)) ||
+        new Set(gameids).size !== gameids.length) {
+        showMessage("Enter a date, association, positive amount, and unique numeric game IDs.", "error");
+        return;
+    }
+    saveButton.disabled = true;
+    try {
+        const response = await fetch("/api/update-payment", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                paymentid: paymentId,
+                originalAssociation: originalEditAssociation,
+                date, association, amount,
+                gameids: gameids.map(Number)
+            })
+        });
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
+        if (!response.ok) {
+            const message = (await response.text()).trim();
+            throw new Error(message || `HTTP ${response.status}`);
+        }
+        await loadPaymentsRegistry();
+        await loadCompletedGames(false);
+        showMessage(`Payment ${paymentId} updated successfully.`, "success");
+    } catch (error) {
+        showMessage(`Unable to update payment: ${error.message}`, "error");
+    } finally {
+        saveButton.disabled = false;
+    }
+});
 
 const deletePaymentModalMessage =
     document.getElementById("deletePaymentModalMessage");
@@ -1852,7 +2030,7 @@ function renderPayments(payments) {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="8">
+                <td colspan="9">
                     No payments are currently in the registry.
                 </td>
             </tr>
@@ -1861,7 +2039,7 @@ function renderPayments(payments) {
         return;
     }
 
-    tbody.innerHTML = payments.map(payment => {
+    tbody.innerHTML = payments.map((payment, index) => {
         const paymentId = getPaymentValue(
             payment,
             "PaymentId",
@@ -1935,15 +2113,6 @@ function renderPayments(payments) {
                     >
                 </td>
 
-                <td>${escapeHtml(paymentId)}</td>
-                <td>${escapeHtml(date)}</td>
-                <td>${escapeHtml(association)}</td>
-                <td>${escapeHtml(displayAmount)}</td>
-
-                <td class="payment-games">
-                    ${escapeHtml(displayGameIds)}
-                </td>
-
                 <td class="view-games-column">
                     <button
                         type="button"
@@ -1954,6 +2123,17 @@ function renderPayments(payments) {
                         aria-label="View games associated with payment ${escapeHtml(paymentId)}"
                     >
                         <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                    </button>
+                </td>
+
+                <td class="edit-column">
+                    <button type="button" class="btn-row-edit"
+                        data-payment-index="${index}"
+                        data-payment-id="${escapeHtml(paymentId)}"
+                        data-association="${escapeHtml(association)}"
+                        title="Edit payment"
+                        aria-label="Edit payment ${escapeHtml(paymentId)}">
+                        <i class="fa-solid fa-pen" aria-hidden="true"></i>
                     </button>
                 </td>
 
@@ -1969,6 +2149,15 @@ function renderPayments(payments) {
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
+                <td>${escapeHtml(paymentId)}</td>
+                <td>${escapeHtml(date)}</td>
+                <td>${escapeHtml(association)}</td>
+                <td>${escapeHtml(displayAmount)}</td>
+
+                <td class="payment-games">
+                    ${escapeHtml(displayGameIds)}
+                </td>
+
             </tr>
         `;
     }).join("");
@@ -2012,6 +2201,14 @@ function renderPayments(payments) {
                     );
                 }
             );
+        });
+
+    document
+        .querySelectorAll(".btn-row-edit")
+        .forEach(function(editButton) {
+            editButton.addEventListener("click", function() {
+                openEditPayment(payments[Number(editButton.dataset.paymentIndex)]);
+            });
         });
 
     document
