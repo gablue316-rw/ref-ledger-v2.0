@@ -4775,6 +4775,68 @@ func GenerateAccountsReceivableReport(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func GenerateRevenueReport(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("GenerateReconciliationReport is called")
+	LogVisitor(r)
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tId := database.TenantId
+
+	if tId == "na" {
+		var err error
+
+		tId, err = getTenantId(r)
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	// Supports:
+	// ?association=MSO
+	// ?association=MSO&association=GOLLC
+	associations := r.URL.Query()["association"]
+
+	revenueReports, err :=
+		database.GetRevenueReports(tId, associations)
+	if err != nil {
+		fmt.Printf(
+			"GenerateRevenueReport failed: %v\n",
+			err,
+		)
+
+		http.Error(
+			w,
+			"Unable to generate revenue report",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	fmt.Println("===== Revenue Reports Returned", revenueReports, "=====")
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(revenueReports); err != nil {
+		fmt.Printf(
+			"GenerateRevenueReport JSON encoding failed: %v\n",
+			err,
+		)
+		return
+	}
+}
+
 func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("GenerateReconciliationReport is called")
 	LogVisitor(r)
@@ -8044,6 +8106,7 @@ func main() {
 	mux.HandleFunc("/api/reports", GenerateReport)
 	mux.HandleFunc("/api/financial-report", GenerateFinancialReport)
 	mux.HandleFunc("/api/expense-report", GenerateExpenseReport)
+	mux.HandleFunc("/api/revenue-report", GenerateRevenueReport)
 	mux.HandleFunc("/api/accounts-receivable-report", GenerateAccountsReceivableReport)
 	mux.HandleFunc("/api/game-report", GenerateGameReport)
 	mux.HandleFunc("/api/reconciliation-report", GenerateReconciliationReport)

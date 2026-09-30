@@ -280,22 +280,26 @@ type OfficialView struct {
 }
 
 type GameView struct {
-	GameId      int64          `json:"GameId"`
-	Date        string         `json:"Date"`
-	Time        string         `json:"Time"`
-	Sport       string         `json:"Sport"`
-	Site        string         `json:"Site"`
-	Field       string         `json:"Field"`
-	NumOfGames  int64          `json:"NumOfGames"`
-	Level       string         `json:"Level"`
-	Home        string         `json:"Home"`
-	Visitor     string         `json:"Visitor"`
-	GameFee     string         `json:"GameFee"`
-	Association string         `json:"Association"`
-	Status      string         `json:"Status"`
-	Officials   []OfficialView `json:"Officials"`
-	ECO         string         `json:"ECO"`
-	Assignor    string         `json:"Assignor"`
+	GameId        int64          `json:"GameId"`
+	Date          string         `json:"Date"`
+	Time          string         `json:"Time"`
+	Sport         string         `json:"Sport"`
+	Site          string         `json:"Site"`
+	Field         string         `json:"Field"`
+	NumOfGames    int64          `json:"NumOfGames"`
+	Level         string         `json:"Level"`
+	Home          string         `json:"Home"`
+	Visitor       string         `json:"Visitor"`
+	GameFee       string         `json:"GameFee"`
+	Association   string         `json:"Association"`
+	Status        string         `json:"Status"`
+	Officials     []OfficialView `json:"Officials"`
+	ECO           string         `json:"ECO"`
+	Assignor      string         `json:"Assignor"`
+	TravelPay     string         `json:"TravelPay"`
+	AssignorFee   string         `json:"AssignorFee"`
+	Deductions    string         `json:"Deductions"`
+	TotalEarnings string         `json:"TotalEarnings"`
 }
 
 type ExpenseReportRow struct {
@@ -336,6 +340,28 @@ type FinancialReportResponse struct {
 	TotalExpenses string `json:"totalExpenses"`
 	NetIncome     string `json:"netIncome"`
 	TotalMileage  string `json:"totalMileage"`
+}
+
+type RevenueReport struct {
+	Association     string `json:"association"`
+	NumOfGames      int64  `json:"numOfGames"`
+	TotGameFees     int64  `json:"totGameFees"`
+	TotTravelPay    int64  `json:"totTravelPay"`
+	GrossRevenue    int64  `json:"grossRevenue"`
+	TotAssignorFees int64  `json:"totAssignorFees"`
+	TotDeductions   int64  `json:"totDeductions"`
+	NetRevenue      int64  `json:"netRevenue"`
+}
+
+type RevenueReportResponse struct {
+	Association     string `json:"association"`
+	NumOfGames      string `json:"numOfGames"`
+	TotGameFees     string `json:"totGameFees"`
+	TotTravelPay    string `json:"totTravelPay"`
+	GrossRevenue    string `json:"grossRevenue"`
+	TotAssignorFees string `json:"totAssignorFees"`
+	TotDeductions   string `json:"totDeductions"`
+	NetRevenue      string `json:"netRevenue"`
 }
 
 type ExpenseReport struct {

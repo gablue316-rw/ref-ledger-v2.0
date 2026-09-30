@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -5809,6 +5810,197 @@ func GetReconciliationReports(
 	return response, nil
 }
 
+func GetRevenueReports(tId string, associations []string) (map[string]model.RevenueReportResponse, error) {
+
+	revenueRecords := make(map[string]model.RevenueReport)
+	ctx := context.Background()
+
+	// Remove empty values and duplicates.
+	selectedAssociations := make([]string, 0, len(associations))
+	seenAssociations := make(map[string]struct{})
+
+	for _, associationName := range associations {
+		associationName = strings.TrimSpace(associationName)
+
+		if associationName == "" {
+			continue
+		}
+
+		if _, exists := seenAssociations[associationName]; exists {
+			continue
+		}
+
+		seenAssociations[associationName] = struct{}{}
+		selectedAssociations = append(
+			selectedAssociations,
+			associationName,
+		)
+	}
+
+	if len(selectedAssociations) > 0 {
+		// The user selected specific associations.
+		for _, associationName := range selectedAssociations {
+			revenueRecords[associationName] = model.RevenueReport{
+				Association: associationName,
+			}
+		}
+	} else {
+		// No associations were selected, so load every association
+		// belonging to this tenant.
+		associationFilter := bson.M{
+			"tenantId": tId,
+		}
+
+		associationsColl :=
+			Client.Database(Database).Collection("associations")
+
+		associationCursor, err :=
+			associationsColl.Find(ctx, associationFilter)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"GetRevenueReports associations query failed: %w",
+				err,
+			)
+		}
+
+		for associationCursor.Next(ctx) {
+			var associationDoc AssociationDoc
+
+			if err := associationCursor.Decode(&associationDoc); err != nil {
+				associationCursor.Close(ctx)
+
+				return nil, fmt.Errorf(
+					"GetRevenueReports association decode failed: %w",
+					err,
+				)
+			}
+
+			associationName := strings.TrimSpace(
+				associationDoc.Name,
+			)
+
+			if associationName == "" {
+				continue
+			}
+
+			revenueRecords[associationName] =
+				model.RevenueReport{
+					Association: associationName,
+				}
+		}
+
+		if err := associationCursor.Err(); err != nil {
+			associationCursor.Close(ctx)
+
+			return nil, fmt.Errorf(
+				"GetRevenueReports associations cursor failed: %w",
+				err,
+			)
+		}
+
+		if err := associationCursor.Close(ctx); err != nil {
+			return nil, fmt.Errorf(
+				"GetRevenueReports failed to close associations cursor: %w",
+				err,
+			)
+		}
+
+	}
+
+	fmt.Printf(
+		"Tenant ID: %q, incoming associations: %#v, selected associations: %#v\n",
+		tId,
+		associations,
+		selectedAssociations,
+	)
+
+	fmt.Printf(
+		"Pre-filled financial records: %#v\n",
+		revenueRecords,
+	)
+
+	// Load games.
+	gameFilter := bson.M{
+		"tenantId": tId,
+	}
+
+	if len(selectedAssociations) > 0 {
+		gameFilter["association"] = bson.M{
+			"$in": selectedAssociations,
+		}
+	}
+	gamesColl := Client.Database(Database).Collection("games")
+
+	gameCursor, err := gamesColl.Find(ctx, gameFilter)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"GetRevenueReports games query failed: %w",
+			err,
+		)
+	}
+
+	for gameCursor.Next(ctx) {
+		var game model.GameDoc
+
+		if err := gameCursor.Decode(&game); err != nil {
+			gameCursor.Close(ctx)
+
+			return nil, fmt.Errorf(
+				"GetRevenueReports game decode failed: %w",
+				err,
+			)
+		}
+
+		if game.Status != "Paid" {
+			continue
+		}
+
+		record, exists := revenueRecords[game.Association]
+		if !exists {
+			// Ignore games whose association is not in the
+			// associations collection for this tenant.
+			continue
+		}
+
+		revenue := game.NumOfGames*game.GameFee + game.TravelPay
+		expenses := game.AssignorFee + game.Deductions
+
+		record.NumOfGames += game.NumOfGames
+		record.TotGameFees += game.NumOfGames * game.GameFee
+		record.TotTravelPay += game.TravelPay
+		record.TotAssignorFees += game.AssignorFee
+		record.TotDeductions += game.Deductions
+		record.GrossRevenue += revenue
+		record.NetRevenue += revenue - expenses
+
+		revenueRecords[game.Association] = record
+
+	}
+
+	// Build the web response.
+	response := make(
+		map[string]model.RevenueReportResponse,
+		len(revenueRecords),
+	)
+
+	for associationName, record := range revenueRecords {
+		response[associationName] =
+			model.RevenueReportResponse{
+				Association:     record.Association,
+				NumOfGames:      strconv.FormatInt(record.NumOfGames, 10),
+				TotGameFees:     formatCurrency(record.TotGameFees),
+				TotTravelPay:    formatCurrency(record.TotTravelPay),
+				GrossRevenue:    formatCurrency(record.GrossRevenue),
+				TotAssignorFees: formatCurrency(record.TotAssignorFees),
+				TotDeductions:   formatCurrency(record.TotDeductions),
+				NetRevenue:      formatCurrency(record.NetRevenue),
+			}
+	}
+
+	return response, nil
+
+}
+
 func GetFinancialReports(tId string, associations []string) (map[string]model.FinancialReportResponse, error) {
 
 	financialRecords := make(map[string]model.FinancialReport)
@@ -5964,7 +6156,7 @@ func GetFinancialReports(tId string, associations []string) (map[string]model.Fi
 		record.GrossIncome +=
 			game.NumOfGames*game.GameFee +
 				game.TravelPay -
-				game.AssignorFee
+				game.AssignorFee - game.Deductions
 
 		financialRecords[game.Association] = record
 	}
@@ -6590,6 +6782,10 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 			Association: r.Association,
 			Assignor:    r.Assignor,
 			ECO:         r.ECO,
+			GameFee:     utils.ConvertInt64ToAmtStr(r.GameFee),
+			AssignorFee: utils.ConvertInt64ToAmtStr(r.AssignorFee),
+			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),
+			Deductions:  utils.ConvertInt64ToAmtStr(r.Deductions),
 		}
 
 		gameRec := model.GameDescriptor{
@@ -6600,8 +6796,8 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 			AssignorFee: utils.ConvertInt64ToAmtStr(r.AssignorFee),
 		}
 
-		gameFee := utils.CalculateGameFee(gameRec)
-		view.GameFee = utils.ConvertInt64ToAmtStr(gameFee)
+		totalEarnings := utils.CalculateGameFee(gameRec)
+		view.TotalEarnings = utils.ConvertInt64ToAmtStr(totalEarnings)
 
 		abbrev := utils.DayOfWeekAbbreviation(r.Date)
 		view.Date = fmt.Sprintf("%s (%s)", r.Date, abbrev)
