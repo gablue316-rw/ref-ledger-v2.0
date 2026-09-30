@@ -272,7 +272,15 @@
         .game-report-table th:nth-child(9),
         .game-report-table td:nth-child(9),
         .game-report-table th:nth-child(11),
-        .game-report-table td:nth-child(11) {
+        .game-report-table td:nth-child(11),
+        .game-report-table th:nth-child(12),
+        .game-report-table td:nth-child(12),
+        .game-report-table th:nth-child(13),
+        .game-report-table td:nth-child(13),
+        .game-report-table th:nth-child(14),
+        .game-report-table td:nth-child(14),
+        .game-report-table th:nth-child(15),
+        .game-report-table td:nth-child(15) {
             text-align: right;
         }
 
@@ -608,6 +616,49 @@
         </div>
     </section>
 
+    <section class="report-block" aria-labelledby="revenueReportTitle">
+        <div class="report-block-header">
+            <h2 id="revenueReportTitle">Revenue Report</h2>
+            <p>Generate a revenue summary for one, multiple, or all associations.</p>
+        </div>
+
+        <div class="report-controls">
+            <div class="filter-group">
+                <label>Associations</label>
+                <div class="checkbox-dropdown" id="revenueAssociationDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('revenueAssociationDropdown')">
+                        <span id="revenueAssociationSummary">All Associations</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="revenueAssociationOptions">
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="button"
+                    class="btn btn-create"
+                    onclick="generateRevenueReport()">
+                    Create Report
+                </button>
+
+                <button
+                    type="button"
+                    class="btn btn-clear"
+                    onclick="clearRevenueReport()">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
+
     <section class="report-block" aria-labelledby="expenseReportTitle">
         <div class="report-block-header">
             <h2 id="expenseReportTitle">Expense Report</h2>
@@ -807,6 +858,7 @@ function updateCheckboxSummary(name) {
     const allLabels = {
         gameAssociation: "All Associations",
         financialAssociation: "All Associations",
+        revenueAssociation: "All Associations",
         expenseAssociation: "All Associations",
         accountsReceivableAssociation: "All Associations",
         reconciliationAssociation: "All Associations",
@@ -863,6 +915,14 @@ async function loadAssociations() {
             }))
         );
         setupCheckboxDropdown("financialAssociation");
+
+        fillCheckboxOptions("revenueAssociation", "revenueAssociationOptions",
+            financialAssociations.map(association => ({
+                value: association,
+                text: association
+            }))
+        );
+        setupCheckboxDropdown("revenueAssociation");
 
         fillCheckboxOptions("gameAssociation", "gameAssociationOptions",
             financialAssociations.map(association => ({
@@ -1609,7 +1669,11 @@ function renderGameReport(report) {
         { label: "Visitor", value: row => gameField(row, "visitor", "Visitor") },
         { label: "Num of Games", value: row => gameField(row, "numOfGames", "NumOfGames") || 1 },
         { label: "Level", value: row => gameField(row, "level", "Level") },
-        { label: "Assignment Earnings", value: row => formatCurrency(parseGameFee(gameField(row, "gameFee", "GameFee"))) },
+        { label: "Game Fee", value: row => formatCurrency(parseGameFee(gameField(row, "gameFee", "GameFee"))) },
+        { label: "Travel Pay", value: row => formatCurrency(parseGameFee(gameField(row, "travelPay", "TravelPay"))) },
+        { label: "Assignor Fee", value: row => formatCurrency(parseGameFee(gameField(row, "assignorFee", "AssignorFee"))) },
+        { label: "Deductions", value: row => formatCurrency(parseGameFee(gameField(row, "deductions", "Deductions"))) },
+        { label: "Assignment Earnings", value: row => formatCurrency(parseReportNumber(gameField(row, "totalEarnings", "TotalEarnings"))) },
         { label: "Assoc", value: row => gameField(row, "association", "Association") },
         { label: "Status", value: row => gameField(row, "status", "Status") },
         { label: "Officials", value: row => getOfficials(row) },
@@ -1637,9 +1701,9 @@ function renderGameReport(report) {
             0,
             parseReportNumber(gameField(row, "numOfGames", "NumOfGames")) || 1
         );
-        const gameFee = parseGameFee(gameField(row, "gameFee", "GameFee"));
+        const totalEarnings = parseReportNumber(gameField(row, "totalEarnings", "TotalEarnings"));
         totalGames += numberOfGames;
-        totalAssignmentEarnings += gameFee;
+        totalAssignmentEarnings += totalEarnings;
 
         const tableRow = tbody.insertRow();
         columns.forEach(column => {
@@ -1732,6 +1796,81 @@ function renderFinancialReport(report) {
         const cell = totalRow.insertCell();
         cell.textContent = field === "totalMileage"
             ? formatMileage(totals[field])
+            : formatCurrency(totals[field]);
+    });
+
+    const container = document.getElementById("reportContainer");
+    container.className = "";
+    container.replaceChildren(table);
+}
+
+function renderRevenueReport(report) {
+    const rows = (report && !Array.isArray(report) && typeof report === "object" && "association" in report
+        ? [report] : getFinancialReportRows(report))
+        .filter(row => row && typeof row === "object")
+        .sort((a, b) => String(a.association ?? "").localeCompare(
+            String(b.association ?? "")
+        ));
+
+    if (rows.length === 0) {
+        setReportMessage("No revenue records were returned.");
+        return;
+    }
+
+    const columns = [
+        { label: "Association", field: "association" },
+        { label: "Number of Games", field: "numOfGames" },
+        { label: "Total Game Fees", field: "totGameFees" },
+        { label: "Total Travel Pay", field: "totTravelPay" },
+        { label: "Gross Revenue", field: "grossRevenue" },
+        { label: "Total Assignor Fees", field: "totAssignorFees" },
+        { label: "Total Deductions", field: "totDeductions" },
+        { label: "Net Revenue", field: "netRevenue" }
+    ];
+
+    const totalFields = columns.slice(1).map(column => column.field);
+    const totals = Object.fromEntries(totalFields.map(field => [field, 0]));
+    const table = document.createElement("table");
+    table.className = "financial-report-table";
+
+    const headerRow = table.createTHead().insertRow();
+
+    columns.forEach(column => {
+        const th = document.createElement("th");
+        th.scope = "col";
+        th.textContent = column.label;
+        headerRow.appendChild(th);
+    });
+
+    const tbody = table.createTBody();
+
+    rows.forEach(row => {
+        const tableRow = tbody.insertRow();
+
+        columns.forEach(column => {
+            const cell = tableRow.insertCell();
+
+            if (column.field === "association") {
+                cell.textContent = String(row[column.field] ?? "");
+                return;
+            }
+
+            const value = parseReportNumber(row[column.field]);
+            totals[column.field] += value;
+
+            cell.textContent = column.field === "numOfGames"
+                ? value.toLocaleString("en-US")
+                : formatCurrency(value);
+        });
+    });
+
+    const totalRow = table.createTFoot().insertRow();
+    totalRow.insertCell().textContent = "Grand Total";
+
+    totalFields.forEach(field => {
+        const cell = totalRow.insertCell();
+        cell.textContent = field === "numOfGames"
+            ? totals[field].toLocaleString("en-US")
             : formatCurrency(totals[field]);
     });
 
@@ -1987,6 +2126,49 @@ async function generateFinancialReport() {
         const report = await response.json();
         renderFinancialReport(report);
         setReportTitle("Financial Report");
+    }
+    catch (err) {
+
+        console.error(err);
+
+        setReportMessage("Failed to generate report.\n\n" + err.message);
+    }
+}
+
+async function generateRevenueReport() {
+
+    const selectedAssociations = selectedValues("revenueAssociation");
+    const allCheckbox = document.querySelector(
+        'input[data-all-for="revenueAssociation"]'
+    );
+
+    const associations = allCheckbox?.checked
+        ? financialAssociations
+        : selectedAssociations;
+
+    const params = new URLSearchParams();
+
+    params.append("type", "Revenue");
+
+    associations.forEach(association => params.append("association", association));
+
+    try {
+
+        setReportMessage("Generating report...");
+
+        const response =
+            await fetch(`/api/revenue-report?${params.toString()}`);
+
+        if (!response.ok) {
+
+            throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+            );
+        }
+
+        const report = await response.json();
+        renderRevenueReport(report);
+        setReportTitle("Revenue Report");
     }
     catch (err) {
 
@@ -2310,6 +2492,27 @@ function clearFinancialReport() {
         ?.setAttribute("aria-expanded", "false");
 
     setReportMessage('Select Financial Report options and click "Create Report".');
+}
+
+function clearRevenueReport() {
+
+    document.querySelectorAll('input[name="revenueAssociation"]').forEach(
+        checkbox => checkbox.checked = false
+    );
+
+    const all = document.querySelector(
+        'input[data-all-for="revenueAssociation"]'
+    );
+
+    if (all) all.checked = true;
+    updateCheckboxSummary("revenueAssociation");
+
+    const dropdown = document.getElementById("revenueAssociationDropdown");
+    dropdown.classList.remove("open");
+    dropdown.querySelector(".checkbox-dropdown-button")
+        ?.setAttribute("aria-expanded", "false");
+
+    setReportMessage('Select Revenue Report options and click "Create Report".');
 }
 
 function clearGameReport() {
