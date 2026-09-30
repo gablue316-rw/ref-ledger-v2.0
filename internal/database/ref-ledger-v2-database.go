@@ -705,25 +705,20 @@ func GetExpenseRegistry(
 }
 
 func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDescriptor, error) {
-
 	paymentFilter := bson.M{"tenantId": filter.TenantId}
 
 	if filter.PaymentId != "" {
 		paymentFilter["paymentId"] = filter.PaymentId
 	}
-
 	if filter.Association != "" {
 		paymentFilter["association"] = filter.Association
 	}
-
 	if filter.Date != "" {
 		paymentFilter["paymentDate"] = filter.Date
 	}
-
 	if filter.Amount > 0 {
 		paymentFilter["paymentAmt"] = filter.Amount
 	}
-
 	if len(filter.GameIds) > 0 {
 		paymentFilter["gameIds"] = bson.M{
 			"$in": filter.GameIds,
@@ -736,21 +731,40 @@ func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDesc
 	db := Client.Database(Database)
 	coll := db.Collection("payments")
 
-	cursor, err := coll.Find(ctx, paymentFilter)
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: paymentFilter}},
+		bson.D{{Key: "$addFields", Value: bson.M{
+			"sortDate": bson.M{
+				"$dateFromString": bson.M{
+					"dateString": "$paymentDate",
+					"format":     "%m/%d/%Y",
+				},
+			},
+		}}},
+		bson.D{{Key: "$sort", Value: bson.D{
+			{Key: "sortDate", Value: 1},
+			{Key: "paymentId", Value: 1},
+		}}},
+		bson.D{{Key: "$unset", Value: "sortDate"}},
+	}
+
+	cursor, err := coll.Aggregate(ctx, pipeline)
+	if err != nil {
+		fmt.Println("Error", err)
+		return []model.PaymentDescriptor{}, err
+	}
+	defer cursor.Close(ctx)
 
 	var results []model.PaymentDoc
-	var paymentRecords []model.PaymentDescriptor
+	paymentRecords := make([]model.PaymentDescriptor, 0)
 
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
+	if err := cursor.All(ctx, &results); err != nil {
 		fmt.Println("Error", err)
 		return []model.PaymentDescriptor{}, err
 	}
 
 	for _, r := range results {
-
 		paymentRecords = append(paymentRecords, utils.ConvertPaymentDocToPaymentDescr(r))
-
 	}
 	return paymentRecords, nil
 }
