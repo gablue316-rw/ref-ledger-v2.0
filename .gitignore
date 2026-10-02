@@ -42,3 +42,6 @@ values.yaml.local
 
 # bugs directory
 bugs
+
+# tools
+tools/migrateOfficials

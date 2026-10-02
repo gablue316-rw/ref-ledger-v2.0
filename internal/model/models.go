@@ -108,7 +108,29 @@ type OfficialDoc struct {
 	Association string `bson:"association,omitempty"`
 }
 
+// GameOfficialDoc is one assignment in a game's variable-length officials array.
+// OfficialId is the decimal official ID; an empty string means Unassigned.
+// Title, DisplayOrder, and Name are server-populated snapshots for historical games.
+
+type GameOfficialDoc struct {
+	RoleId       string `bson:"roleId" json:"roleId"`
+	Title        string `bson:"title" json:"title"`
+	DisplayOrder int    `bson:"displayOrder" json:"displayOrder"`
+	OfficialId   string `bson:"officialId" json:"officialId"`
+	Name         string `bson:"name" json:"name"`
+}
+
+// GameOfficialFilter matches a role and official within the SAME array entry.
+// Leave RoleId empty to match the official in any role; Title is an optional fallback.
+
+type GameOfficialFilter struct {
+	RoleId     string `json:"roleId,omitempty"`
+	Title      string `json:"title,omitempty"`
+	OfficialId string `json:"officialId,omitempty"`
+}
+
 type GameDescriptor struct {
+	Officials   []GameOfficialDoc `json:"Officials"`
 	GameId      string
 	Date        string
 	Time        string
@@ -125,61 +147,75 @@ type GameDescriptor struct {
 	Deductions  string
 	Association string
 	Status      string
-	Referee     string
-	U1          string
-	U2          string
-	ECO         string
-	Assignor    string
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	Referee string `json:"Referee,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	U1 string `json:"U1,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	U2 string `json:"U2,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	ECO      string `json:"ECO,omitempty"`
+	Assignor string
 }
 
 type GameDoc struct {
-	GameId       int64     `bson:"gameId,omitempty"`
-	Date         string    `bson:"date,omitempty"`
-	Time         string    `bson:"time,omitempty"`
-	GameDateTime time.Time `bson:"gameDateTime,omitempty"`
-	Sport        string    `bson:"sport,omitempty"`
-	Site         string    `bson:"site,omitempty"`
-	Field        string    `bson:"field,omitempty"`
-	NumOfGames   int64     `bson:"numOfGames,omitempty"`
-	Level        string    `bson:"level,omitempty"`
-	Home         string    `bson:"home,omitempty"`
-	Visitor      string    `bson:"visitor,omitempty"`
-	GameFee      int64     `bson:"gameFee"`
-	TravelPay    int64     `bson:"travelPay"`
-	AssignorFee  int64     `bson:"assignorFee"`
-	Deductions   int64     `bson:"deductions"`
-	Association  string    `bson:"association,omitempty"`
-	Status       string    `bson:"status,omitempty"`
-	Referee      string    `bson:"referee,omitempty"`
-	U1           string    `bson:"u1,omitempty"`
-	U2           string    `bson:"u2,omitempty"`
-	ECO          string    `bson:"eco,omitempty"`
-	Assignor     string    `bson:"assignor,omitempty"`
-	TenantId     string    `bson:"tenantId"`
+	Officials    []GameOfficialDoc `bson:"officials" json:"officials"`
+	GameId       int64             `bson:"gameId,omitempty"`
+	Date         string            `bson:"date,omitempty"`
+	Time         string            `bson:"time,omitempty"`
+	GameDateTime time.Time         `bson:"gameDateTime,omitempty"`
+	Sport        string            `bson:"sport,omitempty"`
+	Site         string            `bson:"site,omitempty"`
+	Field        string            `bson:"field,omitempty"`
+	NumOfGames   int64             `bson:"numOfGames,omitempty"`
+	Level        string            `bson:"level,omitempty"`
+	Home         string            `bson:"home,omitempty"`
+	Visitor      string            `bson:"visitor,omitempty"`
+	GameFee      int64             `bson:"gameFee"`
+	TravelPay    int64             `bson:"travelPay"`
+	AssignorFee  int64             `bson:"assignorFee"`
+	Deductions   int64             `bson:"deductions"`
+	Association  string            `bson:"association,omitempty"`
+	Status       string            `bson:"status,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	Referee string `bson:"referee,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	U1 string `bson:"u1,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	U2 string `bson:"u2,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	ECO      string `bson:"eco,omitempty"`
+	Assignor string `bson:"assignor,omitempty"`
+	TenantId string `bson:"tenantId"`
 }
 
 type JsonDoc struct {
-	GameId      int64  `json:"gameId"`
-	Date        string `json:"date"`
-	Time        string `json:"time"`
-	Sport       string `json:"sport"`
-	Site        string `json:"site"`
-	Field       string `json:"field"`
-	NumOfGames  int64  `json:"numOfGames"`
-	Level       string `json:"level"`
-	Home        string `json:"home"`
-	Visitor     string `json:"visitor"`
-	GameFee     string `json:"gameFee"`
-	TravelPay   string `json:"travelPay"`
-	AssignorFee string `json:"assignorFee"`
-	Deductions  string `json:"deductions"`
-	Association string `json:"association"`
-	Status      string `json:"status"`
-	Referee     string `json:"referee"`
-	U1          string `json:"u1"`
-	U2          string `json:"u2"`
-	ECO         string `json:"eco"`
-	Assignor    string `json:"assignor"`
+	Officials   []GameOfficialDoc `json:"officials"`
+	GameId      int64             `json:"gameId"`
+	Date        string            `json:"date"`
+	Time        string            `json:"time"`
+	Sport       string            `json:"sport"`
+	Site        string            `json:"site"`
+	Field       string            `json:"field"`
+	NumOfGames  int64             `json:"numOfGames"`
+	Level       string            `json:"level"`
+	Home        string            `json:"home"`
+	Visitor     string            `json:"visitor"`
+	GameFee     string            `json:"gameFee"`
+	TravelPay   string            `json:"travelPay"`
+	AssignorFee string            `json:"assignorFee"`
+	Deductions  string            `json:"deductions"`
+	Association string            `json:"association"`
+	Status      string            `json:"status"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	Referee string `json:"referee,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	U1 string `json:"u1,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	U2 string `json:"u2,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	ECO      string `json:"eco,omitempty"`
+	Assignor string `json:"assignor"`
 }
 
 type Filter struct {
@@ -209,24 +245,25 @@ type GFilters struct {
 }
 
 type GameFilter struct {
-	Status      []string `json:"status,omitempty"`
-	Association []string `json:"association,omitempty"`
-	GameId      []int64  `json:"gameId,omitempty"`
-	Date        *Date    `json:"date,omitempty"`
-	Referee     string   `json:"referee,omitempty"`
-	U1          string   `json:"u1,omitempty"`
-	U2          string   `json:"u2,omitempty"`
-	Site        []string `json:"site,omitempty"`
-	Sport       []string `json:"sport,omitempty"`
-	Level       []string `json:"level,omitempty"`
-	Home        string   `json:"home,omitempty"`
-	Visitor     string   `json:"visitor,omitempty"`
-	Assignor    []string `json:"assignor,omitempty"`
-	Official    []string `json:"official,omitempty"`
-	ECO         []string `json:"eco,omitempty"`
-	BeginDate   string   `json:"beginDate,omitempty"`
-	EndDate     string   `json:"endDate,omitempty"`
-	TenantId    string   `json:"tenantId"`
+	Officials   []GameOfficialFilter `json:"officials,omitempty"`
+	Status      []string             `json:"status,omitempty"`
+	Association []string             `json:"association,omitempty"`
+	GameId      []int64              `json:"gameId,omitempty"`
+	Date        *Date                `json:"date,omitempty"`
+	Referee     string               `json:"referee,omitempty"`
+	U1          string               `json:"u1,omitempty"`
+	U2          string               `json:"u2,omitempty"`
+	Site        []string             `json:"site,omitempty"`
+	Sport       []string             `json:"sport,omitempty"`
+	Level       []string             `json:"level,omitempty"`
+	Home        string               `json:"home,omitempty"`
+	Visitor     string               `json:"visitor,omitempty"`
+	Assignor    []string             `json:"assignor,omitempty"`
+	Official    []string             `json:"official,omitempty"`
+	ECO         []string             `json:"eco,omitempty"`
+	BeginDate   string               `json:"beginDate,omitempty"`
+	EndDate     string               `json:"endDate,omitempty"`
+	TenantId    string               `json:"tenantId"`
 }
 
 type Config struct {
@@ -244,27 +281,32 @@ type FeaturesConfig struct {
 }
 
 type HtmlResponse struct {
-	GameId      int64  `json:"gameId" bson:"gameId,omitempty"`
-	Date        string `json:"date" bson:"date,omitempty"`
-	Time        string `json:"time" bson:"time,omitempty"`
-	Sport       string `json:"sport" bson:"sport,omitempty"`
-	Site        string `json:"site" bson:"site,omitempty"`
-	Field       string `json:"field" bson:"field,omitempty"`
-	NumOfGames  int64  `json:"numOfGames" bson:"numOfGames,omitempty"`
-	Level       string `json:"level" bson:"level,omitempty"`
-	Home        string `json:"home" bson:"home,omitempty"`
-	Visitor     string `json:"visitor" bson:"visitor,omitempty"`
-	GameFee     int64  `json:"gameFee" bson:"gameFee,omitempty"`
-	TravelPay   int64  `json:"travelPay" bson:"travelPay,omitempty"`
-	AssignorFee int64  `json:"assignorFee" bson:"assignorFee,omitempty"`
-	Deductions  int64  `json:"deductions" bson:"deductions,omitempty"`
-	Association string `json:"association" bson:"association,omitempty"`
-	Status      string `json:"status" bson:"status,omitempty"`
-	Referee     string `json:"referee" bson:"referee,omitempty"`
-	U1          string `json:"u1" bson:"u1,omitempty"`
-	U2          string `json:"u2" bson:"u2,omitempty"`
-	ECO         string `json:"eco" bson:"eco,omitempty"`
-	Assignor    string `json:"assignor" bson:"assignor,omitempty"`
+	Officials   []GameOfficialDoc `json:"officials" bson:"officials"`
+	GameId      int64             `json:"gameId" bson:"gameId,omitempty"`
+	Date        string            `json:"date" bson:"date,omitempty"`
+	Time        string            `json:"time" bson:"time,omitempty"`
+	Sport       string            `json:"sport" bson:"sport,omitempty"`
+	Site        string            `json:"site" bson:"site,omitempty"`
+	Field       string            `json:"field" bson:"field,omitempty"`
+	NumOfGames  int64             `json:"numOfGames" bson:"numOfGames,omitempty"`
+	Level       string            `json:"level" bson:"level,omitempty"`
+	Home        string            `json:"home" bson:"home,omitempty"`
+	Visitor     string            `json:"visitor" bson:"visitor,omitempty"`
+	GameFee     int64             `json:"gameFee" bson:"gameFee,omitempty"`
+	TravelPay   int64             `json:"travelPay" bson:"travelPay,omitempty"`
+	AssignorFee int64             `json:"assignorFee" bson:"assignorFee,omitempty"`
+	Deductions  int64             `json:"deductions" bson:"deductions,omitempty"`
+	Association string            `json:"association" bson:"association,omitempty"`
+	Status      string            `json:"status" bson:"status,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	Referee string `json:"referee,omitempty" bson:"referee,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	U1 string `json:"u1,omitempty" bson:"u1,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	U2 string `json:"u2,omitempty" bson:"u2,omitempty"`
+	// Deprecated: use Officials. Retained for legacy callers/documents.
+	ECO      string `json:"eco,omitempty" bson:"eco,omitempty"`
+	Assignor string `json:"assignor" bson:"assignor,omitempty"`
 }
 
 type OfficialDetailsView struct {
@@ -275,8 +317,11 @@ type OfficialDetailsView struct {
 }
 
 type OfficialView struct {
-	OfficialId int64  `json:"OfficialId"`
-	Name       string `json:"Name"`
+	RoleId       string `json:"RoleId"`
+	Title        string `json:"Title"`
+	DisplayOrder int    `json:"DisplayOrder"`
+	OfficialId   int64  `json:"OfficialId"`
+	Name         string `json:"Name"`
 }
 
 type GameView struct {
@@ -416,4 +461,16 @@ type ReconciliationReportResponse struct {
 	PaymentGameIds []int64 `json:"paymentGameIds"`
 	LinkedGames    []int64 `json:"linkedGames"`
 	UnlinkeGames   []int64 `json:"unlinkedGames"`
+}
+
+type OfficialRole struct {
+	RoleId       string `bson:"roleId" json:"roleId"`
+	Title        string `bson:"title" json:"title"`
+	DisplayOrder int    `bson:"displayOrder" json:"displayOrder"`
+	Active       bool   `bson:"active" json:"active"`
+}
+
+type OfficialRolesRequest struct {
+	Sport string         `bson:"sport" json:"sport"`
+	Roles []OfficialRole `bson:"roles" json:"roles"`
 }

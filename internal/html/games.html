@@ -28,6 +28,16 @@ body {
 .card{background:#fff;padding:20px;border-radius:10px;margin-bottom:15px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
 .card-title{font-size:18px;font-weight:bold;margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid #ddd;}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;}
+.official-fields{grid-column:1 / -1;}
+.basic-game-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
+.role-hint{grid-column:1 / -1;display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid #c7d2fe;border-left:4px solid #6366f1;border-radius:10px;background:linear-gradient(120deg,#eef2ff,#f8fafc);color:#4338ca;}
+.role-hint-icon{width:42px;height:42px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#e0e7ff;color:#4f46e5;font-size:19px;}
+.role-hint-title{display:block;margin-bottom:4px;font-size:14px;font-weight:bold;}
+.role-hint-message{display:block;color:#475569;font-size:14px;line-height:1.5;}
+.role-hint.error{border-color:#fecaca;border-left-color:#dc2626;background:#fef2f2;color:#b91c1c;}
+.role-hint.error .role-hint-icon{background:#fee2e2;color:#b91c1c;}
+.role-hint.error .role-hint-message{color:#b91c1c;}
+.btn:disabled{opacity:.55;cursor:not-allowed;}
 .form-group{display:flex;flex-direction:column;}
 .form-group label{font-weight:bold;margin-bottom:5px;}
 .form-group input,.form-group select{padding:10px;border:1px solid #ccc;border-radius:5px;}
@@ -87,7 +97,7 @@ body{padding:10px;}
 
 <div class="card">
 <div class="card-title">Basic Game Information</div>
-<div class="form-grid">
+<div class="form-grid basic-game-grid">
 
 <div class="form-group">
     <label for="association">Association</label>
@@ -99,6 +109,12 @@ body{padding:10px;}
 <div class="form-group"><label for="gameId">Game ID</label><input type="number" id="gameId" required></div>
 <div class="form-group"><label for="date">Date</label><input type="date" id="date" required></div>
 <div class="form-group"><label for="time">Time</label><input type="time" id="time" required></div>
+<div class="form-group">
+    <label for="status">Status</label>
+    <select id="status">
+        <option value="">Loading statuses...</option>
+    </select>
+</div>
 </div>
 </div>
 
@@ -122,7 +138,7 @@ body{padding:10px;}
 <div class="form-group"><label for="field">Field</label><input type="text" id="field"></div>
 <div class="form-group">
     <label for="sport">Sport</label>
-    <select id="sport">
+    <select id="sport" disabled>
         <option value="">Select Sport</option>
     </select>
 </div>
@@ -143,39 +159,15 @@ body{padding:10px;}
 <div class="card">
 <div class="card-title">Officials</div>
 <div class="form-grid">
-<div class="form-group">
-    <label for="status">Status</label>
-    <select id="status">
-        <option value="">Loading statuses...</option>r
-    </select>
-</div>
-<div class="form-group">
-    <label for="referee">Referee</label>
-    <select id="referee">
-        <option value="Unassigned">Unassigned</option>
-    </select>
-</div>
 
-<div class="form-group">
-    <label for="u1">U1</label>
-    <select id="u1">
-        <option value="Unassigned">Unassigned</option>
-    </select>
+<div id="officialRolesHint" class="role-hint" role="status" aria-live="polite">
+    <span class="role-hint-icon" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+    <div>
+        <span class="role-hint-title">Official fields follow your sport</span>
+        <span id="officialRolesMessage" class="role-hint-message">Choose a sport in Location &amp; Sport. Its official fields will appear here automatically.</span>
+    </div>
 </div>
-
-<div class="form-group">
-    <label for="u2">U2</label>
-    <select id="u2">
-        <option value="Unassigned">Unassigned</option>
-    </select>
-</div>
-
-<div class="form-group">
-    <label for="eco">ECO</label>
-    <select id="eco">
-        <option value="Unassigned">Unassigned</option>
-    </select>
-</div>  
+<div id="officialFields" class="official-fields form-grid" aria-label="Sport official assignments"></div>
 
 <div class="form-group">
     <label for="assignor">Assignor</label>
@@ -187,7 +179,7 @@ body{padding:10px;}
 </div> 
 </div> 
 
-   
+
 <div class="button-row">
    <button
        type="button"
@@ -220,7 +212,7 @@ body{padding:10px;}
        <i class="fa-solid fa-trash"></i>                   
        Delete
    </button>
-                    
+
    <button
        type="button"
        id="clearBtn"
@@ -236,7 +228,7 @@ body{padding:10px;}
        <i class="fa-solid fa-file-import"></i>
        Import
    </button>   
-      
+
 
 </div>
 
@@ -250,16 +242,257 @@ body{padding:10px;}
 
 <script>
 
-function setUpdateMode(isUpdate) {
-    const gameId = document.getElementById("gameId");
-    const association = document.getElementById("association");
+// Set this URL to your existing sport-role GET route if its name differs.
+const OFFICIAL_ROLES_API = "/api/settings/official-roles";
+let isUpdateMode = false;
+let pageReady = false;
+let rolesReady = false;
+let officialsDirectory = [];
+let officialsLoadError = "";
+let roleFields = [];
+let roleRequest = 0;
+let roleAbortController = null;
+let formRevision = 0;
 
-    gameId.readOnly = isUpdate;
-    association.disabled = isUpdate;
-
-    document.getElementById("addGameBtn").disabled = isUpdate;
-    document.getElementById("updateGameBtn").disabled = !isUpdate;
+function updateActionButtons() {
+    document.getElementById("addGameBtn").disabled = !pageReady || !rolesReady || isUpdateMode;
+    document.getElementById("updateGameBtn").disabled = !pageReady || !rolesReady || !isUpdateMode;
+    document.getElementById("getGameBtn").disabled = !pageReady;
 }
+
+function setUpdateMode(isUpdate) {
+    isUpdateMode = isUpdate;
+    document.getElementById("gameId").readOnly = isUpdate;
+    document.getElementById("association").disabled = isUpdate;
+    updateActionButtons();
+}
+
+function roleHint(message, error = false) {
+    const hint = document.getElementById("officialRolesHint");
+    document.getElementById("officialRolesMessage").textContent = message;
+    hint.classList.toggle("error", error);
+}
+
+function resetOfficialFields() {
+    roleRequest++;
+    if (roleAbortController) roleAbortController.abort();
+    roleAbortController = null;
+    rolesReady = false;
+    roleFields = [];
+    document.getElementById("officialFields").replaceChildren();
+    roleHint("Choose a sport in Location & Sport. Its official fields will appear here automatically.");
+    updateActionButtons();
+}
+
+function normalizeRole(role) {
+    return {
+        roleId: String(role.roleId ?? role.RoleId ?? ""),
+        title: String(role.title ?? role.Title ?? ""),
+        displayOrder: Number(role.displayOrder ?? role.DisplayOrder ?? 0),
+        active: (role.active ?? role.Active) === true
+    };
+}
+
+function normalizeAssignment(assignment) {
+    const rawId = assignment.officialId ?? assignment.OfficialId ?? "";
+    return {
+        roleId: String(assignment.roleId ?? assignment.RoleId ?? ""),
+        title: String(assignment.title ?? assignment.Title ?? ""),
+        displayOrder: Number(assignment.displayOrder ?? assignment.DisplayOrder ?? 0),
+        officialId: rawId === 0 || rawId === "0" || rawId === "Unassigned" ? "" : String(rawId),
+        name: String(assignment.name ?? assignment.Name ?? "Unassigned")
+    };
+}
+
+function savedGameAssignments(game, roles) {
+    if (!game) return [];
+    const key = value => String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+    const byId = new Map(roles.map(role => [role.roleId, role]));
+    const byTitle = new Map(roles.map(role => [key(role.title), role]));
+    const result = new Map();
+    const rawAssignments = game.Officials ?? game.officials;
+    const assignments = Array.isArray(rawAssignments) ? rawAssignments : [];
+    const withoutRoles = [];
+    for (const raw of assignments) {
+        const assignment = normalizeAssignment(raw);
+        assignment.title = String(raw.title ?? raw.Title ?? raw.role ?? raw.Role ?? "").trim();
+        const role = byId.get(assignment.roleId) || (!assignment.roleId ? byTitle.get(key(assignment.title)) : null);
+        if (role) {
+            assignment.roleId = role.roleId;
+            assignment.title = assignment.title || role.title;
+            if (raw.displayOrder == null && raw.DisplayOrder == null) assignment.displayOrder = role.displayOrder;
+        }
+        if (!assignment.roleId || !assignment.title) {
+            if (assignment.officialId || (assignment.name && assignment.name !== "Unassigned")) withoutRoles.push(assignment);
+            continue;
+        }
+        // The new array is authoritative, including explicitly Unassigned entries.
+        result.set(assignment.roleId, assignment);
+    }
+    // Some existing handlers return Officials: [] together with Referee/U1/U2/ECO.
+    // Fill missing roles from named legacy fields instead of ignoring those values.
+    const fields = new Map(Object.entries(game).map(([name, value]) => [key(name), value]));
+    for (const role of roles) {
+        if (result.has(role.roleId)) continue;
+        const aliases = [key(role.title)];
+        if (key(role.title) === "plateumpire") aliases.push("referee");
+        const field = aliases.find(name => fields.has(name));
+        if (!field) continue;
+        const value = fields.get(field);
+        if (value == null || value === "") continue;
+        const assignment = typeof value === "object" ? normalizeAssignment(value) : {
+            officialId: "", name: String(value).trim()
+        };
+        result.set(role.roleId, {
+            ...assignment, roleId: role.roleId, title: role.title, displayOrder: role.displayOrder
+        });
+    }
+    // Do not silently drop a legacy assignment whose sport has no corresponding role.
+    for (const title of ["Referee", "U1", "U2", "ECO"]) {
+        const value = fields.get(key(title));
+        if (value == null || value === "" || value === "Unassigned") continue;
+        const role = byTitle.get(key(title)) || (title === "Referee" ? byTitle.get("plateumpire") : null);
+        if (!role && !assignments.length) throw new Error(`The saved ${title} assignment has no matching role for this sport. Review it before saving.`);
+    }
+    // A list of names without role metadata cannot safely be matched by array position.
+    const matched = Array.from(result.values());
+    const unresolved = withoutRoles.filter(assignment => !matched.some(saved =>
+        assignment.officialId ? saved.officialId === assignment.officialId || saved.name === assignment.name : saved.name === assignment.name
+    ));
+    if (unresolved.length) throw new Error("The game API returned officials without roleId/title. Update the Find handler to return each assignment's role metadata.");
+    return matched;
+}
+
+function appendOfficialOption(select, official, value) {
+    const option = new Option(official.name, value);
+    option.dataset.officialId = official.officialId;
+    option.dataset.name = official.name;
+    select.add(option);
+    return option;
+}
+
+function renderOfficialFields(roles, savedAssignments) {
+    const container = document.getElementById("officialFields");
+    container.replaceChildren();
+    roleFields = [];
+    const definitions = new Map(roles.map(role => [role.roleId, role]));
+    const saved = new Map(savedAssignments.map(assignment => [assignment.roleId, assignment]));
+    const fields = roles.filter(role => role.active).map(role => ({ role, assignment: saved.get(role.roleId) }));
+    // Keep inactive or deleted saved assignments visible and unchanged during edits.
+    savedAssignments.forEach(assignment => {
+        if (!definitions.get(assignment.roleId)?.active) {
+            fields.push({
+                role: { roleId: assignment.roleId, title: assignment.title, displayOrder: assignment.displayOrder, active: false },
+                assignment, preserved: true
+            });
+        }
+    });
+    fields.sort((a, b) => (a.assignment?.displayOrder ?? a.role.displayOrder) - (b.assignment?.displayOrder ?? b.role.displayOrder));
+    fields.forEach(({ role, assignment, preserved }, index) => {
+        const group = document.createElement("div");
+        group.className = "form-group";
+        const label = document.createElement("label");
+        const select = document.createElement("select");
+        select.id = `official-role-${index}`;
+        label.htmlFor = select.id;
+        label.textContent = (assignment?.title || role.title) + (preserved ? " (saved role)" : "");
+        appendOfficialOption(select, { officialId: "", name: "Unassigned" }, "");
+        officialsDirectory.forEach((official, officialIndex) => {
+            appendOfficialOption(select, official, official.officialId ? `id:${official.officialId}` : `name:${officialIndex}`);
+        });
+        if (assignment && (assignment.officialId || (assignment.name && assignment.name !== "Unassigned"))) {
+            const match = Array.from(select.options).find(option =>
+                assignment.officialId ? option.dataset.officialId === assignment.officialId : option.dataset.name.trim().toLowerCase() === assignment.name.trim().toLowerCase()
+            );
+            if (match) select.value = match.value;
+            else {
+                const option = appendOfficialOption(select, {
+                    officialId: assignment.officialId, name: assignment.name || `Official ${assignment.officialId}`
+                }, `saved:${index}`);
+                select.value = option.value;
+            }
+        }
+        select.disabled = Boolean(preserved);
+        group.append(label, select);
+        container.appendChild(group);
+        roleFields.push({ role, assignment, select, preserved: Boolean(preserved) });
+    });
+}
+
+async function loadSportOfficialRoles(sport, game = null) {
+    const request = ++roleRequest;
+    if (roleAbortController) roleAbortController.abort();
+    const controller = new AbortController();
+    roleAbortController = controller;
+    rolesReady = false;
+    roleFields = [];
+    document.getElementById("officialFields").replaceChildren();
+    updateActionButtons();
+    if (!sport) { roleHint("Choose a sport in Location & Sport. Its official fields will appear here automatically."); return false; }
+    roleHint(`Loading official roles for ${sport}...`);
+    try {
+        if (officialsLoadError) throw new Error(officialsLoadError);
+        const url = new URL(OFFICIAL_ROLES_API, window.location.origin);
+        url.searchParams.set("sport", sport);
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Unable to load official roles for ${sport} (${response.status}).`);
+        const data = await response.json();
+        if (request !== roleRequest) return false;
+        const rawRoles = Array.isArray(data) ? data : data.roles ?? data.Roles;
+        if (!Array.isArray(rawRoles)) throw new Error("The official roles response must contain a roles array.");
+        const roles = rawRoles.map(normalizeRole).sort((a, b) => a.displayOrder - b.displayOrder);
+        const ids = new Set();
+        roles.forEach(role => {
+            if (!role.roleId || !role.title || ids.has(role.roleId)) throw new Error("Official role definitions contain missing or duplicate identifiers.");
+            ids.add(role.roleId);
+        });
+        const assignments = savedGameAssignments(game, roles);
+        // Old report responses that lack role metadata are not safe to save as assignments.
+        if (assignments.some(assignment => !assignment.roleId || !assignment.title)) {
+            throw new Error("This game's officials response needs roleId and title for each assignment.");
+        }
+        renderOfficialFields(roles, assignments);
+        if (!roleFields.length) {
+            roleHint(`No active official roles are configured for ${sport}. Add roles in Settings first.`, true);
+            return false;
+        }
+        rolesReady = true;
+        roleHint(`${sport}: ${roleFields.length} official roles.`);
+        updateActionButtons();
+        return true;
+    } catch (err) {
+        if (request !== roleRequest || err.name === "AbortError") return false;
+        roleHint(err.message || "Unable to load official roles.", true);
+        return false;
+    }
+}
+
+function collectOfficialAssignments() {
+    if (!rolesReady || !document.getElementById("sport").value) throw new Error("Select a sport and wait for its official roles to load.");
+    return roleFields.map(({ role, assignment, select, preserved }) => {
+        if (preserved) return { ...assignment };
+        const option = select.selectedOptions[0];
+        return {
+            roleId: role.roleId,
+            title: assignment?.title || role.title,
+            displayOrder: assignment?.displayOrder ?? role.displayOrder,
+            officialId: option?.dataset.officialId || "",
+            name: option?.dataset.name || "Unassigned"
+        };
+    });
+}
+
+function ensureSelectedValue(id, value) {
+    const select = document.getElementById(id);
+    const text = String(value ?? "");
+    if (text && !Array.from(select.options).some(option => option.value === text)) select.add(new Option(text, text));
+    select.value = text;
+}
+
+document.getElementById("sport").addEventListener("change", async function () {
+    formRevision++;
+    await loadSportOfficialRoles(this.value);
+});
 
 document
     .getElementById("importGamesBtn")
@@ -278,7 +511,7 @@ async function loadAssignors() {
 
         const assignors = await response.json();
         console.log(assignors);
-    
+
         const dropdowns = [
             "assignor"
         ];
@@ -290,7 +523,7 @@ async function loadAssignors() {
             select.innerHTML =
                 '<option value="Unassigned">Unassigned</option>';
             select.value = "Unassigned";
-            
+
             assignors.forEach(assignor => {
                const option = document.createElement("option");
                option.value = assignor.name;
@@ -314,7 +547,7 @@ async function loadAssociations() {
 
         const associations = await response.json();
         console.log(associations);
-    
+
         const dropdowns = [
             "association"
         ];
@@ -349,7 +582,7 @@ async function loadLevels() {
 
         const levels = await response.json();
         console.log(levels);
-    
+
         const dropdowns = [
             "level"
         ];
@@ -384,7 +617,7 @@ async function loadSites() {
 
         const sites = await response.json();
         console.log(sites);
-    
+
         const dropdowns = [
             "site"
         ];
@@ -420,7 +653,7 @@ async function loadSports() {
 
         const sports = await response.json();
         console.log(sports);
-    
+
         const dropdowns = [
             "sport"
         ];
@@ -448,38 +681,20 @@ async function loadSports() {
 async function loadOfficials() {
     try {
         const response = await fetch("/api/loadOfficials");
-
-        if (!response.ok) {
-            throw new Error("Failed to load officials");
-        }
-
-        const officials = await response.json();
-        console.log(officials);
-    
-        const dropdowns = [
-            "referee",
-            "u1",
-            "u2",
-            "eco"
-        ];
-
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
-
-            // Keep the first option
-            select.innerHTML =
-                '<option value="Unassigned">Unassigned</option>';
-            select.value = "Unassigned";
-            
-            officials.forEach(official => {
-               const option = document.createElement("option");
-               option.value = official.name;
-               option.textContent = official.name;
-               select.appendChild(option);
-            });
-        });
-
+        if (!response.ok) throw new Error("Unable to load the officials directory. Reload the page to retry.");
+        const data = await response.json();
+        const officials = Array.isArray(data) ? data : data.officials ?? data.Officials;
+        if (!Array.isArray(officials)) throw new Error("The officials directory response must contain an array.");
+        officialsDirectory = officials.map(official => {
+            const rawId = official.officialId ?? official.OfficialId ?? official.id ?? official.Id ?? "";
+            return {
+                officialId: rawId === 0 || rawId === "0" ? "" : String(rawId),
+                name: typeof official === "string" ? official : String(official.name ?? official.Name ?? `${official.firstName ?? official.FirstName ?? ""} ${official.lastName ?? official.LastName ?? ""}`).trim()
+            };
+        }).filter(official => official.name && official.name !== "Unassigned");
+        officialsLoadError = "";
     } catch (err) {
+        officialsLoadError = err.message;
         console.error("Error loading officials:", err);
     }
 }
@@ -534,7 +749,7 @@ async function loadStatusTypes() {
         if (statuses.includes("Pending")) {
             statusSelect.value = "Pending";
         }
-        
+
         if (statuses.length === 0) {
             statusSelect.innerHTML =
                 '<option value="">No statuses found</option>';
@@ -547,6 +762,7 @@ async function loadStatusTypes() {
 }
 
 document.addEventListener("DOMContentLoaded", async function() {
+    updateActionButtons();
     await Promise.all([
         loadStatusTypes(),
         loadOfficials(),
@@ -557,23 +773,22 @@ document.addEventListener("DOMContentLoaded", async function() {
         loadAssignors()
     ]);
 
+    pageReady = true;
+    document.getElementById("sport").disabled = false;
     setUpdateMode(false);
+    await loadSportOfficialRoles(document.getElementById("sport").value);
 });
 
 document.getElementById("clearBtn").addEventListener("click", function () {
+    formRevision++;
     document.getElementById("gameForm").reset();
+    document.getElementById("sport").value = "";
     document.getElementById("status").value = "Pending";
-
-    for (const id of ["referee", "u1","u2","eco", "assignor"]) {
-        document.getElementById(id).value = "Unassigned";
-    }
-
+    document.getElementById("assignor").value = "Unassigned";
+    resetOfficialFields();
     setUpdateMode(false);
-
-    document.getElementById("message").innerText =
-        "Ready to enter Games";
+    document.getElementById("message").innerText = "Ready to enter Games";
 });
-
 
 function toInputDate(dateStr) {
     const d = new Date(dateStr);
@@ -616,7 +831,7 @@ document.getElementById("deleteBtn").addEventListener("click", async function ()
             "Enter an Association first.";
         return;
     }
-    
+
     try {
         const response = await fetch(`/api/deleteGame/${association}/${gameId}`, {
             method: "DELETE"
@@ -633,7 +848,7 @@ document.getElementById("deleteBtn").addEventListener("click", async function ()
         if (response.ok && typeof loadPendingGames === "function") {
             await loadPendingGames();
 }
-    
+
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }
@@ -655,10 +870,12 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
             "Enter an Association first.";
         return;
     }
+    const revision = ++formRevision;
     try {
 
         const response = await fetch(`/api/game/${association}/${gameId}`);
 
+        if (revision !== formRevision) return;
         if (!response.ok) {
             document.getElementById("message").innerText =
                 "Game not found.";
@@ -666,6 +883,12 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         }
 
         const game = await response.json();
+        console.log(
+            "Find officials:",
+            JSON.stringify(game.Officials ?? game.officials, null, 2)
+        );        
+       
+        if (revision !== formRevision) return;
 
         console.log("Returned game:", game);
 
@@ -675,7 +898,7 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("time").value = toInputTime(game.Time);
         document.getElementById("site").value = game.Site;
         document.getElementById("field").value = game.Field;
-        document.getElementById("sport").value = game.Sport;
+        ensureSelectedValue("sport", game.Sport);
         document.getElementById("level").value = game.Level;
         document.getElementById("home").value = game.Home ?? "";
         document.getElementById("visitor").value = game.Visitor ?? "";
@@ -687,18 +910,21 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("deductions").value = game.Deductions;
 
         document.getElementById("status").value = game.Status;
-        document.getElementById("referee").value = game.Referee;
-        document.getElementById("u1").value = game.U1;
-        document.getElementById("u2").value = game.U2;
-        document.getElementById("eco").value = game.ECO; 
         document.getElementById("assignor").value = game.Assignor;
 
-        setUpdateMode(true);     
+        setUpdateMode(true);
+        const loaded = await loadSportOfficialRoles(game.Sport, game);
+        if (revision !== formRevision) return;
+        if (!loaded) {
+            document.getElementById("message").innerText = "Game loaded, but its official roles could not be loaded. Saving is disabled.";
+            return;
+        }     
 
         document.getElementById("message").innerText =
             "Game loaded successfully.";  
 
     } catch (err) {
+        if (revision !== formRevision) return;
         document.getElementById("message").innerText =
             "Server unavailable.";
     }
@@ -707,6 +933,9 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
 document.getElementById("updateGameBtn").addEventListener("click", async function(e) {
     e.preventDefault();
 
+    let assignments;
+    try { assignments = collectOfficialAssignments(); }
+    catch (err) { document.getElementById("message").innerText = err.message; return; }
     const game = {
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value),
@@ -724,10 +953,7 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         assignorFee: parseFloat(document.getElementById("assignorFee").value),
         deductions: parseFloat(document.getElementById("deductions").value),
         status: document.getElementById("status").value,
-        referee: document.getElementById("referee").value,
-        u1: document.getElementById("u1").value,
-        u2: document.getElementById("u2").value,
-        eco: document.getElementById("eco").value,
+        officials: assignments,
         assignor: document.getElementById("assignor").value
     };
 
@@ -777,6 +1003,9 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
 document.getElementById("addGameBtn").addEventListener("click", async function(e) {
     e.preventDefault();
 
+    let assignments;
+    try { assignments = collectOfficialAssignments(); }
+    catch (err) { document.getElementById("message").innerText = err.message; return; }
     const game = {
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value),
@@ -794,10 +1023,7 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         assignorFee: parseFloat(document.getElementById("assignorFee").value),
         deductions: parseFloat(document.getElementById("deductions").value),
         status: document.getElementById("status").value,
-        referee: document.getElementById("referee").value,
-        u1: document.getElementById("u1").value,
-        u2: document.getElementById("u2").value,
-        eco: document.getElementById("eco").value,
+        officials: assignments,
         assignor: document.getElementById("assignor").value
     };
 

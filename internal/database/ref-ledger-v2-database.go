@@ -527,7 +527,7 @@ func GetGameByGameIdAndAssoc(assoc, gameId, tId string) (model.GameDescriptor, e
 		return model.GameDescriptor{}, fmt.Errorf("Game not found for association: %s and game ID: %s", assoc, gameId)
 	}
 
-	gameRecord := utils.ConvertGameDocToGameDescr(results[0])
+	gameRecord := convertGameDocWithOfficials(results[0])
 
 	return gameRecord, nil
 }
@@ -566,6 +566,10 @@ func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescript
 
 	cursor, err := coll.Find(ctx, filter)
 
+	if err != nil {
+		return model.GameDescriptor{}, err
+	}
+	defer cursor.Close(ctx)
 	var results []model.GameDoc
 	var gameRecord model.GameDescriptor
 
@@ -575,11 +579,14 @@ func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescript
 		return model.GameDescriptor{}, err
 	}
 
+	if len(results) == 0 {
+		return model.GameDescriptor{}, fmt.Errorf("game not found")
+	}
 	if len(results) > 1 {
 		return model.GameDescriptor{}, fmt.Errorf("Error!  Multiple game documents found!")
 	}
 
-	gameRecord = utils.ConvertGameDocToGameDescr(results[0])
+	gameRecord = convertGameDocWithOfficials(results[0])
 
 	return gameRecord, nil
 }
@@ -871,7 +878,7 @@ func QueryAggregatedGames(parentCtx context.Context, dbase, collection string, f
 
 	for _, r := range results {
 
-		gameRecords = append(gameRecords, utils.ConvertGameDocToGameDescr(r))
+		gameRecords = append(gameRecords, convertGameDocWithOfficials(r))
 
 	}
 	return gameRecords, nil
@@ -1073,48 +1080,54 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 		}
 	}
 
+	var officialConditions bson.A
 	if len(filter.Official) > 0 {
-		fmt.Println("Adding Officials...")
-		mongoFilter["$or"] = bson.A{
-			bson.M{"referee": bson.M{"$in": filter.Official}},
-			bson.M{"u1": bson.M{"$in": filter.Official}},
-			bson.M{"u2": bson.M{"$in": filter.Official}},
+		officialConditions = append(officialConditions, bson.M{"$or": bson.A{
+			bson.M{"officials": bson.M{"$elemMatch": bson.M{"name": bson.M{"$in": filter.Official}}}},
+			bson.M{"officials.officialId": bson.M{"$in": filter.Official}},
+			legacyOfficialFilter("", filter.Official),
+		}})
+	}
+	if len(filter.ECO) > 0 {
+		officialConditions = append(officialConditions, roleOfficialFilter("ECO", filter.ECO))
+	}
+	// Preserve legacy positional-filter OR behavior without overwriting other filters.
+	var positional bson.A
+	if filter.Referee != "" {
+		positional = append(positional, roleOfficialFilter("Referee", []string{filter.Referee}))
+	}
+	if filter.U1 != "" {
+		positional = append(positional, roleOfficialFilter("U1", []string{filter.U1}))
+	}
+	if filter.U2 != "" {
+		positional = append(positional, roleOfficialFilter("U2", []string{filter.U2}))
+	}
+	if len(positional) > 0 {
+		officialConditions = append(officialConditions, bson.M{"$or": positional})
+	}
+	for _, assignment := range filter.Officials {
+		entry := bson.M{}
+		if assignment.RoleId != "" {
+			entry["roleId"] = assignment.RoleId
+		}
+		if assignment.Title != "" {
+			entry["title"] = assignment.Title
+		}
+		if assignment.OfficialId != "" {
+			entry["officialId"] = assignment.OfficialId
+		}
+		if len(entry) > 0 {
+			officialConditions = append(officialConditions, bson.M{"officials": bson.M{"$elemMatch": entry}})
 		}
 	}
-
-	if len(filter.ECO) > 0 {
-		fmt.Println("Adding ECOs...")
-		mongoFilter["eco"] = bson.M{
-			"$in": filter.ECO,
-		}
+	if len(officialConditions) > 0 {
+		mongoFilter["$and"] = officialConditions
 	}
 	if strings.TrimSpace(filter.Home) != "" {
-		fmt.Println("Adding Home...")
 		mongoFilter["home"] = strings.TrimSpace(filter.Home)
 	}
-
 	if strings.TrimSpace(filter.Visitor) != "" {
-		fmt.Println("Adding Visitor...")
 		mongoFilter["visitor"] = strings.TrimSpace(filter.Visitor)
-	}
-
-	// Official filters
-	var officials []bson.M
-
-	if filter.Referee != "" {
-		officials = append(officials, bson.M{"referee": filter.Referee})
-	}
-
-	if filter.U1 != "" {
-		officials = append(officials, bson.M{"u1": filter.U1})
-	}
-
-	if filter.U2 != "" {
-		officials = append(officials, bson.M{"u2": filter.U2})
-	}
-
-	if len(officials) > 0 {
-		mongoFilter["$or"] = officials
 	}
 
 	// Filter by gameDateTime. Dates are supplied as M/D/YYYY.
@@ -1331,7 +1344,7 @@ func QueryGames(parentCtx context.Context, dbase, collection, filter string) ([]
 
 	for _, r := range results {
 
-		gameRecords = append(gameRecords, utils.ConvertGameDocToGameDescr(r))
+		gameRecords = append(gameRecords, convertGameDocWithOfficials(r))
 
 	}
 	return gameRecords, nil
@@ -1814,6 +1827,9 @@ func GetGamesCollection(parentCtx context.Context, assoc string) ([]model.GameDo
 		return []model.GameDoc{}, err
 	}
 
+	for i := range results {
+		results[i].Officials = gameOfficialsForRead(results[i])
+	}
 	return results, nil
 }
 
@@ -2332,7 +2348,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 
-	doc := utils.ConvertGameDescrToGameDoc(game)
+	doc := convertGameDescrWithOfficials(game)
 	doc.TenantId = tId
 
 	doc.GameDateTime, err = convertDateStringToTime(game.Date, game.Time)
@@ -2347,8 +2363,19 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		"tenantId":    tId,
 	}
 
+	var previous model.GameDoc
+	if err := coll.FindOne(ctx, filter).Decode(&previous); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("game not found")
+		}
+		return err
+	}
+	if err := prepareGameOfficials(ctx, coll.Database(), &doc, &previous); err != nil {
+		return err
+	}
 	update := bson.M{
-		"$set": doc,
+		"$set":   doc,
+		"$unset": bson.M{"referee": "", "u1": "", "u2": "", "eco": ""},
 	}
 
 	fmt.Println("Update filter:", filter, "update:", update)
@@ -2357,6 +2384,9 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		return err
 	}
 
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("game not found")
+	}
 	fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
 	return nil
 }
@@ -2378,11 +2408,18 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 
 	for _, v := range game {
 
-		doc := utils.ConvertGameDescrToGameDoc(v)
+		doc := convertGameDescrWithOfficials(v)
 		doc.TenantId = tId
 		doc.GameDateTime, err = convertDateStringToTime(v.Date, v.Time)
 		if err != nil {
+			totalErrors++
 			fmt.Println(err)
+			continue
+		}
+		if err := prepareGameOfficials(ctx, coll.Database(), &doc, nil); err != nil {
+			totalErrors++
+			fmt.Println(err)
+			continue
 		}
 
 		gameExists, err := GameExists(doc)
@@ -3464,24 +3501,6 @@ func (sc *SiteCollection) Dump(id, tenantId string) error {
 	return nil
 }
 
-// Games Collection, Documents and API Code
-
-// Add to these structures when I completely migrate the games logic to methods
-type Game struct {
-	Id          string
-	Association string
-}
-
-type GameJson struct {
-	Id          string `json:"gameId"`
-	Association string `json:"association"`
-}
-
-type GameDoc struct {
-	Id          string `bson:"gameId,omitempty"`
-	Association string `bson:"association,omitempty"`
-}
-
 type GameCollection struct {
 	DB        *mongo.Database
 	Coll      *mongo.Collection
@@ -3498,30 +3517,7 @@ func (gc *GameCollection) Init(client *mongo.Client) error {
 }
 
 func (gc *GameCollection) ConvDocToGame(doc model.GameDoc) model.GameDescriptor {
-
-	return model.GameDescriptor{
-		GameId:      utils.ConvertInt64ToStr(doc.GameId),
-		Date:        doc.Date,
-		Time:        doc.Time,
-		Sport:       doc.Sport,
-		Site:        doc.Site,
-		Field:       doc.Field,
-		NumOfGames:  utils.ConvertInt64ToStr(doc.NumOfGames),
-		Level:       doc.Level,
-		Home:        doc.Home,
-		Visitor:     doc.Visitor,
-		GameFee:     utils.ConvertInt64ToAmtStr(doc.GameFee),
-		TravelPay:   utils.ConvertInt64ToAmtStr(doc.TravelPay),
-		AssignorFee: utils.ConvertInt64ToAmtStr(doc.AssignorFee),
-		Deductions:  utils.ConvertInt64ToAmtStr(doc.Deductions),
-		Association: doc.Association,
-		Status:      doc.Status,
-		Referee:     doc.Referee,
-		U1:          doc.U1,
-		U2:          doc.U2,
-		ECO:         doc.ECO,
-		Assignor:    doc.Assignor,
-	}
+	return convertGameDocWithOfficials(doc)
 }
 
 func (gc *GameCollection) Get(association string, gameId string, tenantId string) (model.GameDescriptor, error) {
@@ -3626,7 +3622,7 @@ func (gc *GameCollection) Add(
 	)
 	defer cancel()
 
-	doc := utils.ConvertGameDescrToGameDoc(game)
+	doc := convertGameDescrWithOfficials(game)
 	doc.TenantId = tenantId
 
 	gameDateTime, err := utils.ConvertDateStringToTime(
@@ -3644,6 +3640,10 @@ func (gc *GameCollection) Add(
 
 	doc.GameDateTime = gameDateTime
 
+	if err := prepareGameOfficials(ctx, gc.Coll.Database(), &doc, nil); err != nil {
+		gc.LastError = err
+		return err
+	}
 	result, err := gc.Coll.InsertOne(ctx, doc)
 	if err != nil {
 		gc.LastError = err
@@ -3771,16 +3771,21 @@ func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int,
 
 	for cursor.Next(ctx) {
 
+		game = model.GameDoc{}
 		err := cursor.Decode(&game)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		totalGames = totalGames + game.NumOfGames
+		game.Officials = gameOfficialsForRead(game)
 		games = append(games, game)
 
 	}
 
+	if err := cursor.Err(); err != nil {
+		return nil, 0, err
+	}
 	fmt.Println("database/Get7DayPendingGames returning ", totalGames, "games")
 	return games, int(totalGames), nil
 
@@ -3828,16 +3833,21 @@ func (gc *GameCollection) GetTomorrowsPendingGames(tId string) ([]model.GameDoc,
 
 	for cursor.Next(ctx) {
 
+		game = model.GameDoc{}
 		err := cursor.Decode(&game)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		totalGames = totalGames + game.NumOfGames
+		game.Officials = gameOfficialsForRead(game)
 		games = append(games, game)
 
 	}
 
+	if err := cursor.Err(); err != nil {
+		return nil, 0, err
+	}
 	fmt.Println("database/GetTomorrowsPendingGames returning ", totalGames, "games")
 	return games, int(totalGames), nil
 
@@ -3882,16 +3892,21 @@ func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, in
 
 	for cursor.Next(ctx) {
 
+		game = model.GameDoc{}
 		err := cursor.Decode(&game)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		totalGames = totalGames + game.NumOfGames
+		game.Officials = gameOfficialsForRead(game)
 		games = append(games, game)
 
 	}
 
+	if err := cursor.Err(); err != nil {
+		return nil, 0, err
+	}
 	fmt.Println("database/GetTodaysPendingGames returning ", totalGames, "games")
 	return games, int(totalGames), nil
 
@@ -5362,10 +5377,9 @@ func (lc *LevelsCollection) LevelExists(
 }
 
 type Sport struct {
-	ID       string `bson:"id" json:"id"`
-	Name     string `bson:"name" json:"name"`
-	Active   bool   `bson:"active" json:"active"`
-	TenantID string `bson:"tenantId" json:"tenantId"`
+	ID     string `bson:"id" json:"id"`
+	Name   string `bson:"name" json:"name"`
+	Active bool   `bson:"active" json:"active"`
 }
 
 type SportsCollection struct {
@@ -5383,18 +5397,15 @@ func (sc *SportsCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
-func (sc *SportsCollection) GetSports(tenantId string, activeOnly bool) ([]Sport, error) {
+func (sc *SportsCollection) GetSports(activeOnly bool) ([]Sport, error) {
 
 	ctx := context.TODO()
 
-	filter := bson.M{
-		"tenantId": tenantId,
-	}
+	filter := bson.M{}
 
 	if activeOnly {
 		filter["active"] = true
 	}
-	fmt.Println("Searching for Sports for tenantId", tenantId)
 
 	opts := options.Find().
 		SetSort(bson.D{
@@ -5421,18 +5432,15 @@ func (sc *SportsCollection) GetSports(tenantId string, activeOnly bool) ([]Sport
 		)
 	}
 
-	fmt.Println("Total sports found for tenant", tenantId, ":", len(sports))
+	fmt.Println("Total sports found:", len(sports))
 	return sports, nil
 }
 
-func (sc *SportsCollection) Add(sport Sport, tenantId string) error {
+func (sc *SportsCollection) Add(sport Sport) error {
 
 	sport.ID = strings.TrimSpace(sport.ID)
 	sport.Name = strings.TrimSpace(sport.Name)
 	sport.Active = true
-
-	// Use the authenticated tenant ID.
-	sport.TenantID = strings.TrimSpace(tenantId)
 
 	if sport.ID == "" {
 		return fmt.Errorf("sport ID is required")
@@ -5442,12 +5450,7 @@ func (sc *SportsCollection) Add(sport Sport, tenantId string) error {
 		return fmt.Errorf("sport name is required")
 	}
 
-	if sport.TenantID == "" {
-		return fmt.Errorf("tenant ID is required")
-	}
-
 	duplicateFilter := bson.M{
-		"tenantId": sport.TenantID,
 		"$or": bson.A{
 			bson.M{"id": sport.ID},
 			bson.M{"name": sport.Name},
@@ -5491,22 +5494,16 @@ func (sc *SportsCollection) Add(sport Sport, tenantId string) error {
 	return nil
 }
 
-func (sc *SportsCollection) Delete(sportID string, tenantID string) error {
+func (sc *SportsCollection) Delete(sportID string) error {
 
 	sportID = strings.TrimSpace(sportID)
-	tenantID = strings.TrimSpace(tenantID)
 
 	if sportID == "" {
 		return fmt.Errorf("sport ID is required")
 	}
 
-	if tenantID == "" {
-		return fmt.Errorf("tenant ID is required")
-	}
-
 	gamesFilter := bson.M{
-		"tenantId": tenantID,
-		"sport":    sportID,
+		"sport": sportID,
 	}
 
 	gamesCollection := Client.Database(Database).Collection("games")
@@ -5521,8 +5518,7 @@ func (sc *SportsCollection) Delete(sportID string, tenantID string) error {
 	}
 
 	filter := bson.M{
-		"id":       sportID,
-		"tenantId": tenantID,
+		"id": sportID,
 	}
 
 	result, err := sc.Coll.DeleteOne(
@@ -5547,15 +5543,14 @@ func (sc *SportsCollection) Delete(sportID string, tenantID string) error {
 	return nil
 }
 
-func (sc *SportsCollection) Activate(sport Sport, tenantId string) error {
+func (sc *SportsCollection) Activate(sport Sport) error {
 
 	sport.ID = strings.TrimSpace(sport.ID)
 	sport.Name = strings.TrimSpace(sport.Name)
 
 	fmt.Println("Sport:", sport)
 	filter := bson.M{
-		"id":       sport.ID,
-		"tenantId": tenantId,
+		"id": sport.ID,
 	}
 
 	update := bson.M{
@@ -5587,15 +5582,14 @@ func (sc *SportsCollection) Activate(sport Sport, tenantId string) error {
 
 }
 
-func (sc *SportsCollection) Deactivate(sport Sport, tenantId string) error {
+func (sc *SportsCollection) Deactivate(sport Sport) error {
 
 	sport.ID = strings.TrimSpace(sport.ID)
 	sport.Name = strings.TrimSpace(sport.Name)
 
 	fmt.Println("Sport:", sport)
 	filter := bson.M{
-		"id":       sport.ID,
-		"tenantId": tenantId,
+		"id": sport.ID,
 	}
 
 	update := bson.M{
@@ -6742,10 +6736,6 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 	ctx := context.Background()
 	gameReportRecords := []model.GameView{}
 
-	var oc OfficialCollection
-
-	oc.DB = Client.Database(Database)
-	oc.Coll = oc.DB.Collection("officials")
 	//
 	// Create Filter
 	//
@@ -6781,7 +6771,6 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 			Status:      r.Status,
 			Association: r.Association,
 			Assignor:    r.Assignor,
-			ECO:         r.ECO,
 			GameFee:     utils.ConvertInt64ToAmtStr(r.GameFee),
 			AssignorFee: utils.ConvertInt64ToAmtStr(r.AssignorFee),
 			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),
@@ -6802,27 +6791,20 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 		abbrev := utils.DayOfWeekAbbreviation(r.Date)
 		view.Date = fmt.Sprintf("%s (%s)", r.Date, abbrev)
 
-		if r.Referee != "" && r.Referee != "Unassigned" {
-
-			ov, error := oc.GetOfficialView(r.Referee, r.TenantId)
-			if error == nil {
-				view.Officials = append(view.Officials, ov)
+		view.Officials = make([]model.OfficialView, 0)
+		for _, assignment := range gameOfficialsForRead(r) {
+			id, _ := strconv.ParseInt(assignment.OfficialId, 10, 64)
+			name := assignment.Name
+			if name == "" {
+				name = "Unassigned"
 			}
-		}
-
-		if r.U1 != "" && r.U1 != "Unassigned" {
-
-			ov, error := oc.GetOfficialView(r.U1, r.TenantId)
-			if error == nil {
-				view.Officials = append(view.Officials, ov)
-			}
-		}
-
-		if r.U2 != "" && r.U2 != "Unassigned" {
-
-			ov, error := oc.GetOfficialView(r.U2, r.TenantId)
-			if error == nil {
-				view.Officials = append(view.Officials, ov)
+			view.Officials = append(view.Officials, model.OfficialView{
+				OfficialId: id, Name: name, RoleId: assignment.RoleId,
+				Title: assignment.Title, DisplayOrder: assignment.DisplayOrder,
+			})
+			// Transitional response for pages that still display ECO separately.
+			if assignment.Title == "ECO" {
+				view.ECO = name
 			}
 		}
 
@@ -6862,4 +6844,570 @@ func GetStatusTypes() []StatusType {
 		{Status: "Paid"},
 		{Status: "Pending"},
 	}
+}
+
+func CreateSettingsIndexes() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	coll := Client.Database(Database).Collection("settings")
+
+	index := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "tenantId", Value: 1},
+		},
+		Options: options.Index().
+			SetUnique(true).
+			SetName("settings_tenantId_unique"),
+	}
+
+	_, err := coll.Indexes().CreateOne(ctx, index)
+	if err != nil {
+		return fmt.Errorf("failed to create settings index: %w", err)
+	}
+
+	return nil
+}
+
+func AddOfficialRoles(request model.OfficialRolesRequest) error {
+
+	if strings.TrimSpace(request.Sport) == "" {
+		return fmt.Errorf("sport is required")
+	}
+
+	if request.Roles == nil {
+		request.Roles = make([]model.OfficialRole, 0)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	db := Client.Database(Database)
+	coll := db.Collection("roles")
+
+	sportSettings := bson.M{
+		"sport": request.Sport,
+		"roles": request.Roles,
+	}
+
+	// Keep other sports, then append this sport's current configuration.
+	update := mongo.Pipeline{
+		bson.D{{Key: "$set", Value: bson.M{
+			"officialRoles": bson.M{
+				"$concatArrays": bson.A{
+					bson.M{
+						"$filter": bson.M{
+							"input": bson.M{
+								"$ifNull": bson.A{"$officialRoles", bson.A{}},
+							},
+							"as": "entry",
+							"cond": bson.M{
+								"$ne": bson.A{
+									"$$entry.sport",
+									bson.M{"$literal": request.Sport},
+								},
+							},
+						},
+					},
+					bson.M{"$literal": bson.A{sportSettings}},
+				},
+			},
+		}}},
+	}
+
+	_, err := coll.UpdateOne(
+		ctx,
+		bson.M{},
+		update,
+		options.Update().SetUpsert(true),
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to save official roles for %q: %w",
+			request.Sport,
+			err,
+		)
+	}
+
+	return nil
+}
+
+func DeleteOfficialRoles(sport string) error {
+
+	if strings.TrimSpace(sport) == "" {
+		return fmt.Errorf("sport is required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	coll := Client.Database(Database).Collection("roles")
+
+	filter := bson.M{}
+
+	update := bson.M{
+		"$pull": bson.M{
+			"officialRoles": bson.M{
+				"sport": sport,
+			},
+		},
+	}
+
+	_, err := coll.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to delete official roles for %q: %w",
+			sport,
+			err,
+		)
+	}
+
+	return nil
+}
+
+func GetOfficialRoles(sport string) (model.OfficialRolesRequest, error) {
+	response := model.OfficialRolesRequest{
+		Sport: sport,
+		Roles: make([]model.OfficialRole, 0),
+	}
+
+	if strings.TrimSpace(sport) == "" {
+		return response, fmt.Errorf("sport is required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	coll := Client.Database(Database).Collection("roles")
+
+	filter := bson.M{
+		"officialRoles": bson.M{
+			"$elemMatch": bson.M{"sport": sport},
+		},
+	}
+
+	projection := bson.M{
+		"_id": 0,
+		"officialRoles": bson.M{
+			"$elemMatch": bson.M{"sport": sport},
+		},
+	}
+
+	var doc struct {
+		OfficialRoles []model.OfficialRolesRequest `bson:"officialRoles"`
+	}
+
+	err := coll.FindOne(
+		ctx,
+		filter,
+		options.FindOne().SetProjection(projection),
+	).Decode(&doc)
+
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return response, nil
+	}
+	if err != nil {
+		return response, fmt.Errorf(
+			"failed to get official roles for %q: %w",
+			sport,
+			err,
+		)
+	}
+
+	if len(doc.OfficialRoles) > 0 && doc.OfficialRoles[0].Roles != nil {
+		response.Roles = doc.OfficialRoles[0].Roles
+	}
+
+	sort.SliceStable(response.Roles, func(i, j int) bool {
+		return response.Roles[i].DisplayOrder < response.Roles[j].DisplayOrder
+	})
+
+	return response, nil
+}
+
+// GetActiveOfficialRoles supplies the new-game HTML with configured, active fields.
+// Keep GetOfficialRoles unchanged for the Settings page, which needs inactive roles too.
+func GetActiveOfficialRoles(sport string) (model.OfficialRolesRequest, error) {
+	response, err := GetOfficialRoles(sport)
+	if err != nil {
+		return response, err
+	}
+	active := make([]model.OfficialRole, 0)
+	for _, role := range response.Roles {
+		if role.Active {
+			active = append(active, role)
+		}
+	}
+	response.Roles = active
+	return response, nil
+}
+
+// These wrappers preserve variable assignments even when the older utils converters
+// know only Referee/U1/U2/ECO. No changes to those utility signatures are required.
+func convertGameDescrWithOfficials(game model.GameDescriptor) model.GameDoc {
+	doc := utils.ConvertGameDescrToGameDoc(game)
+	if game.Officials != nil {
+		doc.Officials = append([]model.GameOfficialDoc{}, game.Officials...)
+	}
+	return doc
+}
+
+func convertGameDocWithOfficials(doc model.GameDoc) model.GameDescriptor {
+	game := utils.ConvertGameDocToGameDescr(doc)
+	game.Officials = gameOfficialsForRead(doc)
+	game.Referee, game.U1, game.U2, game.ECO = "", "", "", ""
+	for _, assignment := range game.Officials {
+		name := assignment.Name
+		if name == "" {
+			name = "Unassigned"
+		}
+		switch assignment.Title {
+		case "Referee", "Plate Umpire":
+			game.Referee = name
+		case "U1":
+			game.U1 = name
+		case "U2":
+			game.U2 = name
+		case "ECO":
+			game.ECO = name
+		}
+	}
+	return game
+}
+
+func legacyGameOfficials(doc model.GameDoc, roles []model.OfficialRole) []model.GameOfficialDoc {
+	assignments := make([]model.GameOfficialDoc, 0)
+	for _, entry := range []struct{ title, name string }{
+		{"Referee", doc.Referee}, {"U1", doc.U1}, {"U2", doc.U2}, {"ECO", doc.ECO},
+	} {
+		if strings.TrimSpace(entry.name) == "" {
+			continue
+		}
+		assignment := model.GameOfficialDoc{Title: entry.title, Name: entry.name, DisplayOrder: len(assignments) + 1}
+		for _, role := range roles {
+			if role.Title == entry.title || (entry.title == "Referee" && role.Title == "Plate Umpire") {
+				assignment.RoleId, assignment.Title, assignment.DisplayOrder = role.RoleId, role.Title, role.DisplayOrder
+				break
+			}
+		}
+		// Unassigned legacy slots outside this sport need no historical entry.
+		if assignment.RoleId == "" && strings.TrimSpace(assignment.Name) == "Unassigned" {
+			continue
+		}
+		// Never assume the old U2 slot meant U3: keep it visible for manual review.
+		assignments = append(assignments, assignment)
+	}
+	return assignments
+}
+
+func gameOfficialsForRead(doc model.GameDoc) []model.GameOfficialDoc {
+	var result []model.GameOfficialDoc
+
+	if len(doc.Officials) > 0 {
+		result = append([]model.GameOfficialDoc{}, doc.Officials...)
+	} else {
+		definitions, err := GetOfficialRoles(doc.Sport)
+		if err != nil {
+			log.Printf(
+				"game %d: unable to load legacy roles: %v",
+				doc.GameId,
+				err,
+			)
+		}
+
+		result = legacyGameOfficials(doc, definitions.Roles)
+
+		// Include every active role while preserving legacy assignments.
+		seen := make(map[string]bool)
+		for _, assignment := range result {
+			seen[assignment.RoleId] = true
+		}
+
+		for _, role := range definitions.Roles {
+			if role.Active && !seen[role.RoleId] {
+				result = append(result, model.GameOfficialDoc{
+					RoleId:       role.RoleId,
+					Title:        role.Title,
+					DisplayOrder: role.DisplayOrder,
+					Name:         "Unassigned",
+				})
+				seen[role.RoleId] = true
+			}
+		}
+	}
+
+	// Resolve saved IDs or legacy names for both document formats.
+	if Client != nil {
+		ctx, cancel := context.WithTimeout(
+			context.Background(),
+			10*time.Second,
+		)
+		defer cancel()
+
+		db := Client.Database(Database)
+
+		for i := range result {
+			if err := resolveGameOfficial(
+				ctx,
+				db,
+				doc.TenantId,
+				&result[i],
+			); err != nil {
+				// Keep the saved assignment if its official cannot be resolved.
+				log.Printf(
+					"game %d role %q: %v",
+					doc.GameId,
+					result[i].Title,
+					err,
+				)
+			}
+		}
+	}
+
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].DisplayOrder < result[j].DisplayOrder
+	})
+
+	return result
+}
+
+// resolveGameOfficial uses tenant-scoped IDs for new assignments and supports names
+// only for the legacy input path. The server supplies the canonical name snapshot.
+func resolveGameOfficial(ctx context.Context, db *mongo.Database, tenantId string, assignment *model.GameOfficialDoc) error {
+	assignment.OfficialId = strings.TrimSpace(assignment.OfficialId)
+	assignment.Name = strings.TrimSpace(assignment.Name)
+	if assignment.OfficialId == "Unassigned" {
+		assignment.OfficialId = ""
+	}
+	if assignment.OfficialId == "" && (assignment.Name == "" || assignment.Name == "Unassigned") {
+		assignment.Name = "Unassigned"
+		return nil
+	}
+	filter := bson.M{"tenantId": tenantId}
+	if assignment.OfficialId != "" {
+		id, err := strconv.ParseInt(assignment.OfficialId, 10, 64)
+		if err != nil || id <= 0 {
+			return fmt.Errorf("invalid officialId %q for role %q", assignment.OfficialId, assignment.Title)
+		}
+		filter["$or"] = bson.A{bson.M{"officialId": id}, bson.M{"id": id}}
+	} else {
+		parts := strings.Fields(assignment.Name)
+		if len(parts) < 2 {
+			return fmt.Errorf("invalid official name %q for role %q", assignment.Name, assignment.Title)
+		}
+		filter["firstName"], filter["lastName"] = parts[0], parts[len(parts)-1]
+	}
+	var official struct {
+		OfficialId int64  `bson:"officialId"`
+		Id         int64  `bson:"id"`
+		FirstName  string `bson:"firstName"`
+		LastName   string `bson:"lastName"`
+	}
+	err := db.Collection("officials").FindOne(ctx, filter,
+		options.FindOne().SetCollation(&options.Collation{Locale: "en", Strength: 2})).Decode(&official)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf("official not found for role %q", assignment.Title)
+	}
+	if err != nil {
+		return fmt.Errorf("look up official for role %q: %w", assignment.Title, err)
+	}
+	id := official.OfficialId
+	if id == 0 {
+		id = official.Id
+	}
+	if id <= 0 {
+		return fmt.Errorf("official for role %q has no valid ID", assignment.Title)
+	}
+	assignment.OfficialId = strconv.FormatInt(id, 10)
+	assignment.Name = strings.TrimSpace(official.FirstName + " " + official.LastName)
+	return nil
+}
+
+func loadGameRoleDefinitions(ctx context.Context, db *mongo.Database, sport string) ([]model.OfficialRole, error) {
+	var doc struct {
+		OfficialRoles []model.OfficialRolesRequest `bson:"officialRoles"`
+	}
+	err := db.Collection("roles").FindOne(ctx,
+		bson.M{"officialRoles": bson.M{"$elemMatch": bson.M{"sport": sport}}},
+		options.FindOne().SetProjection(bson.M{"officialRoles": bson.M{"$elemMatch": bson.M{"sport": sport}}}),
+	).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, fmt.Errorf("no official roles configured for sport %q", sport)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load roles for %q: %w", sport, err)
+	}
+	if len(doc.OfficialRoles) == 0 {
+		return nil, fmt.Errorf("no official roles configured for sport %q", sport)
+	}
+	return doc.OfficialRoles[0].Roles, nil
+}
+
+func prepareGameOfficials(ctx context.Context, db *mongo.Database, doc *model.GameDoc, previous *model.GameDoc) error {
+	roles, err := loadGameRoleDefinitions(ctx, db, doc.Sport)
+	if err != nil {
+		return err
+	}
+	var existing []model.GameOfficialDoc
+	if previous != nil && previous.Sport == doc.Sport {
+		if previous.Officials != nil {
+			existing = append([]model.GameOfficialDoc{}, previous.Officials...)
+		} else {
+			existing = legacyGameOfficials(*previous, roles)
+			for i := range existing {
+				if err := resolveGameOfficial(ctx, db, doc.TenantId, &existing[i]); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	submitted := doc.Officials
+	if submitted == nil {
+		// Older handlers do not send Officials. Preserve custom assignments on edit,
+		// then apply any legacy fields they did submit by their matching role title.
+		submitted = append([]model.GameOfficialDoc{}, existing...)
+		for _, legacy := range legacyGameOfficials(*doc, roles) {
+			if err := resolveGameOfficial(ctx, db, doc.TenantId, &legacy); err != nil {
+				return err
+			}
+			found := false
+			for i := range submitted {
+				if submitted[i].Title == legacy.Title {
+					submitted[i].OfficialId, submitted[i].Name = legacy.OfficialId, legacy.Name
+					found = true
+					break
+				}
+			}
+			if !found {
+				submitted = append(submitted, legacy)
+			}
+		}
+	}
+	result, err := normalizeGameRoleAssignments(roles, submitted, existing)
+	if err != nil {
+		return err
+	}
+	for i := range result {
+		// A previously saved assignment may refer to an official subsequently deleted.
+		// Preserve unchanged historical snapshots; validate every changed/new assignment.
+		unchanged := false
+		for _, old := range existing {
+			if old.RoleId == result[i].RoleId && old.OfficialId == result[i].OfficialId && old.Name == result[i].Name {
+				unchanged = true
+				break
+			}
+		}
+		if !unchanged {
+			if err := resolveGameOfficial(ctx, db, doc.TenantId, &result[i]); err != nil {
+				return err
+			}
+		}
+	}
+	doc.Officials = result
+	// Only the array is persisted. Old fields remain in the Go type for compatibility.
+	doc.Referee, doc.U1, doc.U2, doc.ECO = "", "", "", ""
+	return nil
+}
+
+// normalizeGameRoleAssignments is pure: validate role membership and snapshots,
+// fill missing active slots, and retain disabled/deleted historical assignments.
+func normalizeGameRoleAssignments(roles []model.OfficialRole, submitted, existing []model.GameOfficialDoc) ([]model.GameOfficialDoc, error) {
+	definitions := make(map[string]model.OfficialRole)
+	titles := make(map[string]string)
+	oldByRole := make(map[string]model.GameOfficialDoc)
+	for _, role := range roles {
+		if role.RoleId == "" {
+			return nil, fmt.Errorf("configured role %q has no roleId", role.Title)
+		}
+		if _, duplicate := definitions[role.RoleId]; duplicate {
+			return nil, fmt.Errorf("duplicate configured roleId %q", role.RoleId)
+		}
+		definitions[role.RoleId] = role
+		titles[role.Title] = role.RoleId
+	}
+	for _, old := range existing {
+		if old.RoleId != "" {
+			oldByRole[old.RoleId] = old
+		}
+	}
+	result := make([]model.GameOfficialDoc, 0)
+	seen := make(map[string]bool)
+	for _, assignment := range submitted {
+		assignment.RoleId = strings.TrimSpace(assignment.RoleId)
+		if assignment.RoleId == "" {
+			assignment.RoleId = titles[assignment.Title]
+		}
+		if assignment.RoleId == "" {
+			return nil, fmt.Errorf("role %q is not configured for this sport; review the legacy assignment", assignment.Title)
+		}
+		if seen[assignment.RoleId] {
+			return nil, fmt.Errorf("duplicate assignment for roleId %q", assignment.RoleId)
+		}
+		role, configured := definitions[assignment.RoleId]
+		old, existed := oldByRole[assignment.RoleId]
+		if !configured || !role.Active {
+			if !existed || assignment.OfficialId != old.OfficialId || (assignment.OfficialId == "" && assignment.Name != old.Name) {
+				return nil, fmt.Errorf("roleId %q is inactive or does not belong to this sport", assignment.RoleId)
+			}
+			assignment = old
+		} else if existed {
+			assignment.Title, assignment.DisplayOrder = old.Title, old.DisplayOrder
+			// Client-supplied names are not authoritative when an ID is supplied.
+			if assignment.OfficialId != "" && assignment.OfficialId == old.OfficialId {
+				assignment.Name = old.Name
+			}
+		} else {
+			assignment.Title, assignment.DisplayOrder = role.Title, role.DisplayOrder
+		}
+		seen[assignment.RoleId] = true
+		result = append(result, assignment)
+	}
+	for _, role := range roles {
+		if role.Active && !seen[role.RoleId] {
+			result = append(result, model.GameOfficialDoc{RoleId: role.RoleId, Title: role.Title, DisplayOrder: role.DisplayOrder, Name: "Unassigned"})
+			seen[role.RoleId] = true
+		}
+	}
+	for _, old := range existing {
+		role, configured := definitions[old.RoleId]
+		if old.RoleId != "" && !seen[old.RoleId] && (!configured || !role.Active) {
+			result = append(result, old)
+		}
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].DisplayOrder < result[j].DisplayOrder })
+	return result, nil
+}
+
+// Legacy filters apply only to documents that have not yet adopted the array.
+func legacyOfficialFilter(title string, values []string) bson.M {
+	fields := []string{"referee", "u1", "u2", "eco"}
+	switch title {
+	case "Referee", "Plate Umpire":
+		fields = []string{"referee"}
+	case "U1":
+		fields = []string{"u1"}
+	case "U2":
+		fields = []string{"u2"}
+	case "ECO":
+		fields = []string{"eco"}
+	}
+	var alternatives bson.A
+	for _, field := range fields {
+		alternatives = append(alternatives, bson.M{field: bson.M{"$in": values}})
+	}
+	return bson.M{"officials": bson.M{"$exists": false}, "$or": alternatives}
+}
+
+func roleOfficialFilter(title string, values []string) bson.M {
+	titles := []string{title}
+	if title == "Referee" {
+		titles = append(titles, "Plate Umpire")
+	}
+	return bson.M{"$or": bson.A{
+		bson.M{"officials": bson.M{"$elemMatch": bson.M{
+			"title": bson.M{"$in": titles},
+			"$or":   bson.A{bson.M{"name": bson.M{"$in": values}}, bson.M{"officialId": bson.M{"$in": values}}},
+		}}},
+		legacyOfficialFilter(title, values),
+	}}
 }
