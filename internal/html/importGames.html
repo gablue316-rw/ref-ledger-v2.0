@@ -5,15 +5,13 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
 <title>Ref Ledger V2.0 Import Games</title>
-
 <link
     rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
 >
-<link rel="stylesheet" href="/components/navbar.css?v=12"> 
-
+>
+<link rel="stylesheet" href="/components/navbar.css?v=12">
 <style>
 * {
     box-sizing: border-box;
@@ -21,18 +19,15 @@
     padding: 0;
     font-family: Arial, Helvetica, sans-serif;
 }
-
 body {
    background-color: #f4f6f9;
    color: #333;
 }
-
 .container {
     max-width: 1200px;
     margin: 20px auto;
     padding: 0 20px;
 }
-
 .header {
     background-color: #1e293b;
     color: white;
@@ -40,11 +35,9 @@ body {
     border-radius: 10px;
     margin-bottom: 20px;
 }
-
 .header h1 {
     margin-bottom: 10px;
 }
-
 .form-card {
     background-color: white;
     padding: 25px;
@@ -52,17 +45,14 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     margin-bottom: 20px;
 }
-
 .form-card h2 {
     margin-bottom: 10px;
 }
-
 .description {
     color: #475569;
     line-height: 1.5;
     margin-bottom: 20px;
 }
-
 .instructions {
     background-color: #eff6ff;
     border-left: 5px solid #2563eb;
@@ -70,17 +60,14 @@ body {
     padding: 15px;
     margin-bottom: 20px;
 }
-
 .instructions h3 {
     margin-bottom: 10px;
     color: #1e3a8a;
 }
-
 .instructions ol {
     padding-left: 22px;
     line-height: 1.7;
 }
-
 .template-format {
     margin-top: 15px;
     padding: 12px;
@@ -89,23 +76,19 @@ body {
     border-radius: 6px;
     overflow-x: auto;
 }
-
 .template-format code {
     white-space: nowrap;
     font-family: Consolas, Monaco, monospace;
     font-size: 14px;
 }
-
 .form-group {
     margin-bottom: 20px;
 }
-
 label {
     display: block;
     font-weight: bold;
     margin-bottom: 7px;
 }
-
 input[type="file"] {
     width: 100%;
     padding: 11px;
@@ -114,7 +97,6 @@ input[type="file"] {
     background-color: white;
     font-size: 15px;
 }
-
 .selected-file {
     margin-top: 10px;
     padding: 12px;
@@ -124,14 +106,12 @@ input[type="file"] {
     color: #475569;
     word-break: break-word;
 }
-
 .button-row {
     display: flex;
     gap: 10px;
     margin-top: 20px;
     flex-wrap: wrap;
 }
-
 .btn {
     border: none;
     color: white;
@@ -147,52 +127,40 @@ input[type="file"] {
     gap: 8px;
     min-height: 42px;
 }
-
 .btn:disabled {
     opacity: 0.55;
     cursor: not-allowed;
 }
-
 .btn-template {
     background-color: #7c3aed;
 }
-
 .btn-template:hover:not(:disabled) {
     background-color: #6d28d9;
 }
-
 .btn-preview {
     background-color: #2563eb;
 }
-
 .btn-preview:hover:not(:disabled) {
     background-color: #1d4ed8;
 }
-
 .btn-import {
     background-color: #16a34a;
 }
-
 .btn-import:hover:not(:disabled) {
     background-color: #15803d;
 }
-
 .btn-clear {
     background-color: #dc2626;
 }
-
 .btn-clear:hover:not(:disabled) {
     background-color: #b91c1c;
 }
-
 .btn-cancel {
     background-color: #64748b;
 }
-
 .btn-cancel:hover {
     background-color: #475569;
 }
-
 .message-box {
     background-color: white;
     padding: 15px 20px;
@@ -204,76 +172,61 @@ input[type="file"] {
     display: flex;
     align-items: center;
 }
-
 .message-box.info {
     border-left: 6px solid #2563eb;
     color: #1e3a8a;
 }
-
 .message-box.success {
     border-left: 6px solid #16a34a;
     color: #166534;
 }
-
 .message-box.error {
     border-left: 6px solid #dc2626;
     color: #991b1b;
 }
-
 .message-box.warning {
     border-left: 6px solid #f59e0b;
     color: #92400e;
 }
-
 .preview-section {
     display: none;
 }
-
 .summary-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 15px;
     margin: 20px 0;
 }
-
 .summary-card {
     padding: 18px;
     border-radius: 8px;
     text-align: center;
     border: 1px solid #e2e8f0;
 }
-
 .summary-card.total {
     background-color: #eff6ff;
 }
-
 .summary-card.valid {
     background-color: #f0fdf4;
 }
-
 .summary-card.invalid {
     background-color: #fef2f2;
 }
-
 .summary-number {
     display: block;
     font-size: 28px;
     font-weight: bold;
     margin-bottom: 5px;
 }
-
 .summary-card.total .summary-number {
     color: #1d4ed8;
 }
-
 .summary-card.valid .summary-number {
     color: #15803d;
 }
-
 .summary-card.invalid .summary-number {
     color: #b91c1c;
 }
-
 .table-container {
     width: 100%;
     overflow-x: auto;
@@ -281,13 +234,11 @@ input[type="file"] {
     border-radius: 7px;
     margin-top: 15px;
 }
-
 table {
     width: 100%;
     min-width: 900px;
     border-collapse: collapse;
 }
-
 th {
     background-color: #2563eb;
     color: white;
@@ -295,32 +246,26 @@ th {
     text-align: left;
     white-space: nowrap;
 }
-
 td {
     padding: 11px;
     border-bottom: 1px solid #ddd;
     vertical-align: top;
 }
-
 tr:nth-child(even) {
     background-color: #f9fafb;
 }
-
 .status-valid {
     color: #15803d;
     font-weight: bold;
 }
-
 .status-error {
     color: #b91c1c;
     font-weight: bold;
 }
-
 .error-list {
     color: #b91c1c;
     line-height: 1.4;
 }
-
 .import-options {
     margin-top: 20px;
     padding: 18px;
@@ -328,90 +273,69 @@ tr:nth-child(even) {
     border: 1px solid #cbd5e1;
     border-radius: 7px;
 }
-
 .import-options h3 {
     margin-bottom: 12px;
 }
-
 .radio-option {
     display: flex;
     align-items: flex-start;
     gap: 10px;
     margin-bottom: 10px;
 }
-
 .radio-option input {
     margin-top: 3px;
 }
-
 .radio-option label {
     margin: 0;
     font-weight: normal;
 }
-
 .mobile-preview-note {
     display: none;
     color: #64748b;
     font-size: 14px;
     margin-top: 10px;
 }
-
 @media (max-width: 768px) {
     body {
         padding: 10px;
     }
-
     .header {
         padding: 16px;
     }
-
     .form-card {
         padding: 18px;
     }
-
     .button-row {
         flex-direction: column;
     }
-
     .btn {
         width: 100%;
     }
-
     .summary-grid {
         grid-template-columns: 1fr;
     }
-
     .mobile-preview-note {
         display: block;
     }
 }
 </style>
 </head>
-
 <body>
-
-<div id="navbar-container"></div>   
-
+<div id="navbar-container"></div>
 <div class="container">
-
     <div class="header">
         <h1>Ref Ledger V2.0 Import Games</h1>
         <p>Import multiple games from a CSV file.</p>
     </div>
-
     <div class="form-card">
-
         <h2>Games CSV Import</h2>
-
         <p class="description">
             Download the CSV template, enter the games, and upload the
             completed file. The file will be validated before any records are
             added.
         </p>
-
         <div class="instructions">
             <h3>Import Instructions</h3>
-
             <ol>
                 <li>Download the Games CSV template.</li>
                 <li>Open the template in Excel, Google Sheets, or another spreadsheet program.</li>
@@ -420,12 +344,10 @@ tr:nth-child(even) {
                 <li>Save or export the completed file as CSV.</li>
                 <li>Select the file below and preview it before importing.</li>
             </ol>
-
             <div class="template-format">
-                <code>firstName,lastName,phone,email,address</code>
+                <code>gameId,date,time,sport,site,field,numOfGames,level,gameFee,travelPay,assignorFee,deductions,association,status,official1,official2,official3,official4,official5,official6,official7,official8,official9,official10,assignor,home,visitor</code>
             </div>
         </div>
-
         <div class="button-row">
             <a
                 href="/api/import/games/template"
@@ -435,12 +357,9 @@ tr:nth-child(even) {
                 Download Games Template
             </a>
         </div>
-
         <form id="importGamesForm">
-
             <div class="form-group">
                 <label for="csvFile">Games CSV File</label>
-
                 <input
                     type="file"
                     id="csvFile"
@@ -448,12 +367,10 @@ tr:nth-child(even) {
                     accept=".csv,text/csv"
                     required
                 >
-
                 <div id="selectedFile" class="selected-file">
                     No file selected.
                 </div>
             </div>
-
             <div class="button-row">
                 <button
                     type="submit"
@@ -463,7 +380,6 @@ tr:nth-child(even) {
                     <i class="fa-solid fa-magnifying-glass"></i>
                     Preview Games
                 </button>
-
                 <button
                     type="button"
                     id="clearFileBtn"
@@ -472,58 +388,43 @@ tr:nth-child(even) {
                     <i class="fa-solid fa-eraser"></i>
                     Clear
                 </button>
-
                 <a href="/games" class="btn btn-cancel">
                     <i class="fa-solid fa-arrow-left"></i>
                     Return to Games
                 </a>
             </div>
-
         </form>
-
     </div>
-
     <div class="message-box info" id="message">
         Select an Games CSV file to begin.
     </div>
-
     <div class="form-card preview-section" id="previewSection">
-
         <h2>Games Import Preview</h2>
-
         <p class="description">
             Review each game and correct any errors before completing the
             import.
         </p>
-
         <div class="summary-grid">
-
             <div class="summary-card total">
                 <span class="summary-number" id="totalRows">0</span>
                 Total Rows
             </div>
-
             <div class="summary-card valid">
                 <span class="summary-number" id="validRows">0</span>
                 Valid Rows
             </div>
-
             <div class="summary-card invalid">
                 <span class="summary-number" id="invalidRows">0</span>
                 Rows With Errors
             </div>
-
         </div>
-
         <p class="mobile-preview-note">
             Swipe left and right to view all preview columns.
         </p>
-
         <div class="table-container">
             <table id="previewTable">
-
                 <thead>
-                    <tr>
+                    <tr id="previewTableHeaderRow">
                         <th>CSV Row</th>
                         <th>Status</th>
                         <th>Game Id</th>
@@ -542,24 +443,15 @@ tr:nth-child(even) {
                         <th>Deductions</th>
                         <th>Association</th>
                         <th>Status</th>
-                        <th>Referee</th>
-                        <th>U1</th>
-                        <th>U2</th> 
-                        <th>ECO</th>
                         <th>Assignor</th>
                         <th>Errors</th>
                     </tr>
                 </thead>
-
                 <tbody id="previewTableBody"></tbody>
-
             </table>
         </div>
-
         <div class="import-options">
-
             <h3>Duplicate Games</h3>
-
             <div class="radio-option">
                 <input
                     type="radio"
@@ -568,12 +460,10 @@ tr:nth-child(even) {
                     value="skip"
                     checked
                 >
-
                 <label for="skipDuplicates">
                     Skip games whose details already exist.
                 </label>
             </div>
-
             <div class="radio-option">
                 <input
                     type="radio"
@@ -581,16 +471,12 @@ tr:nth-child(even) {
                     name="duplicateAction"
                     value="stop"
                 >
-
                 <label for="stopOnDuplicate">
                     Stop the entire import when a duplicate is found.
                 </label>
             </div>
-
         </div>
-
         <div class="button-row">
-
             <button
                 type="button"
                 id="importBtn"
@@ -600,7 +486,6 @@ tr:nth-child(even) {
                 <i class="fa-solid fa-file-import"></i>
                 Import Valid Games
             </button>
-
             <button
                 type="button"
                 id="clearPreviewBtn"
@@ -609,151 +494,106 @@ tr:nth-child(even) {
                 <i class="fa-solid fa-xmark"></i>
                 Clear Preview
             </button>
-
             <a href="/games" class="btn btn-cancel">
                 <i class="fa-solid fa-arrow-left"></i>
                 Return to Games
             </a>
-
         </div>
-
     </div>
-
 </div>
-
 <script src="/components/navbar.js?v=12"></script>
-
 <script>
 const importGamesForm =
     document.getElementById("importGamesForm");
-
 const csvFile =
     document.getElementById("csvFile");
-
 const selectedFile =
     document.getElementById("selectedFile");
-
 const previewBtn =
     document.getElementById("previewBtn");
-
 const importBtn =
     document.getElementById("importBtn");
-
 const clearFileBtn =
     document.getElementById("clearFileBtn");
-
 const clearPreviewBtn =
     document.getElementById("clearPreviewBtn");
-
 const previewSection =
     document.getElementById("previewSection");
-
 const previewTableBody =
     document.getElementById("previewTableBody");
-
 const messageBox =
     document.getElementById("message");
-
 let previewToken = "";
 let validRowCount = 0;
-
-
 csvFile.addEventListener("change", function () {
     clearPreview();
-
     if (csvFile.files.length === 0) {
         selectedFile.textContent = "No file selected.";
-
         showMessage(
             "Select a Games CSV file to begin.",
             "info"
         );
-
         return;
     }
-
     const file = csvFile.files[0];
-
     selectedFile.textContent =
         file.name + " (" + formatFileSize(file.size) + ")";
-
     showMessage(
         "File selected. Select Preview Games to validate it.",
         "info"
     );
 });
-
 clearFileBtn.addEventListener("click", function () {
     importGamesForm.reset();
-
     selectedFile.textContent = "No file selected.";
-
     clearPreview();
-
     showMessage(
         "File selection and preview cleared.",
         "info"
     );
 });
-
 clearPreviewBtn.addEventListener("click", function () {
     clearPreview();
-
     showMessage(
         "Preview cleared. You may select another file or preview the current file again.",
         "info"
     );
 });
-
 importGamesForm.addEventListener(
     "submit",
     async function (event) {
         event.preventDefault();
-
         if (csvFile.files.length === 0) {
             showMessage(
                 "Select a Games CSV file.",
                 "error"
             );
-
             return;
         }
-
         const file = csvFile.files[0];
-
         if (!file.name.toLowerCase().endsWith(".csv")) {
             showMessage(
                 "The selected file must have a .csv extension.",
                 "error"
             );
-
             return;
         }
-
         const maximumFileSize = 5 * 1024 * 1024;
-
         if (file.size > maximumFileSize) {
             showMessage(
                 "The selected file is too large. The maximum file size is 5 MB.",
                 "error"
             );
-
             return;
         }
-
         const formData = new FormData();
-
         formData.append("file", file);
-
         setPreviewLoading(true);
-
         clearPreview();
-
         showMessage(
             "Validating the Games CSV file...",
             "info"
         );
-
         try {
             const response = await fetch(
                 "/api/import/games/preview",
@@ -762,7 +602,6 @@ importGamesForm.addEventListener(
                     body: formData
                 }
             );
-
             if (
                 response.status === 401 ||
                 response.redirected
@@ -770,18 +609,14 @@ importGamesForm.addEventListener(
                 window.location.href = "/login";
                 return;
             }
-
             if (response.status === 403) {
                 showMessage(
                     "Permission denied. Read-only users cannot import games.",
                     "error"
                 );
-
                 return;
             }
-
             const result = await readResponse(response);
-
             if (!response.ok) {
                 throw new Error(
                     result.error ||
@@ -789,9 +624,7 @@ importGamesForm.addEventListener(
                     "Unable to preview the Games CSV file."
                 );
             }
-
             displayPreview(result);
-
             if (Number(result.invalidRows || 0) > 0) {
                 showMessage(
                     "Preview complete. Some rows contain errors and will not be imported.",
@@ -803,60 +636,47 @@ importGamesForm.addEventListener(
                     "success"
                 );
             }
-
         } catch (error) {
             clearPreview();
-
             showMessage(
                 error.message || "Server unavailable.",
                 "error"
             );
-
         } finally {
             setPreviewLoading(false);
         }
     }
 );
-
 importBtn.addEventListener("click", async function () {
     if (!previewToken) {
         showMessage(
             "Preview the Games CSV file before importing.",
             "error"
         );
-
         return;
     }
-
     if (validRowCount === 0) {
         showMessage(
             "There are no valid games to import.",
             "error"
         );
-
         return;
     }
-
     const duplicateActionElement =
         document.querySelector(
             'input[name="duplicateAction"]:checked'
         );
-
     const duplicateAction =
         duplicateActionElement
             ? duplicateActionElement.value
             : "skip";
-
     importBtn.disabled = true;
-
     importBtn.innerHTML =
         '<i class="fa-solid fa-spinner fa-spin"></i> Importing Games...';
-
     showMessage(
         "Importing valid games...",
         "info"
     );
-
     try {
         const response = await fetch(
             "/api/import/games/commit",
@@ -871,7 +691,6 @@ importBtn.addEventListener("click", async function () {
                 })
             }
         );
-
         if (
             response.status === 401 ||
             response.redirected
@@ -879,19 +698,15 @@ importBtn.addEventListener("click", async function () {
             window.location.href = "/login";
             return;
         }
-
         if (response.status === 403) {
             showMessage(
                 "Permission denied. Read-only users cannot import games.",
                 "error"
             );
-
             resetImportButton();
             return;
         }
-
         const result = await readResponse(response);
-
         if (!response.ok) {
             throw new Error(
                 result.error ||
@@ -899,11 +714,9 @@ importBtn.addEventListener("click", async function () {
                 "Unable to import games."
             );
         }
-
         const added = Number(result.added || 0);
         const skipped = Number(result.skipped || 0);
         const failed = Number(result.failed || 0);
-
         showMessage(
             "Import complete. Added: " +
             added +
@@ -914,235 +727,251 @@ importBtn.addEventListener("click", async function () {
             ".",
             failed > 0 ? "warning" : "success"
         );
-
         previewToken = "";
         validRowCount = 0;
-
         importBtn.disabled = true;
-
         importBtn.innerHTML =
             '<i class="fa-solid fa-check"></i> Import Complete';
-
     } catch (error) {
         showMessage(
             error.message || "Server unavailable.",
             "error"
         );
-
         resetImportButton();
     }
 });
-
 function displayPreview(result) {
-    const rows =
-        Array.isArray(result.rows)
-            ? result.rows
-            : [];
-
-    previewToken =
-        result.previewToken || "";
-
-    const totalRows =
-        Number(
-            result.totalRows !== undefined
-                ? result.totalRows
-                : rows.length
-        );
-
-    validRowCount =
-        Number(result.validRows || 0);
-
-    const invalidRows =
-        Number(result.invalidRows || 0);
-
-    document.getElementById("totalRows").textContent =
-        totalRows;
-
-    document.getElementById("validRows").textContent =
-        validRowCount;
-
-    document.getElementById("invalidRows").textContent =
-        invalidRows;
-
+    const rows = Array.isArray(result.rows) ? result.rows : [];
+    previewToken = result.previewToken || "";
+    const totalRows = Number(
+        result.totalRows !== undefined
+            ? result.totalRows
+            : rows.length
+    );
+    validRowCount = Number(result.validRows || 0);
+    const invalidRows = Number(result.invalidRows || 0);
+    document.getElementById("totalRows").textContent = totalRows;
+    document.getElementById("validRows").textContent = validRowCount;
+    document.getElementById("invalidRows").textContent = invalidRows;
     previewTableBody.innerHTML = "";
-
+    /*
+        Build the official columns from all roles returned in the preview.
+        RoleId keeps distinct roles separate and DisplayOrder controls
+        their position in the table.
+    */
+    const roleMap = new Map();
     rows.forEach(function (row) {
-        const tableRow =
-            document.createElement("tr");
-
         const data =
             row.data && typeof row.data === "object"
                 ? row.data
                 : {};
-
-        appendCell(
-            tableRow,
-            row.rowNumber ?? ""
+        getOfficials(data).forEach(function (official) {
+            const roleId =
+                getValue(official, "roleId", "RoleId");
+            const title =
+                getValue(official, "title", "Title");
+            const displayOrder = Number(
+                getValue(
+                    official,
+                    "displayOrder",
+                    "DisplayOrder"
+                ) || 0
+            );
+            const roleKey =
+                roleId ||
+                (
+                    String(title).toLowerCase() +
+                    "|" +
+                    String(displayOrder)
+                );
+            if (!roleMap.has(roleKey)) {
+                roleMap.set(roleKey, {
+                    roleId: roleId,
+                    title: title || "Official",
+                    displayOrder: displayOrder,
+                    roleKey: roleKey
+                });
+            }
+        });
+    });
+    const previewRoles =
+        Array.from(roleMap.values()).sort(
+            function (a, b) {
+                if (a.displayOrder !== b.displayOrder) {
+                    return a.displayOrder - b.displayOrder;
+                }
+                return String(a.title).localeCompare(
+                    String(b.title)
+                );
+            }
         );
-
-        const statusCell =
-            document.createElement("td");
-
+    buildPreviewTableHeader(previewRoles);
+    rows.forEach(function (row) {
+        const tableRow = document.createElement("tr");
+        const data =
+            row.data && typeof row.data === "object"
+                ? row.data
+                : {};
+        appendCell(tableRow, row.rowNumber ?? "");
+        const statusCell = document.createElement("td");
         statusCell.textContent =
             row.valid ? "Valid" : "Error";
-
         statusCell.className =
             row.valid
                 ? "status-valid"
                 : "status-error";
-
         tableRow.appendChild(statusCell);
-
-        appendCell(
-            tableRow,
-            getValue(data, "gameId", "GameId")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "date", "Date")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "time", "Time")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "sport", "Sport")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "site", "Site")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "field", "Field")
-        );        
-
-        appendCell(
-            tableRow,
-            getValue(data, "numOfGames", "NumOfGames")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "level", "Level")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "home", "Home")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "visitor", "Visitor")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "gameFee", "GameFee")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "travelPay", "TravelPay")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "assignorFee", "AssignorFee")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "deductions", "Deductions")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "association", "Association")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "status", "Status")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "referee", "Referee")
-        );
-        
-        appendCell(
-            tableRow,
-            getValue(data, "u1", "U1")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "u2", "U2")
-        );
-
-        appendCell(
-            tableRow,
-            getValue(data, "eco", "ECO")
-        );
-        
+        appendCell(tableRow, getValue(data, "gameId", "GameId"));
+        appendCell(tableRow, getValue(data, "date", "Date"));
+        appendCell(tableRow, getValue(data, "time", "Time"));
+        appendCell(tableRow, getValue(data, "sport", "Sport"));
+        appendCell(tableRow, getValue(data, "site", "Site"));
+        appendCell(tableRow, getValue(data, "field", "Field"));
+        appendCell(tableRow, getValue(data, "numOfGames", "NumOfGames"));
+        appendCell(tableRow, getValue(data, "level", "Level"));
+        appendCell(tableRow, getValue(data, "home", "Home"));
+        appendCell(tableRow, getValue(data, "visitor", "Visitor"));
+        appendCell(tableRow, getValue(data, "gameFee", "GameFee"));
+        appendCell(tableRow, getValue(data, "travelPay", "TravelPay"));
+        appendCell(tableRow, getValue(data, "assignorFee", "AssignorFee"));
+        appendCell(tableRow, getValue(data, "deductions", "Deductions"));
+        appendCell(tableRow, getValue(data, "association", "Association"));
+        appendCell(tableRow, getValue(data, "status", "Status"));
+        const officials = getOfficials(data);
+        previewRoles.forEach(function (role) {
+            const matchingOfficial =
+                officials.find(function (official) {
+                    const officialRoleId =
+                        getValue(
+                            official,
+                            "roleId",
+                            "RoleId"
+                        );
+                    if (role.roleId && officialRoleId) {
+                        return officialRoleId === role.roleId;
+                    }
+                    const officialTitle =
+                        getValue(
+                            official,
+                            "title",
+                            "Title"
+                        );
+                    const officialDisplayOrder = Number(
+                        getValue(
+                            official,
+                            "displayOrder",
+                            "DisplayOrder"
+                        ) || 0
+                    );
+                    return (
+                        String(officialTitle).toLowerCase() ===
+                            String(role.title).toLowerCase() &&
+                        officialDisplayOrder ===
+                            role.displayOrder
+                    );
+                });
+            appendCell(
+                tableRow,
+                matchingOfficial
+                    ? getValue(
+                        matchingOfficial,
+                        "name",
+                        "Name"
+                    )
+                    : ""
+            );
+        });
         appendCell(
             tableRow,
             getValue(data, "assignor", "Assignor")
         );
-
-        
-        const errorCell =
-            document.createElement("td");
-
+        const errorCell = document.createElement("td");
         errorCell.className = "error-list";
-
         if (Array.isArray(row.errors)) {
-            errorCell.textContent =
-                row.errors.join("; ");
+            errorCell.textContent = row.errors.join("; ");
         } else {
-            errorCell.textContent =
-                row.error || "";
+            errorCell.textContent = row.error || "";
         }
-
         tableRow.appendChild(errorCell);
-
         previewTableBody.appendChild(tableRow);
     });
-
     previewSection.style.display = "block";
-
     importBtn.disabled =
         !previewToken || validRowCount === 0;
-
     importBtn.innerHTML =
         '<i class="fa-solid fa-file-import"></i> Import Valid Games';
-
     previewSection.scrollIntoView({
         behavior: "smooth",
         block: "start"
     });
 }
-
-function appendCell(row, value) {
-    const cell =
-        document.createElement("td");
-
+function getOfficials(data) {
+    const officials =
+        getValue(data, "officials", "Officials");
+    return Array.isArray(officials)
+        ? officials
+        : [];
+}
+function buildPreviewTableHeader(previewRoles) {
+    const headerRow =
+        document.getElementById(
+            "previewTableHeaderRow"
+        );
+    headerRow.innerHTML = "";
+    const fixedHeadersBeforeOfficials = [
+        "CSV Row",
+        "Status",
+        "Game Id",
+        "Date",
+        "Time",
+        "Sport",
+        "Site",
+        "Field",
+        "Num of Games",
+        "Level",
+        "Home",
+        "Visitor",
+        "Game Fee",
+        "Travel Pay",
+        "Assignor Fee",
+        "Deductions",
+        "Association",
+        "Status"
+    ];
+    fixedHeadersBeforeOfficials.forEach(
+        function (headerText) {
+            appendHeaderCell(
+                headerRow,
+                headerText
+            );
+        }
+    );
+    previewRoles.forEach(function (role) {
+        appendHeaderCell(
+            headerRow,
+            role.title
+        );
+    });
+    appendHeaderCell(headerRow, "Assignor");
+    appendHeaderCell(headerRow, "Errors");
+}
+function appendHeaderCell(row, value) {
+    const cell = document.createElement("th");
     cell.textContent =
         value === null || value === undefined
             ? ""
             : String(value);
-
     row.appendChild(cell);
 }
-
+function appendCell(row, value) {
+    const cell =
+        document.createElement("td");
+    cell.textContent =
+        value === null || value === undefined
+            ? ""
+            : String(value);
+    row.appendChild(cell);
+}
 function getValue(data, camelCaseName, exportedName) {
     if (
         Object.prototype.hasOwnProperty.call(
@@ -1152,7 +981,6 @@ function getValue(data, camelCaseName, exportedName) {
     ) {
         return data[camelCaseName] ?? "";
     }
-
     if (
         Object.prototype.hasOwnProperty.call(
             data,
@@ -1161,43 +989,31 @@ function getValue(data, camelCaseName, exportedName) {
     ) {
         return data[exportedName] ?? "";
     }
-
     return "";
 }
-
 function clearPreview() {
     previewToken = "";
     validRowCount = 0;
-
     document.getElementById("totalRows").textContent =
         "0";
-
     document.getElementById("validRows").textContent =
         "0";
-
     document.getElementById("invalidRows").textContent =
         "0";
-
     previewTableBody.innerHTML = "";
-
     previewSection.style.display = "none";
-
     resetImportButton();
 }
-
 function resetImportButton() {
     importBtn.disabled =
         !previewToken || validRowCount === 0;
-
     importBtn.innerHTML =
         '<i class="fa-solid fa-file-import"></i> Import Valid Games';
 }
-
 function setPreviewLoading(isLoading) {
     previewBtn.disabled = isLoading;
     csvFile.disabled = isLoading;
     clearFileBtn.disabled = isLoading;
-
     if (isLoading) {
         previewBtn.innerHTML =
             '<i class="fa-solid fa-spinner fa-spin"></i> Validating...';
@@ -1206,47 +1022,38 @@ function setPreviewLoading(isLoading) {
             '<i class="fa-solid fa-magnifying-glass"></i> Preview Games';
     }
 }
-
 function showMessage(text, type) {
     messageBox.textContent = text;
     messageBox.className =
         "message-box " + type;
 }
-
 function formatFileSize(bytes) {
     if (bytes < 1024) {
         return bytes + " bytes";
     }
-
     if (bytes < 1024 * 1024) {
         return (
             bytes / 1024
         ).toFixed(1) + " KB";
     }
-
     return (
         bytes / (1024 * 1024)
     ).toFixed(1) + " MB";
 }
-
 async function readResponse(response) {
     const contentType =
         response.headers.get("content-type") || "";
-
     if (
         contentType.includes("application/json")
     ) {
         return await response.json();
     }
-
     const text =
         await response.text();
-
     return {
         message: text
     };
 }
 </script>
-
 </body>
 </html>

@@ -625,6 +625,12 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+.edit-officials-section { margin-top: 22px; padding: 18px; border: 1px solid #ddd6fe; border-radius: 10px; background: #faf5ff; }
+.edit-officials-section h3 { color: #6d28d9; margin-bottom: 8px; }
+#editOfficialsMessage { color: #64748b; margin-bottom: 14px; }
+.official-assignment { display: block; margin-bottom: 6px; white-space: nowrap; }
+.official-role-title { font-weight: bold; color: #475569; }
 </style>
 </head>
 
@@ -891,7 +897,6 @@ body {
                 <th>Assoc</th>
                 <th>Status</th>
                 <th>Officials</th>
-                <th>ECO</th>
                 <th>Assignor</th>
             </tr>
         </thead>
@@ -1029,13 +1034,14 @@ body {
                     <div class="edit-game-field"><label for="editTravelPay">Travel Pay</label><input type="number" min="0" step="0.01" id="editTravelPay"></div>
                     <div class="edit-game-field"><label for="editAssignorFee">Assignor Fee</label><input type="number" min="0" step="0.01" id="editAssignorFee"></div>
                     <div class="edit-game-field"><label for="editDeductions">Deductions</label><input type="number" min="0" step="0.01" id="editDeductions"></div>
-                    <div class="edit-game-field"><label for="editReferee">Referee</label><select id="editReferee"><option value="">Select Official</option></select></div>
-                    <div class="edit-game-field"><label for="editU1">U1</label><select id="editU1"><option value="">Select Official</option></select></div>
-                    <div class="edit-game-field"><label for="editU2">U2</label><select id="editU2"><option value="">Select Official</option></select></div>
-                    <div class="edit-game-field"><label for="editEco">ECO</label><select id="editEco"><option value="">Select Official</option></select></div>
                     <div class="edit-game-field"><label for="editAssignor">Assignor</label><select id="editAssignor"><option value="">Select Assignor</option></select></div>
                 </div>
 
+                <section class="edit-officials-section" aria-labelledby="editOfficialsTitle">
+                    <h3 id="editOfficialsTitle"><i class="fa-solid fa-users" aria-hidden="true"></i> Officials</h3>
+                    <p id="editOfficialsMessage" role="status">Choose a sport to load its official fields.</p>
+                    <div id="editOfficialsFields" class="edit-game-form-grid"></div>
+                </section>
                 <div id="editGameError" class="edit-game-error" role="alert"></div>
             </div>
 
@@ -1384,18 +1390,7 @@ function renderGames(
             </button>
         `;
 
-        const officialsHtml = Array.isArray(game.Officials)
-            ? game.Officials
-                .map(official => `
-                    <a
-                        href="#"
-                        class="official-link"
-                        data-official-id="${official.OfficialId}">
-                        ${official.Name}
-                    </a>
-                `)
-                .join(", ")
-            : "";
+        const officialsHtml = renderOfficialAssignments(game);
 
         row.innerHTML = `
             <td class="game-actions-cell">
@@ -1425,7 +1420,6 @@ function renderGames(
                 </span>
             </td>
             <td>${officialsHtml}</td>
-            <td>${game.ECO ?? game.eco ?? ""}</td>
             <td>${game.Assignor ?? game.assignor ?? ""}</td>            
         `;
 
@@ -2369,13 +2363,7 @@ async function loadOfficials() {
         }
 
         const officials = await response.json();
-        ["editReferee", "editU1", "editU2", "editEco"].forEach(
-            selectId => populateEditSelect(
-                selectId,
-                officials,
-                "Select Official"
-            )
-        );
+        dashboardOfficials = Array.isArray(officials) ? officials : [];
         populateOfficialFilter("official", officials);
         populateOfficialFilter("eco", officials);
 
@@ -2640,6 +2628,168 @@ function confirmGameCompletion(gameId) {
     });
 }
 
+
+let dashboardOfficials = null;
+let editOfficialRows = [];
+let editOfficialsReady = false;
+let editOfficialsVersion = 0;
+let editSportAssignments = new Map();
+let editOfficialsSport = "";
+
+function officialValue(record, field) {
+    return record?.[field] ?? record?.[field.charAt(0).toUpperCase() + field.slice(1)];
+}
+
+function normalizeGameOfficial(record) {
+    return {
+        roleId: String(officialValue(record, "roleId") ?? ""),
+        title: String(officialValue(record, "title") ?? record?.Role ?? record?.role ?? record?.Position ?? record?.position ?? ""),
+        displayOrder: Number(officialValue(record, "displayOrder") ?? 0),
+        officialId: String(officialValue(record, "officialId") ?? ""),
+        name: String(officialValue(record, "name") ?? "")
+    };
+}
+
+function savedDashboardOfficials(game) {
+    const saved = gameValue(game, "Officials");
+    if (Array.isArray(saved) && saved.length) {
+        return saved.map(normalizeGameOfficial).sort((a, b) => a.displayOrder - b.displayOrder);
+    }
+    return ["Referee", "U1", "U2", "ECO"].flatMap((title, index) => {
+        const name = gameValue(game, title, title === "ECO" ? "eco" : null);
+        return name ? [{ roleId: "", title, displayOrder: index + 1, officialId: "", name: String(name) }] : [];
+    });
+}
+
+function escapeOfficialHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+}
+
+function renderOfficialAssignments(game) {
+    return savedDashboardOfficials(game).map(official => {
+        const name = official.name || (official.officialId ? `Official ${official.officialId}` : "Unassigned");
+        const label = official.title ? `<span class="official-role-title">${escapeOfficialHTML(official.title)}:</span> ` : "";
+        const person = official.officialId && name !== "Unassigned"
+            ? `<a href="#" class="official-link" data-official-id="${escapeOfficialHTML(official.officialId)}">${escapeOfficialHTML(name)}</a>`
+            : escapeOfficialHTML(name);
+        return `<span class="official-assignment">${label}${person}</span>`;
+    }).join("");
+}
+
+async function getDashboardOfficialDirectory() {
+    if (dashboardOfficials !== null) return dashboardOfficials;
+    const response = await fetch("/api/loadOfficials");
+    if (!response.ok) throw new Error(`Unable to load officials (HTTP ${response.status}).`);
+    const data = await response.json();
+    if (!Array.isArray(data)) throw new Error("The official directory response must be an array.");
+    dashboardOfficials = data;
+    return data;
+}
+
+function collectEditOfficials() {
+    return editOfficialRows.map(({ role, select }) => {
+        const option = select.selectedOptions[0];
+        return {
+            roleId: role.roleId,
+            title: role.title,
+            displayOrder: role.displayOrder,
+            officialId: option?.dataset.officialId || "",
+            name: option?.dataset.name || "Unassigned"
+        };
+    });
+}
+
+async function loadEditOfficialRoles(sport, game = null) {
+    const version = ++editOfficialsVersion;
+    editOfficialsReady = false;
+    editOfficialsSport = sport;
+    editOfficialRows = [];
+    const container = document.getElementById("editOfficialsFields");
+    const message = document.getElementById("editOfficialsMessage");
+    container.replaceChildren();
+    message.textContent = sport ? `Loading official fields for ${sport}…` : "Choose a sport to load its official fields.";
+    if (!sport) return;
+    try {
+        const [response, directory] = await Promise.all([
+            fetch(`/api/settings/official-roles?sport=${encodeURIComponent(sport)}`),
+            getDashboardOfficialDirectory()
+        ]);
+        if (!response.ok) throw new Error(`Unable to load official roles for ${sport} (HTTP ${response.status}).`);
+        const data = await response.json();
+        if (version !== editOfficialsVersion) return;
+        const definitions = Array.isArray(data) ? data : data.roles ?? data.Roles;
+        if (!Array.isArray(definitions)) throw new Error("The official roles response must include a roles array.");
+        const saved = game ? savedDashboardOfficials(game) : editSportAssignments.get(sport) || [];
+        if (saved.some(assignment => !assignment.title && !assignment.roleId)) {
+            throw new Error("Saved officials are missing role titles and IDs. The game endpoint must return the complete Officials assignments.");
+        }
+        const roles = definitions.filter(role => officialValue(role, "active") !== false)
+            .map(normalizeGameOfficial);
+        // Keep saved inactive or retired roles so an unrelated edit does not erase them.
+        for (const assignment of saved) {
+            const match = roles.some(role => assignment.roleId
+                ? role.roleId === assignment.roleId
+                : role.title.toLowerCase() === assignment.title.toLowerCase());
+            if (!match) roles.push({ ...assignment, historical: true });
+        }
+        roles.sort((a, b) => a.displayOrder - b.displayOrder);
+        for (const role of roles) {
+            const assignment = saved.find(item => item.roleId
+                ? item.roleId === role.roleId
+                : item.title.toLowerCase() === role.title.toLowerCase());
+            const field = document.createElement("div");
+            field.className = "edit-game-field";
+            const label = document.createElement("label");
+            const select = document.createElement("select");
+            select.id = `editOfficialRole${editOfficialRows.length}`;
+            label.htmlFor = select.id;
+            label.textContent = role.title + (role.historical ? " (saved role)" : "");
+            const addOption = (id, name) => {
+                const option = document.createElement("option");
+                option.value = String(select.options.length);
+                option.textContent = name;
+                option.dataset.officialId = id;
+                option.dataset.name = name;
+                select.appendChild(option);
+                return option;
+            };
+            addOption("", "Unassigned");
+            directory.forEach(person => {
+                const id = String(officialValue(person, "officialId") ?? person.id ?? person.Id ?? "");
+                const name = String(officialValue(person, "name") ?? [officialValue(person, "firstName"), officialValue(person, "lastName")].filter(Boolean).join(" "));
+                if (name && name !== "Unassigned") addOption(id, name);
+            });
+            if (assignment && (assignment.officialId || (assignment.name && assignment.name !== "Unassigned"))) {
+                let option = Array.from(select.options).find(option => assignment.officialId
+                    ? option.dataset.officialId === assignment.officialId
+                    : option.dataset.name.toLowerCase() === assignment.name.toLowerCase());
+                if (!option) option = addOption(assignment.officialId, assignment.name && assignment.name !== "Unassigned"
+                    ? assignment.name : `Official ${assignment.officialId}`);
+                select.value = option.value;
+            }
+            select.disabled = Boolean(role.historical);
+            field.append(label, select);
+            container.appendChild(field);
+            editOfficialRows.push({ role, select });
+        }
+        editOfficialsReady = true;
+        message.textContent = roles.length ? `Official fields for ${sport}.` : `No active official roles are configured for ${sport}.`;
+    } catch (error) {
+        if (version !== editOfficialsVersion) return;
+        container.replaceChildren();
+        editOfficialRows = [];
+        message.textContent = error.message;
+        showEditGameError(error.message);
+    }
+}
+
+document.getElementById("editSport").addEventListener("change", async event => {
+    if (editOfficialsReady) editSportAssignments.set(editOfficialsSport, collectEditOfficials());
+    document.getElementById("editGameError").style.display = "none";
+    await loadEditOfficialRoles(event.target.value);
+});
+
 function gameValue(game, pascalName, camelName = null) {
     return game?.[pascalName] ?? game?.[camelName ||
         pascalName.charAt(0).toLowerCase() + pascalName.slice(1)] ?? "";
@@ -2724,31 +2874,6 @@ async function openEditGame(gameId, association) {
         return;
     }
 
-    const officials = Array.isArray(gameBeingEdited.Officials)
-        ? gameBeingEdited.Officials
-        : [];
-    const officialName = (position, fallbackIndex) => {
-        const match = officials.find(official =>
-            String(
-                official.Position ??
-                official.position ??
-                official.Role ??
-                official.role ??
-                official.Assignment ??
-                official.assignment ??
-                ""
-            ).toLowerCase() ===
-            position.toLowerCase()
-        );
-
-        if (match) {
-            return match.Name ?? match.name ?? "";
-        }
-
-        const fallbackOfficial = officials[fallbackIndex];
-        return fallbackOfficial?.Name ?? fallbackOfficial?.name ?? "";
-    };
-
     document.getElementById("editGameId").value = gameValue(gameBeingEdited, "GameId");
     document.getElementById("editAssociation").value = gameValue(gameBeingEdited, "Association");
     if (dashboardSites.length === 0) {
@@ -2794,36 +2919,19 @@ async function openEditGame(gameId, association) {
     document.getElementById("editTravelPay").value = gameValue(gameBeingEdited, "TravelPay");
     document.getElementById("editAssignorFee").value = gameValue(gameBeingEdited, "AssignorFee");
     document.getElementById("editDeductions").value = gameValue(gameBeingEdited, "Deductions");
-    setEditSelectValue(
-        "editReferee",
-        gameValue(gameBeingEdited, "Referee") ||
-            officialName("referee", 0) ||
-            "Unassigned"
-    );
-    setEditSelectValue(
-        "editU1",
-        gameValue(gameBeingEdited, "U1") ||
-            officialName("u1", 1) ||
-            "Unassigned"
-    );
-    setEditSelectValue(
-        "editU2",
-        gameValue(gameBeingEdited, "U2") ||
-            officialName("u2", 2) ||
-            "Unassigned"
-    );
-    setEditSelectValue(
-        "editEco",
-        gameValue(gameBeingEdited, "ECO", "eco") ||
-            "Unassigned"
-    );
     setEditSelectValue("editAssignor", gameValue(gameBeingEdited, "Assignor"));
     document.getElementById("editGameError").style.display = "none";
     document.getElementById("editGameModalOverlay").classList.add("show");
     document.getElementById("editTime").focus();
+    editSportAssignments = new Map();
+    await loadEditOfficialRoles(gameValue(gameBeingEdited, "Sport"), gameBeingEdited);
 }
 
 function closeEditGame() {
+    editOfficialsVersion++;
+    editOfficialsReady = false;
+    editOfficialRows = [];
+    document.getElementById("editOfficialsFields").replaceChildren();
     document.getElementById("editGameModalOverlay").classList.remove("show");
     document.getElementById("editGameForm").reset();
     document.getElementById("editGameError").style.display = "none";
@@ -2843,6 +2951,10 @@ async function saveEditedGame(event) {
         return;
     }
 
+    if (!editOfficialsReady) {
+        showEditGameError("Wait for the official fields to load successfully before saving.");
+        return;
+    }
     const gameId = document.getElementById("editGameId").value;
     const association = document.getElementById("editAssociation").value;
     const saveButton = document.getElementById("saveEditGameButton");
@@ -2863,10 +2975,7 @@ async function saveEditedGame(event) {
         assignorFee: Number.parseFloat(document.getElementById("editAssignorFee").value || 0),
         deductions: Number.parseFloat(document.getElementById("editDeductions").value || 0),
         status: document.getElementById("editStatus").value,
-        referee: document.getElementById("editReferee").value.trim() || "Unassigned",
-        u1: document.getElementById("editU1").value.trim() || "Unassigned",
-        u2: document.getElementById("editU2").value.trim() || "Unassigned",
-        eco: document.getElementById("editEco").value.trim() || "Unassigned",
+        officials: collectEditOfficials(),
         assignor: document.getElementById("editAssignor").value.trim()
     };
 

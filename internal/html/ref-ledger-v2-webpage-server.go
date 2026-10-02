@@ -51,27 +51,28 @@ var dbName string
 
 /* July 18, 2026 */
 type Game struct {
-	Association string  `json:"association"`
-	GameId      int     `json:"gameId"`
-	Date        string  `json:"date"`
-	Time        string  `json:"time"`
-	Site        string  `json:"site"`
-	Field       string  `json:"field"`
-	Sport       string  `json:"sport"`
-	Level       string  `json:"level"`
-	Home        string  `json:"home"`
-	Visitor     string  `json:"visitor"`
-	NumOfGames  int     `json:"numOfGames"`
-	GameFee     float64 `json:"gameFee"`
-	TravelPay   float64 `json:"travelPay"`
-	AssignorFee float64 `json:"assignorFee"`
-	Deductions  float64 `json:"deductions"`
-	Status      string  `json:"status"`
-	Referee     string  `json:"referee"`
-	U1          string  `json:"u1"`
-	U2          string  `json:"u2"`
-	ECO         string  `json:"eco"`
-	Assignor    string  `json:"assignor"`
+	Association string                  `json:"association"`
+	GameId      int                     `json:"gameId"`
+	Date        string                  `json:"date"`
+	Time        string                  `json:"time"`
+	Site        string                  `json:"site"`
+	Field       string                  `json:"field"`
+	Sport       string                  `json:"sport"`
+	Level       string                  `json:"level"`
+	Home        string                  `json:"home"`
+	Visitor     string                  `json:"visitor"`
+	NumOfGames  int                     `json:"numOfGames"`
+	GameFee     float64                 `json:"gameFee"`
+	TravelPay   float64                 `json:"travelPay"`
+	AssignorFee float64                 `json:"assignorFee"`
+	Deductions  float64                 `json:"deductions"`
+	Status      string                  `json:"status"`
+	Referee     string                  `json:"referee"`
+	U1          string                  `json:"u1"`
+	U2          string                  `json:"u2"`
+	ECO         string                  `json:"eco"`
+	Assignor    string                  `json:"assignor"`
+	Officials   []model.GameOfficialDoc `json:"officials"`
 }
 
 type Expense struct {
@@ -170,6 +171,24 @@ func LogRequest(next http.Handler) http.Handler {
 	})
 }
 
+func officialRolesAccess(next http.HandlerFunc) http.HandlerFunc {
+	restricted := readOnlyForbidden(next)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			next(w, r)
+
+		case http.MethodPut, http.MethodDelete:
+			restricted(w, r)
+
+		default:
+			w.Header().Set("Allow", "GET, PUT, DELETE")
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
+
 func readOnlyForbidden(next http.HandlerFunc) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -241,6 +260,7 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 		U2:          g.U2,
 		ECO:         g.ECO,
 		Assignor:    g.Assignor,
+		Officials:   g.Officials,
 	}
 }
 
@@ -600,7 +620,7 @@ func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
 	*/
 	activeOnly := r.URL.Query().Get("active") == "true"
 
-	sports, err := spc.GetSports(tId, activeOnly)
+	sports, err := spc.GetSports(activeOnly)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -927,10 +947,16 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"deductions",
 		"association",
 		"status",
-		"referee",
-		"u1",
-		"u2",
-		"eco",
+		"official1",
+		"official2",
+		"official3",
+		"official4",
+		"official5",
+		"official6",
+		"official7",
+		"official8",
+		"official9",
+		"official10",
 		"assignor",
 		"home",
 		"visitor",
@@ -973,7 +999,13 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"John Doe",
 		"Jane Smith",
 		"Bob Johnson",
-		"Alice Brown",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
 		"Charlie Davis",
 		"Mill Creek",
 		"Buford",
@@ -1073,27 +1105,24 @@ const maxCSVRows = 1000
 const previewExpiration = 15 * time.Minute
 
 type GameImportData struct {
-	GameId      int64  `json:"gameId"`
-	Date        string `json:"date"`
-	Time        string `json:"time"`
-	Sport       string `json:"sport"`
-	Site        string `json:"site"`
-	Field       string `json:"field"`
-	NumOfGames  int64  `json:"numOfGames"`
-	Level       string `json:"level"`
-	Home        string `json:"home"`
-	Visitor     string `json:"visitor"`
-	GameFee     string `json:"gameFee"`
-	TravelPay   string `json:"travelPay"`
-	AssignorFee string `json:"assignorFee"`
-	Deductions  string `json:"deductions"`
-	Association string `json:"association"`
-	Status      string `json:"status"`
-	Referee     string `json:"referee"`
-	U1          string `json:"u1"`
-	U2          string `json:"u2"`
-	ECO         string `json:"eco"`
-	Assignor    string `json:"assignor"`
+	GameId      int64                   `json:"gameId"`
+	Date        string                  `json:"date"`
+	Time        string                  `json:"time"`
+	Sport       string                  `json:"sport"`
+	Site        string                  `json:"site"`
+	Field       string                  `json:"field"`
+	NumOfGames  int64                   `json:"numOfGames"`
+	Level       string                  `json:"level"`
+	Home        string                  `json:"home"`
+	Visitor     string                  `json:"visitor"`
+	GameFee     string                  `json:"gameFee"`
+	TravelPay   string                  `json:"travelPay"`
+	AssignorFee string                  `json:"assignorFee"`
+	Deductions  string                  `json:"deductions"`
+	Association string                  `json:"association"`
+	Status      string                  `json:"status"`
+	Officials   []model.GameOfficialDoc `json:"officials"`
+	Assignor    string                  `json:"assignor"`
 }
 
 type GamePreviewRow struct {
@@ -1433,19 +1462,27 @@ func validateGamesCSVHeader(header []string) error {
 		"deductions",
 		"association",
 		"status",
-		"referee",
-		"u1",
-		"u2",
-		"eco",
+		"official1",
+		"official2",
+		"official3",
+		"official4",
+		"official5",
+		"official6",
+		"official7",
+		"official8",
+		"official9",
+		"official10",
 		"assignor",
 		"home",
 		"visitor",
 	}
 
 	if len(header) != len(expected) {
-		return fmt.Errorf("invalid CSV header: expected %d columns but found %d",
+		return fmt.Errorf(
+			"invalid CSV header: expected %d columns but found %d",
 			len(expected),
-			len(header))
+			len(header),
+		)
 	}
 
 	for i := range header {
@@ -1534,13 +1571,19 @@ func buildGamePreviewRow(
 	tId string,
 ) GamePreviewRow {
 
+	const expectedColumns = 27
+	const firstOfficialColumn = 14
+	const maxOfficialColumns = 10
+	const assignorColumn = 24
+	const homeColumn = 25
+	const visitorColumn = 26
+
 	row := GamePreviewRow{
 		RowNumber: rowNumber,
 		Valid:     false,
 		Errors:    make([]string, 0),
 	}
 
-	// Convert GameId and NumOfGames to int64.
 	gameId, _ := strconv.ParseInt(
 		csvColumn(record, 0),
 		10,
@@ -1552,46 +1595,6 @@ func buildGamePreviewRow(
 		10,
 		64,
 	)
-
-	if len(record) != 21 {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf(
-				"Expected 21 columns but found %d",
-				len(record),
-			),
-		)
-
-		/*
-			Still copy any available values so the user can see
-			what was read from the CSV.
-		*/
-		row.Data = GameImportData{
-			GameId:      gameId,
-			Date:        csvColumn(record, 1),
-			Time:        csvColumn(record, 2),
-			Sport:       csvColumn(record, 3),
-			Site:        csvColumn(record, 4),
-			Field:       csvColumn(record, 5),
-			NumOfGames:  numOfGames,
-			Level:       csvColumn(record, 7),
-			GameFee:     csvColumn(record, 8),
-			TravelPay:   csvColumn(record, 9),
-			AssignorFee: csvColumn(record, 10),
-			Deductions:  csvColumn(record, 11),
-			Association: csvColumn(record, 12),
-			Status:      csvColumn(record, 13),
-			Referee:     csvColumn(record, 14),
-			U1:          csvColumn(record, 15),
-			U2:          csvColumn(record, 16),
-			ECO:         csvColumn(record, 17),
-			Assignor:    csvColumn(record, 18),
-			Home:        csvColumn(record, 19),
-			Visitor:     csvColumn(record, 20),
-		}
-
-		return row
-	}
 
 	row.Data = GameImportData{
 		GameId:      gameId,
@@ -1608,13 +1611,22 @@ func buildGamePreviewRow(
 		Deductions:  csvColumn(record, 11),
 		Association: csvColumn(record, 12),
 		Status:      csvColumn(record, 13),
-		Referee:     csvColumn(record, 14),
-		U1:          csvColumn(record, 15),
-		U2:          csvColumn(record, 16),
-		ECO:         csvColumn(record, 17),
-		Assignor:    csvColumn(record, 18),
-		Home:        csvColumn(record, 19),
-		Visitor:     csvColumn(record, 20),
+		Officials:   make([]model.GameOfficialDoc, 0),
+		Assignor:    csvColumn(record, assignorColumn),
+		Home:        csvColumn(record, homeColumn),
+		Visitor:     csvColumn(record, visitorColumn),
+	}
+
+	if len(record) != expectedColumns {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Expected %d columns but found %d",
+				expectedColumns,
+				len(record),
+			),
+		)
+		return row
 	}
 
 	/*
@@ -1698,60 +1710,148 @@ func buildGamePreviewRow(
 	}
 
 	/*
-		Validate officials and ECO.
+		Load the roles configured for this sport.
+
+		database.GetOfficialRoles returns the roles for the requested sport.
+		Only active roles participate in a game import. The active roles are
+		sorted by DisplayOrder so official1 maps to the first configured role,
+		official2 maps to the second configured role, and so on.
 	*/
-	officials := []struct {
-		role string
-		name string
-	}{
-		{
-			role: "Official",
-			name: row.Data.Referee,
-		},
-		{
-			role: "Official",
-			name: row.Data.U1,
-		},
-		{
-			role: "Official",
-			name: row.Data.U2,
-		},
-		{
-			role: "ECO",
-			name: row.Data.ECO,
-		},
-	}
+	sportName := strings.TrimSpace(row.Data.Sport)
 
-	for _, official := range officials {
-		name := strings.TrimSpace(official.name)
-
-		if name == "" ||
-			strings.EqualFold(name, "Unassigned") {
-			continue
-		}
-
-		exists, err := oc.Exists(
-			name,
-			tId,
+	if sportName == "" {
+		row.Errors = append(
+			row.Errors,
+			"Sport is required",
 		)
+	} else {
+		roleResponse, roleErr := database.GetOfficialRoles(sportName)
 
-		if err != nil {
-			row.Errors = append(
-				row.Errors,
-				err.Error(),
-			)
-			continue
-		}
-
-		if !exists {
+		if roleErr != nil {
 			row.Errors = append(
 				row.Errors,
 				fmt.Sprintf(
-					"%s %q does not exist",
-					official.role,
-					name,
+					"Error occurred while fetching official roles for sport %q: %v",
+					sportName,
+					roleErr,
 				),
 			)
+		} else {
+			sort.SliceStable(
+				roleResponse.Roles,
+				func(i, j int) bool {
+					return roleResponse.Roles[i].DisplayOrder <
+						roleResponse.Roles[j].DisplayOrder
+				},
+			)
+
+			activeRoleCount := 0
+			for _, role := range roleResponse.Roles {
+				if role.Active {
+					activeRoleCount++
+				}
+			}
+
+			if activeRoleCount > maxOfficialColumns {
+				row.Errors = append(
+					row.Errors,
+					fmt.Sprintf(
+						"Sport %q has %d active official roles, but the Games CSV supports a maximum of %d",
+						sportName,
+						activeRoleCount,
+						maxOfficialColumns,
+					),
+				)
+			} else {
+				officialPosition := 0
+
+				for _, role := range roleResponse.Roles {
+					if !role.Active {
+						continue
+					}
+
+					name := strings.TrimSpace(
+						csvColumn(
+							record,
+							firstOfficialColumn+officialPosition,
+						),
+					)
+
+					if name == "" {
+						name = "Unassigned"
+					}
+
+					gameOfficial := model.GameOfficialDoc{
+						RoleId:       role.RoleId,
+						Title:        role.Title,
+						DisplayOrder: role.DisplayOrder,
+						Name:         name,
+					}
+
+					if !strings.EqualFold(name, "Unassigned") {
+						officialExists, officialErr := oc.Exists(
+							name,
+							tId,
+						)
+
+						if officialErr != nil {
+							row.Errors = append(
+								row.Errors,
+								fmt.Sprintf(
+									"Unable to validate %s %q: %v",
+									role.Title,
+									name,
+									officialErr,
+								),
+							)
+						} else if !officialExists {
+							row.Errors = append(
+								row.Errors,
+								fmt.Sprintf(
+									"%s %q does not exist",
+									role.Title,
+									name,
+								),
+							)
+						}
+					}
+
+					row.Data.Officials = append(
+						row.Data.Officials,
+						gameOfficial,
+					)
+
+					officialPosition++
+				}
+
+				/*
+					Columns beyond the number of active roles for the sport
+					must be blank. This catches an official entered in a
+					position that does not exist for that sport.
+				*/
+				for i := activeRoleCount; i < maxOfficialColumns; i++ {
+					name := strings.TrimSpace(
+						csvColumn(
+							record,
+							firstOfficialColumn+i,
+						),
+					)
+
+					if name != "" &&
+						!strings.EqualFold(name, "Unassigned") {
+
+						row.Errors = append(
+							row.Errors,
+							fmt.Sprintf(
+								"Sport %q has %d active official roles; official%d must be blank",
+								sportName,
+								activeRoleCount,
+								i+1,
+							),
+						)
+					}
+				}
+			}
 		}
 	}
 
@@ -3118,10 +3218,7 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			Deductions:  data.Deductions,
 			Association: data.Association,
 			Status:      data.Status,
-			Referee:     data.Referee,
-			U1:          data.U1,
-			U2:          data.U2,
-			ECO:         data.ECO,
+			Officials:   data.Officials,
 			Assignor:    data.Assignor,
 		}
 
@@ -4044,6 +4141,10 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		fmt.Println("Record=[", record, "]")
+		/*
+			buildGamePreviewRow resolves official1..official10 against the
+			active roles configured for record[3] (sport), in displayOrder.
+		*/
 		previewRow := buildGamePreviewRow(
 			csvRowNumber,
 			record,
@@ -5166,6 +5267,14 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	var siteId string
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
+	if tId == "na" {
+		tId, err = getTenantId(r)
+		if err != nil {
+			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			return
+		}
+	}
+
 	fmt.Println("##### UpdateGame Enpoint Called #####")
 
 	err = json.NewDecoder(r.Body).Decode(&game)
@@ -5299,6 +5408,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	singleGameDesc = GameDocToGameDescr(game)
+
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
 		api.DelGame(context.TODO(), singleGameDesc.GameId)
@@ -6847,214 +6957,235 @@ func SortGamesByDateTime(games []model.HtmlResponse) ([]model.HtmlResponse, erro
 }
 
 func GetGames(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Println("GetGames has been called")
-
 	LogVisitor(r)
 
-	var games []model.HtmlResponse
-	var gameView []model.GameView
-	var gameFilters model.GFilters = model.GFilters{}
-	//var siteId string
-	var tId string = database.TenantId
-	var HtmlAssocGameTotals reports.AssocGameTotalsMap
-	HtmlAssocGameTotals.Init()
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-	_, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	// Return complete dynamic assignments without changing GameView.
+	type dashboardGameView struct {
+		model.GameView
+		Officials []model.GameOfficialDoc `json:"Officials"`
+	}
+
+	var games []model.HtmlResponse
+	gameViews := make([]dashboardGameView, 0)
+	gameFilters := model.GFilters{}
+
+	var totals reports.AssocGameTotalsMap
+	totals.Init()
+
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	db := database.Client.Database(database.Database)
-	coll := db.Collection("games")
+	tId, err := getTenantId(r)
+	if err != nil || tId == "" || tId == "na" {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
-	// 1. Read query parameters
-	statuses := r.URL.Query()["status"]
-	associations := r.URL.Query()["association"]
-	sports := r.URL.Query()["sport"]
-	begindate := r.URL.Query().Get("begindate")
-	enddate := r.URL.Query().Get("enddate")
-	levels := r.URL.Query()["level"]
-	gameId := r.URL.Query().Get("gameId")
-	sites := r.URL.Query()["site"]
-	ecos := r.URL.Query()["eco"]
-	assignors := r.URL.Query()["assignor"]
-	officials := r.URL.Query()["official"]
-	home := r.URL.Query().Get("home")
-	visitor := r.URL.Query().Get("visitor")
+	query := r.URL.Query()
 
-	fmt.Println("Statuses:", statuses, "Associations:", associations, "Sports:", sports, "Levels:", levels, "GameId:", gameId, "Sites:", sites, "Official:", officials)
-	fmt.Println("ECOs:", ecos, "Assignors:", assignors, "Home:", home, "Visitor:", visitor, "Begin Date:", begindate, "End Date:", enddate)
+	cleanValues := func(values []string) []string {
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			value = strings.TrimSpace(value)
+			if value != "" {
+				result = append(result, value)
+			}
+		}
+		return result
+	}
+
+	statuses := cleanValues(query["status"])
+	associations := cleanValues(query["association"])
+	sports := cleanValues(query["sport"])
+	levels := cleanValues(query["level"])
+	sites := cleanValues(query["site"])
+	ecos := cleanValues(query["eco"])
+	assignors := cleanValues(query["assignor"])
+	officials := cleanValues(query["official"])
+
+	begindate := query.Get("begindate")
+	enddate := query.Get("enddate")
+	gameId := strings.TrimSpace(query.Get("gameId"))
+	home := query.Get("home")
+	visitor := query.Get("visitor")
 
 	if begindate == "today" && enddate == "" {
 		enddate = begindate
 	}
 
 	for i, status := range statuses {
-		status = strings.TrimSpace(status)
-
-		if status == "" {
-			continue
-		}
-
 		runes := []rune(status)
 		runes[0] = unicode.ToUpper(runes[0])
 		statuses[i] = string(runes)
 	}
 
-	var bDate string = ""
-	var eDate string = ""
-	var err error
-
-	bDate, eDate, err = utils.FormatDateFilter(begindate, enddate)
+	bDate, eDate, err := utils.FormatDateFilter(begindate, enddate)
 	if err != nil {
-		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	fmt.Println("bDate: ", bDate, "eDate:", eDate)
-	if len(gameId) > 0 {
+	if gameId != "" {
 		ids, err := utils.ConvertGameIdStrToInt(gameId)
 		if err != nil {
-			fmt.Println("Error:", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		gameFilters.GameId, err = utils.ConvertGameIdIntToStr(ids)
 		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-	} else {
-		gameFilters.GameId = gameId
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
 
-	// if len(site) > 0 {
-	// 	siteId, err = sc.GetSiteId(site, tId)
-	// 	if err != nil {
-	// 		http.Error(w, "Invalid site ID", http.StatusBadRequest)
-	// 		return
-	// 	}
-	// }
-
-	gameFilters.Status = ""
-	gameFilters.Association = ""
-	gameFilters.Level = ""
 	gameFilters.FromDate = bDate
 	gameFilters.ToDate = eDate
-	gameFilters.Site = ""
-	gameFilters.Official = ""
 	gameFilters.TenantId = tId
 	gameFilters.Home = home
 	gameFilters.Visitor = visitor
 
-	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
 	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
 	if err != nil {
-		fmt.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	mongoDbFilter, err := database.BuildMongoGameFilterFromFile(gfilter)
-
 	if err != nil {
-		fmt.Println("FILTER BUILD ERROR", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	if mongoDbFilter == nil {
+		mongoDbFilter = bson.M{}
+	}
+
+	// Always scope this request to its authenticated tenant.
+	mongoDbFilter["tenantId"] = tId
+
 	if len(statuses) > 0 {
-		mongoDbFilter["status"] = bson.M{
-			"$in": statuses,
-		}
+		mongoDbFilter["status"] = bson.M{"$in": statuses}
 	}
 
 	if len(associations) > 0 {
-		mongoDbFilter["association"] = bson.M{
-			"$in": associations,
-		}
+		mongoDbFilter["association"] = bson.M{"$in": associations}
 	}
 
 	if len(sports) > 0 {
-		mongoDbFilter["sport"] = bson.M{
-			"$in": sports,
-		}
+		mongoDbFilter["sport"] = bson.M{"$in": sports}
 	}
 
 	if len(levels) > 0 {
-		mongoDbFilter["level"] = bson.M{
-			"$in": levels,
-		}
+		mongoDbFilter["level"] = bson.M{"$in": levels}
 	}
 
+	// Additional conditions are combined with the original filter.
+	// This preserves any existing $or or $and conditions.
+	extraConditions := bson.A{}
+
 	if len(officials) > 0 {
-		mongoDbFilter["$or"] = bson.A{
-			bson.M{"referee": bson.M{"$in": officials}},
-			bson.M{"u1": bson.M{"$in": officials}},
-			bson.M{"u2": bson.M{"$in": officials}},
-		}
+		extraConditions = append(extraConditions, bson.M{
+			"$or": bson.A{
+				// Dynamic assignments: any role except ECO.
+				bson.M{
+					"officials": bson.M{
+						"$elemMatch": bson.M{
+							"name":  bson.M{"$in": officials},
+							"title": bson.M{"$ne": "ECO"},
+						},
+					},
+				},
+				// Legacy assignments: only when the array is absent or empty.
+				bson.M{
+					"$and": bson.A{
+						bson.M{"officials.0": bson.M{"$exists": false}},
+						bson.M{
+							"$or": bson.A{
+								bson.M{"referee": bson.M{"$in": officials}},
+								bson.M{"u1": bson.M{"$in": officials}},
+								bson.M{"u2": bson.M{"$in": officials}},
+							},
+						},
+					},
+				},
+			},
+		})
 	}
 
 	if len(ecos) > 0 {
-		mongoDbFilter["eco"] = bson.M{
-			"$in": ecos,
-		}
+		extraConditions = append(extraConditions, bson.M{
+			"$or": bson.A{
+				bson.M{
+					"officials": bson.M{
+						"$elemMatch": bson.M{
+							"title": "ECO",
+							"name":  bson.M{"$in": ecos},
+						},
+					},
+				},
+				bson.M{
+					"$and": bson.A{
+						bson.M{"officials.0": bson.M{"$exists": false}},
+						bson.M{"eco": bson.M{"$in": ecos}},
+					},
+				},
+			},
+		})
 	}
 
 	if len(assignors) > 0 {
-		mongoDbFilter["assignor"] = bson.M{
-			"$in": assignors,
-		}
+		mongoDbFilter["assignor"] = bson.M{"$in": assignors}
 	}
 
 	if len(sites) > 0 {
-		siteIds := make([]string, len(sites))
-		for sid := range sites {
-			siteName := sites[sid]
+		siteIds := make([]string, 0, len(sites))
+
+		for _, siteName := range sites {
 			siteId, err := sc.GetSiteId(siteName, tId)
 			if err != nil {
-				http.Error(w, "Invalid site ID", http.StatusBadRequest)
-				continue
+				http.Error(
+					w,
+					fmt.Sprintf("Invalid site: %s", siteName),
+					http.StatusBadRequest,
+				)
+				return
 			}
+
 			siteIds = append(siteIds, siteId)
 		}
 
-		mongoDbFilter["site"] = bson.M{
-			"$in": siteIds,
-		}
+		mongoDbFilter["site"] = bson.M{"$in": siteIds}
 	}
 
-	fmt.Println("Game Filters", gameFilters)
+	if len(extraConditions) > 0 {
+		conditions := bson.A{mongoDbFilter}
+		conditions = append(conditions, extraConditions...)
+		mongoDbFilter = bson.M{"$and": conditions}
+	}
 
-	// 2. Query MongoDB
+	coll := database.Client.
+		Database(database.Database).
+		Collection("games")
 
-	opts := options.Find().
-		SetSort(bson.D{
-			{Key: "gameDateTime", Value: 1},
-		})
+	opts := options.Find().SetSort(bson.D{
+		{Key: "gameDateTime", Value: 1},
+	})
 
-	fmt.Println("opts:", opts, "filter:", mongoDbFilter)
-	cursor, err := coll.Find(context.TODO(), mongoDbFilter, opts)
-
+	cursor, err := coll.Find(ctx, mongoDbFilter, opts)
 	if err != nil {
-		fmt.Println("MONGO FIND ERROR:", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	defer cursor.Close(ctx)
 
-	defer cursor.Close(context.TODO())
-
-	// 3. Decode results
-
-	err = cursor.All(context.TODO(), &games)
-
-	if err != nil {
-		fmt.Println("Decoding failed")
+	if err := cursor.All(ctx, &games); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -7062,24 +7193,19 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	if len(games) == 0 {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-
 		json.NewEncoder(w).Encode(map[string]string{
 			"message": "No games were found matching your search criteria.",
 		})
-
 		return
 	}
 
 	sortedGames, err := SortGamesByDateTime(games)
-
 	if err != nil {
-		fmt.Println("Sorting failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	for _, game := range sortedGames {
-
 		gameRec := model.GameDescriptor{
 			GameFee:     utils.ConvertInt64ToAmtStr(game.GameFee),
 			NumOfGames:  utils.ConvertInt64ToStr(game.NumOfGames),
@@ -7089,7 +7215,12 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 
 		gameFee := utils.CalculateGameFee(gameRec)
-		HtmlAssocGameTotals.Update(game.Association, game.Status, game.NumOfGames, gameFee)
+		totals.Update(
+			game.Association,
+			game.Status,
+			game.NumOfGames,
+			gameFee,
+		)
 
 		view := model.GameView{
 			GameId:      game.GameId,
@@ -7104,59 +7235,87 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Status:      game.Status,
 			Association: game.Association,
 			Assignor:    game.Assignor,
-			ECO:         game.ECO,
 		}
 
 		view.GameFee = fmt.Sprintf("$%.2f", float64(gameFee)/100)
+		view.Date = fmt.Sprintf(
+			"%s (%s)",
+			game.Date,
+			utils.DayOfWeekAbbreviation(game.Date),
+		)
 
-		abbrev := utils.DayOfWeekAbbreviation(game.Date)
-		view.Date = fmt.Sprintf("%s (%s)", game.Date, abbrev)
+		assignments := make(
+			[]model.GameOfficialDoc,
+			0,
+			len(game.Officials),
+		)
 
-		if game.Referee != "" && game.Referee != "Unassigned" {
+		if len(game.Officials) > 0 {
+			// Modern games: preserve every saved role and assignment.
+			assignments = append(assignments, game.Officials...)
+		} else {
+			// Compatibility for games that have not been migrated.
+			refereeTitle := "Referee"
+			if strings.EqualFold(strings.TrimSpace(game.Sport), "Softball") {
+				refereeTitle = "Plate Umpire"
+			}
 
-			ov, error := oc.GetOfficialView(game.Referee, tId)
-			if error == nil {
-				view.Officials = append(view.Officials, ov)
+			legacyRoles := []struct {
+				title string
+				name  string
+			}{
+				{title: refereeTitle, name: game.Referee},
+				{title: "U1", name: game.U1},
+				{title: "U2", name: game.U2},
+				{title: "ECO", name: game.ECO},
+			}
+
+			for i, role := range legacyRoles {
+				name := strings.TrimSpace(role.name)
+				if name == "" || strings.EqualFold(name, "Unassigned") {
+					continue
+				}
+
+				assignments = append(assignments, model.GameOfficialDoc{
+					Title:        role.title,
+					DisplayOrder: i + 1,
+					Name:         name,
+				})
 			}
 		}
 
-		if game.U1 != "" && game.U1 != "Unassigned" {
+		for i := range assignments {
+			assignment := &assignments[i]
+			assignment.Name = strings.TrimSpace(assignment.Name)
 
-			ov, error := oc.GetOfficialView(game.U1, tId)
-			if error == nil {
-				view.Officials = append(view.Officials, ov)
+			if assignment.Name == "" {
+				if assignment.OfficialId != "" {
+					assignment.Name = "Official " + assignment.OfficialId
+				} else {
+					assignment.Name = "Unassigned"
+				}
+			}
+
+			// Retain the compatibility ECO field for other consumers.
+			if strings.EqualFold(assignment.Title, "ECO") {
+				view.ECO = assignment.Name
 			}
 		}
 
-		if game.U1 != "" && game.U2 != "Unassigned" {
+		sort.SliceStable(assignments, func(i, j int) bool {
+			return assignments[i].DisplayOrder < assignments[j].DisplayOrder
+		})
 
-			ov, error := oc.GetOfficialView(game.U2, tId)
-			if error == nil {
-				view.Officials = append(view.Officials, ov)
-			}
-		}
-
-		//view.Officials = reports.FormatOfficialString(game.Referee, game.U1, game.U2)
-
-		gameView = append(gameView, view)
-		fmt.Println("view ", view)
+		gameViews = append(gameViews, dashboardGameView{
+			GameView:  view,
+			Officials: assignments,
+		})
 	}
 
-	/*
-		reptLines := HtmlAssocGameTotals.FormatTotalLine()
-
-		if len(reptLines) > 0 {
-			fmt.Println(reptLines)
-		}
-	*/
-
-	fmt.Println("Returning the following", gameView)
-
-	// 4. Return JSON
 	w.Header().Set("Content-Type", "application/json")
-
-	json.NewEncoder(w).Encode(gameView)
-
+	if err := json.NewEncoder(w).Encode(gameViews); err != nil {
+		fmt.Printf("Unable to return dashboard games: %v\n", err)
+	}
 }
 
 func isAuthenticated(r *http.Request) bool {
@@ -7227,6 +7386,77 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func OfficialRolesHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	switch r.Method {
+	case http.MethodGet:
+		sport := r.URL.Query().Get("sport")
+
+		// tid comes from the authenticated session.
+		response, err := database.GetOfficialRoles(sport)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			fmt.Printf("Unable to return official roles: %v\n", err)
+		}
+
+	case http.MethodPut:
+		var request model.OfficialRolesRequest
+
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		fmt.Printf("PUT official roles: sport=%q\n", request.Sport)
+
+		for _, role := range request.Roles {
+			fmt.Printf(
+				"RoleId=%s Title=%q DisplayOrder=%d Active=%t\n",
+				role.RoleId,
+				role.Title,
+				role.DisplayOrder,
+				role.Active,
+			)
+		}
+
+		// Save this sport's roles using the session's tenantId.
+		// Return success only after the database update succeeds.
+		// tid comes from your authenticated session.
+		if err := database.AddOfficialRoles(request); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Official roles saved successfully.",
+		})
+
+	case http.MethodDelete:
+		sport := r.URL.Query().Get("sport")
+
+		// tid comes from the authenticated session.
+		if err := database.DeleteOfficialRoles(sport); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		json.NewEncoder(w).Encode(map[string]string{
+			"message": "Official roles deleted successfully.",
+		})
+
+	default:
+		w.Header().Set("Allow", "GET, PUT, DELETE")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
+	}
 }
 
 func CreateAccount(w http.ResponseWriter, r *http.Request) {
@@ -7342,16 +7572,6 @@ func AddSport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantId, err := getTenantId(r)
-	if err != nil {
-		http.Error(
-			w,
-			"Unable to determine tenant ID",
-			http.StatusUnauthorized,
-		)
-		return
-	}
-
 	var sport database.Sport
 
 	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
@@ -7363,7 +7583,7 @@ func AddSport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := spc.Add(sport, tenantId); err != nil {
+	if err := spc.Add(sport); err != nil {
 		http.Error(
 			w,
 			err.Error(),
@@ -7393,16 +7613,6 @@ func DelSport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantID, err := getTenantId(r)
-	if err != nil {
-		http.Error(
-			w,
-			"Unable to determine tenant ID",
-			http.StatusUnauthorized,
-		)
-		return
-	}
-
 	sportID := strings.TrimSpace(
 		r.URL.Query().Get("id"),
 	)
@@ -7416,7 +7626,7 @@ func DelSport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := spc.Delete(sportID, tenantID); err != nil {
+	if err := spc.Delete(sportID); err != nil {
 		http.Error(
 			w,
 			err.Error(),
@@ -7603,17 +7813,6 @@ func ActivateSport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantId, err := getTenantId(r)
-
-	if err != nil {
-		http.Error(
-			w,
-			"Unable to determine tenant ID",
-			http.StatusUnauthorized,
-		)
-		return
-	}
-
 	var sport database.Sport
 
 	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
@@ -7625,7 +7824,7 @@ func ActivateSport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := spc.Activate(sport, tenantId); err != nil {
+	if err := spc.Activate(sport); err != nil {
 		http.Error(
 			w,
 			err.Error(),
@@ -7654,17 +7853,6 @@ func DeactivateSport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantId, err := getTenantId(r)
-
-	if err != nil {
-		http.Error(
-			w,
-			"Unable to determine tenant ID",
-			http.StatusUnauthorized,
-		)
-		return
-	}
-
 	var sport database.Sport
 
 	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
@@ -7676,7 +7864,7 @@ func DeactivateSport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := spc.Deactivate(sport, tenantId); err != nil {
+	if err := spc.Deactivate(sport); err != nil {
 		http.Error(
 			w,
 			err.Error(),
@@ -7895,6 +8083,8 @@ func main() {
 		utils.AuditLog.Println("Failed to initialize site collection.")
 		return
 	}
+
+	database.CreateSettingsIndexes()
 
 	result, err, numOfIndices := sc.IsIndexed()
 
@@ -8122,6 +8312,7 @@ func main() {
 	mux.HandleFunc("/api/logout", Logout)
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
 	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
+	mux.HandleFunc("/api/settings/official-roles", authRequired(officialRolesAccess(OfficialRolesHandler)))
 
 	mux.HandleFunc("/components-test", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "NEW BINARY IS RUNNING")
