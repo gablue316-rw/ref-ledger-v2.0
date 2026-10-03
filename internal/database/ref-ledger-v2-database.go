@@ -5440,7 +5440,6 @@ func (sc *SportsCollection) Add(sport Sport) error {
 
 	sport.ID = strings.TrimSpace(sport.ID)
 	sport.Name = strings.TrimSpace(sport.Name)
-	sport.Active = true
 
 	if sport.ID == "" {
 		return fmt.Errorf("sport ID is required")

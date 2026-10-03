@@ -1531,7 +1531,8 @@
                         },
                         body: JSON.stringify({
                             id: sportName,
-                            name: sportName
+                            name: sportName,
+                            active: false
                         })
                     });
                     if (response.status === 401) {
@@ -1557,8 +1558,7 @@
                     await loadSports();
                     resetSportForm();
                     showMessage(
-                        responseData.message ||
-                        "Sport added successfully",
+                        "Sport added as inactive. Add its official roles, then activate the sport.",
                         "success"
                     );
                 } catch (error) {
