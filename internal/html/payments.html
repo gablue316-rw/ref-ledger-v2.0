@@ -2444,6 +2444,25 @@ async function loadPaymentsRegistry() {
     }
 }
 
+function renderPaymentOfficialAssignments(game) {
+    const saved = game.Officials ?? game.officials;
+    const officials = Array.isArray(saved) ? saved.map(record => ({
+        title: String(record?.title ?? record?.Title ?? record?.Role ?? record?.role ?? record?.Position ?? record?.position ?? ""),
+        displayOrder: Number(record?.displayOrder ?? record?.DisplayOrder ?? 0),
+        officialId: String(record?.officialId ?? record?.OfficialId ?? ""),
+        name: String(record?.name ?? record?.Name ?? "")
+    })).sort((a, b) => a.displayOrder - b.displayOrder) : [];
+
+    return officials.map(official => {
+        const name = official.name || (official.officialId ? `Official ${official.officialId}` : "Unassigned");
+        const label = official.title ? `<strong>${escapeHtml(official.title)}:</strong> ` : "";
+        const person = official.officialId && name !== "Unassigned"
+            ? `<a href="#" class="official-link" data-official-id="${escapeHtml(official.officialId)}">${escapeHtml(name)}</a>`
+            : escapeHtml(name);
+        return `<div>${label}${person}</div>`;
+    }).join("");
+}
+
 function renderGames(
     games,
     options = {}
@@ -2484,20 +2503,7 @@ function renderGames(
             ).replace(/[$,\s]/g, "")
         ) || 0;
 
-        const officialsHtml =
-            Array.isArray(game.Officials)
-                ? game.Officials
-                    .map(official => `
-                        <a
-                            href="#"
-                            class="official-link"
-                            data-official-id="${official.OfficialId}"
-                        >
-                            ${official.Name}
-                        </a>
-                    `)
-                    .join(", ")
-                : "";
+        const officialsHtml = renderPaymentOfficialAssignments(game);
 
         return `
             <tr>
