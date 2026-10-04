@@ -6211,7 +6211,7 @@ func GetFinancialReports(tId string, associations []string) (map[string]model.Fi
 			}
 
 			if expense.Type == "Mileage" {
-				record.TotalMileage += expense.Amount
+				record.TotalMileage += expense.Mileage
 			} else {
 				record.TotalExpenses += expense.Amount
 			}
@@ -6483,7 +6483,7 @@ func GetExpenseReports(
 			record.Equipment += expense.Amount
 
 		case "mileage":
-			record.Mileage += expense.Amount
+			record.Mileage += expense.Mileage
 		}
 
 		expenseRecords[associationName] = record

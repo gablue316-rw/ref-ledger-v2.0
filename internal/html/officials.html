@@ -663,6 +663,15 @@ function confirmOfficialDeletion(message, target) {
     });
 }
 
+let directoryRequestVersion = 0;
+function clearOfficialsDirectory() {
+    directoryRequestVersion++;
+    document.querySelector("#officialsTable tbody").innerHTML = "";
+    document.getElementById("directorySection").style.display = "none";
+    selectAllOfficials.checked = false;
+    selectAllOfficials.indeterminate = false;
+    deleteSelectedOfficialsBtn.disabled = true;
+}
 function clearOfficialForm() {
     document.getElementById("officialsForm").reset();
     document.getElementById("firstname").focus();
@@ -808,6 +817,7 @@ document
 document
     .getElementById("clearBtn")
     .addEventListener("click", function () {
+        clearOfficialsDirectory();
         clearOfficialForm();
 
         document.getElementById("message").innerText =
@@ -983,6 +993,7 @@ document
 document
     .getElementById("getOfficialBtn")
     .addEventListener("click", async function () {
+        clearOfficialsDirectory();
         const firstName = document
             .getElementById("firstname")
             .value
@@ -1122,6 +1133,7 @@ document
 document
     .getElementById("directoryBtn")
     .addEventListener("click", async function () {
+        const requestVersion = ++directoryRequestVersion;
         const firstName = document
             .getElementById("firstname")
             .value
@@ -1152,6 +1164,7 @@ document
                 `/api/officialsDirectory?${params.toString()}`
             );
 
+            if (requestVersion !== directoryRequestVersion) return;
             if (
                 response.status === 401 ||
                 response.redirected
@@ -1168,6 +1181,7 @@ document
             }
 
             const officials = await response.json();
+            if (requestVersion !== directoryRequestVersion) return;
 
             const tbody = document.querySelector(
                 "#officialsTable tbody"
@@ -1333,6 +1347,7 @@ document
                                 message ||
                                 "Official deleted successfully.";
                         } catch (err) {
+            if (requestVersion !== directoryRequestVersion) return;
                             document.getElementById(
                                 "message"
                             ).innerText =

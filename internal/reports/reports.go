@@ -857,9 +857,9 @@ func GenerateExpenseReportv2(records []model.ExpenseDescriptor) model.ExpenseRep
 		expenseRow.Description = rec.Description
 
 		if rec.Type == "Mileage" {
-			expenseRow.Mileage = rec.Amount
+			expenseRow.Mileage = rec.Mileage
 			expenseRow.Amount = "0.00"
-			miles, err := utils.ConvertStrToInt64(TrimMileageStr(rec.Amount))
+			miles, err := utils.ConvertStrToInt64(TrimMileageStr(rec.Mileage))
 			if err != nil {
 				fmt.Println(err)
 				continue
@@ -933,7 +933,7 @@ func GenerateExpenseReport(records []model.ExpenseDescriptor) []string {
 		}
 
 		if rec.Type == "Mileage" {
-			miles = TrimMileageStr(rec.Amount)
+			miles = TrimMileageStr(rec.Mileage)
 			milesInt64, err := utils.ConvertStrToInt64(miles)
 			if err != nil {
 				fmt.Println(err)
