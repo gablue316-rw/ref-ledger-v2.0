@@ -1747,9 +1747,9 @@ function renderFinancialReport(report) {
 
     const columns = [
         { label: "Association", field: "association" },
-        { label: "Gross Income", field: "grossIncome" },
+        { label: "Net Earnings", field: "grossIncome" },
         { label: "Total Expenses", field: "totalExpenses" },
-        { label: "Net Income", field: "netIncome" },
+        { label: "Net Income Before Taxes", field: "netIncome" },
         { label: "Total Mileage", field: "totalMileage" }
     ];
 
@@ -1822,10 +1822,10 @@ function renderRevenueReport(report) {
         { label: "Number of Games", field: "numOfGames" },
         { label: "Total Game Fees", field: "totGameFees" },
         { label: "Total Travel Pay", field: "totTravelPay" },
-        { label: "Gross Revenue", field: "grossRevenue" },
+        { label: "Gross Earnings", field: "grossRevenue" },
         { label: "Total Assignor Fees", field: "totAssignorFees" },
         { label: "Total Deductions", field: "totDeductions" },
-        { label: "Net Revenue", field: "netRevenue" }
+        { label: "Net Earnings", field: "netRevenue" }
     ];
 
     const totalFields = columns.slice(1).map(column => column.field);

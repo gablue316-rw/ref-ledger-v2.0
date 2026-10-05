@@ -574,6 +574,25 @@ func ConvertGameIdStrToInt(g string) ([]int64, error) {
 	return gameIds, nil
 }
 
+func ConvertStrMilesToInt64(miles string) (int64, error) {
+
+	var num int64
+
+	if miles == "" {
+		return int64(0), nil
+	}
+	_, err := fmt.Sscanf(miles, "%d", &num)
+
+	if err != nil {
+		ErrStr := fmt.Sprintf("Error converting string %s to int64.  Reason: %s", miles, err)
+		fmt.Println(ErrStr)
+		return int64(0), err
+	}
+	num = num * 100
+
+	return num, nil
+
+}
 func ConvertMilesToStr(miles int64) string {
 
 	str := strconv.FormatInt((miles / 100), 10) // Convert to string with base 10
@@ -772,6 +791,7 @@ func ConvertExpenseDescrToExpenseDoc(expenseDescr model.ExpenseDescriptor) model
 
 	expenseAmt, _ := ConvertAmtStrToInt64(expenseDescr.Amount)
 	gameId, err := ConvertStrToInt64(expenseDescr.GameId)
+	mileage, _ := ConvertStrToInt64(expenseDescr.Mileage)
 	if err != nil {
 		fmt.Println("Error converting GameId to int64.  Reason:", err)
 		return model.ExpenseDoc{}
@@ -781,6 +801,7 @@ func ConvertExpenseDescrToExpenseDoc(expenseDescr model.ExpenseDescriptor) model
 		Date:        expenseDescr.Date,
 		Type:        expenseDescr.Type,
 		Amount:      expenseAmt,
+		Mileage:     mileage,
 		Association: expenseDescr.Association,
 		GameId:      gameId,
 		Description: expenseDescr.Description,
@@ -824,17 +845,21 @@ func CalculateGameFee(gameRec model.GameDescriptor) int64 {
 
 func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescriptor {
 
+	fmt.Println("ConvertExpenseDocToExpenseDescr: ExpenseDoc:", doc)
 	expenseAmt := ConvertInt64ToAmtStr(doc.Amount)
 	gameId := ConvertInt64ToStr(doc.GameId)
+	mileage := ConvertMilesToStr(doc.Mileage)
 	descr := model.ExpenseDescriptor{
 		ExpenseId:   doc.ExpenseId,
 		Date:        doc.Date,
 		Type:        doc.Type,
 		Amount:      expenseAmt,
+		Mileage:     mileage,
 		Association: doc.Association,
 		GameId:      gameId,
 		Description: doc.Description,
 	}
+	fmt.Println("ConvertExpenseDocToExpenseDescr: ExpenseDescriptor:", descr)
 	return descr
 }
 

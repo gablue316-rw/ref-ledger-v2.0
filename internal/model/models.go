@@ -26,6 +26,7 @@ type ExpenseDescriptor struct {
 	Date        string
 	Type        string
 	Amount      string
+	Mileage     string
 	Association string
 	GameId      string
 	Description string
@@ -36,6 +37,7 @@ type ExpenseDoc struct {
 	Date        string `bson:"date,omitempty"`
 	Type        string `bson:"type,omitempty"`
 	Amount      int64  `bson:"amount,omitempty"`
+	Mileage     int64  `bson:"mileage,omitempty"`
 	Association string `bson:"association,omitempty"`
 	GameId      int64  `bson:"gameId,omitempty"`
 	Description string `bson:"description,omitempty"`
