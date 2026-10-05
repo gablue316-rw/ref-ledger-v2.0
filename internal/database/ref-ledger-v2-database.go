@@ -4528,6 +4528,7 @@ type Expense struct {
 	Date        string
 	Type        string
 	Amount      string
+	Mileage     string
 	Association string
 	GameId      string
 	Description string
@@ -4537,6 +4538,7 @@ type ExpenseJson struct {
 	Date        string `json:"date"`
 	ExpenseType string `json:"expenseType"`
 	Amount      int64  `json:"amount"`
+	Mileage     int64  `json:"mileage"`
 	Description string `json:"description"`
 	Association string `json:"association"`
 	GameId      int64  `json:"gameId"`
@@ -4547,6 +4549,7 @@ type ExpenseDoc struct {
 	Date        string `bson:"date,omitempty"`
 	Type        string `bson:"type,omitempty"`
 	Amount      int64  `bson:"amount,omitempty"`
+	Mileage     int64  `bson:"mileage,omitempty"`
 	Association string `bson:"association,omitempty"`
 	GameId      int64  `bson:"gameId,omitempty"`
 	Description string `bson:"description,omitempty"`
@@ -4570,10 +4573,30 @@ func (ec *ExpensesCollection) Init(client *mongo.Client) error {
 
 func (ec *ExpensesCollection) convExpenseToDoc(expense Expense) ExpenseDoc {
 
-	expenseAmt, err := utils.ConvertAmtStrToInt64(expense.Amount)
-	if err != nil {
-		fmt.Println("Error converting Amount:", err)
+	fmt.Println("convExpenseToDoc expense:", expense)
+	var mileage int64 = 0
+	var amt int64 = 0
+	var err error
+
+	if expense.Type == "Mileage" {
+		fmt.Println("convExpenseToDoc converting mileage:", expense.Amount)
+		mileage, err = utils.ConvertStrMilesToInt64(expense.Amount)
+		if err != nil {
+			fmt.Println("Error converting Mileage:", err)
+		}
+		amt = 0
+		fmt.Println("convExpenseToDoc converted mileage to :", mileage)
+	} else {
+		fmt.Println("convExpenseToDoc converting amount:", expense.Amount)
+		amt, err = utils.ConvertAmtStrToInt64(expense.Amount)
+
+		if err != nil {
+			fmt.Println("Error converting Amount:", err)
+		}
+		fmt.Println("convExpenseToDoc converted amount to :", amt)
 	}
+
+	fmt.Println("Amt:", amt, "Mileage:", mileage)
 
 	gameId, err := utils.ConvertStrToInt64(expense.GameId)
 	if err != nil {
@@ -4582,7 +4605,8 @@ func (ec *ExpensesCollection) convExpenseToDoc(expense Expense) ExpenseDoc {
 	return ExpenseDoc{
 		Date:        expense.Date,
 		Type:        expense.Type,
-		Amount:      expenseAmt,
+		Amount:      amt,
+		Mileage:     mileage,
 		Association: expense.Association,
 		GameId:      gameId,
 		Description: expense.Description,
@@ -4593,11 +4617,13 @@ func (ec *ExpensesCollection) ConvJsonToExpense(expenseJson ExpenseJson) Expense
 
 	fmt.Println("Converting JSON to Expense", expenseJson)
 	expenseAmt := utils.ConvertInt64ToAmtStr(expenseJson.Amount)
+	mileage := utils.ConvertInt64ToStr(expenseJson.Mileage / 100)
 	gameId := utils.ConvertInt64ToStr(expenseJson.GameId)
 	return Expense{
 		Date:        expenseJson.Date,
 		Type:        expenseJson.ExpenseType,
 		Amount:      expenseAmt,
+		Mileage:     mileage,
 		Association: expenseJson.Association,
 		GameId:      gameId,
 		Description: expenseJson.Description,
@@ -4634,8 +4660,14 @@ func (ec *ExpensesCollection) GetExpense(assoc, tenantId, expenseType string) (i
 		return totalExpense, fmt.Errorf("GetExpense failure.  Reason: %s", err)
 	}
 
-	for _, r := range results {
-		totalExpense += r.Amount
+	if expenseType == "Mileage" {
+		for _, r := range results {
+			totalExpense += r.Mileage
+		}
+	} else {
+		for _, r := range results {
+			totalExpense += r.Amount
+		}
 	}
 
 	return totalExpense, nil
@@ -4780,19 +4812,33 @@ func (ec *ExpensesCollection) Update(
 		"tenantId":    tenantId,
 	}
 
-	expenseAmt, err := utils.ConvertAmtStrToInt64(expense.Amount)
-	if err != nil {
-		return fmt.Errorf(
-			"Error converting Amount: %w",
-			err,
-		)
+	var amt int64 = 0
+	var mileage int64 = 0
+
+	if expense.Type == "Mileage" {
+		fmt.Println("Update Expense converting mileage:", expense.Amount)
+		mileage, err = utils.ConvertStrMilesToInt64(expense.Amount)
+		if err != nil {
+			fmt.Println("Error converting Mileage:", err)
+		}
+		amt = 0
+		fmt.Println("Update Expense converted mileage to :", mileage)
+	} else {
+		fmt.Println("Update Expense converting amount:", expense.Amount)
+		amt, err = utils.ConvertAmtStrToInt64(expense.Amount)
+
+		if err != nil {
+			fmt.Println("Error converting Amount:", err)
+		}
+		fmt.Println("Update Expense converted amount to :", amt)
 	}
 
 	update := bson.M{
 		"$set": bson.M{
 			"date":        formattedDate,
 			"description": strings.TrimSpace(expense.Description),
-			"amount":      expenseAmt,
+			"amount":      amt,
+			"mileage":     mileage,
 			"expenseType": strings.TrimSpace(expense.Type),
 		},
 	}
@@ -4847,8 +4893,10 @@ func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
 	expense.Date = formattedDate
 
 	doc := ec.convExpenseToDoc(expense)
+
 	doc.TenantId = tenantId
 	doc.ExpenseId = ec.GenerateExpenseId(expense)
+	fmt.Println("Adding Expense Doc:", doc)
 
 	result, ec.LastError = ec.Coll.InsertOne(ctx, doc)
 	if ec.LastError != nil {
@@ -6402,8 +6450,9 @@ func GetExpenseReports(
 			continue
 		}
 
-		record.Deductions += game.Deductions
-
+		if game.Status == "Paid" {
+			record.Deductions += game.Deductions
+		}
 		expenseRecords[game.Association] = record
 	}
 

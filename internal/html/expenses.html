@@ -1216,11 +1216,13 @@ function renderExpenses(expenses) {
             "type",
             "Type"
         );
-        const amount = getExpenseValue(
-            expense,
-            "amount",
-            "Amount"
-        );
+        const isMileage =
+            String(expenseType).trim().toLowerCase() === "mileage";
+
+        const amount = isMileage
+            ? getExpenseValue(expense, "mileage", "Mileage")
+            : getExpenseValue(expense, "amount", "Amount");
+        
         const description = getExpenseValue(
             expense,
             "description",

@@ -79,6 +79,7 @@ type Expense struct {
 	Date        string  `json:"date"`
 	ExpenseType string  `json:"expenseType"`
 	Amount      float64 `json:"amount"`
+	Mileage     float64 `json:"mileage"`
 	Description string  `json:"description"`
 	Association string  `json:"association"`
 	GameID      int     `json:"gameId"`
@@ -293,6 +294,7 @@ func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
 		Date:        formattedDate,
 		Type:        e.ExpenseType,
 		Amount:      strconv.FormatFloat(e.Amount, 'f', 2, 64),
+		Mileage:     strconv.FormatFloat(e.Mileage/100, 'f', 0, 64),
 		Association: e.Association,
 		GameId:      strconv.Itoa(e.GameID),
 		Description: e.Description,
