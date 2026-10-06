@@ -659,6 +659,55 @@
         </div>
     </section>
 
+    <section class="report-block" aria-labelledby="tax1099ReportTitle">
+        <div class="report-block-header">
+            <h2 id="tax1099ReportTitle">1099 Report</h2>
+            <p>Summarize payments by association for a selected tax year.</p>
+        </div>
+
+        <div class="report-controls">
+            <div class="filter-group">
+                <label>Associations</label>
+                <div class="checkbox-dropdown" id="tax1099AssociationDropdown">
+                    <button
+                        type="button"
+                        class="checkbox-dropdown-button"
+                        aria-haspopup="true"
+                        aria-expanded="false"
+                        onclick="toggleCheckboxDropdown('tax1099AssociationDropdown')">
+                        <span id="tax1099AssociationSummary">All Associations</span>
+                    </button>
+                    <div
+                        class="checkbox-dropdown-menu"
+                        id="tax1099AssociationOptions">
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-group">
+                <label for="report1099TaxYear">Tax Year</label>
+                <input type="text" id="report1099TaxYear" inputmode="numeric"
+                    maxlength="4" pattern="[1-9][0-9]{3}" placeholder="Blank = All Years">
+            </div>
+
+            <div class="button-row">
+                <button
+                    type="button"
+                    class="btn btn-create"
+                    onclick="generate1099Report()">
+                    Create Report
+                </button>
+
+                <button
+                    type="button"
+                    class="btn btn-clear"
+                    onclick="clear1099Report()">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
+
     <section class="report-block" aria-labelledby="expenseReportTitle">
         <div class="report-block-header">
             <h2 id="expenseReportTitle">Expense Report</h2>
@@ -859,6 +908,7 @@ function updateCheckboxSummary(name) {
         gameAssociation: "All Associations",
         financialAssociation: "All Associations",
         revenueAssociation: "All Associations",
+        tax1099Association: "All Associations",
         expenseAssociation: "All Associations",
         accountsReceivableAssociation: "All Associations",
         reconciliationAssociation: "All Associations",
@@ -923,6 +973,14 @@ async function loadAssociations() {
             }))
         );
         setupCheckboxDropdown("revenueAssociation");
+
+        fillCheckboxOptions("tax1099Association", "tax1099AssociationOptions",
+            financialAssociations.map(association => ({
+                value: association,
+                text: association
+            }))
+        );
+        setupCheckboxDropdown("tax1099Association");
 
         fillCheckboxOptions("gameAssociation", "gameAssociationOptions",
             financialAssociations.map(association => ({
@@ -1501,6 +1559,7 @@ async function loadAssignors() {
 let financialAssociations = [];
 
 document.addEventListener("DOMContentLoaded", async function() {
+    document.getElementById("report1099TaxYear").value = String(new Date().getFullYear());
     await Promise.all([
         loadAssociations(),
         loadStatusTypes(),
@@ -1748,7 +1807,7 @@ function renderFinancialReport(report) {
     const columns = [
         { label: "Association", field: "association" },
         { label: "Net Earnings", field: "grossIncome" },
-        { label: "Total Expenses", field: "totalExpenses" },
+        { label: "Expenses Excluding Deductions", field: "totalExpenses" },
         { label: "Net Income Before Taxes", field: "netIncome" },
         { label: "Total Mileage", field: "totalMileage" }
     ];
@@ -1799,9 +1858,17 @@ function renderFinancialReport(report) {
             : formatCurrency(totals[field]);
     });
 
+    const note = document.createElement("p");
+    note.style.marginTop = "15px";
+    note.style.color = "#64748b";
+    note.textContent =
+        "Note: Deductions have already been subtracted to calculate Net Earnings " +
+        "and are excluded from expenses in this Financial Report. " +
+        "They appear as an expense in the Expense Report.";
+
     const container = document.getElementById("reportContainer");
     container.className = "";
-    container.replaceChildren(table);
+    container.replaceChildren(table, note);
 }
 
 function renderRevenueReport(report) {
@@ -2788,6 +2855,86 @@ function clearReconciliationReport() {
     setReportMessage(
         'Select Reconciliation Report options and click "Create Report".'
     );
+}
+
+function render1099Report(report) {
+    const rows = (report && !Array.isArray(report) && typeof report === "object" && "association" in report
+        ? [report] : getFinancialReportRows(report))
+        .filter(row => row && typeof row === "object")
+        .sort((a, b) => String(a.association ?? "").localeCompare(String(b.association ?? "")));
+
+    if (rows.length === 0) {
+        setReportMessage("No payments were returned for the selected tax year and associations.");
+        return;
+    }
+
+    const table = document.createElement("table");
+    table.className = "financial-report-table";
+    const header = table.createTHead().insertRow();
+    ["Tax Year", "Association", "Total Payments"].forEach(label => {
+        const th = document.createElement("th");
+        th.scope = "col";
+        th.textContent = label;
+        header.appendChild(th);
+    });
+    const body = table.createTBody();
+    let totalCents = 0;
+    rows.forEach(row => {
+        const tr = body.insertRow();
+        tr.insertCell().textContent = String(row.taxYear ?? "");
+        tr.insertCell().textContent = String(row.association ?? "");
+        // ReportResponse1099.amount is a dollar string, not integer cents.
+        const cents = Math.round(parseReportNumber(row.amount) * 100);
+        totalCents += cents;
+        tr.insertCell().textContent = formatCurrency(cents / 100);
+    });
+    const total = table.createTFoot().insertRow();
+    const label = total.insertCell();
+    label.colSpan = 2;
+    label.textContent = "Grand Total";
+    total.insertCell().textContent = formatCurrency(totalCents / 100);
+    const container = document.getElementById("reportContainer");
+    container.className = "";
+    container.replaceChildren(table);
+}
+
+async function generate1099Report() {
+    const input = document.getElementById("report1099TaxYear");
+    const taxYear = input.value.trim();
+    if (taxYear !== "" && !/^[1-9][0-9]{3}$/.test(taxYear)) {
+        setReportMessage("Enter a four-digit Tax Year between 1000 and 9999, or leave blank for all years.");
+        input.focus();
+        return;
+    }
+    const params = new URLSearchParams({ type: "1099" });
+    if (taxYear !== "") params.append("taxYear", taxYear);
+    // No association parameters means all associations, including historical ones.
+    selectedValues("tax1099Association").forEach(association => params.append("association", association));
+    try {
+        setReportMessage("Generating 1099 report...");
+        const response = await fetch(`/api/1099-report?${params.toString()}`);
+        if (!response.ok) {
+            const detail = await response.text();
+            throw new Error(`HTTP ${response.status}: ${detail || response.statusText}`);
+        }
+        render1099Report(await response.json());
+        setReportTitle(taxYear === "" ? "1099 Report — All Years" : `1099 Report — Tax Year ${taxYear}`);
+    } catch (err) {
+        console.error("Error generating 1099 report:", err);
+        setReportMessage("Failed to generate 1099 report.\n\n" + err.message);
+    }
+}
+
+function clear1099Report() {
+    document.querySelectorAll('input[name="tax1099Association"]').forEach(checkbox => checkbox.checked = false);
+    const all = document.querySelector('input[data-all-for="tax1099Association"]');
+    if (all) all.checked = true;
+    updateCheckboxSummary("tax1099Association");
+    const dropdown = document.getElementById("tax1099AssociationDropdown");
+    dropdown.classList.remove("open");
+    dropdown.querySelector(".checkbox-dropdown-button")?.setAttribute("aria-expanded", "false");
+    document.getElementById("report1099TaxYear").value = "";
+    setReportMessage('Select 1099 Report options and click "Create Report".');
 }
 
 </script>

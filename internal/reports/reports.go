@@ -400,23 +400,25 @@ func GenerateReconciliationReport(records []model.PaymentDescriptor, tid string)
 }
 
 func GeneratePaymentReport(records []model.PaymentDescriptor, tid string) []string {
-
 	fmt.Println("Generating Payment Report")
-	rept := make([]string, 10, 20)
-	var totalPayments int64 = 0
-	var paymentAmtInt64 int64 = 0
-	var totalNumOfPayments int = 0
-	var err error
 
-	reptFmtStr := "%-19s%-17s$%-11s%-16s%-60s\n"
-	reptFmtStr2 := "%-64s%-60s\n"
+	rept := make([]string, 0, 20)
+	var totalPayments int64
+	var totalNumOfPayments int
+
+	reptFmtStr := "%-19s%-17s%-10s$%-11s%-16s%-60s\n"
+	reptFmtStr2 := "%-74s%-60s\n"
 
 	title := "Payment Report\n"
-	heading1 := "Payment ID         Payment Date     Amount      Association     Game IDs\n"
-	separator := "===================================================================================================================================\n"
+	heading1 := fmt.Sprintf(
+		"%-19s%-17s%-10s%-12s%-16s%-60s\n",
+		"Payment ID", "Payment Date", "Tax Year",
+		"Amount", "Association", "Game IDs",
+	)
+	separator := strings.Repeat("=", 134) + "\n"
 	reptTimeMsg := getReportGeneratedDate()
 
-	maxLineLength := len(heading1)
+	maxLineLength := len(strings.TrimRight(heading1, "\n"))
 	newTitle := utils.CenterText(title, maxLineLength)
 	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
 
@@ -426,13 +428,16 @@ func GeneratePaymentReport(records []model.PaymentDescriptor, tid string) []stri
 	rept = append(rept, separator)
 
 	for _, record := range records {
-
 		totalNumOfPayments++
-		paymentAmtInt64, err = utils.ConvertAmtStrToInt64(record.PaymentAmt)
+
+		paymentAmtInt64, err := utils.ConvertAmtStrToInt64(record.PaymentAmt)
 		if err == nil {
 			totalPayments += paymentAmtInt64
 		} else {
-			utils.AuditLog.Printf("Failed to convert payment amount string to int64 for PaymentId %s.  Reason: %v", record.PaymentId, err)
+			utils.AuditLog.Printf(
+				"Failed to convert payment amount string to int64 for PaymentId %s. Reason: %v",
+				record.PaymentId, err,
+			)
 		}
 
 		if len(record.GameIds) > 60 {
@@ -440,17 +445,38 @@ func GeneratePaymentReport(records []model.PaymentDescriptor, tid string) []stri
 
 			for i, v := range gameIdLines {
 				if i == 0 {
-					rept = append(rept, fmt.Sprintf(reptFmtStr, record.PaymentId, record.PaymentDate, record.PaymentAmt, record.Association, v))
+					rept = append(rept, fmt.Sprintf(
+						reptFmtStr,
+						record.PaymentId,
+						record.PaymentDate,
+						record.TaxYear,
+						record.PaymentAmt,
+						record.Association,
+						v,
+					))
 				} else {
 					rept = append(rept, fmt.Sprintf(reptFmtStr2, "", v))
 				}
 			}
 		} else {
-			rept = append(rept, fmt.Sprintf(reptFmtStr, record.PaymentId, record.PaymentDate, record.PaymentAmt, record.Association, record.GameIds))
+			rept = append(rept, fmt.Sprintf(
+				reptFmtStr,
+				record.PaymentId,
+				record.PaymentDate,
+				record.TaxYear,
+				record.PaymentAmt,
+				record.Association,
+				record.GameIds,
+			))
 		}
 	}
+
 	rept = append(rept, "\n")
-	rept = append(rept, fmt.Sprintf("Total Payments: %d Total Deposits: $%s\n", totalNumOfPayments, utils.ConvertInt64ToAmtStr(totalPayments)))
+	rept = append(rept, fmt.Sprintf(
+		"Total Payments: %d Total Deposits: $%s\n",
+		totalNumOfPayments,
+		utils.ConvertInt64ToAmtStr(totalPayments),
+	))
 
 	return rept
 }

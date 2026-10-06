@@ -166,66 +166,6 @@ func UpdateOfficials(parentCtx context.Context, file string) error {
 
 }
 
-func UpdatePayments(parentCtx context.Context, file string) error {
-
-	fmt.Println("Adding to Payments Collection")
-
-	payments := []model.PaymentDescriptor{}
-
-	// Read file
-	fd, err := os.Open(file)
-	if err != nil {
-		fmt.Println(err)
-		return fmt.Errorf("Failed to open file %s.  Reason: %s", file, err)
-	}
-	defer fd.Close()
-
-	sc := bufio.NewScanner(fd)
-
-	recordsRead := 0
-	recordsAppended := 0
-	recordsDeleted := 0
-	validationErrors := 0
-
-	type PaymentDescriptor struct {
-		PaymentId   string
-		PaymentDate string
-		PaymentAmt  string
-		Association string
-		GameIds     string
-	}
-	for sc.Scan() {
-
-		line := sc.Text()
-		recordsRead++
-		fields := strings.Split(line, ",")
-
-		payment := model.PaymentDescriptor{
-			PaymentId:   fields[0],
-			PaymentDate: fields[1],
-			PaymentAmt:  fields[2],
-			Association: fields[3],
-			GameIds:     fields[4],
-		}
-
-		err = ValidatePaymentDescriptor(parentCtx, payment)
-		if err != nil {
-			fmt.Println(err)
-			validationErrors++
-			continue
-		}
-
-		payments = append(payments, payment)
-
-		recordsAppended++
-	}
-
-	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
-	AddPayments(parentCtx, payments)
-
-	return nil
-}
-
 func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
 
 	fmt.Println("Adding to Games Collection using Json File")
@@ -272,11 +212,6 @@ func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
 
 	return nil
 
-}
-
-// Stubbed out for now
-func ValidatePaymentDescriptor(parentCtx context.Context, p model.PaymentDescriptor) error {
-	return nil
 }
 
 // Stubbed out for now
@@ -497,11 +432,6 @@ func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
 
 	return nil
 
-}
-
-func AddPayments(parentCtx context.Context, payment []model.PaymentDescriptor) {
-
-	database.InsertPaymentDocs(parentCtx, payment, database.Database, "payments", database.TenantId)
 }
 
 func AddGames(parentCtx context.Context, game []model.GameDescriptor) {

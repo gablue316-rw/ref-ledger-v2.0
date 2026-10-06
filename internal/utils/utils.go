@@ -747,28 +747,26 @@ func ConvertOfficialDocToOfficialDescr(doc model.OfficialDoc) model.OfficialDesc
 }
 
 func ConvertPaymentDocToPaymentDescr(doc model.PaymentDoc) model.PaymentDescriptor {
-
-	var gameIds string
 	paymentAmt := ConvertInt64ToAmtStr(doc.PaymentAmt)
-	gameIds, _ = ConvertGameIdsToRange(doc.GameIds)
+	gameIds, _ := ConvertGameIdsToRange(doc.GameIds)
 
-	paymentDescr := model.PaymentDescriptor{
+	var taxYear string
+	if doc.TaxYear != 0 {
+		taxYear = strconv.Itoa(doc.TaxYear)
+	}
+
+	return model.PaymentDescriptor{
 		PaymentId:   doc.PaymentId,
 		PaymentDate: doc.PaymentDate,
 		PaymentAmt:  paymentAmt,
 		Association: doc.Association,
 		GameIds:     gameIds,
+		TaxYear:     taxYear,
 	}
-
-	return paymentDescr
-
 }
 
 func ConvertPaymentDescrToPaymentDoc(paymentDescr model.PaymentDescriptor) model.PaymentDoc {
-
-	var gameIds []int64 = []int64{}
 	gameIds, err := ConvertGameIdStrToInt(paymentDescr.GameIds)
-
 	if err != nil {
 		fmt.Println(err)
 		return model.PaymentDoc{}
@@ -776,15 +774,23 @@ func ConvertPaymentDescrToPaymentDoc(paymentDescr model.PaymentDescriptor) model
 
 	paymentAmt, _ := ConvertAmtStrToInt64(paymentDescr.PaymentAmt)
 
-	doc := model.PaymentDoc{
+	var taxYear int
+	if paymentDescr.TaxYear != "" {
+		taxYear, err = strconv.Atoi(paymentDescr.TaxYear)
+		if err != nil {
+			fmt.Println("Invalid tax year:", err)
+			return model.PaymentDoc{}
+		}
+	}
+
+	return model.PaymentDoc{
 		PaymentId:   paymentDescr.PaymentId,
 		PaymentDate: paymentDescr.PaymentDate,
 		PaymentAmt:  paymentAmt,
 		Association: paymentDescr.Association,
 		GameIds:     gameIds,
+		TaxYear:     taxYear,
 	}
-
-	return doc
 }
 
 func ConvertExpenseDescrToExpenseDoc(expenseDescr model.ExpenseDescriptor) model.ExpenseDoc {

@@ -606,6 +606,13 @@
             <div class="row">
 
                 <div class="col">
+                    <label for="paymentTaxYear">Tax Year</label>
+                    <input type="text" id="paymentTaxYear" inputmode="numeric"
+                        maxlength="4" pattern="[1-9][0-9]{3}" required>
+                    <p class="field-help">Defaults to the payment date year. You can enter a different year.</p>
+                </div>
+
+                <div class="col">
                     <label for="amount">
                         Payment Amount
                     </label>
@@ -682,6 +689,12 @@
                         <option value="">Loading associations...</option>
                     </select>
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label for="filterTaxYear">Tax Year</label>
+                <input type="text" id="filterTaxYear" inputmode="numeric"
+                    maxlength="4" pattern="[1-9][0-9]{3}" placeholder="Blank = All Years">
             </div>
 
             <div class="form-group">
@@ -848,6 +861,7 @@
                         <th class="delete-column">Delete</th>
                         <th>Payment ID</th>
                         <th>Date</th>
+                        <th>Tax Year</th>
                         <th>Association</th>
                         <th>Amount</th>
                         <th>Game IDs</th>
@@ -871,6 +885,11 @@
         <div class="col">
             <label for="editPaymentDate">Date</label>
             <input id="editPaymentDate" type="date" required>
+        </div>
+        <div class="col">
+            <label for="editPaymentTaxYear">Tax Year</label>
+            <input id="editPaymentTaxYear" type="text" inputmode="numeric"
+                maxlength="4" pattern="[1-9][0-9]{3}" required>
         </div>
         <div class="col">
             <label for="editPaymentAssociation">Association</label>
@@ -1012,6 +1031,35 @@ const paymentFilterForm =
 const messageBox =
     document.getElementById("message");
 
+function isValidTaxYear(value) {
+    return /^[1-9][0-9]{3}$/.test(String(value));
+}
+
+function defaultPaymentTaxYear(date) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date.slice(0, 4) : String(new Date().getFullYear());
+}
+
+let paymentTaxYearOverridden = false;
+const paymentTaxYearInput = document.getElementById("paymentTaxYear");
+const paymentDateInput = document.getElementById("date");
+paymentTaxYearInput.value = defaultPaymentTaxYear(paymentDateInput.value);
+document.getElementById("filterTaxYear").value = String(new Date().getFullYear());
+paymentTaxYearInput.addEventListener("input", () => {
+    paymentTaxYearOverridden = paymentTaxYearInput.value.trim() !== "";
+});
+paymentDateInput.addEventListener("change", () => {
+    if (!paymentTaxYearOverridden) {
+        paymentTaxYearInput.value = defaultPaymentTaxYear(paymentDateInput.value);
+    }
+});
+paymentForm.addEventListener("reset", () => {
+    setTimeout(() => {
+        paymentTaxYearOverridden = false;
+        paymentTaxYearInput.value = defaultPaymentTaxYear(paymentDateInput.value);
+    }, 0);
+});
+
 function showMessage(message, type = "info") {
     messageBox.className = `message-box ${type}`;
     messageBox.textContent = message;
@@ -1079,6 +1127,9 @@ function openEditPayment(payment) {
         document.getElementById("editPaymentDate").value = paymentDateForInput(
             getPaymentValue(payment, "PaymentDate", "paymentDate", "Date", "date")
         );
+        const savedTaxYear = String(getPaymentValue(payment, "TaxYear", "taxYear", "Taxyear")).trim();
+        document.getElementById("editPaymentTaxYear").value = isValidTaxYear(savedTaxYear)
+            ? savedTaxYear : defaultPaymentTaxYear(document.getElementById("editPaymentDate").value);
         document.getElementById("editPaymentAssociation").value = association;
         originalEditAssociation = association;
         const amount = getPaymentValue(payment, "PaymentAmt", "paymentAmt", "Amount", "amount");
@@ -1104,6 +1155,7 @@ editPaymentForm.addEventListener("submit", async function(event) {
     const saveButton = document.getElementById("saveEditPaymentBtn");
     const paymentId = document.getElementById("editPaymentId").value;
     const date = document.getElementById("editPaymentDate").value;
+    const taxYear = document.getElementById("editPaymentTaxYear").value.trim();
     const association = originalEditAssociation;
     const amount = Number(document.getElementById("editPaymentAmount").value);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !association ||
@@ -1111,17 +1163,21 @@ editPaymentForm.addEventListener("submit", async function(event) {
         showMessage("Enter a date and positive amount.", "error");
         return;
     }
+    if (!isValidTaxYear(taxYear)) {
+        showMessage("Enter a four-digit Tax Year between 1000 and 9999.", "error");
+        return;
+    }
     saveButton.disabled = true;
     let outcome = "";
     let outcomeType = "error";
     try {
-        const response = await fetch("/api/payments", {
+        const response = await fetch("/api/update-payment", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 paymentid: paymentId,
                 originalAssociation: originalEditAssociation,
-                date, association, amount,
+                date, association, amount, taxYear: Number(taxYear),
                 gameids: originalEditGameIds.map(Number)
             })
         });
@@ -1378,8 +1434,15 @@ paymentForm.addEventListener(
             return;
         }
 
+        const taxYear = paymentTaxYearInput.value.trim();
+        if (!isValidTaxYear(taxYear)) {
+            showMessage("Enter a four-digit Tax Year between 1000 and 9999.", "error");
+            return;
+        }
+
         const payment = {
             date: paymentDate,
+            taxYear: Number(taxYear),
             paymentid: paymentId,
             amount: amount,
             association: association,
@@ -2029,7 +2092,7 @@ function renderPayments(payments) {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="9">
+                <td colspan="10">
                     No payments are currently in the registry.
                 </td>
             </tr>
@@ -2150,6 +2213,7 @@ function renderPayments(payments) {
                 </td>
                 <td>${escapeHtml(paymentId)}</td>
                 <td>${escapeHtml(date)}</td>
+                <td>${escapeHtml(getPaymentValue(payment, "TaxYear", "taxYear", "Taxyear"))}</td>
                 <td>${escapeHtml(association)}</td>
                 <td>${escapeHtml(displayAmount)}</td>
 
@@ -2311,6 +2375,11 @@ function filterPaymentsByGameIds(payments, gameIdFilter) {
 }
 
 async function loadPaymentsRegistry() {
+    const taxYear = document.getElementById("filterTaxYear").value.trim();
+    if (taxYear !== "" && !isValidTaxYear(taxYear)) {
+        showMessage("Enter a four-digit Tax Year, or leave blank for all years.", "error");
+        return;
+    }
     messageBox.innerText =
         "Loading payment registry...";
 
@@ -2322,6 +2391,7 @@ async function loadPaymentsRegistry() {
     searchPaymentsBtn.disabled = true;
 
     const params = new URLSearchParams();
+    if (taxYear !== "") params.append("taxYear", taxYear);
 
     const paymentId = document
         .getElementById("filterPaymentId")

@@ -712,8 +712,19 @@ func GetExpenseRegistry(
 	return expenseRecords, nil
 }
 
-func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDescriptor, error) {
+func GetPaymentRegistry(
+	filter model.PaymentRegistryFilter,
+) ([]model.PaymentDescriptor, error) {
 	paymentFilter := bson.M{"tenantId": filter.TenantId}
+
+	taxYear := strings.TrimSpace(filter.TaxYear)
+	if taxYear != "" {
+		year, err := strconv.Atoi(taxYear)
+		if err != nil || year < 1000 || year > 9999 {
+			return nil, fmt.Errorf("invalid tax year: %q", taxYear)
+		}
+		paymentFilter["taxYear"] = year
+	}
 
 	if filter.PaymentId != "" {
 		paymentFilter["paymentId"] = filter.PaymentId
@@ -772,8 +783,16 @@ func GetPaymentRegistry(filter model.PaymentRegistryFilter) ([]model.PaymentDesc
 	}
 
 	for _, r := range results {
-		paymentRecords = append(paymentRecords, utils.ConvertPaymentDocToPaymentDescr(r))
+		record := utils.ConvertPaymentDocToPaymentDescr(r)
+
+		record.TaxYear = ""
+		if r.TaxYear != 0 {
+			record.TaxYear = strconv.Itoa(r.TaxYear)
+		}
+
+		paymentRecords = append(paymentRecords, record)
 	}
+
 	return paymentRecords, nil
 }
 
@@ -2083,37 +2102,72 @@ func VerifyGameMatchesAssociation(gameIds []int64, association, tenantId string)
 	return gameErrors
 }
 
-func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection, tId string) (int, int, int, []error) {
-
+func InsertPaymentDocs(
+	parentCtx context.Context,
+	payment []model.PaymentDescriptor,
+	dbase, collection, tId string,
+) (int, int, int, []error) {
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 	collectionName := coll.Name()
-	utils.AuditLog.Printf("InsertPaymentDocs: Inserting %d payment records into collection %s", len(payment), collection)
+
+	utils.AuditLog.Printf(
+		"InsertPaymentDocs: Inserting %d payment records into collection %s",
+		len(payment), collection,
+	)
 	fmt.Println("Inserting records into", collectionName)
 
 	recordsInserted := 0
 	totalErrors := 0
-	var gameIds []int64
-	var gamesUpdatedToPaid int = 0
-
+	gamesUpdatedToPaid := 0
 	importErrors := make([]error, 0)
 
 	for _, v := range payment {
-
-		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-		doc.TenantId = tId
-		paymentExists, err := PaymentExists(doc)
-
-		if paymentExists {
+		paymentDate, err := time.Parse(
+			"1/2/2006",
+			strings.TrimSpace(v.PaymentDate),
+		)
+		if err != nil {
+			dateErr := fmt.Errorf(
+				"invalid payment date %q for PaymentId %s: expected m/d/yyyy: %w",
+				v.PaymentDate, v.PaymentId, err,
+			)
+			utils.AuditLog.Println(dateErr)
+			fmt.Println(dateErr)
 			totalErrors++
-			fmt.Println("Payment with id already exists")
-			importErrors = append(importErrors, errors.New("Payment with ID already exists"))
+			importErrors = append(importErrors, dateErr)
 			continue
 		}
 
+		// Preserve the supplied tax year; default only when blank.
+		taxYear := paymentDate.Year()
+		taxYearText := strings.TrimSpace(v.TaxYear)
+
+		if taxYearText != "" {
+			parsedYear, err := strconv.Atoi(taxYearText)
+			if err != nil || parsedYear < 1000 || parsedYear > 9999 {
+				yearErr := fmt.Errorf(
+					"invalid tax year %q for PaymentId %s: expected a year between 1000 and 9999",
+					v.TaxYear, v.PaymentId,
+				)
+				utils.AuditLog.Println(yearErr)
+				fmt.Println(yearErr)
+				totalErrors++
+				importErrors = append(importErrors, yearErr)
+				continue
+			}
+			taxYear = parsedYear
+		}
+
+		v.TaxYear = strconv.Itoa(taxYear)
+		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
+		doc.TenantId = tId
+		doc.TaxYear = taxYear
+
+		paymentExists, err := PaymentExists(doc)
 		if err != nil {
 			totalErrors++
 			fmt.Println(err)
@@ -2121,95 +2175,161 @@ func InsertPaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			continue
 		}
 
-		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
+		if paymentExists {
+			totalErrors++
+			fmt.Println("Payment with id already exists")
+			importErrors = append(
+				importErrors,
+				errors.New("Payment with ID already exists"),
+			)
+			continue
+		}
 
+		gameIds, err := utils.ConvertGameIdStrToInt(v.GameIds)
 		if err != nil {
-			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
-			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
+			utils.AuditLog.Printf(
+				"Failed to convert Game Ids string to []int64 for PaymentId %s. Reason: %v",
+				doc.PaymentId, err,
+			)
+			fmt.Println("Failed to convert Game Ids string to []int64. Reason:", err)
+			totalErrors++
 			importErrors = append(importErrors, err)
 			continue
 		}
 
-		gameErrors := VerifyGameMatchesAssociation(gameIds, v.Association, tId)
-
-		if gameErrors != nil {
+		gameErrors := VerifyGameMatchesAssociation(
+			gameIds, v.Association, tId,
+		)
+		if len(gameErrors) > 0 {
+			totalErrors++
 			importErrors = append(importErrors, gameErrors...)
 			continue
 		}
 
 		statusErrors := VerifyGameStatus(gameIds, v.Association, tId)
-		if gameErrors != nil {
+		if len(statusErrors) > 0 {
+			totalErrors++
 			importErrors = append(importErrors, statusErrors...)
 			continue
 		}
 
 		totalGameFee, err := GetGameFee(gameIds, tId, "")
 		if err != nil {
-			utils.AuditLog.Printf("Failed to get game fee for Game Ids %v.  Reason: %v", gameIds, err)
-			fmt.Println("Failed to get game fee.  Reason:", err)
+			utils.AuditLog.Printf(
+				"Failed to get game fee for Game Ids %v. Reason: %v",
+				gameIds, err,
+			)
+			fmt.Println("Failed to get game fee. Reason:", err)
+			totalErrors++
 			importErrors = append(importErrors, err)
 			continue
 		}
 
 		if totalGameFee != doc.PaymentAmt {
-			errStr := fmt.Sprintf("Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s", doc.PaymentId, utils.ConvertInt64ToAmtStr(totalGameFee), utils.ConvertInt64ToAmtStr(doc.PaymentAmt))
+			errStr := fmt.Sprintf(
+				"Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s",
+				doc.PaymentId,
+				utils.ConvertInt64ToAmtStr(totalGameFee),
+				utils.ConvertInt64ToAmtStr(doc.PaymentAmt),
+			)
 			utils.AuditLog.Println(errStr)
 			fmt.Println(errStr)
 			totalErrors++
-			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			importErrors = append(importErrors, errors.New(errStr))
 			continue
 		}
 
 		_, err = coll.InsertOne(ctx, doc)
 		if err != nil {
-			utils.AuditLog.Printf("Failed to insert payment record for PaymentId %s.  Reason: %v", doc.PaymentId, err)
-			fmt.Println("Insert failed.  Reason:", err)
+			utils.AuditLog.Printf(
+				"Failed to insert payment record for PaymentId %s. Reason: %v",
+				doc.PaymentId, err,
+			)
+			fmt.Println("Insert failed. Reason:", err)
 			totalErrors++
 			importErrors = append(importErrors, err)
 			continue
 		}
 
 		recordsInserted++
-
 		gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
 	}
 
-	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors, "Games Updated to Paid:", gamesUpdatedToPaid)
-	return recordsInserted, totalErrors, gamesUpdatedToPaid, importErrors
+	fmt.Println(
+		"Total Records inserted into", collectionName, ":", recordsInserted,
+		"Total Errors:", totalErrors,
+		"Games Updated to Paid:", gamesUpdatedToPaid,
+	)
 
+	return recordsInserted, totalErrors, gamesUpdatedToPaid, importErrors
 }
 
-func UpdatePaymentDocs(parentCtx context.Context, payment []model.PaymentDescriptor, dbase, collection, tId string) (int, int, int, []error) {
-
+func UpdatePaymentDocs(
+	parentCtx context.Context,
+	payment []model.PaymentDescriptor,
+	dbase, collection, tId string,
+) (int, int, int, []error) {
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 	collectionName := coll.Name()
-	utils.AuditLog.Printf("UpdatePaymentDocs: Updating %d payment records into collection %s", len(payment), collection)
+
+	utils.AuditLog.Printf(
+		"UpdatePaymentDocs: Updating %d payment records into collection %s",
+		len(payment), collection,
+	)
 	fmt.Println("Updating records into", collectionName)
 
 	recordsUpdated := 0
 	totalErrors := 0
-	var gameIds []int64
-	var gamesUpdatedToPaid int = 0
-
+	gamesUpdatedToPaid := 0
 	importErrors := make([]error, 0)
 
 	for _, v := range payment {
-
-		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-		doc.TenantId = tId
-		paymentExists, err := PaymentExists(doc)
-
-		if !paymentExists {
+		paymentDate, err := time.Parse(
+			"1/2/2006",
+			strings.TrimSpace(v.PaymentDate),
+		)
+		if err != nil {
+			dateErr := fmt.Errorf(
+				"invalid payment date %q for PaymentId %s: expected m/d/yyyy: %w",
+				v.PaymentDate, v.PaymentId, err,
+			)
+			utils.AuditLog.Println(dateErr)
+			fmt.Println(dateErr)
 			totalErrors++
-			fmt.Println("Payment with id does not exist")
-			importErrors = append(importErrors, errors.New("Payment with ID does not exist"))
+			importErrors = append(importErrors, dateErr)
 			continue
 		}
 
+		// Preserve the supplied tax year; default only when blank.
+		taxYear := paymentDate.Year()
+		taxYearText := strings.TrimSpace(v.TaxYear)
+
+		if taxYearText != "" {
+			parsedYear, err := strconv.Atoi(taxYearText)
+			if err != nil || parsedYear < 1000 || parsedYear > 9999 {
+				yearErr := fmt.Errorf(
+					"invalid tax year %q for PaymentId %s: expected a year between 1000 and 9999",
+					v.TaxYear, v.PaymentId,
+				)
+				utils.AuditLog.Println(yearErr)
+				fmt.Println(yearErr)
+				totalErrors++
+				importErrors = append(importErrors, yearErr)
+				continue
+			}
+			taxYear = parsedYear
+		}
+
+		v.TaxYear = strconv.Itoa(taxYear)
+		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
+		doc.TenantId = tId
+		doc.TaxYear = taxYear
+
+		paymentExists, err := PaymentExists(doc)
 		if err != nil {
 			totalErrors++
 			fmt.Println(err)
@@ -2217,49 +2337,77 @@ func UpdatePaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 			continue
 		}
 
-		gameIds, err = utils.ConvertGameIdStrToInt(v.GameIds)
+		if !paymentExists {
+			totalErrors++
+			fmt.Println("Payment with id does not exist")
+			importErrors = append(
+				importErrors,
+				errors.New("Payment with ID does not exist"),
+			)
+			continue
+		}
 
-		fmt.Println("Game Ids:", gameIds)
-
+		gameIds, err := utils.ConvertGameIdStrToInt(v.GameIds)
 		if err != nil {
-			utils.AuditLog.Printf("Failed to convert Game Ids string to []int64 for PaymentId %s.  Reason: %v", doc.PaymentId, err)
-			fmt.Println("Failed to convert Game Ids string to []int64.  Reason:", err)
+			utils.AuditLog.Printf(
+				"Failed to convert Game Ids string to []int64 for PaymentId %s. Reason: %v",
+				doc.PaymentId, err,
+			)
+			fmt.Println("Failed to convert Game Ids string to []int64. Reason:", err)
+			totalErrors++
 			importErrors = append(importErrors, err)
 			continue
 		}
 
-		gameErrors := VerifyGameMatchesAssociation(gameIds, v.Association, TenantId)
+		fmt.Println("Game Ids:", gameIds)
 
-		if gameErrors != nil {
+		gameErrors := VerifyGameMatchesAssociation(
+			gameIds, v.Association, tId,
+		)
+		if len(gameErrors) > 0 {
+			totalErrors++
 			importErrors = append(importErrors, gameErrors...)
 			continue
 		}
 
-		statusErrors := VerifyGameStatus(gameIds, v.Association, tId)
-		if gameErrors != nil {
-			importErrors = append(importErrors, statusErrors...)
-			continue
-		}
+		//
+		// Comment this out until we allow the user to update game ids
+		//
 
-		//
-		// If the user modified the game ids those that have been removed need to be set back to Completed.
-		// Those added need to be set to Paid.   Also make sure the Game Ids are not associated with another payment.
-		//
+		// statusErrors := VerifyGameStatus(gameIds, v.Association, tId)
+		// if len(statusErrors) > 0 {
+		// 	totalErrors++
+		// 	importErrors = append(importErrors, statusErrors...)
+		// 	continue
+		// }
+
+		// If game IDs change, removed games need to return to Completed,
+		// and added games need to become Paid. That reconciliation still
+		// needs to be implemented separately.
 
 		totalGameFee, err := GetGameFee(gameIds, tId, "")
 		if err != nil {
-			utils.AuditLog.Printf("Failed to get game fee for Game Ids %v.  Reason: %v", gameIds, err)
-			fmt.Println("Failed to get game fee.  Reason:", err)
+			utils.AuditLog.Printf(
+				"Failed to get game fee for Game Ids %v. Reason: %v",
+				gameIds, err,
+			)
+			fmt.Println("Failed to get game fee. Reason:", err)
+			totalErrors++
 			importErrors = append(importErrors, err)
 			continue
 		}
 
 		if totalGameFee != doc.PaymentAmt {
-			errStr := fmt.Sprintf("Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s", doc.PaymentId, utils.ConvertInt64ToAmtStr(totalGameFee), utils.ConvertInt64ToAmtStr(doc.PaymentAmt))
+			errStr := fmt.Sprintf(
+				"Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s",
+				doc.PaymentId,
+				utils.ConvertInt64ToAmtStr(totalGameFee),
+				utils.ConvertInt64ToAmtStr(doc.PaymentAmt),
+			)
 			utils.AuditLog.Println(errStr)
 			fmt.Println(errStr)
 			totalErrors++
-			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			importErrors = append(importErrors, errors.New(errStr))
 			continue
 		}
 
@@ -2273,43 +2421,56 @@ func UpdatePaymentDocs(parentCtx context.Context, payment []model.PaymentDescrip
 		}
 
 		fmt.Println("Update filter:", filter, "update:", update)
+
 		result, err := coll.UpdateOne(ctx, filter, update)
 		if err != nil {
-			errStr := fmt.Sprintf("Payment Update Failed")
-			utils.AuditLog.Println(errStr)
-			fmt.Println(errStr)
+			updateErr := fmt.Errorf(
+				"payment update failed for PaymentId %s: %w",
+				doc.PaymentId, err,
+			)
+			utils.AuditLog.Println(updateErr)
+			fmt.Println(updateErr)
 			totalErrors++
-			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			importErrors = append(importErrors, updateErr)
 			continue
 		}
 
-		fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
+		fmt.Println(
+			"Updated Match:", result.MatchedCount,
+			"Updated document:", result.ModifiedCount,
+		)
 
 		if result.MatchedCount == 0 {
-			errStr := fmt.Sprintf("Payment not found")
+			errStr := "Payment not found"
 			utils.AuditLog.Println(errStr)
 			fmt.Println(errStr)
 			totalErrors++
-			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			importErrors = append(importErrors, errors.New(errStr))
 			continue
-		} else if result.ModifiedCount == 0 {
-			errStr := fmt.Sprintf("No changes")
+		}
+
+		if result.ModifiedCount == 0 {
+			errStr := "No changes"
 			utils.AuditLog.Println(errStr)
 			fmt.Println(errStr)
 			totalErrors++
-			importErrors = append(importErrors, fmt.Errorf("%s", errStr))
+			importErrors = append(importErrors, errors.New(errStr))
 			continue
 		}
 
 		recordsUpdated++
-
 		gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
 	}
 
-	fmt.Println("Total Records updated into", collectionName, ":", recordsUpdated, "Total Errors:", totalErrors, "Games Updated to Paid:", gamesUpdatedToPaid)
-	return recordsUpdated, totalErrors, gamesUpdatedToPaid, importErrors
+	fmt.Println(
+		"Total Records updated into", collectionName, ":", recordsUpdated,
+		"Total Errors:", totalErrors,
+		"Games Updated to Paid:", gamesUpdatedToPaid,
+	)
 
+	return recordsUpdated, totalErrors, gamesUpdatedToPaid, importErrors
 }
+
 func InsertExpenseDocs(parentCtx context.Context, expense []model.ExpenseDescriptor, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -5690,6 +5851,111 @@ func formatCurrency(cents int64) string {
 	return "$" + formatInt64Hundredths(cents)
 }
 
+func Get1099Reports(
+	tId string,
+	associations []string,
+	taxYear string,
+) (map[string]model.ReportResponse1099, error) {
+	paymentFilter := bson.M{
+		"tenantId": tId,
+	}
+
+	// A blank tax year includes all years.
+	taxYear = strings.TrimSpace(taxYear)
+	if taxYear != "" {
+		year, err := strconv.Atoi(taxYear)
+		if err != nil || year < 1000 || year > 9999 {
+			return nil, fmt.Errorf("invalid tax year: %q", taxYear)
+		}
+		paymentFilter["taxYear"] = year
+	}
+
+	// Remove empty association values and duplicates.
+	selectedAssociations := make([]string, 0, len(associations))
+	seenAssociations := make(map[string]struct{})
+
+	for _, associationName := range associations {
+		associationName = strings.TrimSpace(associationName)
+		if associationName == "" {
+			continue
+		}
+		if _, exists := seenAssociations[associationName]; exists {
+			continue
+		}
+
+		seenAssociations[associationName] = struct{}{}
+		selectedAssociations = append(selectedAssociations, associationName)
+	}
+
+	// No association filter means include all associations.
+	if len(selectedAssociations) > 0 {
+		paymentFilter["association"] = bson.M{
+			"$in": selectedAssociations,
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	paymentColl := Client.Database(Database).Collection("payments")
+	paymentCursor, err := paymentColl.Find(ctx, paymentFilter)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"Get1099Reports payment query failed: %w", err,
+		)
+	}
+	defer paymentCursor.Close(ctx)
+
+	records1099 := make(map[string]model.Report1099)
+
+	for paymentCursor.Next(ctx) {
+		var payment model.PaymentDoc
+		if err := paymentCursor.Decode(&payment); err != nil {
+			return nil, fmt.Errorf(
+				"Get1099Reports payment decode failed: %w", err,
+			)
+		}
+
+		// Group payments by both tax year and association.
+		key := fmt.Sprintf("%d|%s", payment.TaxYear, payment.Association)
+
+		record := records1099[key]
+		record.Taxyear = payment.TaxYear
+		record.Association = payment.Association
+		record.Amount += payment.PaymentAmt
+		records1099[key] = record
+	}
+
+	if err := paymentCursor.Err(); err != nil {
+		return nil, fmt.Errorf(
+			"Get1099Reports payment cursor failed: %w", err,
+		)
+	}
+
+	response := make(map[string]model.ReportResponse1099, len(records1099))
+
+	for key, record := range records1099 {
+		// Format cents as dollars without floating-point conversion.
+		dollars := record.Amount / 100
+		cents := record.Amount % 100
+		sign := ""
+
+		if record.Amount < 0 {
+			sign = "-"
+			dollars = -dollars
+			cents = -cents
+		}
+
+		response[key] = model.ReportResponse1099{
+			Taxyear:     record.Taxyear,
+			Association: record.Association,
+			Amount:      fmt.Sprintf("%s%d.%02d", sign, dollars, cents),
+		}
+	}
+
+	return response, nil
+}
+
 func GetReconciliationReports(
 	tId string,
 	associations []string,
@@ -6237,13 +6503,6 @@ func GetFinancialReports(tId string, associations []string) (map[string]model.Fi
 				err,
 			)
 		}
-
-		totalDeductions, err := GetTotalDeductions(associationName, tId)
-		if err != nil {
-			totalDeductions = 0
-		}
-
-		record.TotalExpenses = totalDeductions
 
 		for expenseCursor.Next(ctx) {
 			var expense model.ExpenseDoc
