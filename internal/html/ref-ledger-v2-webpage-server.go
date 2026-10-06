@@ -91,6 +91,7 @@ type Payment struct {
 	PaymentAmt  float64 `json:"amount"`
 	Association string  `json:"association"`
 	GameID      []int64 `json:"gameids"`
+	TaxYear     int     `json:"taxYear"`
 }
 
 type GameStatusUpdate struct {
@@ -266,22 +267,29 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 }
 
 func PaymentDocToPaymentDescr(p Payment) model.PaymentDescriptor {
+	t, err := time.Parse("2006-01-02", p.PaymentDate)
+	if err != nil {
+		fmt.Println("Invalid payment date:", err)
+		return model.PaymentDescriptor{}
+	}
 
-	t, _ := time.Parse("2006-01-02", p.PaymentDate)
-	formattedDate := t.Format("1/2/2006")
+	taxYear := p.TaxYear
+	if taxYear == 0 {
+		taxYear = t.Year()
+	}
+
+	gameIds := make([]string, 0, len(p.GameID))
+	for _, id := range p.GameID {
+		gameIds = append(gameIds, strconv.FormatInt(int64(id), 10))
+	}
 
 	return model.PaymentDescriptor{
-		PaymentDate: formattedDate,
+		PaymentDate: t.Format("1/2/2006"),
 		PaymentId:   p.PaymentId,
 		PaymentAmt:  strconv.FormatFloat(p.PaymentAmt, 'f', 2, 64),
 		Association: p.Association,
-		GameIds: strings.Trim(strings.Join(func() []string {
-			var gameIds []string
-			for _, id := range p.GameID {
-				gameIds = append(gameIds, strconv.Itoa(int(id)))
-			}
-			return gameIds
-		}(), ";"), ","),
+		TaxYear:     strconv.Itoa(taxYear),
+		GameIds:     strings.Join(gameIds, ";"),
 	}
 }
 
@@ -5064,6 +5072,69 @@ func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func Generate1099Report(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Generate1099Report is called")
+	LogVisitor(r)
+
+	if r.Method != http.MethodGet {
+		http.Error(
+			w,
+			"Method not allowed",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	tId := database.TenantId
+
+	if tId == "na" {
+		var err error
+
+		tId, err = getTenantId(r)
+		if err != nil {
+			http.Error(
+				w,
+				"Invalid tenant ID",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
+	// Supports:
+	// ?association=MSO
+	// ?association=MSO&association=GOLLC
+	associations := r.URL.Query()["association"]
+	taxyear := r.URL.Query().Get("taxYear")
+
+	expenseReports, err :=
+		database.Get1099Reports(tId, associations, taxyear)
+	if err != nil {
+		fmt.Printf(
+			"Generate1099Report failed: %v\n",
+			err,
+		)
+
+		http.Error(
+			w,
+			"Unable to generate 1099 report",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	fmt.Println("===== 1099 Reports Returned", expenseReports, "=====")
+	w.Header().Set("Content-Type", "application/json")
+
+	if err := json.NewEncoder(w).Encode(expenseReports); err != nil {
+		fmt.Printf(
+			"Generate1099Report JSON encoding failed: %v\n",
+			err,
+		)
+		return
+	}
+}
+
 func GenerateExpenseReport(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("GenerateExpenseReport is called")
 	LogVisitor(r)
@@ -5544,27 +5615,27 @@ func CreatePayment(
 	err = json.NewDecoder(r.Body).Decode(&payment)
 	if err != nil {
 		fmt.Println("Invalid JSON. Error:", err)
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
 
+	if payment.TaxYear < 1000 || payment.TaxYear > 9999 {
 		http.Error(
 			w,
-			"invalid JSON",
+			"Tax Year must be between 1000 and 9999.",
 			http.StatusBadRequest,
 		)
 		return
 	}
 
-	singlePayment :=
-		PaymentDocToPaymentDescr(payment)
+	singlePayment := PaymentDocToPaymentDescr(payment)
+	singlePayment.TaxYear = strconv.Itoa(payment.TaxYear)
 
-	paymentDescr :=
-		[]model.PaymentDescriptor{
-			singlePayment,
-		}
-
-	fmt.Println(
-		"Payment Descr:",
+	paymentDescr := []model.PaymentDescriptor{
 		singlePayment,
-	)
+	}
+
+	fmt.Println("Payment Descr:", singlePayment)
 
 	totalAdded, totalErrors, totalUpdatedToPaid, insertErrors :=
 		database.InsertPaymentDocs(
@@ -5575,8 +5646,7 @@ func CreatePayment(
 			tId,
 		)
 
-	errorMessages :=
-		make([]string, 0, len(insertErrors))
+	errorMessages := make([]string, 0, len(insertErrors))
 
 	for _, insertError := range insertErrors {
 		errorMessages = append(
@@ -5592,10 +5662,7 @@ func CreatePayment(
 		"errors":             errorMessages,
 	}
 
-	w.Header().Set(
-		"Content-Type",
-		"application/json",
-	)
+	w.Header().Set("Content-Type", "application/json")
 
 	if totalErrors > 0 {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -5603,8 +5670,7 @@ func CreatePayment(
 		w.WriteHeader(http.StatusCreated)
 	}
 
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		fmt.Println(
 			"Unable to encode payment response. Error:",
 			err,
@@ -5627,27 +5693,27 @@ func UpdatePayment(
 	err = json.NewDecoder(r.Body).Decode(&payment)
 	if err != nil {
 		fmt.Println("Invalid JSON. Error:", err)
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
 
+	if payment.TaxYear < 1000 || payment.TaxYear > 9999 {
 		http.Error(
 			w,
-			"invalid JSON",
+			"Tax Year must be between 1000 and 9999.",
 			http.StatusBadRequest,
 		)
 		return
 	}
 
-	singlePayment :=
-		PaymentDocToPaymentDescr(payment)
+	singlePayment := PaymentDocToPaymentDescr(payment)
+	singlePayment.TaxYear = strconv.Itoa(payment.TaxYear)
 
-	paymentDescr :=
-		[]model.PaymentDescriptor{
-			singlePayment,
-		}
-
-	fmt.Println(
-		"Payment Descr:",
+	paymentDescr := []model.PaymentDescriptor{
 		singlePayment,
-	)
+	}
+
+	fmt.Println("Payment Descr:", singlePayment)
 
 	totalUpdated, totalErrors, totalUpdatedToPaid, updateErrors :=
 		database.UpdatePaymentDocs(
@@ -5658,8 +5724,7 @@ func UpdatePayment(
 			tId,
 		)
 
-	errorMessages :=
-		make([]string, 0, len(updateErrors))
+	errorMessages := make([]string, 0, len(updateErrors))
 
 	for _, updateError := range updateErrors {
 		errorMessages = append(
@@ -5669,26 +5734,21 @@ func UpdatePayment(
 	}
 
 	response := map[string]interface{}{
-		"totalUpdated": totalUpdated,
-
+		"totalUpdated":       totalUpdated,
 		"totalErrors":        totalErrors,
 		"totalUpdatedToPaid": totalUpdatedToPaid,
 		"errors":             errorMessages,
 	}
 
-	w.Header().Set(
-		"Content-Type",
-		"application/json",
-	)
+	w.Header().Set("Content-Type", "application/json")
 
 	if totalErrors > 0 {
 		w.WriteHeader(http.StatusInternalServerError)
 	} else {
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusOK)
 	}
 
-	err = json.NewEncoder(w).Encode(response)
-	if err != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		fmt.Println(
 			"Unable to encode payment response. Error:",
 			err,
@@ -5840,20 +5900,25 @@ func ParseGameIds(value string) ([]int64, error) {
 }
 
 func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
+	paymentId := strings.TrimSpace(r.URL.Query().Get("paymentId"))
+	date := strings.TrimSpace(r.URL.Query().Get("date"))
+	taxYear := strings.TrimSpace(r.URL.Query().Get("taxYear"))
 
-	paymentId := strings.TrimSpace(
-		r.URL.Query().Get("paymentId"),
-	)
-
-	date := strings.TrimSpace(
-		r.URL.Query().Get("date"),
-	)
+	// A blank tax year includes all years.
+	if taxYear != "" {
+		year, err := strconv.Atoi(taxYear)
+		if err != nil || year < 1000 || year > 9999 {
+			http.Error(
+				w,
+				"Tax Year must be between 1000 and 9999, or blank for all years.",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
 
 	if date != "" {
-		parsedDate, err := time.Parse(
-			"2006-01-02",
-			date,
-		)
+		parsedDate, err := time.Parse("2006-01-02", date)
 		if err != nil {
 			http.Error(
 				w,
@@ -5871,14 +5936,8 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 
-	association := strings.TrimSpace(
-		r.URL.Query().Get("association"),
-	)
-
-	amountText := strings.TrimSpace(
-		r.URL.Query().Get("amount"),
-	)
-
+	association := strings.TrimSpace(r.URL.Query().Get("association"))
+	amountText := strings.TrimSpace(r.URL.Query().Get("amount"))
 	gameIdsText := strings.TrimSpace(r.URL.Query().Get("gameIdFilter"))
 
 	gameIds, err := ParseGameIds(gameIdsText)
@@ -5894,11 +5953,7 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 	var amount int64
 
 	if amountText != "" {
-		parsedAmount, err := strconv.ParseFloat(
-			amountText,
-			64,
-		)
-
+		parsedAmount, err := strconv.ParseFloat(amountText, 64)
 		if err != nil {
 			http.Error(
 				w,
@@ -5927,6 +5982,7 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 		Amount:      amount,
 		GameIds:     gameIds,
 		TenantId:    database.TenantId,
+		TaxYear:     taxYear,
 	}
 
 	fmt.Println("Payment Filter:", registryFilter)
@@ -5950,7 +6006,6 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 			err,
 		)
 	}
-
 }
 
 func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
@@ -8298,6 +8353,7 @@ func main() {
 	mux.HandleFunc("/api/reports", GenerateReport)
 	mux.HandleFunc("/api/financial-report", GenerateFinancialReport)
 	mux.HandleFunc("/api/expense-report", GenerateExpenseReport)
+	mux.HandleFunc("/api/1099-report", Generate1099Report)
 	mux.HandleFunc("/api/revenue-report", GenerateRevenueReport)
 	mux.HandleFunc("/api/accounts-receivable-report", GenerateAccountsReceivableReport)
 	mux.HandleFunc("/api/game-report", GenerateGameReport)

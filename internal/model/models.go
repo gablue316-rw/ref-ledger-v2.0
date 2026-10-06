@@ -64,6 +64,7 @@ type PaymentDescriptor struct {
 	PaymentAmt  string
 	Association string
 	GameIds     string
+	TaxYear     string
 }
 
 type PaymentDoc struct {
@@ -73,6 +74,7 @@ type PaymentDoc struct {
 	Association string  `bson:"association,omitempty"`
 	GameIds     []int64 `bson:"gameIds,omitempty"`
 	TenantId    string  `bson:"tenantId,omitempty"`
+	TaxYear     int     `bson:"taxYear,omitempty"`
 }
 
 type PaymentRegistryFilter struct {
@@ -82,6 +84,7 @@ type PaymentRegistryFilter struct {
 	Amount      int64
 	GameIds     []int64
 	TenantId    string
+	TaxYear     string
 }
 
 type ExpenseRegistryFilter struct {
@@ -475,4 +478,16 @@ type OfficialRole struct {
 type OfficialRolesRequest struct {
 	Sport string         `bson:"sport" json:"sport"`
 	Roles []OfficialRole `bson:"roles" json:"roles"`
+}
+
+type Report1099 struct {
+	Taxyear     int    `json:"taxYear"`
+	Association string `json:"association"`
+	Amount      int64  `json:"amount"`
+}
+
+type ReportResponse1099 struct {
+	Taxyear     int    `json:"taxYear"`
+	Association string `json:"association"`
+	Amount      string `json:"amount"`
 }
