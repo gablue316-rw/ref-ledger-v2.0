@@ -305,6 +305,17 @@
                 width: 100%;
             }
         }
+        .email-report-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+        .email-report-toolbar button, #emailReportDialog button { padding: 10px 16px; cursor: pointer; }
+        .email-report-toolbar button:disabled { cursor: default; opacity: .5; }
+        #emailReportDialog { width: min(520px, calc(100% - 32px)); margin: auto; padding: 24px; border: 0; border-radius: 10px; color: #333; }
+        #emailReportDialog::backdrop { background: rgba(0, 0, 0, .5); }
+        #emailReportDialog h2 { margin-bottom: 12px; }
+        #emailReportDialog label { display: block; margin-top: 16px; margin-bottom: 6px; }
+        #emailReportDialog input, #emailReportDialog textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 5px; font: inherit; }
+        #emailReportDialog textarea { min-height: 90px; resize: vertical; }
+        .email-report-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+        #emailReportStatus { margin-top: 12px; white-space: pre-wrap; }
     </style>
 </head>
 
@@ -839,6 +850,11 @@
 
     <!-- REPORT OUTPUT -->
     <div class="report-container">
+        <div class="email-report-toolbar">
+            <button type="button" id="emailReportButton" disabled>
+                <i class="fa-solid fa-envelope" aria-hidden="true"></i> Email Report (PDF)
+            </button>
+        </div>
 
         <div id="reportOutputTitle" class="report-title">
             Report Output
@@ -852,6 +868,24 @@ Select Report type, enter options and click "Create Report".
 
 </div>
 
+<dialog id="emailReportDialog" aria-labelledby="emailReportDialogTitle">
+    <form id="emailReportForm">
+        <h2 id="emailReportDialogTitle">Email Report</h2>
+        <p id="emailReportDescription"></p>
+        <p>The report will be sent as a PDF attachment.</p>
+        <label for="emailReportTo">Recipient Email</label>
+        <input type="email" id="emailReportTo" required maxlength="254" autocomplete="email" placeholder="recipient@example.com">
+        <label for="emailReportSubject">Subject</label>
+        <input type="text" id="emailReportSubject" required maxlength="200">
+        <label for="emailReportMessage">Message (optional)</label>
+        <textarea id="emailReportMessage" maxlength="5000" placeholder="Enter a message to include with the report."></textarea>
+        <div id="emailReportStatus" role="status" aria-live="polite"></div>
+        <div class="email-report-actions">
+            <button type="button" id="emailReportCancel">Back to Reports</button>
+            <button type="submit" id="emailReportSend">Send PDF</button>
+        </div>
+    </form>
+</dialog>
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
@@ -1587,6 +1621,8 @@ function setReportTitle(title) {
 }
 
 function setReportMessage(message) {
+    currentEmailReport = null;
+    document.getElementById("emailReportButton").disabled = true;
     document.getElementById("reportOutputTitle").textContent = "Report Output";
     const container = document.getElementById("reportContainer");
     container.className = "report-message";
@@ -2193,6 +2229,7 @@ async function generateFinancialReport() {
         const report = await response.json();
         renderFinancialReport(report);
         setReportTitle("Financial Report");
+        rememberEmailReport("financial", params);
     }
     catch (err) {
 
@@ -2236,6 +2273,7 @@ async function generateRevenueReport() {
         const report = await response.json();
         renderRevenueReport(report);
         setReportTitle("Revenue Report");
+        rememberEmailReport("revenue", params);
     }
     catch (err) {
 
@@ -2395,6 +2433,7 @@ async function generateGameReport() {
 
         renderGameReport(report);
         setReportTitle("Game Report");
+        rememberEmailReport("game", params);
     }
     catch (err) {
         console.error(
@@ -2441,6 +2480,7 @@ async function generateExpenseReport() {
         const report = await response.json();
         renderExpenseReport(report);
         setReportTitle("Expense Report");
+        rememberEmailReport("expense", params);
     }
     catch (err) {
         console.error(err);
@@ -2485,6 +2525,7 @@ async function generateAccountsReceivableReport() {
         const report = await response.json();
         renderAccountsReceivableReport(report);
         setReportTitle("Accounts Receivable Report");
+        rememberEmailReport("accounts-receivable", params);
     }
     catch (err) {
         console.error(err);
@@ -2530,6 +2571,7 @@ async function generateReconciliationReport() {
         const report = await response.json();
         renderReconciliationReport(report);
         setReportTitle("Reconciliation Report");
+        rememberEmailReport("reconciliation", params);
     }
     catch (err) {
         console.error(err);
@@ -2919,6 +2961,7 @@ async function generate1099Report() {
         }
         render1099Report(await response.json());
         setReportTitle(taxYear === "" ? "1099 Report — All Years" : `1099 Report — Tax Year ${taxYear}`);
+        rememberEmailReport("1099", params);
     } catch (err) {
         console.error("Error generating 1099 report:", err);
         setReportMessage("Failed to generate 1099 report.\n\n" + err.message);
@@ -2936,6 +2979,88 @@ function clear1099Report() {
     document.getElementById("report1099TaxYear").value = "";
     setReportMessage('Select 1099 Report options and click "Create Report".');
 }
+
+// Backend contract: POST /api/email-report, Content-Type: application/json.
+// Body: { to, subject, message, format: "pdf", reportType, filters, reportTitle, generatedAt }.
+// filters maps query parameter names to arrays of strings, preserving multi-select values.
+// Derive tenantId from the authenticated session; regenerate and create the PDF on the server.
+// Return 200 JSON { "message": "Report sent successfully." } only after accepting the email.
+// A development stub should return { "message": "Stub received request; no email sent." }.
+// Return a non-2xx status with JSON { "error": "..." } or a plain-text error on failure.
+let currentEmailReport = null;
+let emailReportSending = false;
+let emailReportSnapshot = null;
+function rememberEmailReport(reportType, params) {
+    const filters = {};
+    for (const key of new Set(params.keys())) filters[key] = params.getAll(key);
+    currentEmailReport = {
+        reportType, filters,
+        reportTitle: document.getElementById("reportOutputTitle").textContent,
+        generatedAt: new Date().toISOString()
+    };
+    document.getElementById("emailReportButton").disabled =
+        !document.querySelector("#reportContainer table");
+}
+const emailDialog = document.getElementById("emailReportDialog");
+document.getElementById("emailReportButton").addEventListener("click", () => {
+    if (!currentEmailReport || emailReportSending) return;
+    emailReportSnapshot = JSON.parse(JSON.stringify(currentEmailReport));
+    document.getElementById("emailReportDescription").textContent = emailReportSnapshot.reportTitle;
+    document.getElementById("emailReportSubject").value = emailReportSnapshot.reportTitle;
+    document.getElementById("emailReportMessage").value = "";
+    document.getElementById("emailReportStatus").textContent = "";
+    emailDialog.showModal();
+    document.getElementById("emailReportTo").focus();
+});
+document.getElementById("emailReportCancel").addEventListener("click", () => {
+    if (!emailReportSending) emailDialog.close();
+});
+emailDialog.addEventListener("cancel", event => {
+    if (emailReportSending) event.preventDefault();
+});
+document.getElementById("emailReportForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    if (emailReportSending || !emailReportSnapshot) return;
+    const form = event.currentTarget;
+    const to = document.getElementById("emailReportTo");
+    const subject = document.getElementById("emailReportSubject");
+    to.value = to.value.trim();
+    subject.value = subject.value.trim();
+    if (!form.reportValidity()) return;
+    emailReportSending = true;
+    const status = document.getElementById("emailReportStatus");
+    const send = document.getElementById("emailReportSend");
+    const cancel = document.getElementById("emailReportCancel");
+    const controls = form.querySelectorAll("input, textarea");
+    const payload = {
+        ...emailReportSnapshot, to: to.value, subject: subject.value,
+        message: document.getElementById("emailReportMessage").value.trim(), format: "pdf"
+    };
+    send.disabled = cancel.disabled = true;
+    controls.forEach(control => control.disabled = true);
+    send.textContent = "Sending...";
+    status.textContent = "Sending PDF report...";
+    try {
+        const response = await fetch("/api/email-report", {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const text = await response.text();
+        let result = {};
+        try { result = text ? JSON.parse(text) : {}; } catch (_) { /* Plain-text errors are supported. */ }
+        if (!response.ok) throw new Error(result.error || result.message || text || `HTTP ${response.status}`);
+        status.textContent = result.message || "Email request accepted by the server.";
+        document.getElementById("emailReportMessage").value = "";
+    } catch (error) {
+        status.textContent = "Unable to send report. " + error.message;
+    } finally {
+        emailReportSending = false;
+        send.disabled = cancel.disabled = false;
+        controls.forEach(control => control.disabled = false);
+        send.textContent = "Send PDF";
+    }
+});
 
 </script>
 

@@ -45,3 +45,9 @@ bugs
 
 # tools
 tools/migrateOfficials
+
+# resend
+resend
+
+# *.bkup
+*.bkup
