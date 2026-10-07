@@ -7040,7 +7040,8 @@ func GetAccountsReceivableReport(
 
 func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	gameReportRecords := []model.GameView{}
 
 	//
@@ -7053,11 +7054,15 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 	//
 	// Get Game Documents
 	//
-	cursor := QueryCollection(gameFilter, Database, "games")
+	cursor, err := Client.Database(Database).Collection("games").Find(ctx, gameFilter)
+	if err != nil {
+		return nil, fmt.Errorf("query games report: %w", err)
+	}
+	defer cursor.Close(ctx)
 
 	var results []model.GameDoc
 
-	err := cursor.All(ctx, &results)
+	err = cursor.All(ctx, &results)
 	if err != nil {
 		fmt.Println("Error", err)
 		return []model.GameView{}, err

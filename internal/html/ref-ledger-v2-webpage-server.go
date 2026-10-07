@@ -7445,6 +7445,62 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func EmailReport(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	fail := func(status int, message string) {
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
+	}
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		fail(http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	// Read the tenant from this request's session, never the global development tenant.
+	session, err := database.GetSession(r)
+	if err != nil || session == nil || session.TenantID == "" || session.TenantID == "na" {
+		fail(http.StatusUnauthorized, "Please sign in again")
+		return
+	}
+	if session.Role == "readonly" {
+		fail(http.StatusForbidden, "Readonly users cannot email reports")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 128*1024)
+	defer r.Body.Close()
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	var request database.EmailReportRequest
+	if err := decoder.Decode(&request); err != nil {
+		fail(http.StatusBadRequest, "Invalid report email request")
+		return
+	}
+	var extra interface{}
+	if err := decoder.Decode(&extra); err != io.EOF {
+		fail(http.StatusBadRequest, "Request must contain one JSON object")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	emailID, err := database.EmailReport(ctx, session.TenantID, request)
+	if err != nil {
+		switch {
+		case errors.Is(err, database.ErrInvalidEmailReport):
+			fail(http.StatusBadRequest, err.Error())
+		case errors.Is(err, database.ErrNoEmailReportData):
+			fail(http.StatusBadRequest, "No records matched the selected report filters")
+		default:
+			log.Printf("EmailReport failed: %v", err)
+			fail(http.StatusBadGateway, "Unable to email the report. Check the server log for details. A timeout can occur after acceptance; check Resend before retrying.")
+		}
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"message": "Report submitted to Resend successfully. Delivery may take a moment.",
+		"emailId": emailID,
+	})
+}
+
 func OfficialRolesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -8371,6 +8427,7 @@ func main() {
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
 	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
 	mux.HandleFunc("/api/settings/official-roles", authRequired(officialRolesAccess(OfficialRolesHandler)))
+	mux.HandleFunc("/api/email-report", authRequired(readOnlyForbidden(EmailReport)))
 
 	mux.HandleFunc("/components-test", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "NEW BINARY IS RUNNING")
