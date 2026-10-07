@@ -6359,6 +6359,8 @@ func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println("Official JSON:",officialJson)
+	
 	err = oc.Update(database.TenantId, oc.ConvJsonToOfficial(officialJson))
 	if err != nil {
 		fmt.Println("Failed to update official")

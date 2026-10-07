@@ -1,1374 +1,447 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ref Ledger V2.0 Officials Entry</title>
-
-<link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <link rel="stylesheet" href="/components/navbar.css?v=12">
-
 <style>
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-    font-family: Arial, Helvetica, sans-serif;
-}
-
-body {
-    background-color: #f4f6f9;
-    color: #333;
-}
-
-.container {
-    max-width: 1200px;
-    margin: 20px auto;
-    padding: 0 20px;
-}
-
-.header {
-    background-color: #1e293b;
-    color: white;
-    padding: 20px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-}
-
-.header h1 {
-    margin-bottom: 10px;
-}
-
-.form-card {
-    background-color: white;
-    padding: 25px;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
-}
-
-.row {
-    display: flex;
-    gap: 20px;
-    margin-bottom: 15px;
-}
-
-.col,
-.form-group {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-label {
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-input {
-    width: 100%;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-}
-
-.button-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-    flex-wrap: wrap;
-}
-
-.btn {
-    border: none;
-    color: white;
-    padding: 11px 20px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 14px;
-}
-
-.btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-}
-
-.btn-find {
-    background: #2563eb;
-}
-
-.btn-find:hover {
-    background: #1d4ed8;
-}
-
-.btn-add {
-    background-color: #16a34a;
-}
-
-.btn-add:hover {
-    background-color: #15803d;
-}
-
-.btn-save {
-    background-color: #5f16a3;
-}
-
-.btn-save:hover {
-    background-color: #291580;
-}
-
-.btn-clear {
-    background-color: #dc2626;
-}
-
-.btn-clear:hover {
-    background-color: #b91c1c;
-}
-
-.btn-delete {
-    background: #ffff00;
-    color: black;
-}
-
-.btn-delete:hover {
-    background: #ffc000;
-    color: black;
-}
-
-.btn-directory {
-    background-color: #7c3aed;
-    color: white;
-}
-
-.btn-directory:hover {
-    background-color: #6d28d9;
-}
-
-.btn-import {
-    background-color: #0f766e;
-    color: white;
-}
-
-.btn-import:hover {
-    background-color: #115e59;
-}
-
-.btn-delete-selected {
-    background-color: #dc2626;
-}
-
-.btn-delete-selected:hover:not(:disabled) {
-    background-color: #b91c1c;
-}
-
-.message-box {
-    background-color: white;
-    padding: 15px 20px;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    font-weight: bold;
-    min-height: 60px;
-    margin-bottom: 20px;
-}
-
-.directory-note {
-    margin-bottom: 15px;
-    color: #475569;
-    font-size: 14px;
-}
-
-.directory-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 15px;
-    margin-bottom: 15px;
-}
-
-.select-all-label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0;
-    cursor: pointer;
-}
-
-.select-all-label input,
-.official-select {
-    width: auto;
-    cursor: pointer;
-}
-
-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-th {
-    background-color: #2563eb;
-    color: white;
-    padding: 10px;
-    text-align: left;
-}
-
-td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
-}
-
-tr:nth-child(even) {
-    background-color: #f9fafb;
-}
-
-.select-column,
-.delete-column {
-    width: 70px;
-    text-align: center;
-}
-
-.btn-row-delete {
-    border: none;
-    background: transparent;
-    color: #dc2626;
-    padding: 6px 9px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-}
-
-.btn-row-delete:hover {
-    color: white;
-    background-color: #dc2626;
-}
-
-.delete-modal {
-    width: min(460px, calc(100% - 32px));
-    padding: 0;
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.3);
-    overflow: hidden;
-}
-
-.delete-modal::backdrop {
-    background: rgba(15, 23, 42, 0.65);
-    backdrop-filter: blur(3px);
-}
-
-.delete-modal-content {
-    background: white;
-}
-
-.delete-modal-header {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 22px 24px 16px;
-}
-
-.delete-modal-icon {
-    display: grid;
-    place-items: center;
-    flex: 0 0 48px;
-    height: 48px;
-    border-radius: 50%;
-    background: #fee2e2;
-    color: #dc2626;
-    font-size: 21px;
-}
-
-.delete-modal-header h2 {
-    color: #1e293b;
-    font-size: 21px;
-    margin-bottom: 3px;
-}
-
-.delete-modal-header p {
-    color: #64748b;
-    font-size: 14px;
-}
-
-.delete-modal-body {
-    padding: 4px 24px 22px;
-    color: #475569;
-    line-height: 1.55;
-}
-
-.delete-modal-target {
-    margin-top: 14px;
-    padding: 12px 14px;
-    border: 1px solid #fecaca;
-    border-radius: 9px;
-    background: #fff7f7;
-    color: #991b1b;
-    font-weight: bold;
-}
-
-.delete-modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 16px 24px;
-    border-top: 1px solid #e2e8f0;
-    background: #f8fafc;
-}
-
-.btn-modal-cancel {
-    background: white;
-    color: #334155;
-    border: 1px solid #cbd5e1;
-}
-
-.btn-modal-cancel:hover {
-    background: #f1f5f9;
-}
-
-.btn-modal-delete {
-    background: #dc2626;
-}
-
-.btn-modal-delete:hover {
-    background: #b91c1c;
-}
-
-@media (max-width: 768px) {
-    .row,
-    .button-row,
-    .directory-actions {
-        flex-direction: column;
-    }
-
-    .btn {
-        width: 100%;
-    }
-
-    .delete-modal-actions .btn {
-        width: auto;
-    }
-}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; }
+body { background: #f4f6f9; color: #333; }
+.container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
+.header { background: #1e293b; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+.header h1 { margin-bottom: 10px; }
+.form-card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 8px #0000001a; margin-bottom: 20px; }
+.row { display: flex; gap: 20px; margin-bottom: 15px; }
+.col, .form-group { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+label { font-weight: bold; margin-bottom: 5px; }
+input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+input[readonly] { background: #f1f5f9; color: #64748b; cursor: default; }
+.button-row { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+.btn { border: none; color: white; padding: 11px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; }
+.btn:disabled { cursor: not-allowed; opacity: .55; }
+.btn-find { background: #2563eb; } .btn-find:hover { background: #1d4ed8; }
+.btn-add { background: #16a34a; } .btn-add:hover { background: #15803d; }
+.btn-save { background: #5f16a3; } .btn-save:hover { background: #291580; }
+.btn-clear, .btn-delete-selected, .btn-modal-delete { background: #dc2626; }
+.btn-clear:hover, .btn-delete-selected:hover:not(:disabled), .btn-modal-delete:hover { background: #b91c1c; }
+.btn-delete { background: #ffff00; color: black; } .btn-delete:hover { background: #ffc000; }
+.btn-directory { background: #7c3aed; } .btn-directory:hover { background: #6d28d9; }
+.btn-import { background: #0f766e; } .btn-import:hover { background: #115e59; }
+.message-box { background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 8px #0000001a; font-weight: bold; white-space: pre-line; min-height: 60px; margin-bottom: 20px; }
+.directory-note { margin: 10px 0 15px; color: #475569; font-size: 14px; }
+.directory-actions { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 15px; }
+.select-all-label { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
+.select-all-label input, .official-select { width: auto; cursor: pointer; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { background: #2563eb; color: white; padding: 10px; text-align: left; }
+td { padding: 10px; border-bottom: 1px solid #ddd; }
+tr:nth-child(even) { background: #f9fafb; }
+.select-column, .action-column { width: 65px; text-align: center; }
+.btn-row-edit, .btn-row-delete { border: none; background: transparent; padding: 6px 9px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+.btn-row-edit { color: #5f16a3; } .btn-row-edit:hover { color: white; background: #5f16a3; }
+.btn-row-delete { color: #dc2626; } .btn-row-delete:hover { color: white; background: #dc2626; }
+dialog { margin: auto; padding: 0; border: none; border-radius: 16px; box-shadow: 0 24px 60px #0f172a4d; max-height: calc(100vh - 32px); overflow: auto; }
+dialog::backdrop { background: #0f172aa6; backdrop-filter: blur(3px); }
+.delete-modal { width: min(460px, calc(100% - 32px)); }
+.edit-modal { width: min(700px, calc(100% - 32px)); }
+.modal-header { display: flex; align-items: center; gap: 14px; padding: 22px 24px 16px; }
+.modal-header h2 { color: #1e293b; font-size: 21px; margin-bottom: 3px; }
+.modal-header p { color: #64748b; font-size: 14px; }
+.delete-modal-icon { display: grid; place-items: center; flex: 0 0 48px; height: 48px; border-radius: 50%; background: #fee2e2; color: #dc2626; font-size: 21px; }
+.modal-body { padding: 4px 24px 22px; color: #475569; line-height: 1.55; }
+.delete-modal-target { margin-top: 14px; padding: 12px 14px; border: 1px solid #fecaca; border-radius: 9px; background: #fff7f7; color: #991b1b; font-weight: bold; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.btn-modal-cancel { background: white; color: #334155; border: 1px solid #cbd5e1; } .btn-modal-cancel:hover { background: #f1f5f9; }
+#editMessage { color: #b91c1c; min-height: 22px; }
+@media (max-width: 768px) { .row, .button-row, .directory-actions { flex-direction: column; } .btn { width: 100%; } .modal-actions .btn { width: auto; } }
 </style>
 </head>
-
 <body>
-
 <div id="navbar-container"></div>
-
 <div class="container">
-
-    <div class="header">
-        <h1>Ref Ledger V2.0 Officials Entry</h1>
-        <p>Manage and track Officials information.</p>
-    </div>
-
+    <div class="header"><h1>Ref Ledger V2.0 Officials Entry</h1><p>Manage and track Officials information.</p></div>
     <div class="form-card">
         <form id="officialsForm">
-
             <div class="row">
-                <div class="form-group">
-                    <label for="firstname">First Name</label>
-                    <input type="text" id="firstname" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="lastname">Last Name</label>
-                    <input type="text" id="lastname" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="phone">Phone</label>
-                    <input type="text" id="phone">
-                </div>
+                <div class="form-group"><label for="firstname">First Name</label><input type="text" id="firstname" required></div>
+                <div class="form-group"><label for="lastname">Last Name</label><input type="text" id="lastname" required></div>
+                <div class="form-group"><label for="phone">Phone</label><input type="text" id="phone"></div>
             </div>
-
             <div class="row">
-                <div class="col">
-                    <label for="email">Email</label>
-                    <input type="email" id="email">
-                </div>
-
-                <div class="col">
-                    <label for="address">Address</label>
-                    <input type="text" id="address">
-                </div>
+                <div class="col"><label for="email">Email</label><input type="email" id="email"></div>
+                <div class="col"><label for="address">Address</label><input type="text" id="address"></div>
             </div>
-
             <div class="button-row">
-                <button
-                    type="button"
-                    id="getOfficialBtn"
-                    class="btn btn-find">
-                    <i class="fa-solid fa-magnifying-glass"></i>
-                    Find
-                </button>
-
-                <button
-                    type="submit"
-                    class="btn btn-add">
-                    <i class="fa-solid fa-plus"></i>
-                    Add
-                </button>
-
-                <button
-                    type="button"
-                    id="updateOfficialBtn"
-                    class="btn btn-save">
-                    <i class="fa-solid fa-pen"></i>
-                    Save
-                </button>
-
-                <button
-                    type="button"
-                    id="deleteOfficialBtn"
-                    class="btn btn-delete">
-                    <i class="fa-solid fa-trash"></i>
-                    Delete
-                </button>
-
-                <button
-                    type="button"
-                    id="clearBtn"
-                    class="btn btn-clear">
-                    <i class="fa-solid fa-eraser"></i>
-                    Clear
-                </button>
-
-                <button
-                    type="button"
-                    id="directoryBtn"
-                    class="btn btn-directory">
-                    <i class="fa-solid fa-address-book"></i>
-                    Directory
-                </button>
-
-                <button
-                    type="button"
-                    id="importOfficialsBtn"
-                    class="btn btn-import">
-                    <i class="fa-solid fa-file-import"></i>
-                    Import
-                </button>
+                <button type="button" id="getOfficialBtn" class="btn btn-find"><i class="fa-solid fa-magnifying-glass"></i> Find</button>
+                <button type="submit" class="btn btn-add"><i class="fa-solid fa-plus"></i> Add</button>
+                <button type="button" id="updateOfficialBtn" class="btn btn-save"><i class="fa-solid fa-pen"></i> Save</button>
+                <button type="button" id="deleteOfficialBtn" class="btn btn-delete"><i class="fa-solid fa-trash"></i> Delete</button>
+                <button type="button" id="clearBtn" class="btn btn-clear"><i class="fa-solid fa-eraser"></i> Clear</button>
+                <button type="button" id="directoryBtn" class="btn btn-directory"><i class="fa-solid fa-address-book"></i> Directory</button>
+                <button type="button" id="importOfficialsBtn" class="btn btn-import"><i class="fa-solid fa-file-import"></i> Import</button>
             </div>
-
         </form>
     </div>
-
-    <div class="message-box" id="message">
-        Ready to enter officials.
-    </div>
-
-    <div
-        class="form-card"
-        id="directorySection"
-        style="display: none;"
-    >
+    <div class="message-box" id="message" role="status">Ready to enter officials.</div>
+    <div class="form-card" id="directorySection" style="display: none;">
         <h2>Officials Directory</h2>
-
-        <p class="directory-note">
-            Directory is filtered by First Name and/or Last Name when
-            those fields are filled in. Leave both blank to show all
-            officials.
-        </p>
-
+        <p class="directory-note">Directory is filtered by First Name and/or Last Name when those fields are filled in. Leave both blank to show all officials.</p>
         <div class="directory-actions">
-            <label
-                class="select-all-label"
-                for="selectAllOfficials"
-            >
-                <input
-                    type="checkbox"
-                    id="selectAllOfficials"
-                >
-                Select All
-            </label>
-
-            <button
-                type="button"
-                id="deleteSelectedOfficialsBtn"
-                class="btn btn-delete-selected"
-                disabled
-            >
-                <i class="fa-solid fa-trash"></i>
-                Delete Selected
-            </button>
+            <label class="select-all-label" for="selectAllOfficials"><input type="checkbox" id="selectAllOfficials"> Select All</label>
+            <button type="button" id="deleteSelectedOfficialsBtn" class="btn btn-delete-selected" disabled><i class="fa-solid fa-trash"></i> Delete Selected</button>
         </div>
-
-        <table id="officialsTable">
-            <thead>
-                <tr>
-                    <th class="select-column">Select</th>
-                    <th>First Name</th>
-                    <th>Last Name</th>
-                    <th>Phone</th>
-                    <th>Email</th>
-                    <th>Address</th>
-                    <th class="delete-column">Delete</th>
-                </tr>
-            </thead>
-
-            <tbody></tbody>
-        </table>
+        <div class="table-scroll">
+            <table id="officialsTable">
+                <thead><tr><th class="select-column">Select</th><th class="action-column">Edit</th><th class="action-column">Delete</th><th>First Name</th><th>Last Name</th><th>Phone</th><th>Email</th><th>Address</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
-
 </div>
-
-<dialog
-    id="deleteConfirmationModal"
-    class="delete-modal"
-    aria-labelledby="deleteModalTitle"
-    aria-describedby="deleteModalMessage"
->
-    <div class="delete-modal-content">
-        <div class="delete-modal-header">
-            <div class="delete-modal-icon" aria-hidden="true">
-                <i class="fa-solid fa-trash-can"></i>
+<dialog id="editOfficialModal" class="edit-modal" aria-labelledby="editModalTitle" aria-describedby="editModalNote">
+    <form id="editOfficialForm">
+        <div class="modal-header"><div><h2 id="editModalTitle"><i class="fa-solid fa-pencil" aria-hidden="true"></i> Edit Official</h2><p id="editModalNote">First and last name cannot be changed.</p></div></div>
+        <div class="modal-body">
+            <div class="row">
+                <div class="form-group"><label for="editFirstName">First Name</label><input id="editFirstName" readonly></div>
+                <div class="form-group"><label for="editLastName">Last Name</label><input id="editLastName" readonly></div>
             </div>
-
-            <div>
-                <h2 id="deleteModalTitle">Confirm deletion</h2>
-                <p>This action cannot be undone.</p>
+            <div class="row">
+                <div class="form-group"><label for="editPhone">Phone</label><input id="editPhone" type="text"></div>
+                <div class="form-group"><label for="editEmail">Email</label><input id="editEmail" type="email"></div>
             </div>
+            <div class="row"><div class="form-group"><label for="editAddress">Address</label><input id="editAddress" type="text"></div></div>
+            <p id="editMessage" role="status"></p>
         </div>
-
-        <div class="delete-modal-body">
-            <p id="deleteModalMessage">
-                Are you sure you want to delete this official?
-            </p>
-
-            <div
-                id="deleteModalTarget"
-                class="delete-modal-target"
-            ></div>
+        <div class="modal-actions">
+            <button type="button" id="cancelEditBtn" class="btn btn-modal-cancel">Cancel</button>
+            <button type="submit" id="saveEditBtn" class="btn btn-save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
         </div>
-
-        <div class="delete-modal-actions">
-            <button
-                type="button"
-                id="cancelDeleteBtn"
-                class="btn btn-modal-cancel"
-            >
-                Cancel
-            </button>
-
-            <button
-                type="button"
-                id="confirmDeleteBtn"
-                class="btn btn-modal-delete"
-            >
-                <i class="fa-solid fa-trash-can"></i>
-                Delete
-            </button>
-        </div>
+    </form>
+</dialog>
+<dialog id="deleteConfirmationModal" class="delete-modal" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalMessage">
+    <div class="modal-header">
+        <div class="delete-modal-icon" aria-hidden="true"><i class="fa-solid fa-trash-can"></i></div>
+        <div><h2 id="deleteModalTitle">Confirm deletion</h2><p>This action cannot be undone.</p></div>
+    </div>
+    <div class="modal-body"><p id="deleteModalMessage"></p><div id="deleteModalTarget" class="delete-modal-target"></div></div>
+    <div class="modal-actions">
+        <button type="button" id="cancelDeleteBtn" class="btn btn-modal-cancel">Cancel</button>
+        <button type="button" id="confirmDeleteBtn" class="btn btn-modal-delete"><i class="fa-solid fa-trash-can"></i> Delete</button>
     </div>
 </dialog>
-
 <script src="/components/navbar.js?v=12"></script>
-
 <script>
-const selectAllOfficials =
-    document.getElementById("selectAllOfficials");
-
-const deleteSelectedOfficialsBtn =
-    document.getElementById("deleteSelectedOfficialsBtn");
-
-const deleteConfirmationModal =
-    document.getElementById("deleteConfirmationModal");
-
-const deleteModalMessage =
-    document.getElementById("deleteModalMessage");
-
-const deleteModalTarget =
-    document.getElementById("deleteModalTarget");
-
-const confirmDeleteBtn =
-    document.getElementById("confirmDeleteBtn");
-
-const cancelDeleteBtn =
-    document.getElementById("cancelDeleteBtn");
-
-function confirmOfficialDeletion(message, target) {
-    deleteModalMessage.textContent = message;
-    deleteModalTarget.textContent = target;
-    deleteConfirmationModal.showModal();
-
-    return new Promise(function (resolve) {
-        function finish(confirmed) {
-            confirmDeleteBtn.removeEventListener(
-                "click",
-                confirmDeletion
-            );
-
-            cancelDeleteBtn.removeEventListener(
-                "click",
-                cancelDeletion
-            );
-
-            deleteConfirmationModal.removeEventListener(
-                "cancel",
-                cancelWithEscape
-            );
-
-            deleteConfirmationModal.removeEventListener(
-                "click",
-                cancelFromBackdrop
-            );
-
-            deleteConfirmationModal.close();
-            resolve(confirmed);
-        }
-
-        function confirmDeletion() {
-            finish(true);
-        }
-
-        function cancelDeletion() {
-            finish(false);
-        }
-
-        function cancelWithEscape(event) {
-            event.preventDefault();
-            finish(false);
-        }
-
-        function cancelFromBackdrop(event) {
-            if (event.target === deleteConfirmationModal) {
-                finish(false);
-            }
-        }
-
-        confirmDeleteBtn.addEventListener(
-            "click",
-            confirmDeletion
-        );
-
-        cancelDeleteBtn.addEventListener(
-            "click",
-            cancelDeletion
-        );
-
-        deleteConfirmationModal.addEventListener(
-            "cancel",
-            cancelWithEscape
-        );
-
-        deleteConfirmationModal.addEventListener(
-            "click",
-            cancelFromBackdrop
-        );
-
-        cancelDeleteBtn.focus();
-    });
-}
-
+const byId = id => document.getElementById(id);
+const selectAllOfficials = byId("selectAllOfficials");
+const deleteSelectedOfficialsBtn = byId("deleteSelectedOfficialsBtn");
+const deleteConfirmationModal = byId("deleteConfirmationModal");
+const editOfficialModal = byId("editOfficialModal");
 let directoryRequestVersion = 0;
+let editingOfficial = null;
+let editSaving = false;
+let loadedOfficial = null;
+const showMessage = text => { byId("message").textContent = text; };
+function requiresLogin(response) {
+    if (response.status === 401 || response.redirected) {
+        window.location.href = "/login";
+        return true;
+    }
+    return false;
+}
+function normalizeOfficial(value) {
+    return {
+        ...value,
+        FirstName: value.FirstName ?? value.firstName ?? "",
+        LastName: value.LastName ?? value.lastName ?? "",
+        Phone: value.Phone ?? value.phone ?? "",
+        Email: value.Email ?? value.email ?? "",
+        Address: value.Address ?? value.address ?? ""
+    };
+}
+function officialPayload(official, phone, email, address) {
+    const payload = { firstName: official.FirstName, lastName: official.LastName, phone, email, address };
+    // Retain an existing ID when the API supplies it; never generate one here.
+    const id = official.Id ?? official.id ?? official.ID;
+    if (id !== undefined && id !== null) payload.id = id;
+    return payload;
+}
+function readMainForm() {
+    return officialPayload({
+        ...(loadedOfficial || {}),
+        FirstName: byId("firstname").value.trim(),
+        LastName: byId("lastname").value.trim()
+    }, byId("phone").value.trim(), byId("email").value.trim(), byId("address").value.trim());
+}
 function clearOfficialsDirectory() {
     directoryRequestVersion++;
-    document.querySelector("#officialsTable tbody").innerHTML = "";
-    document.getElementById("directorySection").style.display = "none";
-    selectAllOfficials.checked = false;
-    selectAllOfficials.indeterminate = false;
-    deleteSelectedOfficialsBtn.disabled = true;
+    document.querySelector("#officialsTable tbody").replaceChildren();
+    byId("directorySection").style.display = "none";
+    updateDirectorySelection();
 }
 function clearOfficialForm() {
-    document.getElementById("officialsForm").reset();
-    document.getElementById("firstname").focus();
+    byId("officialsForm").reset();
+    loadedOfficial = null;
+    byId("firstname").readOnly = false;
+    byId("lastname").readOnly = false;
+    document.querySelector("#officialsForm .btn-add").disabled = false;
+    byId("firstname").focus();
 }
-
+function fillMainForm(official) {
+    loadedOfficial = official;
+    for (const [input, field] of [["firstname", "FirstName"], ["lastname", "LastName"], ["phone", "Phone"], ["email", "Email"], ["address", "Address"]]) {
+        byId(input).value = official[field];
+    }
+    byId("firstname").readOnly = true;
+    byId("lastname").readOnly = true;
+    document.querySelector("#officialsForm .btn-add").disabled = true;
+}
 function updateDirectorySelection() {
-    const checkboxes = Array.from(
-        document.querySelectorAll(".official-select")
-    );
-
-    const selectedCount = checkboxes.filter(
-        checkbox => checkbox.checked
-    ).length;
-
-    selectAllOfficials.checked =
-        checkboxes.length > 0 &&
-        selectedCount === checkboxes.length;
-
-    selectAllOfficials.indeterminate =
-        selectedCount > 0 &&
-        selectedCount < checkboxes.length;
-
-    deleteSelectedOfficialsBtn.disabled =
-        selectedCount === 0;
+    const checkboxes = [...document.querySelectorAll(".official-select")];
+    const count = checkboxes.filter(box => box.checked).length;
+    selectAllOfficials.checked = checkboxes.length > 0 && count === checkboxes.length;
+    selectAllOfficials.indeterminate = count > 0 && count < checkboxes.length;
+    deleteSelectedOfficialsBtn.disabled = count === 0;
 }
-
-async function deleteDirectoryOfficial(
-    firstName,
-    lastName
-) {
-    return fetch(
-        `/api/deleteOfficial/${encodeURIComponent(
-            firstName
-        )}/${encodeURIComponent(lastName)}`,
-        {
-            method: "DELETE"
-        }
-    );
+function confirmOfficialDeletion(message, target) {
+    byId("deleteModalMessage").textContent = message;
+    byId("deleteModalTarget").textContent = target;
+    deleteConfirmationModal.returnValue = "cancel";
+    deleteConfirmationModal.showModal();
+    byId("cancelDeleteBtn").focus();
+    return new Promise(resolve => {
+        deleteConfirmationModal.addEventListener("close", () => resolve(deleteConfirmationModal.returnValue === "delete"), { once: true });
+    });
 }
-
-selectAllOfficials.addEventListener(
-    "change",
-    function () {
-        document
-            .querySelectorAll(".official-select")
-            .forEach(function (checkbox) {
-                checkbox.checked =
-                    selectAllOfficials.checked;
-            });
-
-        updateDirectorySelection();
+byId("confirmDeleteBtn").addEventListener("click", () => deleteConfirmationModal.close("delete"));
+byId("cancelDeleteBtn").addEventListener("click", () => deleteConfirmationModal.close("cancel"));
+deleteConfirmationModal.addEventListener("click", event => {
+    if (event.target === deleteConfirmationModal) {
+        const rect = deleteConfirmationModal.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) deleteConfirmationModal.close("cancel");
     }
-);
-
-deleteSelectedOfficialsBtn.addEventListener(
-    "click",
-    async function () {
-        const selected = Array.from(
-            document.querySelectorAll(
-                ".official-select:checked"
-            )
-        );
-
-        if (selected.length === 0) {
-            document.getElementById("message").innerText =
-                "Select at least one official to delete.";
-
+});
+function deleteDirectoryOfficial(firstName, lastName) {
+    return fetch(`/api/deleteOfficial/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}`, { method: "DELETE" });
+}
+selectAllOfficials.addEventListener("change", () => {
+    document.querySelectorAll(".official-select").forEach(box => { box.checked = selectAllOfficials.checked; });
+    updateDirectorySelection();
+});
+deleteSelectedOfficialsBtn.addEventListener("click", async () => {
+    const selected = [...document.querySelectorAll(".official-select:checked")];
+    if (!selected.length) return showMessage("Select at least one official to delete.");
+    if (!await confirmOfficialDeletion("You are about to permanently delete the selected officials.", `${selected.length} selected official(s)`)) return;
+    deleteSelectedOfficialsBtn.disabled = true;
+    showMessage(`Deleting ${selected.length} selected official(s)...`);
+    let deleted = 0;
+    const failures = [];
+    for (const box of selected) {
+        try {
+            const response = await deleteDirectoryOfficial(box.dataset.firstName, box.dataset.lastName);
+            if (requiresLogin(response)) return;
+            if (response.status === 403) {
+                updateDirectorySelection();
+                return showMessage("Permission denied. Read-only users cannot delete officials.");
+            }
+            if (response.ok) {
+                box.closest("tr").remove();
+                deleted++;
+            } else {
+                const reason = (await response.text()).trim() || "Unable to delete official.";
+                const name = `${box.dataset.firstName} ${box.dataset.lastName}`.trim();
+                failures.push(/^delete failed:/i.test(reason)
+                    ? reason
+                    : `Delete failed: cannot delete ${name}: ${reason}`);
+            }
+        } catch {
+            const name = `${box.dataset.firstName} ${box.dataset.lastName}`.trim();
+            failures.push(`Delete failed: cannot delete ${name}: Server unavailable.`);
+        }
+    }
+    updateDirectorySelection();
+    showMessage(failures.length
+        ? (deleted > 0 ? `${deleted} official(s) deleted successfully.\n` : "") + failures.join("\n")
+        : `${deleted} official(s) deleted successfully.`);
+});
+byId("importOfficialsBtn").addEventListener("click", () => { window.location.href = "/importOfficials"; });
+byId("clearBtn").addEventListener("click", () => { clearOfficialsDirectory(); clearOfficialForm(); showMessage("Form cleared."); });
+async function saveMainOfficial(update) {
+    if (!byId("officialsForm").reportValidity()) return;
+    const official = readMainForm();
+    if (!official.firstName || !official.lastName) return showMessage("Enter both First Name and Last Name first.");
+    showMessage(update ? "Updating Official" : "Saving Official");
+    try {
+        const response = await fetch(update ? "/api/officials-update" : "/api/officials", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(official)
+        });
+        if (requiresLogin(response)) return;
+        if (response.status === 403) return showMessage(`Permission denied. Read-only users cannot ${update ? "update" : "add"} officials.`);
+        const message = await response.text();
+        showMessage(message || (response.ok ? `Official ${update ? "updated" : "saved"} successfully.` : `Error ${update ? "updating" : "saving"} official.`));
+        if (response.ok) {
+            clearOfficialsDirectory();
+            if (!update) clearOfficialForm();
+        }
+    } catch { showMessage("Server unavailable."); }
+}
+byId("officialsForm").addEventListener("submit", event => { event.preventDefault(); saveMainOfficial(false); });
+byId("updateOfficialBtn").addEventListener("click", () => saveMainOfficial(true));
+byId("getOfficialBtn").addEventListener("click", async () => {
+    clearOfficialsDirectory();
+    const firstName = byId("firstname").value.trim(), lastName = byId("lastname").value.trim();
+    if (!firstName || !lastName) return showMessage("Enter both First Name and Last Name first.");
+    showMessage("Loading Official");
+    try {
+        const response = await fetch(`/api/officials/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}?t=${Date.now()}`);
+        if (requiresLogin(response)) return;
+        if (!response.ok) return showMessage("Official not found.");
+        fillMainForm(normalizeOfficial(await response.json()));
+        showMessage("Official loaded successfully.");
+    } catch { showMessage("Server unavailable."); }
+});
+byId("deleteOfficialBtn").addEventListener("click", async () => {
+    const firstName = byId("firstname").value.trim(), lastName = byId("lastname").value.trim();
+    if (!firstName || !lastName) return showMessage("Enter both First Name and Last Name first.");
+    if (!await confirmOfficialDeletion("You are about to permanently delete this official.", `${firstName} ${lastName}`)) return;
+    showMessage("Deleting Official");
+    try {
+        const response = await deleteDirectoryOfficial(firstName, lastName);
+        if (requiresLogin(response)) return;
+        if (response.status === 403) return showMessage("Permission denied. Read-only users cannot delete officials.");
+        const message = await response.text();
+        showMessage(message || (response.ok ? "Official deleted successfully." : "Error deleting official."));
+        if (response.ok) { clearOfficialForm(); clearOfficialsDirectory(); }
+    } catch { showMessage("Server unavailable."); }
+});
+function openOfficialEditor(official, row) {
+    editingOfficial = { official, row };
+    byId("editFirstName").value = official.FirstName;
+    byId("editLastName").value = official.LastName;
+    byId("editPhone").value = official.Phone;
+    byId("editEmail").value = official.Email;
+    byId("editAddress").value = official.Address;
+    byId("editMessage").textContent = "";
+    editOfficialModal.showModal();
+    byId("editPhone").focus();
+}
+byId("cancelEditBtn").addEventListener("click", () => { if (!editSaving) editOfficialModal.close(); });
+editOfficialModal.addEventListener("cancel", event => { if (editSaving) event.preventDefault(); });
+editOfficialModal.addEventListener("close", () => { editingOfficial = null; });
+byId("editOfficialForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!editingOfficial || editSaving) return;
+    const { official, row } = editingOfficial;
+    // Names come from the original record, never from the edit inputs.
+    const payload = officialPayload(official, byId("editPhone").value.trim(), byId("editEmail").value.trim(), byId("editAddress").value.trim());
+    editSaving = true;
+    byId("saveEditBtn").disabled = true;
+    byId("cancelEditBtn").disabled = true;
+    byId("editMessage").textContent = "Saving changes...";
+    try {
+        const response = await fetch("/api/officials-update", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+        });
+        if (requiresLogin(response)) return;
+        const message = await response.text();
+        if (!response.ok) {
+            byId("editMessage").textContent = response.status === 403
+                ? "Permission denied. Read-only users cannot update officials."
+                : message || "Error updating official.";
             return;
         }
-
-        const confirmed = await confirmOfficialDeletion(
-            "You are about to permanently delete the " +
-                "selected officials.",
-            `${selected.length} selected official(s)`
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        deleteSelectedOfficialsBtn.disabled = true;
-
-        document.getElementById("message").innerText =
-            `Deleting ${selected.length} selected official(s)...`;
-
-        let deletedCount = 0;
-        let failedCount = 0;
-
-        for (const checkbox of selected) {
-            try {
-                const response =
-                    await deleteDirectoryOfficial(
-                        checkbox.dataset.firstName,
-                        checkbox.dataset.lastName
-                    );
-
-                if (
-                    response.status === 401 ||
-                    response.redirected
-                ) {
-                    window.location.href = "/login";
-                    return;
-                }
-
-                if (response.status === 403) {
-                    document.getElementById(
-                        "message"
-                    ).innerText =
-                        "Permission denied. Read-only users " +
-                        "cannot delete officials.";
-
+        Object.assign(official, { Phone: payload.phone, Email: payload.email, Address: payload.address });
+        [official.FirstName, official.LastName, official.Phone, official.Email, official.Address].forEach((value, index) => {
+            row.cells[index + 3].textContent = value;
+        });
+        if (loadedOfficial && loadedOfficial.FirstName === official.FirstName && loadedOfficial.LastName === official.LastName) fillMainForm(official);
+        showMessage(message || "Official updated successfully.");
+        editOfficialModal.close();
+    } catch { byId("editMessage").textContent = "Server unavailable. Please try again."; }
+    finally {
+        editSaving = false;
+        byId("saveEditBtn").disabled = false;
+        byId("cancelEditBtn").disabled = false;
+    }
+});
+function actionCell(className, icon, label, handler) {
+    const cell = document.createElement("td");
+    cell.className = "action-column";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    const glyph = document.createElement("i");
+    glyph.className = `fa-solid ${icon}`;
+    glyph.setAttribute("aria-hidden", "true");
+    button.appendChild(glyph);
+    button.addEventListener("click", handler);
+    cell.appendChild(button);
+    return cell;
+}
+byId("directoryBtn").addEventListener("click", async () => {
+    const requestVersion = ++directoryRequestVersion;
+    const params = new URLSearchParams();
+    const firstName = byId("firstname").value.trim(), lastName = byId("lastname").value.trim();
+    if (firstName) params.set("firstname", firstName);
+    if (lastName) params.set("lastname", lastName);
+    params.set("t", Date.now());
+    showMessage("Loading Directory");
+    try {
+        const response = await fetch(`/api/officialsDirectory?${params}`);
+        if (requestVersion !== directoryRequestVersion) return;
+        if (requiresLogin(response)) return;
+        if (!response.ok) return showMessage("Unable to load directory.");
+        const officials = await response.json();
+        if (requestVersion !== directoryRequestVersion) return;
+        const tbody = document.querySelector("#officialsTable tbody");
+        tbody.replaceChildren();
+        byId("directorySection").style.display = "block";
+        (officials || []).forEach(value => {
+            const official = normalizeOfficial(value);
+            const row = document.createElement("tr");
+            const name = `${official.FirstName} ${official.LastName}`.trim();
+            const selectCell = document.createElement("td");
+            selectCell.className = "select-column";
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.className = "official-select";
+            checkbox.dataset.firstName = official.FirstName;
+            checkbox.dataset.lastName = official.LastName;
+            checkbox.setAttribute("aria-label", `Select ${name}`);
+            checkbox.addEventListener("change", updateDirectorySelection);
+            selectCell.appendChild(checkbox);
+            row.appendChild(selectCell);
+            row.appendChild(actionCell("btn-row-edit", "fa-pencil", `Edit ${name}`, () => openOfficialEditor(official, row)));
+            row.appendChild(actionCell("btn-row-delete", "fa-trash", `Delete ${name}`, async () => {
+                if (!await confirmOfficialDeletion("You are about to permanently delete this official.", name)) return;
+                showMessage(`Deleting ${name}...`);
+                try {
+                    const response = await deleteDirectoryOfficial(official.FirstName, official.LastName);
+                    if (requiresLogin(response)) return;
+                    if (response.status === 403) return showMessage("Permission denied. Read-only users cannot delete officials.");
+                    const message = await response.text();
+                    if (!response.ok) return showMessage(message || "Error deleting official.");
+                    row.remove();
                     updateDirectorySelection();
-                    return;
-                }
-
-                if (response.ok) {
-                    checkbox.closest("tr").remove();
-                    deletedCount++;
-                } else {
-                    failedCount++;
-                }
-            } catch (err) {
-                failedCount++;
-            }
-        }
-
-        updateDirectorySelection();
-
-        document.getElementById("message").innerText =
-            failedCount === 0
-                ? `${deletedCount} official(s) deleted successfully.`
-                : `${deletedCount} official(s) deleted; ` +
-                  `${failedCount} could not be deleted.`;
-    }
-);
-
-document
-    .getElementById("importOfficialsBtn")
-    .addEventListener("click", function () {
-        window.location.href = "/importOfficials";
-    });
-
-document
-    .getElementById("clearBtn")
-    .addEventListener("click", function () {
-        clearOfficialsDirectory();
-        clearOfficialForm();
-
-        document.getElementById("message").innerText =
-            "Form cleared.";
-    });
-
-document
-    .getElementById("officialsForm")
-    .addEventListener("submit", async function (e) {
-        e.preventDefault();
-
-        const official = {
-            firstName: document
-                .getElementById("firstname")
-                .value
-                .trim(),
-
-            lastName: document
-                .getElementById("lastname")
-                .value
-                .trim(),
-
-            phone: document
-                .getElementById("phone")
-                .value
-                .trim(),
-
-            email: document
-                .getElementById("email")
-                .value
-                .trim(),
-
-            address: document
-                .getElementById("address")
-                .value
-                .trim()
-        };
-
-        document.getElementById("message").innerText =
-            "Saving Official";
-
-        try {
-            const response = await fetch(
-                "/api/officials",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-
-                    body: JSON.stringify(official)
-                }
-            );
-
-            if (
-                response.status === 401 ||
-                response.redirected
-            ) {
-                window.location.href = "/login";
-                return;
-            }
-
-            if (response.status === 403) {
-                document.getElementById(
-                    "message"
-                ).innerText =
-                    "Permission denied. Read-only users " +
-                    "cannot add officials.";
-
-                return;
-            }
-
-            const message = await response.text();
-
-            document.getElementById("message").innerText =
-                response.ok
-                    ? message ||
-                      "Official saved successfully."
-                    : message ||
-                      "Error saving official.";
-
-            if (response.ok) {
-                clearOfficialForm();
-            }
-        } catch (err) {
-            document.getElementById("message").innerText =
-                "Server unavailable.";
-        }
-    });
-
-document
-    .getElementById("updateOfficialBtn")
-    .addEventListener("click", async function (e) {
-        e.preventDefault();
-
-        const official = {
-            firstName: document
-                .getElementById("firstname")
-                .value
-                .trim(),
-
-            lastName: document
-                .getElementById("lastname")
-                .value
-                .trim(),
-
-            phone: document
-                .getElementById("phone")
-                .value
-                .trim(),
-
-            email: document
-                .getElementById("email")
-                .value
-                .trim(),
-
-            address: document
-                .getElementById("address")
-                .value
-                .trim()
-        };
-
-        document.getElementById("message").innerText =
-            "Updating Official";
-
-        try {
-            const response = await fetch(
-                "/api/officials-update",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-
-                    body: JSON.stringify(official)
-                }
-            );
-
-            if (
-                response.status === 401 ||
-                response.redirected
-            ) {
-                window.location.href = "/login";
-                return;
-            }
-
-            if (response.status === 403) {
-                document.getElementById(
-                    "message"
-                ).innerText =
-                    "Permission denied. Read-only users " +
-                    "cannot update officials.";
-
-                return;
-            }
-
-            const message = await response.text();
-
-            document.getElementById("message").innerText =
-                response.ok
-                    ? message ||
-                      "Official updated successfully."
-                    : message ||
-                      "Error updating official.";
-        } catch (err) {
-            document.getElementById("message").innerText =
-                "Server unavailable.";
-        }
-    });
-
-document
-    .getElementById("getOfficialBtn")
-    .addEventListener("click", async function () {
-        clearOfficialsDirectory();
-        const firstName = document
-            .getElementById("firstname")
-            .value
-            .trim();
-
-        const lastName = document
-            .getElementById("lastname")
-            .value
-            .trim();
-
-        if (!firstName || !lastName) {
-            document.getElementById("message").innerText =
-                "Enter both First Name and Last Name first.";
-
-            return;
-        }
-
-        document.getElementById("message").innerText =
-            "Loading Official";
-
-        try {
-            const response = await fetch(
-                `/api/officials/${encodeURIComponent(
-                    firstName
-                )}/${encodeURIComponent(
-                    lastName
-                )}?t=${Date.now()}`
-            );
-
-            if (!response.ok) {
-                document.getElementById("message").innerText =
-                    "Official not found.";
-
-                return;
-            }
-
-            const official = await response.json();
-
-            document.getElementById("firstname").value =
-                official.FirstName || "";
-
-            document.getElementById("lastname").value =
-                official.LastName || "";
-
-            document.getElementById("phone").value =
-                official.Phone || "";
-
-            document.getElementById("email").value =
-                official.Email || "";
-
-            document.getElementById("address").value =
-                official.Address || "";
-
-            document.getElementById("message").innerText =
-                "Official loaded successfully.";
-        } catch (err) {
-            document.getElementById("message").innerText =
-                "Server unavailable.";
-        }
-    });
-
-document
-    .getElementById("deleteOfficialBtn")
-    .addEventListener("click", async function () {
-        const firstName = document
-            .getElementById("firstname")
-            .value
-            .trim();
-
-        const lastName = document
-            .getElementById("lastname")
-            .value
-            .trim();
-
-        if (!firstName || !lastName) {
-            document.getElementById("message").innerText =
-                "Enter both First Name and Last Name first.";
-
-            return;
-        }
-
-        const confirmed = await confirmOfficialDeletion(
-            "You are about to permanently delete this official.",
-            `${firstName} ${lastName}`
-        );
-
-        if (!confirmed) {
-            return;
-        }
-
-        document.getElementById("message").innerText =
-            "Deleting Official";
-
-        try {
-            const response =
-                await deleteDirectoryOfficial(
-                    firstName,
-                    lastName
-                );
-
-            if (
-                response.status === 401 ||
-                response.redirected
-            ) {
-                window.location.href = "/login";
-                return;
-            }
-
-            if (response.status === 403) {
-                document.getElementById(
-                    "message"
-                ).innerText =
-                    "Permission denied. Read-only users " +
-                    "cannot delete officials.";
-
-                return;
-            }
-
-            const message = await response.text();
-
-            document.getElementById("message").innerText =
-                response.ok
-                    ? message ||
-                      "Official deleted successfully."
-                    : message ||
-                      "Error deleting official.";
-
-            if (response.ok) {
-                clearOfficialForm();
-            }
-        } catch (err) {
-            document.getElementById("message").innerText =
-                "Server unavailable.";
-        }
-    });
-
-document
-    .getElementById("directoryBtn")
-    .addEventListener("click", async function () {
-        const requestVersion = ++directoryRequestVersion;
-        const firstName = document
-            .getElementById("firstname")
-            .value
-            .trim();
-
-        const lastName = document
-            .getElementById("lastname")
-            .value
-            .trim();
-
-        const params = new URLSearchParams();
-
-        if (firstName !== "") {
-            params.append("firstname", firstName);
-        }
-
-        if (lastName !== "") {
-            params.append("lastname", lastName);
-        }
-
-        params.append("t", Date.now());
-
-        document.getElementById("message").innerText =
-            "Loading Directory";
-
-        try {
-            const response = await fetch(
-                `/api/officialsDirectory?${params.toString()}`
-            );
-
-            if (requestVersion !== directoryRequestVersion) return;
-            if (
-                response.status === 401 ||
-                response.redirected
-            ) {
-                window.location.href = "/login";
-                return;
-            }
-
-            if (!response.ok) {
-                document.getElementById("message").innerText =
-                    "Unable to load directory.";
-
-                return;
-            }
-
-            const officials = await response.json();
-            if (requestVersion !== directoryRequestVersion) return;
-
-            const tbody = document.querySelector(
-                "#officialsTable tbody"
-            );
-
-            tbody.innerHTML = "";
-
-            selectAllOfficials.checked = false;
-            selectAllOfficials.indeterminate = false;
-            deleteSelectedOfficialsBtn.disabled = true;
-
-            document.getElementById(
-                "directorySection"
-            ).style.display = "block";
-
-            if (!officials || officials.length === 0) {
-                document.getElementById("message").innerText =
-                    "No officials found for the selected filter.";
-
-                return;
-            }
-
-            officials.forEach(function (official) {
-                const row = document.createElement("tr");
-
-                const selectCell =
-                    document.createElement("td");
-
-                selectCell.className = "select-column";
-
-                const checkbox =
-                    document.createElement("input");
-
-                checkbox.type = "checkbox";
-                checkbox.className = "official-select";
-
-                checkbox.dataset.firstName =
-                    official.FirstName || "";
-
-                checkbox.dataset.lastName =
-                    official.LastName || "";
-
-                checkbox.setAttribute(
-                    "aria-label",
-                    `Select ${official.FirstName || ""} ` +
-                    `${official.LastName || ""}`
-                );
-
-                checkbox.addEventListener(
-                    "change",
-                    updateDirectorySelection
-                );
-
-                selectCell.appendChild(checkbox);
-                row.appendChild(selectCell);
-
-                [
-                    official.FirstName,
-                    official.LastName,
-                    official.Phone,
-                    official.Email,
-                    official.Address
-                ].forEach(function (value) {
-                    const cell =
-                        document.createElement("td");
-
-                    cell.textContent = value || "";
-                    row.appendChild(cell);
-                });
-
-                const deleteCell =
-                    document.createElement("td");
-
-                deleteCell.className = "delete-column";
-
-                const deleteButton =
-                    document.createElement("button");
-
-                deleteButton.type = "button";
-                deleteButton.className =
-                    "btn-row-delete";
-
-                deleteButton.title =
-                    "Delete official";
-
-                deleteButton.setAttribute(
-                    "aria-label",
-                    `Delete ${official.FirstName || ""} ` +
-                    `${official.LastName || ""}`
-                );
-
-                deleteButton.innerHTML =
-                    '<i class="fa-solid fa-trash"></i>';
-
-                deleteButton.addEventListener(
-                    "click",
-                    async function () {
-                        const fullName =
-                            `${official.FirstName || ""} ` +
-                            `${official.LastName || ""}`;
-
-                        const confirmed =
-                            await confirmOfficialDeletion(
-                                "You are about to permanently " +
-                                "delete this official.",
-                                fullName.trim()
-                        );
-
-                        if (!confirmed) {
-                            return;
-                        }
-
-                        document.getElementById(
-                            "message"
-                        ).innerText =
-                            `Deleting ${fullName.trim()}...`;
-
-                        try {
-                            const response =
-                                await deleteDirectoryOfficial(
-                                    official.FirstName || "",
-                                    official.LastName || ""
-                                );
-
-                            if (
-                                response.status === 401 ||
-                                response.redirected
-                            ) {
-                                window.location.href = "/login";
-                                return;
-                            }
-
-                            if (response.status === 403) {
-                                document.getElementById(
-                                    "message"
-                                ).innerText =
-                                    "Permission denied. " +
-                                    "Read-only users cannot " +
-                                    "delete officials.";
-
-                                return;
-                            }
-
-                            const message =
-                                await response.text();
-
-                            if (!response.ok) {
-                                document.getElementById(
-                                    "message"
-                                ).innerText =
-                                    message ||
-                                    "Error deleting official.";
-
-                                return;
-                            }
-
-                            row.remove();
-                            updateDirectorySelection();
-
-                            document.getElementById(
-                                "message"
-                            ).innerText =
-                                message ||
-                                "Official deleted successfully.";
-                        } catch (err) {
-            if (requestVersion !== directoryRequestVersion) return;
-                            document.getElementById(
-                                "message"
-                            ).innerText =
-                                "Server unavailable.";
-                        }
-                    }
-                );
-
-                deleteCell.appendChild(deleteButton);
-                row.appendChild(deleteCell);
-                tbody.appendChild(row);
+                    showMessage(message || "Official deleted successfully.");
+                } catch { showMessage("Server unavailable."); }
+            }));
+            [official.FirstName, official.LastName, official.Phone, official.Email, official.Address].forEach(value => {
+                const cell = document.createElement("td");
+                cell.textContent = value;
+                row.appendChild(cell);
             });
-
-            document.getElementById("message").innerText =
-                `${officials.length} officials loaded.`;
-        } catch (err) {
-            document.getElementById("message").innerText =
-                "Server unavailable.";
-        }
-    });
+            tbody.appendChild(row);
+        });
+        updateDirectorySelection();
+        showMessage(officials?.length ? `${officials.length} officials loaded.` : "No officials found for the selected filter.");
+    } catch { if (requestVersion === directoryRequestVersion) showMessage("Server unavailable."); }
+});
 </script>
-
 </body>
 </html>
