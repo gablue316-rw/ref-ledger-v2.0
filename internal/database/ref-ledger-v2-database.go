@@ -4252,11 +4252,23 @@ func (oc *OfficialCollection) getNextId() (int64, error) {
 	return result.Id + 1, nil
 }
 
-func (oc *OfficialCollection) convOfficialToDoc(official Official) (OfficialDoc, error) {
+func (oc *OfficialCollection) convOfficialToDoc(
+	official Official,
+	tenantId string,
+	getNewId bool,
+) (OfficialDoc, error) {
 
-	id, err := oc.getNextId()
+	var id int64 = 0
+	var err error 
+
+	if getNewId {
+	    id, err = oc.getNextId()
+	} else {
+	    id, err = getOfficialsId(official.FirstName, official.LastName,tenantId)
+	} 
+
 	if err != nil {
-		return OfficialDoc{}, err
+	   return OfficialDoc{}, err
 	}
 
 	return OfficialDoc{
@@ -4379,7 +4391,7 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
-	doc, err := oc.convOfficialToDoc(official)
+	doc, err := oc.convOfficialToDoc(official, tenantId, true)
 	if err != nil {
 		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
 	}
@@ -4394,6 +4406,41 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 
 	return nil
 }
+
+func getOfficialsId(fname, lname, tenantId string) (int64, error) {
+
+	var filter bson.M
+	var doc OfficialDoc
+
+	db := Client.Database(Database)
+	coll := db.Collection("officials")
+
+	filter = bson.M{
+		"tenantId": tenantId,
+		"firstName": fname,
+		"lastName": lname,
+	}
+
+	err := coll.FindOne(context.TODO(), filter).Decode(&doc)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			fmt.Println("Official is not found!")
+			return 0, fmt.Errorf(
+				"official %s %s not found",
+				fname, lname,
+			)
+		} else {
+		   fmt.Println("Error retrieving official with name",fname, " ",lname,"Error:",err)
+		}
+		
+		fmt.Println("Returning with error",err)
+		return 0, err
+	}
+	
+	fmt.Println("Returning official id:",doc.Id)
+	return doc.Id, nil
+}
+
 
 func (oc *OfficialCollection) GetById(officialId int64, tenantId string) (Official, error) {
 
@@ -4416,18 +4463,28 @@ func (oc *OfficialCollection) GetById(officialId int64, tenantId string) (Offici
 		},
 	}
 
+	fmt.Println("Searching Official with id",officialId)
+
 	err := oc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
+			fmt.Println("Official is not found!")
 			return Official{}, fmt.Errorf(
 				"official %d not found",
 				officialId,
 			)
+		} else {
+		   fmt.Println("Error retrieving official with id",officialId,"Error:",err)
 		}
+		
+		fmt.Println("Returning with error")
 		return Official{}, err
 	}
 
+	fmt.Println("Converting Doc to Official Descriptor")
 	official := oc.convDocToOfficial(doc)
+	
+	fmt.Println("Returning official:",official)
 	return official, nil
 }
 
@@ -4518,7 +4575,7 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 		"tenantId":  tenantId,
 	}
 
-	doc, err := oc.convOfficialToDoc(official)
+	doc, err := oc.convOfficialToDoc(official,tenantId, false)
 
 	if err != nil {
 		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
@@ -4556,27 +4613,63 @@ func (oc *OfficialCollection) DeleteAll(tenantId string) error {
 }
 
 func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	var filter bson.M
-	var result *mongo.DeleteResult
-
-	filter = bson.M{
+	filter := bson.M{
 		"firstName": firstName,
 		"lastName":  lastName,
 		"tenantId":  tenantId,
 	}
 
-	result, oc.LastError = oc.Coll.DeleteOne(context.TODO(), filter)
-	if oc.LastError != nil {
-		return fmt.Errorf("Failed to delete official.  Reason: %v", oc.LastError)
+	var official OfficialDoc
+	err := oc.Coll.FindOne(ctx, filter).Decode(&official)
+	if err != nil {
+		oc.LastError = err
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("official not found")
+		}
+		return fmt.Errorf("failed to retrieve official: %w", err)
 	}
 
+	// officialId is stored as a string in the games officials array.
+	gameFilter := bson.M{
+		"tenantId":           tenantId,
+		"officials.officialId": strconv.FormatInt(official.Id, 10),
+	}
+
+	gamesCollection := oc.Coll.Database().Collection("games")
+	err = gamesCollection.FindOne(ctx, gameFilter).Err()
+	if err == nil {
+		oc.LastError = fmt.Errorf(
+			"cannot delete %s %s: official is assigned to a game",
+			firstName, lastName,
+		)
+		return oc.LastError
+	}
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		oc.LastError = err
+		return fmt.Errorf("failed to check game assignments: %w", err)
+	}
+
+	// Delete the exact official that was checked.
+	deleteFilter := bson.M{
+		"Id":       official.Id,
+		"tenantId": tenantId,
+	}
+	// Retain the original name filter if the ID's BSON field differs.
+	deleteFilter = filter
+
+	result, err := oc.Coll.DeleteOne(ctx, deleteFilter)
+	oc.LastError = err
+	if err != nil {
+		return fmt.Errorf("failed to delete official: %w", err)
+	}
 	if result.DeletedCount == 0 {
 		return fmt.Errorf("official not found")
 	}
 
-	fmt.Println("Deleted Record with Official Id of", filter["firstName"], " in", oc.Coll.Name(), "Records Deleted:", result.DeletedCount)
-
+	fmt.Println("Deleted official:", firstName, lastName)
 	return nil
 }
 
