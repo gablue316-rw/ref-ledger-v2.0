@@ -7,15 +7,12 @@
 <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">   
 <link rel="stylesheet" href="/components/navbar.css?v=12"> 
-
-
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;}
 body {
     background: #f4f6f9;
     color: #333;
 }
-
 .container {
     max-width: 1200px;
     margin: 20px auto;
@@ -23,12 +20,14 @@ body {
 }
 .header{background:#1e293b;color:#fff;padding:20px;border-radius:10px;margin-bottom:20px;}
 .header h1{margin-bottom:8px;}
-
-
 .card{background:#fff;padding:20px;border-radius:10px;margin-bottom:15px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
 .card-title{font-size:18px;font-weight:bold;margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid #ddd;}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;}
 .official-fields{grid-column:1 / -1;}
+.assignor-row{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;gap:15px;}
+.assignor-row>.form-group{flex:0 0 var(--assignor-width,220px);max-width:100%;min-width:0;}
+.assignor-row>.role-hint{flex:2 1 280px;}
+#assignorHint[hidden]{display:none;}
 .basic-game-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
 .role-hint{grid-column:1 / -1;display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid #c7d2fe;border-left:4px solid #6366f1;border-radius:10px;background:linear-gradient(120deg,#eef2ff,#f8fafc);color:#4338ca;}
 .role-hint-icon{width:42px;height:42px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#e0e7ff;color:#4f46e5;font-size:19px;}
@@ -54,20 +53,16 @@ body {
 .btn-find{
     background:#2563eb;
 }
-
 .btn-find:hover{
     background:#1d4ed8;
 }
-
 .btn-import {
     background-color: #0f766e;
     color: white;
 }
-
 .btn-import:hover {
     background-color: #115e59;
 }
-
         .message-box {
             background-color: white;
             padding: 15px 20px;
@@ -76,7 +71,6 @@ body {
             font-weight: bold;
             min-height: 60px;
         }
-
 #message{margin-top:15px;font-weight:bold;}
 @media(max-width:768px){
 body{padding:10px;}
@@ -92,20 +86,16 @@ body{padding:10px;}
 <h1>Ref Ledger V2.0 Game Entry</h1>
 <p>Create or update game information.</p>
 </div>
-
 <form id="gameForm">
-
 <div class="card">
 <div class="card-title">Basic Game Information</div>
 <div class="form-grid basic-game-grid">
-
 <div class="form-group">
     <label for="association">Association</label>
     <select id="association">
         <option value="">Select Association</option>
     </select>
 </div>
-
 <div class="form-group"><label for="gameId">Game ID</label><input type="number" id="gameId" required></div>
 <div class="form-group"><label for="date">Date</label><input type="date" id="date" required></div>
 <div class="form-group"><label for="time">Time</label><input type="time" id="time" required></div>
@@ -117,7 +107,6 @@ body{padding:10px;}
 </div>
 </div>
 </div>
-
 <div class="card">
 <div class="card-title">Location & Sport</div>
 <div class="form-grid">
@@ -144,7 +133,6 @@ body{padding:10px;}
 </div>
 </div>
 </div>
-
 <div class="card">
 <div class="card-title">Financial Information</div>
 <div class="form-grid">
@@ -155,11 +143,9 @@ body{padding:10px;}
 <div class="form-group"><label for="deductions">Deductions</label><input type="number" step="0.01" value="0.00" id="deductions"></div>
 </div>
 </div>
-
 <div class="card">
 <div class="card-title">Officials</div>
 <div class="form-grid">
-
 <div id="officialRolesHint" class="role-hint" role="status" aria-live="polite">
     <span class="role-hint-icon" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
     <div>
@@ -168,18 +154,23 @@ body{padding:10px;}
     </div>
 </div>
 <div id="officialFields" class="official-fields form-grid" aria-label="Sport official assignments"></div>
-
+<div class="assignor-row">
 <div class="form-group">
     <label for="assignor">Assignor</label>
-    <select id="assignor">
+    <select id="assignor" disabled aria-describedby="assignorHintMessage">
         <option value="Unassigned">Unassigned</option>
     </select>
 </div>
-
+<div id="assignorHint" class="role-hint" role="status" aria-live="polite">
+    <span class="role-hint-icon" aria-hidden="true"><i class="fa-solid fa-building"></i></span>
+    <div>
+        <span class="role-hint-title">Assignors follow your association</span>
+        <span id="assignorHintMessage" class="role-hint-message">Select an Association in Basic Game Information before choosing an Assignor.</span>
+    </div>
+</div>
+</div>
 </div> 
 </div> 
-
-
 <div class="button-row">
    <button
        type="button"
@@ -188,7 +179,6 @@ body{padding:10px;}
        <i class="fa-solid fa-magnifying-glass"></i>                    
        Find
    </button>
-
    <button
        type="button"
        id="addGameBtn"
@@ -196,7 +186,6 @@ body{padding:10px;}
        <i class="fa-solid fa-plus"></i>     
        Add               
    </button>
-
    <button
        type="button"
        id="updateGameBtn"
@@ -204,7 +193,6 @@ body{padding:10px;}
        <i class="fa-solid fa-pen"></i>                   
        Save
    </button>
-
    <button
        type="button"
        id="deleteBtn"
@@ -212,7 +200,6 @@ body{padding:10px;}
        <i class="fa-solid fa-trash"></i>                   
        Delete
    </button>
-
    <button
        type="button"
        id="clearBtn"
@@ -220,7 +207,6 @@ body{padding:10px;}
        <i class="fa-solid fa-eraser"></i>                   
        Clear
    </button>
-
    <button 
        type="button" 
        id="importGamesBtn" 
@@ -228,20 +214,14 @@ body{padding:10px;}
        <i class="fa-solid fa-file-import"></i>
        Import
    </button>   
-
-
 </div>
-
 <div class="message-box" id="message">
         Ready to enter Games
 </div>
 </form>
 </div>
-
 <script src="/components/navbar.js?v=12"></script>
-
 <script>
-
 // Set this URL to your existing sport-role GET route if its name differs.
 const OFFICIAL_ROLES_API = "/api/settings/official-roles";
 let isUpdateMode = false;
@@ -253,26 +233,22 @@ let roleFields = [];
 let roleRequest = 0;
 let roleAbortController = null;
 let formRevision = 0;
-
 function updateActionButtons() {
     document.getElementById("addGameBtn").disabled = !pageReady || !rolesReady || isUpdateMode;
     document.getElementById("updateGameBtn").disabled = !pageReady || !rolesReady || !isUpdateMode;
     document.getElementById("getGameBtn").disabled = !pageReady;
 }
-
 function setUpdateMode(isUpdate) {
     isUpdateMode = isUpdate;
     document.getElementById("gameId").readOnly = isUpdate;
     document.getElementById("association").disabled = isUpdate;
     updateActionButtons();
 }
-
 function roleHint(message, error = false) {
     const hint = document.getElementById("officialRolesHint");
     document.getElementById("officialRolesMessage").textContent = message;
     hint.classList.toggle("error", error);
 }
-
 function resetOfficialFields() {
     roleRequest++;
     if (roleAbortController) roleAbortController.abort();
@@ -283,7 +259,6 @@ function resetOfficialFields() {
     roleHint("Choose a sport in Location & Sport. Its official fields will appear here automatically.");
     updateActionButtons();
 }
-
 function normalizeRole(role) {
     return {
         roleId: String(role.roleId ?? role.RoleId ?? ""),
@@ -292,7 +267,6 @@ function normalizeRole(role) {
         active: (role.active ?? role.Active) === true
     };
 }
-
 function normalizeAssignment(assignment) {
     const rawId = assignment.officialId ?? assignment.OfficialId ?? "";
     return {
@@ -303,7 +277,6 @@ function normalizeAssignment(assignment) {
         name: String(assignment.name ?? assignment.Name ?? "Unassigned")
     };
 }
-
 function savedGameAssignments(game, roles) {
     if (!game) return [];
     const key = value => String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -362,7 +335,6 @@ function savedGameAssignments(game, roles) {
     if (unresolved.length) throw new Error("The game API returned officials without roleId/title. Update the Find handler to return each assignment's role metadata.");
     return matched;
 }
-
 function appendOfficialOption(select, official, value) {
     const option = new Option(official.name, value);
     option.dataset.officialId = official.officialId;
@@ -370,7 +342,15 @@ function appendOfficialOption(select, official, value) {
     select.add(option);
     return option;
 }
-
+function matchAssignorWidth() {
+    const officialSelect = document.querySelector("#officialFields select");
+    const row = document.querySelector(".assignor-row");
+    if (!officialSelect || !row) return;
+    const width = officialSelect.getBoundingClientRect().width;
+    if (width > 0) row.style.setProperty("--assignor-width", `${width}px`);
+}
+const officialWidthObserver = new ResizeObserver(matchAssignorWidth);
+officialWidthObserver.observe(document.getElementById("officialFields"));
 function renderOfficialFields(roles, savedAssignments) {
     const container = document.getElementById("officialFields");
     container.replaceChildren();
@@ -417,8 +397,8 @@ function renderOfficialFields(roles, savedAssignments) {
         container.appendChild(group);
         roleFields.push({ role, assignment, select, preserved: Boolean(preserved) });
     });
+    matchAssignorWidth();
 }
-
 async function loadSportOfficialRoles(sport, game = null) {
     const request = ++roleRequest;
     if (roleAbortController) roleAbortController.abort();
@@ -466,7 +446,6 @@ async function loadSportOfficialRoles(sport, game = null) {
         return false;
     }
 }
-
 function collectOfficialAssignments() {
     if (!rolesReady || !document.getElementById("sport").value) throw new Error("Select a sport and wait for its official roles to load.");
     return roleFields.map(({ role, assignment, select, preserved }) => {
@@ -481,84 +460,96 @@ function collectOfficialAssignments() {
         };
     });
 }
-
 function ensureSelectedValue(id, value) {
     const select = document.getElementById(id);
     const text = String(value ?? "");
     if (text && !Array.from(select.options).some(option => option.value === text)) select.add(new Option(text, text));
     select.value = text;
 }
-
 document.getElementById("sport").addEventListener("change", async function () {
     formRevision++;
     await loadSportOfficialRoles(this.value);
 });
-
 document
     .getElementById("importGamesBtn")
     .addEventListener("click", function () {
         window.location.href = "/importGames";
     });
-
-
-async function loadAssignors() {
-       try {
-        const response = await fetch("/api/loadAssignors");
-
-        if (!response.ok) {
-            throw new Error("Failed to load assignors");
-        }
-
-        const assignors = await response.json();
-        console.log(assignors);
-
-        const dropdowns = [
-            "assignor"
-        ];
-
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
-
-            // Keep the first option
-            select.innerHTML =
-                '<option value="Unassigned">Unassigned</option>';
-            select.value = "Unassigned";
-
-            assignors.forEach(assignor => {
-               const option = document.createElement("option");
-               option.value = assignor.name;
-               option.textContent = assignor.name;
-               select.appendChild(option);
-            });
+let assignorsReady = false;
+let assignorsVersion = 0;
+async function loadAssignors(savedAssignor = "Unassigned") {
+    const version = ++assignorsVersion;
+    const association = document.getElementById("association").value.trim();
+    document.getElementById("assignorHint").hidden = Boolean(association);
+    const select = document.getElementById("assignor");
+    assignorsReady = false;
+    select.disabled = true;
+    select.innerHTML = '<option value="Unassigned">Unassigned</option>';
+    if (!association) {
+        assignorsReady = true;
+        return true;
+    }
+    try {
+        const params = new URLSearchParams({ association });
+        const response = await fetch(`/api/loadAssignors?${params.toString()}`);
+        if (!response.ok) throw new Error(`Unable to load assignors for ${association} (HTTP ${response.status}).`);
+        const records = await response.json();
+        if (version !== assignorsVersion) return false;
+        if (!Array.isArray(records)) throw new Error("The assignor response must be an array.");
+        const names = new Set(["Unassigned"]);
+        records.forEach(record => {
+            const membership = record?.association ?? record?.Association ??
+                record?.associations ?? record?.Associations;
+            if (membership != null) {
+                const associations = Array.isArray(membership) ? membership : [membership];
+                if (!associations.some(value => String(value).trim() === association)) return;
+            }
+            // Records without membership fields must be filtered by the API.
+            const name = String(typeof record === "string" ? record : record?.name ?? record?.Name ?? "").trim();
+            if (!name || names.has(name)) return;
+            names.add(name);
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            select.appendChild(option);
         });
-
-    } catch (err) {
-        console.error("Error loading assignors:", err);
+        const saved = String(savedAssignor || "Unassigned").trim();
+        if (!names.has(saved)) {
+            const option = document.createElement("option");
+            option.value = saved;
+            option.textContent = `${saved} (current assignment)`;
+            option.disabled = true;
+            select.appendChild(option);
+        }
+        select.value = saved;
+        assignorsReady = true;
+        select.disabled = false;
+        return true;
+    } catch (error) {
+        if (version !== assignorsVersion) return false;
+        document.getElementById("message").innerText = error.message;
+        return false;
     }
 }
-
+document.getElementById("association").addEventListener("change", () => {
+    loadAssignors();
+});
 async function loadAssociations() {
     try {
         const response = await fetch("/api/loadAssociations");
-
         if (!response.ok) {
             throw new Error("Failed to load associations");
         }
-
         const associations = await response.json();
         console.log(associations);
-
         const dropdowns = [
             "association"
         ];
-
         dropdowns.forEach(id => {
             const select = document.getElementById(id);
-
             // Keep the first option
             select.innerHTML =
                 '<option value="">Select Association</option>';
-
             associations.forEach(assoc => {
                const option = document.createElement("option");
                option.value = assoc.id;
@@ -566,34 +557,26 @@ async function loadAssociations() {
                select.appendChild(option);
             });
         });
-
     } catch (err) {
         console.error("Error loading associations:", err);
     }
 }
-
 async function loadLevels() {
     try {
         const response = await fetch("/api/levels?active=true")
-
         if (!response.ok) {
             throw new Error("Failed to load levels");
         }
-
         const levels = await response.json();
         console.log(levels);
-
         const dropdowns = [
             "level"
         ];
-
         dropdowns.forEach(id => {
             const select = document.getElementById(id);
-
             // Keep the first option
             select.innerHTML =
                 '<option value="">Select Level</option>';
-
             levels.forEach(level => {
                const option = document.createElement("option");
                option.value = level.name;
@@ -601,34 +584,26 @@ async function loadLevels() {
                select.appendChild(option);
             });
         });
-
     } catch (err) {
         console.error("Error loading levels:", err);
     }
 }
-
 async function loadSites() {
     try {
         const response = await fetch("/api/loadSites");
-
         if (!response.ok) {
             throw new Error("Failed to load sites");
         }
-
         const sites = await response.json();
         console.log(sites);
-
         const dropdowns = [
             "site"
         ];
-
         dropdowns.forEach(id => {
             const select = document.getElementById(id);
-
             // Keep the first option
             select.innerHTML =
                 '<option value="">Select Site</option>';
-
             sites.forEach(site => {
                const option = document.createElement("option");
                option.value = site.name;
@@ -636,35 +611,26 @@ async function loadSites() {
                select.appendChild(option);
             });
         });
-
     } catch (err) {
         console.error("Error loading sites:", err);
     }
 }
-
-
 async function loadSports() {
     try {
         const response = await fetch("/api/loadSports?active=true");
-
         if (!response.ok) {
             throw new Error("Failed to load sports");
         }
-
         const sports = await response.json();
         console.log(sports);
-
         const dropdowns = [
             "sport"
         ];
-
         dropdowns.forEach(id => {
             const select = document.getElementById(id);
-
             // Keep the first option
             select.innerHTML =
                 '<option value="">Select Sport</option>';
-
             sports.forEach(sport => {
                const option = document.createElement("option");
                option.value = sport.name;
@@ -672,12 +638,10 @@ async function loadSports() {
                select.appendChild(option);
             });
         });
-
     } catch (err) {
         console.error("Error loading sports:", err);
     }
 }
-
 async function loadOfficials() {
     try {
         const response = await fetch("/api/loadOfficials");
@@ -698,12 +662,10 @@ async function loadOfficials() {
         console.error("Error loading officials:", err);
     }
 }
-
 function getStatusTypeName(statusType) {
     if (typeof statusType === "string") {
         return statusType.trim();
     }
-
     return String(
         statusType.statusType ??
         statusType.StatusType ??
@@ -714,42 +676,33 @@ function getStatusTypeName(statusType) {
         ""
     ).trim();
 }
-
 async function loadStatusTypes() {
     const statusSelect = document.getElementById("status");
-
     try {
         const response = await fetch("/api/loadStatusTypes");
-
         if (!response.ok) {
             const text = await response.text();
             throw new Error(
                 `Unable to load status types: ${response.status} ${text}`
             );
         }
-
         const responseData = await response.json();
         const statusTypes = Array.isArray(responseData)
             ? responseData
             : responseData.statusTypes ?? responseData.statuses ?? [];
-
         const statuses = statusTypes
             .map(getStatusTypeName)
             .filter((status, index, values) =>
                 status && values.indexOf(status) === index
             );
-
         statusSelect.innerHTML =
             '<option value="">Select Status</option>';
-
         statuses.forEach(status => {
             statusSelect.add(new Option(status, status));
         });
-
         if (statuses.includes("Pending")) {
             statusSelect.value = "Pending";
         }
-
         if (statuses.length === 0) {
             statusSelect.innerHTML =
                 '<option value="">No statuses found</option>';
@@ -760,7 +713,6 @@ async function loadStatusTypes() {
             '<option value="">Unable to load statuses</option>';
     }
 }
-
 document.addEventListener("DOMContentLoaded", async function() {
     updateActionButtons();
     await Promise.all([
@@ -772,99 +724,76 @@ document.addEventListener("DOMContentLoaded", async function() {
         loadSports(),
         loadAssignors()
     ]);
-
     pageReady = true;
     document.getElementById("sport").disabled = false;
     setUpdateMode(false);
     await loadSportOfficialRoles(document.getElementById("sport").value);
 });
-
 document.getElementById("clearBtn").addEventListener("click", function () {
     formRevision++;
     document.getElementById("gameForm").reset();
     document.getElementById("sport").value = "";
     document.getElementById("status").value = "Pending";
-    document.getElementById("assignor").value = "Unassigned";
+    loadAssignors();
     resetOfficialFields();
     setUpdateMode(false);
     document.getElementById("message").innerText = "Ready to enter Games";
 });
-
 function toInputDate(dateStr) {
     const d = new Date(dateStr);
     return d.toISOString().split("T")[0];
 }
-
 function toInputTime(timeStr) {
-
     if (!timeStr) return "";
-
     const [time, modifier] = timeStr.split(" ");
     let [hours, minutes] = time.split(":");
-
     hours = parseInt(hours, 10);
-
     if (modifier === "PM" && hours !== 12) {
         hours += 12;
     }
     if (modifier === "AM" && hours === 12) {
         hours = 0;
     }
-
     return `${String(hours).padStart(2, "0")}:${minutes}`;
 }
-
-
 document.getElementById("deleteBtn").addEventListener("click", async function () {
-
     const gameId = document.getElementById("gameId").value;
     const association = document.getElementById("association").value;
-
     if (!gameId) {
         document.getElementById("message").innerText =
             "Enter a Game ID first.";
         return;
     }
-
     if (!association) {
         document.getElementById("message").innerText =
             "Enter an Association first.";
         return;
     }
-
     try {
         const response = await fetch(`/api/deleteGame/${association}/${gameId}`, {
             method: "DELETE"
         });
-
         const message = await response.text();
-
         document.getElementById("message").innerText =
             response.ok
                 ? message || "Game deleted successfully."
                 : message || "Error deleting game.";
-
         // Reload the navbar count after a successful delete.
         if (response.ok && typeof loadPendingGames === "function") {
             await loadPendingGames();
 }
-
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }
 });
-
 document.getElementById("getGameBtn").addEventListener("click", async function () {
-
     const gameId = document.getElementById("gameId").value;
     const association = document.getElementById("association").value;
-
     if (!gameId) {
         document.getElementById("message").innerText =
             "Enter a Game ID first.";
         return;
     }
-
     if (!association) {
         document.getElementById("message").innerText =
             "Enter an Association first.";
@@ -872,26 +801,20 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
     }
     const revision = ++formRevision;
     try {
-
         const response = await fetch(`/api/game/${association}/${gameId}`);
-
         if (revision !== formRevision) return;
         if (!response.ok) {
             document.getElementById("message").innerText =
                 "Game not found.";
             return;
         }
-
         const game = await response.json();
         console.log(
             "Find officials:",
             JSON.stringify(game.Officials ?? game.officials, null, 2)
         );        
-       
         if (revision !== formRevision) return;
-
         console.log("Returned game:", game);
-
         document.getElementById("association").value = game.Association;
         document.getElementById("gameId").value = game.GameId;
         document.getElementById("date").value = toInputDate(game.Date);
@@ -902,16 +825,15 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("level").value = game.Level;
         document.getElementById("home").value = game.Home ?? "";
         document.getElementById("visitor").value = game.Visitor ?? "";
-
         document.getElementById("numOfGames").value = game.NumOfGames;
         document.getElementById("gameFee").value = game.GameFee;
         document.getElementById("travelPay").value = game.TravelPay;
         document.getElementById("assignorFee").value = game.AssignorFee;
         document.getElementById("deductions").value = game.Deductions;
-
         document.getElementById("status").value = game.Status;
-        document.getElementById("assignor").value = game.Assignor;
-
+        const assignorsLoaded = await loadAssignors(game.Assignor);
+        if (revision !== formRevision) return;
+        if (!assignorsLoaded) return;
         setUpdateMode(true);
         const loaded = await loadSportOfficialRoles(game.Sport, game);
         if (revision !== formRevision) return;
@@ -919,20 +841,20 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
             document.getElementById("message").innerText = "Game loaded, but its official roles could not be loaded. Saving is disabled.";
             return;
         }     
-
         document.getElementById("message").innerText =
             "Game loaded successfully.";  
-
     } catch (err) {
         if (revision !== formRevision) return;
         document.getElementById("message").innerText =
             "Server unavailable.";
     }
 });
-
 document.getElementById("updateGameBtn").addEventListener("click", async function(e) {
     e.preventDefault();
-
+    if (!assignorsReady) {
+        document.getElementById("message").innerText = "Wait for the association assignors to load successfully before saving.";
+        return;
+    }
     let assignments;
     try { assignments = collectOfficialAssignments(); }
     catch (err) { document.getElementById("message").innerText = err.message; return; }
@@ -956,17 +878,14 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         officials: assignments,
         assignor: document.getElementById("assignor").value
     };
-
     if (game.status === "Cancelled") {
         game.gameFee = 0;
         game.travelPay = 0;
         game.assignorFee = 0;
         game.deductions = 0;
-
         document.getElementById("message").innerText =
             "Clearing Game Financials";
     }
-
     try {
         const response = await fetch("/api/game-update", {
             method: "POST",
@@ -975,34 +894,30 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
             },
             body: JSON.stringify(game)
         });
-
         const message = await response.text();
-
         if (!response.ok) {
             document.getElementById("message").innerText =
                 message || "Error saving game.";
             return;
         }
-
         document.getElementById("message").innerText =
             message || "Game updated successfully.";
-
         // Reload the navbar count after a successful save.
         if (typeof loadPendingGames === "function") {
             await loadPendingGames();
         }
-
     } catch (err) {
         console.error("Unable to save game:", err);
-
         document.getElementById("message").innerText =
             "Server unavailable.";
     }
 });
-
 document.getElementById("addGameBtn").addEventListener("click", async function(e) {
     e.preventDefault();
-
+    if (!assignorsReady) {
+        document.getElementById("message").innerText = "Wait for the association assignors to load successfully before saving.";
+        return;
+    }
     let assignments;
     try { assignments = collectOfficialAssignments(); }
     catch (err) { document.getElementById("message").innerText = err.message; return; }
@@ -1026,17 +941,14 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         officials: assignments,
         assignor: document.getElementById("assignor").value
     };
-
     if (game.status === "Cancelled") {
         game.gameFee = 0;
         game.travelPay = 0;
         game.assignorFee = 0;
         game.deductions = 0;
-
         document.getElementById("message").innerText =
             "Clearing Game Financials";
     }
-
     try {
         const response = await fetch("/api/game-save", {
             method: "POST",
@@ -1045,26 +957,20 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
             },
             body: JSON.stringify(game)
         });
-
         const message = await response.text();
-
         if (!response.ok) {
             document.getElementById("message").innerText =
                 message || "Error saving game.";
             return;
         }
-
         document.getElementById("message").innerText =
             message || "Game saved successfully.";
-
         // Reload the navbar count after a successful save.
         if (typeof loadPendingGames === "function") {
             await loadPendingGames();
         }
-
     } catch (err) {
         console.error("Unable to save game:", err);
-
         document.getElementById("message").innerText =
             "Server unavailable.";
     }

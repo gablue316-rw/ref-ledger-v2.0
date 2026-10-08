@@ -2863,22 +2863,36 @@ func (ac *AssociationCollection) AssignorExists(
 	return false, nil
 }
 
-func (ac *AssociationCollection) GetAssignorNames(tenantId string) ([]AssignorName, error) {
-	var assignors []AssignorName
+func (ac *AssociationCollection) GetAssignorNames(
+	tenantId string,
+	associations ...string,
+) ([]AssignorName, error) {
+	assignors := make([]AssignorName, 0)
 
-	cursor, err := ac.Coll.Find(context.TODO(), bson.M{"tenantId": tenantId})
-	if err != nil {
-		return nil, fmt.Errorf("failed to query assignors. Reason: %v", err)
+	filter := bson.M{"tenantId": tenantId}
+
+	if len(associations) > 0 {
+		association := strings.TrimSpace(associations[0])
+		if association != "" {
+			filter["id"] = association
+		}
 	}
-	defer cursor.Close(context.TODO())
+
+	ctx := context.TODO()
+
+	cursor, err := ac.Coll.Find(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query assignors: %w", err)
+	}
+	defer cursor.Close(ctx)
 
 	unique := make(map[string]struct{})
 
-	for cursor.Next(context.TODO()) {
+	for cursor.Next(ctx) {
 		var doc AssociationDoc
 
 		if err := cursor.Decode(&doc); err != nil {
-			return nil, fmt.Errorf("failed to decode assignor document. Reason: %v", err)
+			return nil, fmt.Errorf("failed to decode assignor document: %w", err)
 		}
 
 		for part := range strings.SplitSeq(doc.Assignors, ",") {
@@ -2892,7 +2906,7 @@ func (ac *AssociationCollection) GetAssignorNames(tenantId string) ([]AssignorNa
 	}
 
 	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf("cursor error. Reason: %v", err)
+		return nil, fmt.Errorf("cursor error: %w", err)
 	}
 
 	for name := range unique {

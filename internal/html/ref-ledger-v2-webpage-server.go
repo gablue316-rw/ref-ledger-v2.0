@@ -425,21 +425,22 @@ func GetEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
-
 	LogVisitor(r)
-	var tId string = database.TenantId
+
+	tId := database.TenantId
 	var err error
 
 	if tId == "na" {
 		tId, err = getTenantId(r)
-
 		if err != nil {
 			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 			return
 		}
 	}
 
-	assignors, err := ac.GetAssignorNames(tId)
+	association := strings.TrimSpace(r.URL.Query().Get("association"))
+
+	assignors, err := ac.GetAssignorNames(tId, association)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
