@@ -631,6 +631,11 @@ body {
 #editOfficialsMessage { color: #64748b; margin-bottom: 14px; }
 .official-assignment { display: block; margin-bottom: 6px; white-space: nowrap; }
 .official-role-title { font-weight: bold; color: #475569; }
+.officials-with-text { display: flex; align-items: flex-start; gap: 10px; }
+.group-text-btn { border: 0; background: transparent; color: #2563eb; padding: 4px; font-size: 18px; cursor: pointer; }
+.group-text-btn:hover { color: #1d4ed8; }
+.group-text-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 3px; }
+.group-text-btn:disabled { opacity: 0.5; cursor: wait; }
 </style>
 </head>
 
@@ -1591,6 +1596,59 @@ document.addEventListener("change", function (event) {
     updateDropdownText(groupName);
 });
 
+let editAssignorsReady = false;
+let editAssignorsVersion = 0;
+
+async function loadEditAssignors(game) {
+    const version = ++editAssignorsVersion;
+    const select = document.getElementById("editAssignor");
+    const association = String(gameValue(game, "Association")).trim();
+    editAssignorsReady = false;
+    select.disabled = true;
+    populateEditSelect("editAssignor", [], "Loading assignors...");
+    try {
+        if (!association) throw new Error("The game has no association. Unable to load assignors.");
+        const params = new URLSearchParams({ association });
+        const response = await fetch(`/api/loadAssignors?${params.toString()}`);
+        if (!response.ok) throw new Error(`Unable to load assignors for ${association} (HTTP ${response.status}).`);
+        const records = await response.json();
+        if (version !== editAssignorsVersion || gameBeingEdited !== game) return;
+        if (!Array.isArray(records)) throw new Error("The assignor response must be an array.");
+        // Also enforce association membership when the API includes it in each record.
+        const assignors = records.filter(record => {
+            const membership = record?.association ?? record?.Association ??
+                record?.associations ?? record?.Associations;
+            if (membership == null) return true; // The endpoint must filter records without membership fields.
+            const associations = Array.isArray(membership) ? membership : [membership];
+            return associations.some(value => String(value).trim() === association);
+        });
+        populateEditSelect("editAssignor", assignors, "Select Assignor");
+        if (!Array.from(select.options).some(option => option.value === "Unassigned")) {
+            const option = document.createElement("option");
+            option.value = "Unassigned";
+            option.textContent = "Unassigned";
+            select.appendChild(option);
+        }
+        const saved = String(gameValue(game, "Assignor")).trim() || "Unassigned";
+        // Keep a saved historical assignment visible, but do not offer it as a new selection.
+        if (!Array.from(select.options).some(option => option.value === saved)) {
+            const option = document.createElement("option");
+            option.value = saved;
+            option.textContent = `${saved} (current assignment)`;
+            option.disabled = true;
+            select.appendChild(option);
+        }
+        select.value = saved;
+        editAssignorsReady = true;
+    } catch (error) {
+        if (version !== editAssignorsVersion || gameBeingEdited !== game) return;
+        populateEditSelect("editAssignor", [], "Unable to load assignors");
+        showEditGameError(error.message);
+    } finally {
+        if (version === editAssignorsVersion && gameBeingEdited === game) select.disabled = !editAssignorsReady;
+    }
+}
+
 async function loadAssignors() {
     try {
         const response = await fetch("/api/loadAssignors");
@@ -1600,11 +1658,6 @@ async function loadAssignors() {
         }
 
         const assignors = await response.json();
-        populateEditSelect(
-            "editAssignor",
-            assignors,
-            "Select Assignor"
-        );
         const assignorOptions =
             document.getElementById("assignorOptions");
 
@@ -2667,7 +2720,8 @@ function escapeOfficialHTML(value) {
 }
 
 function renderOfficialAssignments(game) {
-    return savedDashboardOfficials(game).map(official => {
+    const assignments = savedDashboardOfficials(game);
+    const names = assignments.map(official => {
         const name = official.name || (official.officialId ? `Official ${official.officialId}` : "Unassigned");
         const label = official.title ? `<span class="official-role-title">${escapeOfficialHTML(official.title)}:</span> ` : "";
         const person = official.officialId && name !== "Unassigned"
@@ -2675,7 +2729,79 @@ function renderOfficialAssignments(game) {
             : escapeOfficialHTML(name);
         return `<span class="official-assignment">${label}${person}</span>`;
     }).join("");
+    const recipients = assignments.filter(official =>
+        official.name !== "Unassigned" && (official.officialId || official.name));
+    if (!recipients.length) return names;
+    const data = escapeOfficialHTML(JSON.stringify(recipients));
+    return `<div class="officials-with-text"><div>${names}</div><button type="button"
+        class="group-text-btn" data-officials="${data}"
+        title="Text this game's officials" aria-label="Text this game's officials">
+        <i class="fa-solid fa-comments" aria-hidden="true"></i></button></div>`;
 }
+
+// Validate number format; this cannot determine whether a number supports SMS.
+function normalizeTextPhone(value) {
+    const raw = String(value ?? "").trim();
+    if (!raw || !/^\+?[0-9().\s-]+$/.test(raw)) return "";
+    const digits = raw.replace(/\D/g, "");
+    if (!raw.startsWith("+") && /^[2-9]\d{2}[2-9]\d{6}$/.test(digits)) return `+1${digits}`;
+    if ((!raw.startsWith("+") || raw.startsWith("+1")) &&
+        /^1[2-9]\d{2}[2-9]\d{6}$/.test(digits)) return `+${digits}`;
+    if (raw.startsWith("+") && !digits.startsWith("1") && /^[1-9]\d{7,14}$/.test(digits)) return `+${digits}`;
+    return "";
+}
+
+async function openOfficialsGroupText(button) {
+    if (button.disabled) return;
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    try {
+        const assignments = JSON.parse(button.dataset.officials);
+        let directory = null;
+        if (assignments.some(person => !person.officialId)) {
+            directory = await getDashboardOfficialDirectory();
+        }
+        const results = await Promise.allSettled(assignments.map(async person => {
+            let id = person.officialId;
+            if (!id) {
+                const matches = directory.filter(record => {
+                    const name = officialValue(record, "name") ??
+                        [officialValue(record, "firstName"), officialValue(record, "lastName")].filter(Boolean).join(" ");
+                    return String(name).trim().toLowerCase() === person.name.trim().toLowerCase();
+                });
+                if (matches.length !== 1) throw new Error(`Unable to identify ${person.name}.`);
+                id = officialValue(matches[0], "officialId") ?? matches[0].id ?? matches[0].Id;
+                if (!id) throw new Error(`Missing ID for ${person.name}.`);
+            }
+            const response = await fetch(`/api/officials/${encodeURIComponent(id)}`);
+            if (!response.ok) throw new Error(`Unable to load ${person.name || id}.`);
+            const contact = await response.json();
+            return normalizeTextPhone(contact.Phone ?? contact.phone);
+        }));
+        // Do not silently omit officials when their contact lookup fails.
+        if (results.some(result => result.status === "rejected")) {
+            throw new Error("Unable to load all officials' contact information. Please try again.");
+        }
+        const phones = [...new Set(results.map(result => result.value).filter(Boolean))];
+        if (!phones.length) {
+            showMessage("No officials assigned to this game have a valid phone number.", "info");
+            return;
+        }
+        window.location.href = `sms:${phones.join(",")}`;
+    } catch (error) {
+        showMessage(error.message || "Unable to open the group text message.", "error");
+    } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+    }
+}
+
+document.addEventListener("click", event => {
+    const button = event.target.closest(".group-text-btn");
+    if (!button) return;
+    event.preventDefault();
+    openOfficialsGroupText(button);
+});
 
 async function getDashboardOfficialDirectory() {
     if (dashboardOfficials !== null) return dashboardOfficials;
@@ -2848,6 +2974,8 @@ function timeInputValue(value) {
 
 async function openEditGame(gameId, association) {
     gameBeingEdited = null;
+    editAssignorsReady = false;
+    editAssignorsVersion++;
 
     try {
         const response = await fetch(
@@ -2919,15 +3047,19 @@ async function openEditGame(gameId, association) {
     document.getElementById("editTravelPay").value = gameValue(gameBeingEdited, "TravelPay");
     document.getElementById("editAssignorFee").value = gameValue(gameBeingEdited, "AssignorFee");
     document.getElementById("editDeductions").value = gameValue(gameBeingEdited, "Deductions");
-    setEditSelectValue("editAssignor", gameValue(gameBeingEdited, "Assignor"));
     document.getElementById("editGameError").style.display = "none";
     document.getElementById("editGameModalOverlay").classList.add("show");
     document.getElementById("editTime").focus();
     editSportAssignments = new Map();
-    await loadEditOfficialRoles(gameValue(gameBeingEdited, "Sport"), gameBeingEdited);
+    await Promise.all([
+        loadEditAssignors(gameBeingEdited),
+        loadEditOfficialRoles(gameValue(gameBeingEdited, "Sport"), gameBeingEdited)
+    ]);
 }
 
 function closeEditGame() {
+    editAssignorsVersion++;
+    editAssignorsReady = false;
     editOfficialsVersion++;
     editOfficialsReady = false;
     editOfficialRows = [];
@@ -2948,6 +3080,11 @@ async function saveEditedGame(event) {
     event.preventDefault();
 
     if (!gameBeingEdited) {
+        return;
+    }
+
+    if (!editAssignorsReady) {
+        showEditGameError("Wait for the association assignors to load successfully before saving.");
         return;
     }
 
