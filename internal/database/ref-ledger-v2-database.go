@@ -3165,8 +3165,7 @@ func (ac *AssociationCollection) GetAssociationIdsAsStrings(
 	cursor, err := ac.Coll.Find(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"failed to query associations: %w",
-			err,
+			"failed to query associations: %w", err,
 		)
 	}
 	defer cursor.Close(ctx)
@@ -3410,16 +3409,16 @@ func (sc *SiteCollection) Get(name, tenantId string) (*Site, error) {
 	return &site, nil
 }
 
-func (sc *SiteCollection) GetSiteName(siteID, tenantId string) (string, error) {
+func (sc *SiteCollection) GetSiteName(name, tenantId string) (string, error) {
 	var site Site
 	var doc SiteDoc
 
 	filter := bson.M{
-		"id":       siteID,
+		"name":     name,
 		"tenantId": tenantId,
 	}
 
-	fmt.Println("Retrieving site name for ID ", siteID, "and tenant ID ", tenantId, "using the following filter:", filter)
+	fmt.Println("Retrieving site name for name ", name, "and tenant ID ", tenantId, "using the following filter:", filter)
 	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
 
 	if err != nil {
@@ -3449,9 +3448,16 @@ func (sc *SiteCollection) GetSiteNames(
 		tenantId,
 	)
 
+	opts := options.Find().SetSort(
+		bson.D{
+			{Key: "name", Value: 1},
+		},
+	)
+
 	cursor, err := sc.Coll.Find(
 		context.TODO(),
 		filter,
+		opts,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -3530,7 +3536,7 @@ func (sc *SiteCollection) GetSitesDirectory(tenantId, siteName string) ([]Site, 
 
 	opts := options.Find().SetSort(
 		bson.D{
-			{Key: "id", Value: 1},
+			{Key: "name", Value: 1},
 		},
 	)
 
