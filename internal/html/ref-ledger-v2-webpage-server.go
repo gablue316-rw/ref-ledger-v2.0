@@ -29,7 +29,6 @@ import (
 
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
-	"ref-ledger-v2/internal/email"
 	"ref-ledger-v2/internal/handlers"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/reports"
@@ -49,7 +48,6 @@ var Client *mongo.Client
 var uri string
 var dbName string
 
-/* July 18, 2026 */
 type Game struct {
 	Association string                  `json:"association"`
 	GameId      int                     `json:"gameId"`
@@ -67,10 +65,6 @@ type Game struct {
 	AssignorFee float64                 `json:"assignorFee"`
 	Deductions  float64                 `json:"deductions"`
 	Status      string                  `json:"status"`
-	Referee     string                  `json:"referee"`
-	U1          string                  `json:"u1"`
-	U2          string                  `json:"u2"`
-	ECO         string                  `json:"eco"`
 	Assignor    string                  `json:"assignor"`
 	Officials   []model.GameOfficialDoc `json:"officials"`
 }
@@ -211,7 +205,6 @@ func readOnlyForbidden(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func GameDocToGameDescr(g Game) model.GameDescriptor {
-
 	t, err := time.Parse("2006-01-02", g.Date)
 	if err != nil {
 		log.Println("Error parsing date:", err)
@@ -224,20 +217,10 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 	}
 	formattedTime := t.Format("3:04 PM")
 
-	if g.Referee == "" {
-		g.Referee = "Unassigned"
-	}
-
-	if g.U1 == "" {
-		g.U1 = "Unassigned"
-	}
-
-	if g.U2 == "" {
-		g.U2 = "Unassigned"
-	}
-
-	if g.ECO == "" {
-		g.ECO = "Unassigned"
+	var officials []model.GameOfficialDoc
+	if g.Officials != nil {
+		officials = make([]model.GameOfficialDoc, len(g.Officials))
+		copy(officials, g.Officials)
 	}
 
 	return model.GameDescriptor{
@@ -257,12 +240,8 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 		AssignorFee: strconv.FormatFloat(g.AssignorFee, 'f', 2, 64),
 		Deductions:  strconv.FormatFloat(g.Deductions, 'f', 2, 64),
 		Status:      g.Status,
-		Referee:     g.Referee,
-		U1:          g.U1,
-		U2:          g.U2,
-		ECO:         g.ECO,
 		Assignor:    g.Assignor,
-		Officials:   g.Officials,
+		Officials:   officials,
 	}
 }
 
@@ -457,37 +436,20 @@ func GetSitesDirectoryHandler(
 	LogVisitor(r)
 
 	tenantId := database.TenantId
+	siteName := strings.TrimSpace(r.URL.Query().Get("siteName"))
 
-	fmt.Printf(
-		"GetSitesDirectoryHandler tenantId=%q\n",
-		tenantId,
-	)
-
-	sites, err := sc.GetSitesDirectory(tenantId)
+	sites, err := sc.GetSitesDirectory(tenantId, siteName)
 	if err != nil {
-		fmt.Println(
-			"GetSitesDirectory error:",
-			err,
-		)
-
-		http.Error(
-			w,
-			err.Error(),
-			http.StatusInternalServerError,
-		)
+		fmt.Println("GetSitesDirectory error:", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set(
-		"Content-Type",
-		"application/json",
-	)
+	w.Header().Set("Content-Type", "application/json")
 
 	if err := json.NewEncoder(w).Encode(sites); err != nil {
-		fmt.Println(
-			"Failed to encode sites:",
-			err,
-		)
+		fmt.Println("Failed to encode sites:", err)
+		http.Error(w, "Unable to encode sites", http.StatusInternalServerError)
 	}
 }
 
@@ -1641,24 +1603,6 @@ func buildGamePreviewRow(
 	}
 
 	/*
-		Validate site.
-	*/
-	_, err := sc.GetSiteId(
-		row.Data.Site,
-		tId,
-	)
-
-	if err != nil {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf(
-				"Error occurred while fetching site ID: %v",
-				err,
-			),
-		)
-	}
-
-	/*
 		Validate level.
 	*/
 	levelName := strings.TrimSpace(row.Data.Level)
@@ -2357,18 +2301,11 @@ func getAssociationsPreview(token string) (AssociationsImportPreview, bool) {
 }
 
 func getSitesPreview(token string) (SitesImportPreview, bool) {
-
-	officialsPreviewStore.RLock()
-	defer officialsPreviewStore.RUnlock()
+	sitesPreviewStore.RLock()
+	defer sitesPreviewStore.RUnlock()
 
 	preview, found := sitesPreviewStore.items[token]
-
-	if !found {
-		return SitesImportPreview{}, false
-	}
-
-	// Treat expired previews as missing.
-	if time.Now().After(preview.ExpiresAt) {
+	if !found || !time.Now().Before(preview.ExpiresAt) {
 		return SitesImportPreview{}, false
 	}
 
@@ -3173,49 +3110,12 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		/*
-			The CSV contains the site name. Convert it to the
-			stored site ID before constructing the game.
-		*/
-		siteID, err := sc.GetSiteId(
-			data.Site,
-			tId,
-		)
-
-		if err != nil {
-			log.Printf(
-				"CommitGamesImportHandler: site lookup failed: "+
-					"tenant=%s row=%d game=%d site=%q error=%v",
-				tId,
-				previewRow.RowNumber,
-				data.GameId,
-				data.Site,
-				err,
-			)
-
-			failed++
-
-			rowResults = append(
-				rowResults,
-				GamesCommitRowResult{
-					RowNumber: previewRow.RowNumber,
-					Status:    "failed",
-					Message: fmt.Sprintf(
-						"Unable to find site %q.",
-						data.Site,
-					),
-				},
-			)
-
-			continue
-		}
-
 		game := model.GameDescriptor{
 			GameId: gameIDText,
 			Date:   data.Date,
 			Time:   data.Time,
 			Sport:  data.Sport,
-			Site:   siteID,
+			Site:   data.Site,
 			Field:  data.Field,
 			NumOfGames: utils.ConvertInt64ToStr(
 				data.NumOfGames,
@@ -3332,26 +3232,16 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
-
 	if r.Method != http.MethodPost {
-		writeJSONError(
-			w,
-			http.StatusMethodNotAllowed,
-			"Method not allowed.",
-		)
+		w.Header().Set("Allow", http.MethodPost)
+		writeJSONError(w, http.StatusMethodNotAllowed, "Method not allowed.")
 		return
 	}
 
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
+	tId, err := getTenantId(r)
+	if err != nil || tId == "" || tId == "na" {
+		writeJSONError(w, http.StatusBadRequest, "Invalid tenant ID.")
+		return
 	}
 
 	var request struct {
@@ -3363,23 +3253,17 @@ func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&request); err != nil {
-		writeJSONError(
-			w,
-			http.StatusBadRequest,
-			"Invalid request body.",
-		)
+		writeJSONError(w, http.StatusBadRequest, "Invalid request body.")
 		return
 	}
 
 	request.PreviewToken = strings.TrimSpace(request.PreviewToken)
-	request.DuplicateAction = strings.ToLower(strings.TrimSpace(request.DuplicateAction))
+	request.DuplicateAction = strings.ToLower(
+		strings.TrimSpace(request.DuplicateAction),
+	)
 
 	if request.PreviewToken == "" {
-		writeJSONError(
-			w,
-			http.StatusBadRequest,
-			"Preview token is required.",
-		)
+		writeJSONError(w, http.StatusBadRequest, "Preview token is required.")
 		return
 	}
 
@@ -3387,7 +3271,8 @@ func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 		request.DuplicateAction = "skip"
 	}
 
-	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+	if request.DuplicateAction != "skip" &&
+		request.DuplicateAction != "stop" {
 		writeJSONError(
 			w,
 			http.StatusBadRequest,
@@ -3415,8 +3300,8 @@ func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Now().After(preview.ExpiresAt) {
-		deleteOfficialsPreview(request.PreviewToken)
+	if !time.Now().Before(preview.ExpiresAt) {
+		deleteSitesPreview(request.PreviewToken)
 		writeJSONError(
 			w,
 			http.StatusBadRequest,
@@ -3425,7 +3310,7 @@ func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if oc.Coll == nil {
+	if sc.Coll == nil {
 		log.Printf("CommitSitesImportHandler: sites collection is nil")
 		writeJSONError(
 			w,
@@ -3435,172 +3320,112 @@ func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	added := 0
-	skipped := 0
-	failed := 0
-	rowResults := make([]SitesCommitRowResult, 0)
+	response := SitesCommitResponse{
+		Message: "Sites import completed.",
+		Rows:    make([]SitesCommitRowResult, 0),
+	}
+
+	// Returns true when the import must stop.
+	handleDuplicate := func(rowNumber int, siteId string) bool {
+		if request.DuplicateAction == "stop" {
+			response.Message = fmt.Sprintf(
+				"Import stopped because %s already exists.",
+				siteId,
+			)
+			writeJSON(w, http.StatusConflict, response)
+			return true
+		}
+
+		response.Skipped++
+		response.Rows = append(response.Rows, SitesCommitRowResult{
+			RowNumber: rowNumber,
+			Status:    "skipped",
+			Message:   fmt.Sprintf("%s already exists.", siteId),
+		})
+		return false
+	}
 
 	for _, previewRow := range preview.Rows {
 		if !previewRow.Valid {
 			continue
 		}
+
 		data := previewRow.Data
 
 		exists, err := sc.Exists(data.SiteId, tId)
-
 		if err != nil {
 			log.Printf(
-				"CommitSitesImportHandler: "+"duplicate lookup failed: tenant=%s row=%d site=%s error=%v",
+				"CommitSitesImportHandler: duplicate lookup failed: "+
+					"tenant=%s row=%d site=%s error=%v",
 				tId,
 				previewRow.RowNumber,
 				data.SiteId,
 				err,
 			)
 
-			failed++
-
-			rowResults = append(
-				rowResults,
-				SitesCommitRowResult{
-					RowNumber: previewRow.RowNumber,
-					Status:    "failed",
-					Message:   "Unable to check whether the site already exists.",
-				},
-			)
+			response.Failed++
+			response.Rows = append(response.Rows, SitesCommitRowResult{
+				RowNumber: previewRow.RowNumber,
+				Status:    "failed",
+				Message:   "Unable to check whether the site already exists.",
+			})
 			continue
 		}
 
 		if exists {
-			if request.DuplicateAction == "stop" {
-				writeJSON(
-					w,
-					http.StatusConflict,
-					SitesCommitResponse{
-						Added:   added,
-						Skipped: skipped,
-						Failed:  failed,
-						Message: fmt.Sprintf(
-							"Import stopped because %s already exists.",
-							data.SiteId,
-						),
-						Rows: rowResults,
-					},
-				)
-
+			if handleDuplicate(previewRow.RowNumber, data.SiteId) {
 				return
 			}
-
-			skipped++
-
-			rowResults = append(
-				rowResults,
-				SitesCommitRowResult{
-					RowNumber: previewRow.RowNumber,
-					Status:    "skipped",
-					Message: fmt.Sprintf(
-						"%s already exists.",
-						data.SiteId,
-					),
-				},
-			)
-
 			continue
-
 		}
 
 		site := database.Site{
-			Id:      data.SiteId,
 			Name:    data.SiteName,
 			Contact: data.ContactName,
 			Phone:   data.ContactNumber,
 			Email:   data.ContactEmail,
 		}
 
-		err = sc.Add(site, tId)
-
-		if err != nil {
+		if err := sc.Add(site, tId); err != nil {
 			if mongo.IsDuplicateKeyError(err) {
-				if request.DuplicateAction == "stop" {
-					writeJSON(
-						w,
-						http.StatusConflict,
-						SitesCommitResponse{
-							Added:   added,
-							Skipped: skipped,
-							Failed:  failed,
-							Message: fmt.Sprintf(
-								"Import stopped because %s already exists.",
-								data.SiteId,
-							),
-							Rows: rowResults,
-						},
-					)
+				if handleDuplicate(previewRow.RowNumber, data.SiteId) {
 					return
 				}
-
-				skipped++
-
-				rowResults = append(
-					rowResults,
-					SitesCommitRowResult{
-						RowNumber: previewRow.RowNumber,
-						Status:    "skipped",
-						Message: fmt.Sprintf(
-							"%s already exists.",
-							data.SiteId,
-						),
-					},
-				)
-
 				continue
-
 			}
 
 			log.Printf(
-				"CommitSitesImportHandler: "+"insert failed: tenant=%s row=%d site=%s error=%v",
+				"CommitSitesImportHandler: insert failed: "+
+					"tenant=%s row=%d site=%s error=%v",
 				tId,
 				previewRow.RowNumber,
 				data.SiteId,
 				err,
 			)
 
-			failed++
-
-			rowResults = append(
-				rowResults,
-				SitesCommitRowResult{
-					RowNumber: previewRow.RowNumber,
-					Status:    "failed",
-					Message:   "Unable to insert site.",
-				},
-			)
-
+			response.Failed++
+			response.Rows = append(response.Rows, SitesCommitRowResult{
+				RowNumber: previewRow.RowNumber,
+				Status:    "failed",
+				Message:   "Unable to insert site.",
+			})
 			continue
 		}
-		added++
-		rowResults = append(
-			rowResults,
-			SitesCommitRowResult{
-				RowNumber: previewRow.RowNumber,
-				Status:    "added",
-				Message:   fmt.Sprintf("%s %s was added.", data.SiteId, data.SiteName),
-			},
-		)
+
+		response.Added++
+		response.Rows = append(response.Rows, SitesCommitRowResult{
+			RowNumber: previewRow.RowNumber,
+			Status:    "added",
+			Message: fmt.Sprintf(
+				"%s %s was added.",
+				data.SiteId,
+				data.SiteName,
+			),
+		})
 	}
 
 	deleteSitesPreview(request.PreviewToken)
-
-	writeJSON(
-		w,
-		http.StatusOK,
-		SitesCommitResponse{
-			Added:   added,
-			Skipped: skipped,
-			Failed:  failed,
-			Message: "Sites import completed.",
-			Rows:    rowResults,
-		},
-	)
+	writeJSON(w, http.StatusOK, response)
 }
 
 func PreviewAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
@@ -4047,40 +3872,49 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
+	tId := database.TenantId
 	var err error
 
 	fmt.Println("Previewing games import...")
+
 	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	if tId == "na" {
 		tId, err = getTenantId(r)
-
 		if err != nil {
 			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 			return
 		}
 	}
 
-	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
-
-	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+(oneMB))
+	// Allow additional space for multipart boundaries and form metadata.
+	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+oneMB)
 
 	if err := r.ParseMultipartForm(maxCSVSize); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "The CSV upload is invalid or exceeds the 5 MB limit.")
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The CSV upload is invalid or exceeds the 5 MB limit.",
+		)
 		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
 	}
 
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "A Games CSV file is required.")
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"A Games CSV file is required.",
+		)
 		return
 	}
-
 	defer file.Close()
 
 	if err := validateCSVFile(fileHeader); err != nil {
@@ -4089,11 +3923,7 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csvReader := csv.NewReader(file)
-
-	/* Allow variable-length records so we can report a useful row-level error instead of stopping immediately. */
 	csvReader.FieldsPerRecord = -1
-
-	/* This trims spaces that appear outside quoted CSV values. For example: John, Smith is treated similarly to: John,Smith */
 	csvReader.TrimLeadingSpace = true
 
 	header, err := csvReader.Read()
@@ -4101,9 +3931,12 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadRequest, "The CSV file is empty.")
 		return
 	}
-
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "Unable to read the CSV header: "+err.Error())
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Unable to read the CSV header: "+err.Error(),
+		)
 		return
 	}
 
@@ -4113,49 +3946,48 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows := make([]GamePreviewRow, 0)
-
-	/* Used to detect duplicates inside the uploaded CSV file. */
 	gamesInFile := make(map[int64]int)
 	csvRowNumber := 1
 
 	for {
 		record, readErr := csvReader.Read()
-
 		if readErr == io.EOF {
 			break
 		}
 
 		csvRowNumber++
+
+		if readErr == nil && isBlankCSVRecord(record) {
+			continue
+		}
+
 		if len(rows) >= maxCSVRows {
-			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("The CSV file contains more than %d data rows.", maxCSVRows))
+			writeJSONError(
+				w,
+				http.StatusBadRequest,
+				fmt.Sprintf(
+					"The CSV file contains more than %d data rows.",
+					maxCSVRows,
+				),
+			)
 			return
 		}
 
 		if readErr != nil {
-			rows = append(
-				rows,
-				GamePreviewRow{
-					RowNumber: csvRowNumber,
-					Valid:     false,
-					Data:      GameImportData{},
-					Errors: []string{
-						"Unable to parse CSV row: " + readErr.Error(),
-					},
+			rows = append(rows, GamePreviewRow{
+				RowNumber: csvRowNumber,
+				Valid:     false,
+				Data:      GameImportData{},
+				Errors: []string{
+					"Unable to parse CSV row: " + readErr.Error(),
 				},
-			)
-			/* Some CSV syntax errors leave the reader unable to continue reliably. Stop after recording the error. */
+			})
+
+			// Stop because malformed CSV may prevent reliable parsing.
 			break
 		}
 
-		if isBlankCSVRecord(record) {
-			continue
-		}
-
-		fmt.Println("Record=[", record, "]")
-		/*
-			buildGamePreviewRow resolves official1..official10 against the
-			active roles configured for record[3] (sport), in displayOrder.
-		*/
+		// Map official1..official10 to the sport's active roles.
 		previewRow := buildGamePreviewRow(
 			csvRowNumber,
 			record,
@@ -4165,12 +3997,12 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		gameId := previewRow.Data.GameId
 
 		if gameId != 0 {
-			if _, found := gamesInFile[gameId]; found {
+			if previousRow, found := gamesInFile[gameId]; found {
 				previewRow.Errors = append(
 					previewRow.Errors,
 					fmt.Sprintf(
 						"Duplicate game in CSV file; first appeared on row %d",
-						gamesInFile[gameId],
+						previousRow,
 					),
 				)
 			} else {
@@ -4179,7 +4011,6 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		previewRow.Valid = len(previewRow.Errors) == 0
-
 		rows = append(rows, previewRow)
 	}
 
@@ -4192,26 +4023,33 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/* Check MongoDB for games that already exist. This only runs for rows that passed the basic CSV validation. */
-
+	// Check database duplicates for rows that passed initial validation.
+	// Lookup failures become row errors instead of ending the preview.
 	for i := range rows {
 		if !rows[i].Valid {
 			continue
 		}
 
-		exists, err := gc.Exists(rows[i].Data.Association, utils.ConvertInt64ToStr(rows[i].Data.GameId), tId)
+		exists, err := gc.Exists(
+			rows[i].Data.Association,
+			utils.ConvertInt64ToStr(rows[i].Data.GameId),
+			tId,
+		)
 		if err != nil {
 			log.Printf(
-				"PreviewGamesImportHandler: duplicate lookup failed for tenant %s, game %d: %v",
+				"PreviewGamesImportHandler: duplicate lookup failed "+
+					"for tenant %s, game %d: %v",
 				tId,
 				rows[i].Data.GameId,
 				err,
 			)
-			writeJSONError(
-				w,
-				http.StatusInternalServerError,
-				"Unable to validate games against the database.",
+
+			rows[i].Errors = append(
+				rows[i].Errors,
+				"Unable to check whether the game already exists.",
 			)
+			rows[i].Valid = false
+			continue
 		}
 
 		if exists {
@@ -4249,6 +4087,7 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now()
+
 	preview := GamesImportPreview{
 		Token:     previewToken,
 		TenantID:  tId,
@@ -4269,7 +4108,6 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
-
 }
 
 func PreviewOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
@@ -4641,73 +4479,77 @@ func LogVisitor(r *http.Request) {
 	)
 }
 
-func generatePaymentsReport(assoc []string, tid string) []string {
+//
+// Obsolete:  Use the new Generate Report Functions instead.
+//
 
-	var rept []string = []string{}
-	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
-	if err != nil {
-		rept = append(rept, "Error generating payment report.  Failed to retrieve payment records.")
-		return rept
-	}
-	rept = reports.GeneratePaymentReport(paymentRecords, tid)
-	return rept
-}
+// func generatePaymentsReport(assoc []string, tid string) []string {
 
-func generateReconciliationReport(assoc []string, tid string) []string {
+// 	var rept []string = []string{}
+// 	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
+// 	if err != nil {
+// 		rept = append(rept, "Error generating payment report.  Failed to retrieve payment records.")
+// 		return rept
+// 	}
+// 	rept = reports.GeneratePaymentReport(paymentRecords, tid)
+// 	return rept
+// }
 
-	var rept []string = []string{}
+// func generateReconciliationReport(assoc []string, tid string) []string {
 
-	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
-	if err != nil {
-		rept = append(rept, "Error generating reconciliation report.  Failed to retrieve payment records.")
-		return rept
-	}
-	rept = reports.GenerateReconciliationReport(paymentRecords, tid)
+// 	var rept []string = []string{}
 
-	return rept
-}
+// 	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
+// 	if err != nil {
+// 		rept = append(rept, "Error generating reconciliation report.  Failed to retrieve payment records.")
+// 		return rept
+// 	}
+// 	rept = reports.GenerateReconciliationReport(paymentRecords, tid)
 
-func generateAccountsReceivableReport(assoc []string, tid string) []string {
+// 	return rept
+// }
 
-	var rept []string = []string{}
-	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc, tid)
-	return rept
-}
+// func generateAccountsReceivableReport(assoc []string, tid string) []string {
 
-func generateIncomeReport(assoc []string, tid string) []string {
+// 	var rept []string = []string{}
+// 	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc, tid)
+// 	return rept
+// }
 
-	var rept []string = []string{}
-	rept = reports.GenerateIncomeReport(assoc, tid)
-	return rept
-}
+// func generateIncomeReport(assoc []string, tid string) []string {
 
-func generateExpenseReport(filter bson.M) []string {
+// 	var rept []string = []string{}
+// 	rept = reports.GenerateIncomeReport(assoc, tid)
+// 	return rept
+// }
 
-	var rept []string = []string{}
+// func generateExpenseReport(filter bson.M) []string {
 
-	expenseRecords, err := database.QueryExpenses(context.TODO(), database.GetMongoDbName(), "expenses", filter)
-	if err != nil {
-		fmt.Println(err)
-		return []string{}
-	}
-	rept = reports.GenerateExpenseReport(expenseRecords)
+// 	var rept []string = []string{}
 
-	return rept
-}
+// 	expenseRecords, err := database.QueryExpenses(context.TODO(), database.GetMongoDbName(), "expenses", filter)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return []string{}
+// 	}
+// 	rept = reports.GenerateExpenseReport(expenseRecords)
 
-func generateGamesReport(gameFilter bson.M) []string {
-	// Implementation for generating games report
+// 	return rept
+// }
 
-	gameRecords, err := database.QueryAggregatedGames(context.TODO(), database.GetMongoDbName(), "games", gameFilter)
-	if err != nil {
-		fmt.Println("Failed to query aggregated games")
-		return []string{}
-	}
-	rept := reports.GenerateGameReport(gameRecords)
+// func generateGamesReport(gameFilter bson.M) []string {
+// 	// Implementation for generating games report
 
-	return rept
+// 	gameRecords, err := database.QueryAggregatedGames(context.TODO(), database.GetMongoDbName(), "games", gameFilter)
+// 	if err != nil {
+// 		fmt.Println("Failed to query aggregated games")
+// 		return []string{}
+// 	}
+// 	rept := reports.GenerateGameReport(gameRecords)
 
-}
+// 	return rept
+
+// }
 
 func GenerateGameReport(
 	w http.ResponseWriter,
@@ -5200,136 +5042,144 @@ func GenerateExpenseReport(w http.ResponseWriter, r *http.Request) {
 
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("GenerateReport is called")
-	LogVisitor(r)
+	//
+	// Obsolete
+	// This function is no longer used.  It is replaced by the GenerateGameReport, GenerateExpenseReport,
+	// GenerateIncomeReport, GeneratePaymentsReport, GenerateReconciliationReport, and GenerateAccountsReceivableReport functions.
+	//
 
-	var tId string = database.TenantId
-	var err error
-	//var siteId string
+	// fmt.Println("GenerateReport is called")
+	// LogVisitor(r)
 
-	gameFilters := model.GFilters{}
-	//expenseFilters := model.EFilters{}
+	// var tId string = database.TenantId
+	// var err error
+	// //var siteId string
 
-	rType := r.URL.Query().Get("type")
-	rEmail := r.URL.Query().Get("emailaddr")
-	rFile := r.URL.Query().Get("filename")
-	rGameIds := r.URL.Query().Get("gameids")
+	// gameFilters := model.GFilters{}
+	// //expenseFilters := model.EFilters{}
 
-	rSites := r.URL.Query()["site"]
-	rStatuses := r.URL.Query()["status"]
-	rAssociations := r.URL.Query()["association"]
+	// rType := r.URL.Query().Get("type")
+	// rEmail := r.URL.Query().Get("emailaddr")
+	// rFile := r.URL.Query().Get("filename")
+	// rGameIds := r.URL.Query().Get("gameids")
 
-	rept := []string{}
+	// rSites := r.URL.Query()["site"]
+	// rStatuses := r.URL.Query()["status"]
+	// rAssociations := r.URL.Query()["association"]
 
-	if tId == "na" {
-		tId, err = getTenantId(r)
+	// rept := []string{}
 
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
+	// if tId == "na" {
+	// 	tId, err = getTenantId(r)
 
-	// The HTML uses the site name, so we need to convert it to an ID
-	// if rSite != "" {
-	// 	siteId, err = sc.GetSiteId(rSite, tId)
 	// 	if err != nil {
-	// 		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+	// 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 	// 		return
 	// 	}
 	// }
 
-	if len(rGameIds) > 0 {
-		ids, err := utils.ConvertGameIdStrToInt(rGameIds)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-		gameFilters.GameId, err = utils.ConvertGameIdIntToStr(ids)
-		if err != nil {
-			fmt.Println("Error:", err)
-			return
-		}
-	} else {
-		gameFilters.GameId = rGameIds
-	}
+	// // The HTML uses the site name, so we need to convert it to an ID
+	// // if rSite != "" {
+	// // 	siteId, err = sc.GetSiteId(rSite, tId)
+	// // 	if err != nil {
+	// // 		http.Error(w, "Invalid site ID", http.StatusBadRequest)
+	// // 		return
+	// // 	}
+	// // }
 
-	gameFilters.Association = ""
-	gameFilters.Status = ""
-	gameFilters.Site = ""
-	gameFilters.TenantId = tId
-	fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
+	// if len(rGameIds) > 0 {
+	// 	ids, err := utils.ConvertGameIdStrToInt(rGameIds)
+	// 	if err != nil {
+	// 		fmt.Println("Error:", err)
+	// 		return
+	// 	}
+	// 	gameFilters.GameId, err = utils.ConvertGameIdIntToStr(ids)
+	// 	if err != nil {
+	// 		fmt.Println("Error:", err)
+	// 		return
+	// 	}
+	// } else {
+	// 	gameFilters.GameId = rGameIds
+	// }
 
-	gameFilter := bson.M{}
-	expenseFilter := bson.M{}
+	// gameFilters.Association = ""
+	// gameFilters.Status = ""
+	// gameFilters.Site = ""
+	// gameFilters.TenantId = tId
+	// fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
 
-	if len(rStatuses) > 0 {
-		gameFilter["status"] = bson.M{
-			"$in": rStatuses,
-		}
-	}
+	// gameFilter := bson.M{}
+	// expenseFilter := bson.M{}
 
-	if len(rAssociations) > 0 {
-		gameFilter["association"] = bson.M{
-			"$in": rAssociations,
-		}
+	// if len(rStatuses) > 0 {
+	// 	gameFilter["status"] = bson.M{
+	// 		"$in": rStatuses,
+	// 	}
+	// }
 
-		expenseFilter["association"] = bson.M{
-			"$in": rAssociations,
-		}
-	}
+	// if len(rAssociations) > 0 {
+	// 	gameFilter["association"] = bson.M{
+	// 		"$in": rAssociations,
+	// 	}
 
-	if len(rSites) > 0 {
-		gameFilter["site"] = bson.M{
-			"$in": rSites,
-		}
-	}
+	// 	expenseFilter["association"] = bson.M{
+	// 		"$in": rAssociations,
+	// 	}
+	// }
 
-	switch rType {
-	case "Games":
-		rept = generateGamesReport(gameFilter)
-	case "Expenses":
-		rept = generateExpenseReport(expenseFilter)
-	case "Income":
-		rept = generateIncomeReport(rAssociations, tId)
-	case "Payments":
-		rept = generatePaymentsReport(rAssociations, tId)
-	case "Reconciliation":
-		rept = generateReconciliationReport(rAssociations, tId)
-	case "Accounts Receivable":
-		rept = generateAccountsReceivableReport(rAssociations, tId)
-	default:
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprint(w, "Invalid Report Type")
-		return
-	}
+	// if len(rSites) > 0 {
+	// 	gameFilter["site"] = bson.M{
+	// 		"$in": rSites,
+	// 	}
+	// }
 
-	if rEmail != "" {
-		var email email.Email
-		email.Initialize()
-		if rFile == "" {
-			rFile = rType + "_report.pdf"
-		}
-		reports.WriteReportToFile(rept, rFile)
-		// Send report via email
-		email.SetSubject("Ref Ledger V2 Report")
-		email.SetBody("Please see the attached report.\n\nThanks!\n\nGenerated and Sent by Ref Ledger V2.0")
-		email.AddAttachment(rFile)
-		email.SetTo(strings.Split(rEmail, ","))
-		email.Send()
-		w.Header().Set("Content-Type", "text/plain")
-		fmt.Fprint(w, "Email sent")
-	} else {
-		w.Header().Set("Content-Type", "text/plain")
-		output := strings.Join(rept, "\n")
+	// switch rType {
+	// case "Games":
+	// 	rept = generateGamesReport(gameFilter)
+	// case "Expenses":
+	// 	rept = generateExpenseReport(expenseFilter)
+	// case "Income":
+	// 	rept = generateIncomeReport(rAssociations, tId)
+	// case "Payments":
+	// 	rept = generatePaymentsReport(rAssociations, tId)
+	// case "Reconciliation":
+	// 	rept = generateReconciliationReport(rAssociations, tId)
+	// case "Accounts Receivable":
+	// 	rept = generateAccountsReceivableReport(rAssociations, tId)
+	// default:
+	// 	w.Header().Set("Content-Type", "text/plain")
+	// 	fmt.Fprint(w, "Invalid Report Type")
+	// 	return
+	// }
 
-		_, err := w.Write([]byte(output))
-		if err != nil {
-			fmt.Println(err)
-			fmt.Fprint(w, "Error generating report")
-		}
-	}
+	// if rEmail != "" {
+	// 	var email email.Email
+	// 	email.Initialize()
+	// 	if rFile == "" {
+	// 		rFile = rType + "_report.pdf"
+	// 	}
+	// 	reports.WriteReportToFile(rept, rFile)
+	// 	// Send report via email
+	// 	email.SetSubject("Ref Ledger V2 Report")
+	// 	email.SetBody("Please see the attached report.\n\nThanks!\n\nGenerated and Sent by Ref Ledger V2.0")
+	// 	email.AddAttachment(rFile)
+	// 	email.SetTo(strings.Split(rEmail, ","))
+	// 	email.Send()
+	// 	w.Header().Set("Content-Type", "text/plain")
+	// 	fmt.Fprint(w, "Email sent")
+	// } else {
+	// 	w.Header().Set("Content-Type", "text/plain")
+	// 	output := strings.Join(rept, "\n")
 
+	// 	_, err := w.Write([]byte(output))
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 		fmt.Fprint(w, "Error generating report")
+	// 	}
+	// }
+
+	http.Error(w, "Game not found", http.StatusNotFound)
+	return
 }
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
@@ -5338,7 +5188,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	var game Game
 	var tId string = database.TenantId
 	var err error
-	var siteId string
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
 	if tId == "na" {
@@ -5375,15 +5224,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	// The HTML uses the site name, so we need to convert it to an ID
-	siteId, err = sc.GetSiteId(game.Site, tId)
-	if err != nil {
-		http.Error(w, "Invalid site ID", http.StatusBadRequest)
-		return
-	}
-
-	game.Site = siteId
 
 	if game.Status == "Cancelled" {
 		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
@@ -5442,7 +5282,6 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	var game Game
 	var tId string = database.TenantId
 	var err error
-	var siteId string
 	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
@@ -5463,15 +5302,6 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-
-	// The HTML uses the site name, so we need to convert it to an ID
-	siteId, err = sc.GetSiteId(game.Site, tId)
-	if err != nil {
-		http.Error(w, "Invalid site ID", http.StatusBadRequest)
-		return
-	}
-
-	game.Site = siteId
 
 	if game.Status == "Cancelled" {
 		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
@@ -6360,8 +6190,8 @@ func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Official JSON:",officialJson)
-	
+	fmt.Println("Official JSON:", officialJson)
+
 	err = oc.Update(database.TenantId, oc.ConvJsonToOfficial(officialJson))
 	if err != nil {
 		fmt.Println("Failed to update official")
@@ -6882,18 +6712,6 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	//
-	// Replace Site Id with Site Name
-	//
-	siteName, err := sc.GetSiteName(game.Site, tId)
-
-	if err == nil {
-		game.Site = siteName
-	} else {
-		fmt.Println("Failed to get site name:", err)
-		game.Site = "Unknown"
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(game)
@@ -7025,7 +6843,6 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return complete dynamic assignments without changing GameView.
 	type dashboardGameView struct {
 		model.GameView
 		Officials []model.GameOfficialDoc `json:"Officials"`
@@ -7069,14 +6886,32 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	assignors := cleanValues(query["assignor"])
 	officials := cleanValues(query["official"])
 
-	begindate := query.Get("begindate")
-	enddate := query.Get("enddate")
+	begindate := strings.TrimSpace(query.Get("begindate"))
+	enddate := strings.TrimSpace(query.Get("enddate"))
 	gameId := strings.TrimSpace(query.Get("gameId"))
 	home := query.Get("home")
 	visitor := query.Get("visitor")
 
-	if begindate == "today" && enddate == "" {
-		enddate = begindate
+	// Convert "today" to the date format expected by FormatDateFilter.
+	if begindate == "today" || enddate == "today" {
+		location, err := time.LoadLocation("America/New_York")
+		if err != nil {
+			http.Error(w, "Unable to determine today's date", http.StatusInternalServerError)
+			return
+		}
+
+		today := time.Now().In(location).Format("2006-01-02")
+
+		if begindate == "today" {
+			begindate = today
+			if enddate == "" {
+				enddate = today
+			}
+		}
+
+		if enddate == "today" {
+			enddate = today
+		}
 	}
 
 	for i, status := range statuses {
@@ -7127,7 +6962,6 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		mongoDbFilter = bson.M{}
 	}
 
-	// Always scope this request to its authenticated tenant.
 	mongoDbFilter["tenantId"] = tId
 
 	if len(statuses) > 0 {
@@ -7146,34 +6980,14 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		mongoDbFilter["level"] = bson.M{"$in": levels}
 	}
 
-	// Additional conditions are combined with the original filter.
-	// This preserves any existing $or or $and conditions.
 	extraConditions := bson.A{}
 
 	if len(officials) > 0 {
 		extraConditions = append(extraConditions, bson.M{
-			"$or": bson.A{
-				// Dynamic assignments: any role except ECO.
-				bson.M{
-					"officials": bson.M{
-						"$elemMatch": bson.M{
-							"name":  bson.M{"$in": officials},
-							"title": bson.M{"$ne": "ECO"},
-						},
-					},
-				},
-				// Legacy assignments: only when the array is absent or empty.
-				bson.M{
-					"$and": bson.A{
-						bson.M{"officials.0": bson.M{"$exists": false}},
-						bson.M{
-							"$or": bson.A{
-								bson.M{"referee": bson.M{"$in": officials}},
-								bson.M{"u1": bson.M{"$in": officials}},
-								bson.M{"u2": bson.M{"$in": officials}},
-							},
-						},
-					},
+			"officials": bson.M{
+				"$elemMatch": bson.M{
+					"name":  bson.M{"$in": officials},
+					"title": bson.M{"$ne": "ECO"},
 				},
 			},
 		})
@@ -7181,20 +6995,10 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	if len(ecos) > 0 {
 		extraConditions = append(extraConditions, bson.M{
-			"$or": bson.A{
-				bson.M{
-					"officials": bson.M{
-						"$elemMatch": bson.M{
-							"title": "ECO",
-							"name":  bson.M{"$in": ecos},
-						},
-					},
-				},
-				bson.M{
-					"$and": bson.A{
-						bson.M{"officials.0": bson.M{"$exists": false}},
-						bson.M{"eco": bson.M{"$in": ecos}},
-					},
+			"officials": bson.M{
+				"$elemMatch": bson.M{
+					"title": "ECO",
+					"name":  bson.M{"$in": ecos},
 				},
 			},
 		})
@@ -7205,23 +7009,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(sites) > 0 {
-		siteIds := make([]string, 0, len(sites))
-
-		for _, siteName := range sites {
-			siteId, err := sc.GetSiteId(siteName, tId)
-			if err != nil {
-				http.Error(
-					w,
-					fmt.Sprintf("Invalid site: %s", siteName),
-					http.StatusBadRequest,
-				)
-				return
-			}
-
-			siteIds = append(siteIds, siteId)
-		}
-
-		mongoDbFilter["site"] = bson.M{"$in": siteIds}
+		mongoDbFilter["site"] = bson.M{"$in": sites}
 	}
 
 	if len(extraConditions) > 0 {
@@ -7253,9 +7041,12 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	if len(games) == 0 {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]string{
+
+		if err := json.NewEncoder(w).Encode(map[string]string{
 			"message": "No games were found matching your search criteria.",
-		})
+		}); err != nil {
+			log.Printf("Unable to return empty dashboard response: %v", err)
+		}
 		return
 	}
 
@@ -7275,6 +7066,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 
 		gameFee := utils.CalculateGameFee(gameRec)
+
 		totals.Update(
 			game.Association,
 			game.Status,
@@ -7306,43 +7098,9 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 		assignments := make(
 			[]model.GameOfficialDoc,
-			0,
 			len(game.Officials),
 		)
-
-		if len(game.Officials) > 0 {
-			// Modern games: preserve every saved role and assignment.
-			assignments = append(assignments, game.Officials...)
-		} else {
-			// Compatibility for games that have not been migrated.
-			refereeTitle := "Referee"
-			if strings.EqualFold(strings.TrimSpace(game.Sport), "Softball") {
-				refereeTitle = "Plate Umpire"
-			}
-
-			legacyRoles := []struct {
-				title string
-				name  string
-			}{
-				{title: refereeTitle, name: game.Referee},
-				{title: "U1", name: game.U1},
-				{title: "U2", name: game.U2},
-				{title: "ECO", name: game.ECO},
-			}
-
-			for i, role := range legacyRoles {
-				name := strings.TrimSpace(role.name)
-				if name == "" || strings.EqualFold(name, "Unassigned") {
-					continue
-				}
-
-				assignments = append(assignments, model.GameOfficialDoc{
-					Title:        role.title,
-					DisplayOrder: i + 1,
-					Name:         name,
-				})
-			}
-		}
+		copy(assignments, game.Officials)
 
 		for i := range assignments {
 			assignment := &assignments[i]
@@ -7354,11 +7112,6 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 				} else {
 					assignment.Name = "Unassigned"
 				}
-			}
-
-			// Retain the compatibility ECO field for other consumers.
-			if strings.EqualFold(assignment.Title, "ECO") {
-				view.ECO = assignment.Name
 			}
 		}
 
@@ -7373,8 +7126,9 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+
 	if err := json.NewEncoder(w).Encode(gameViews); err != nil {
-		fmt.Printf("Unable to return dashboard games: %v\n", err)
+		log.Printf("Unable to return dashboard games: %v", err)
 	}
 }
 

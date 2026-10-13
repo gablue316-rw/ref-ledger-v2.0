@@ -14,8 +14,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
+	"encoding/csv"
+
 	"go.mongodb.org/mongo-driver/bson"
-	"golang.org/x/exp/slices"
 )
 
 var ApiVersion string = "ref-ledger-api-v2.1.0"
@@ -251,10 +252,6 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 		AcInitialized = true
 	}
 
-	var ref string = strings.TrimSpace(g.Referee)
-	var u1 string = strings.TrimSpace(g.U1)
-	var u2 string = strings.TrimSpace(g.U2)
-	var eco string = strings.TrimSpace(g.ECO)
 	var assignor string = strings.TrimSpace(g.Assignor)
 	var gameid string = strings.TrimSpace(g.GameId)
 	var assoc string = strings.TrimSpace(g.Association)
@@ -262,9 +259,15 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 	fmt.Println("Validating Game with game id", gameid, "for association", assoc)
 
 	if checkForDup {
-		exists, _ := gc.Exists(assoc, gameid, tId)
+		exists, err := gc.Exists(assoc, gameid, tId)
+		if err != nil {
+			return fmt.Errorf("failed to check for duplicate game: %w", err)
+		}
 		if exists {
-			return fmt.Errorf("Duplicate Game")
+			return fmt.Errorf(
+				"duplicate game: game ID %s for association %s",
+				gameid, assoc,
+			)
 		}
 	}
 
@@ -292,38 +295,62 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 		}
 	}
 
-	fmt.Println("Referee=", ref)
-	if ref != "Unassigned" {
-		results, err := oc.Exists(ref, tId)
-		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "Referee", ref)
+	for _, assignment := range g.Officials {
+		role := strings.TrimSpace(assignment.Title)
+		if role == "" {
+			role = assignment.RoleId
+		}
+
+		officialId := strings.TrimSpace(assignment.OfficialId)
+		name := strings.TrimSpace(assignment.Name)
+
+		if officialId == "Unassigned" {
+			officialId = ""
+		}
+
+		if officialId == "" && (name == "" || name == "Unassigned") {
+			continue
+		}
+
+		if officialId != "" {
+			id, err := strconv.ParseInt(officialId, 10, 64)
+			if err != nil || id <= 0 {
+				return fmt.Errorf(
+					"invalid officialId %q for role %q",
+					officialId, role,
+				)
+			}
+
+			if _, err := oc.GetById(id, tId); err != nil {
+				return fmt.Errorf(
+					"invalid official for role %q: %w",
+					role, err,
+				)
+			}
+
+			continue
+		}
+
+		// Support imports containing a name within the Officials array.
+		parts := strings.Fields(name)
+		if len(parts) < 2 {
+			return fmt.Errorf(
+				"invalid official name %q for role %q",
+				name, role,
+			)
+		}
+
+		if _, err := oc.Get(
+			parts[0],
+			parts[len(parts)-1],
+			tId,
+		); err != nil {
+			return fmt.Errorf(
+				"invalid official %q for role %q: %w",
+				name, role, err,
+			)
 		}
 	}
-
-	fmt.Println("U1=", u1)
-	if u1 != "Unassigned" {
-		results, err := oc.Exists(u1, tId)
-		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "U1", u1)
-		}
-	}
-
-	fmt.Println("U2=", u2)
-	if u2 != "Unassigned" {
-		results, err := oc.Exists(u2, tId)
-		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "U2", u2)
-		}
-	}
-
-	fmt.Println("ECO=", eco)
-	if eco != "Unassigned" {
-		results, err := oc.Exists(eco, tId)
-		if !results || err != nil {
-			return fmt.Errorf(errorFormat, "ECO", eco)
-		}
-	}
-
 	fmt.Println("Assignor=", assignor)
 	if assignor != "Unassigned" {
 		results, err := ac.AssignorExists(assignor, tId, g.Association)
@@ -338,100 +365,198 @@ func UpdatePayment(parentCtx context.Context) {
 
 }
 
-func UpdateGame(parentCtx context.Context, cmd string, gameIds []int64) error {
+func UpdateGame(
+	parentCtx context.Context,
+	cmd string,
+	gameIds []int64,
+) error {
+	if len(gameIds) == 0 {
+		return fmt.Errorf("no game IDs were supplied")
+	}
 
-	var field string
-	var value string
-	var cmdList []string
-	var int64Fields []string = []string{"numOfGames", "gameFee", "travelPay", "assignorFee", "deductions"}
-	var officialFields []string = []string{"referee", "u1", "u2", "eco", "assignor"}
-	var tId string = database.TenantId
+	if strings.TrimSpace(cmd) == "" {
+		return fmt.Errorf("no update command was supplied")
+	}
 
-	cmdList = strings.Split(cmd, ";")
+	tId := database.TenantId
 
-	for _, command := range cmdList {
+	if !GcInitialized {
+		if err := gc.Init(database.Client); err != nil {
+			return fmt.Errorf("initialize games collection: %w", err)
+		}
+		GcInitialized = true
+	}
 
-		parts := strings.Split(command, ":")
+	type gameChange struct {
+		field string
+		value string
+	}
 
-		field = parts[0]
-		value = parts[1]
-		var update bson.M
+	changes := make([]gameChange, 0)
 
-		//
-		// Time changes will look like the following:
-		//
-		//    Time:6:15 PM
-		//
-		// The above strings.Split command will split the cmd into 3 elements.
-		// So we will need to reassemble the time
-		//
-		if len(parts) == 3 {
-			value = parts[1] + ":" + parts[2]
+	for _, command := range strings.Split(cmd, ";") {
+		if strings.TrimSpace(command) == "" {
+			continue
 		}
 
-		filter := bson.M{
-			"gameId": bson.M{
-				"$in": gameIds,
-			},
+		parts := strings.SplitN(command, ":", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf(
+				"invalid command %q: expected field:value",
+				command,
+			)
 		}
 
-		if field == "status" && value == "Delete" {
-			if len(gameIds) == 1 {
-				database.DeleteOneDoc(parentCtx, filter, database.Database, "games")
-			} else if len(gameIds) > 1 {
-				database.DeleteManyDoc(parentCtx, filter, database.Database, "games")
+		field := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		switch field {
+		case "referee", "u1", "u2", "eco":
+			return fmt.Errorf(
+				"field %q is deprecated; update the Officials array through the game editor",
+				field,
+			)
+
+		case "date", "time", "site", "field", "level",
+			"home", "visitor", "assignor":
+			// Supported string fields.
+
+		case "numOfGames":
+			n, err := strconv.ParseInt(value, 10, 64)
+			if err != nil || n <= 0 {
+				return fmt.Errorf("invalid number of games %q", value)
 			}
-			return nil
-		}
+			value = strconv.FormatInt(n, 10)
 
-		if field == "status" && value == "Cancelled" {
-			database.ClearGames(parentCtx, gameIds)
-			return nil
-		}
-
-		exists := slices.Contains(officialFields, field)
-		if exists {
-			found, err := oc.Exists(value, tId)
-			if !found || err != nil {
-				return fmt.Errorf("Failed to find %s %s.  Reason: %s", field, value, err)
-			}
-		}
-
-		exists = slices.Contains(int64Fields, field)
-		if exists {
-			valueInt64, err := strconv.ParseFloat(value, 64)
+		case "gameFee", "travelPay", "assignorFee", "deductions":
+			amount, err := utils.ConvertAmtStrToInt64(value)
 			if err != nil {
-				return fmt.Errorf("Error: %s", err)
+				return fmt.Errorf("invalid %s: %w", field, err)
 			}
-			valueInt64 = valueInt64 * 100
-			update = bson.M{
-				"$set": bson.M{
-					field: valueInt64,
-				},
+			value = utils.ConvertInt64ToAmtStr(amount)
+
+		case "status":
+			switch value {
+			case "Pending", "Completed", "Paid", "Cancelled", "Delete":
+			default:
+				return fmt.Errorf("invalid game status %q", value)
 			}
-		} else {
-			update = bson.M{
-				"$set": bson.M{
-					field: value,
-				},
-			}
+
+		default:
+			return fmt.Errorf("unsupported update field %q", field)
 		}
 
-		if len(gameIds) > 1 {
-			database.UpdateManyDoc(parentCtx, filter, update, database.Database, "games")
-		} else {
-			err := database.UpdateOneDoc(parentCtx, filter, update, database.Database, "games")
+		changes = append(changes, gameChange{
+			field: field,
+			value: value,
+		})
+	}
+
+	if len(changes) == 0 {
+		return fmt.Errorf("no update command was supplied")
+	}
+
+	// Deletion must be a separate command.
+	for _, change := range changes {
+		if change.field == "status" && change.value == "Delete" &&
+			len(changes) != 1 {
+			return fmt.Errorf("Delete must be supplied as the only command")
+		}
+	}
+
+	for _, id := range gameIds {
+		if err := parentCtx.Err(); err != nil {
+			return err
+		}
+
+		// Scope the lookup to the current tenant.
+		var doc model.GameDoc
+		err := database.Client.
+			Database(database.Database).
+			Collection("games").
+			FindOne(parentCtx, bson.M{
+				"tenantId": tId,
+				"gameId":   id,
+			}).
+			Decode(&doc)
+		if err != nil {
+			return fmt.Errorf("retrieve game %d: %w", id, err)
+		}
+
+		if changes[0].field == "status" &&
+			changes[0].value == "Delete" {
+			_, err := database.Client.
+				Database(database.Database).
+				Collection("games").
+				DeleteOne(parentCtx, bson.M{
+					"tenantId":    tId,
+					"gameId":      id,
+					"association": doc.Association,
+				})
 			if err != nil {
-				fmt.Println(err)
-			} else {
-				fmt.Println("Successfully updated game with game id[s]:", gameIds)
+				return fmt.Errorf("delete game %d: %w", id, err)
+			}
+			continue
+		}
+
+		game := utils.ConvertGameDocToGameDescr(doc)
+
+		for _, change := range changes {
+			switch change.field {
+			case "date":
+				game.Date = change.value
+			case "time":
+				game.Time = change.value
+			case "site":
+				game.Site = change.value
+			case "field":
+				game.Field = change.value
+			case "level":
+				game.Level = change.value
+			case "home":
+				game.Home = change.value
+			case "visitor":
+				game.Visitor = change.value
+			case "assignor":
+				game.Assignor = change.value
+			case "numOfGames":
+				game.NumOfGames = change.value
+			case "gameFee":
+				game.GameFee = change.value
+			case "travelPay":
+				game.TravelPay = change.value
+			case "assignorFee":
+				game.AssignorFee = change.value
+			case "deductions":
+				game.Deductions = change.value
+			case "status":
+				game.Status = change.value
 			}
 		}
 
+		if game.Status == "Cancelled" {
+			game.GameFee = "0.00"
+			game.TravelPay = "0.00"
+			game.AssignorFee = "0.00"
+			game.Deductions = "0.00"
+		}
+
+		if err := ValidateGameDescriptor(parentCtx, game, false); err != nil {
+			return fmt.Errorf("validate game %d: %w", id, err)
+		}
+
+		if err := database.UpdateOneGameDoc(
+			parentCtx,
+			game,
+			database.Database,
+			"games",
+			tId,
+		); err != nil {
+			return fmt.Errorf("update game %d: %w", id, err)
+		}
 	}
 
 	return nil
-
 }
 
 func AddGames(parentCtx context.Context, game []model.GameDescriptor) {
@@ -479,36 +604,78 @@ func writeToFile(records []string, file string) error {
 	return nil
 }
 
-func DumpGames(parentCtx context.Context, file, assoc, format string) {
-
-	var games []model.GameDoc = []model.GameDoc{}
-	var records []string = []string{}
-
-	var recdFmt string = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s"
-
+func DumpGames(
+	parentCtx context.Context,
+	file, assoc, format string,
+) {
 	games, err := database.GetGamesCollection(parentCtx, assoc)
-
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	fmt.Println("Dumping games.  Number of games:", len(games))
-	for _, game := range games {
+	fmt.Println("Dumping games. Number of games:", len(games))
 
-		if file == "" {
+	if file == "" {
+		for _, game := range games {
 			fmt.Println(game)
-			continue
-		} else {
-			g := utils.ConvertGameDocToGameDescr(game)
-			r := fmt.Sprintf(recdFmt, g.Date, g.Time, g.GameId, g.Sport, g.Level, g.Site, g.Field, g.NumOfGames, g.GameFee, g.Deductions, g.Status, g.Association, g.Referee, g.U1, g.U2, g.ECO, g.Assignor, g.AssignorFee, g.TravelPay)
-			records = append(records, r)
+		}
+		return
+	}
+
+	var output strings.Builder
+	writer := csv.NewWriter(&output)
+
+	for _, game := range games {
+		g := utils.ConvertGameDocToGameDescr(game)
+
+		officials := g.Officials
+		if officials == nil {
+			officials = []model.GameOfficialDoc{}
+		}
+
+		officialsJSON, err := json.Marshal(officials)
+		if err != nil {
+			fmt.Printf(
+				"Failed to encode officials for game %s: %v\n",
+				g.GameId, err,
+			)
+			return
+		}
+
+		err = writer.Write([]string{
+			g.Date,
+			g.Time,
+			g.GameId,
+			g.Sport,
+			g.Level,
+			g.Site,
+			g.Field,
+			g.NumOfGames,
+			g.GameFee,
+			g.Deductions,
+			g.Status,
+			g.Association,
+			string(officialsJSON),
+			g.Assignor,
+			g.AssignorFee,
+			g.TravelPay,
+		})
+		if err != nil {
+			fmt.Println("Failed to write game CSV:", err)
+			return
 		}
 	}
-	if len(records) != 0 {
-		err = writeToFile(records, file)
+
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		fmt.Println("Failed to write game CSV:", err)
+		return
 	}
 
+	if err := os.WriteFile(file, []byte(output.String()), 0644); err != nil {
+		fmt.Println("Failed to save game CSV:", err)
+	}
 }
 
 func DumpOfficials(parentCtx context.Context, file string) {
