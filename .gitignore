@@ -45,6 +45,7 @@ bugs
 
 # tools
 tools/migrateOfficials
+tools/*.txt
 
 # resend
 resend
