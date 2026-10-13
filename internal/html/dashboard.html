@@ -2350,7 +2350,13 @@ async function loadSites() {
         }
 
         const sites = await response.json();
-        dashboardSites = Array.isArray(sites) ? sites : [];
+        dashboardSites = (Array.isArray(sites) ? sites : [])
+            .map(site => ({
+                name: String(
+                    typeof site === "string" ? site : site?.name ?? site?.Name ?? ""
+                ).trim()
+            }))
+            .filter(site => site.name);
         populateEditSelect(
             "editSite",
             dashboardSites,
@@ -3017,23 +3023,10 @@ async function openEditGame(gameId, association) {
         false
     );
     const storedSite = String(gameValue(gameBeingEdited, "Site") || "").trim();
-    const normalizedStoredSite = storedSite.toLowerCase();
-    const matchingSite = dashboardSites.find(site => {
-        const siteId = String(site?.id ?? "").trim().toLowerCase();
-        const siteName = String(site?.name ?? "").trim().toLowerCase();
-
-        return siteId === normalizedStoredSite ||
-            siteName === normalizedStoredSite;
-    });
-
-    if (matchingSite) {
-        setEditSelectValue("editSite", matchingSite.name);
-    } else {
-        setEditSelectValue("editSite", "");
-        console.warn(
-            `No site name found for stored site ID: ${storedSite}`
-        );
-    }
+    const matchingSite = dashboardSites.find(site =>
+        site.name.toLowerCase() === storedSite.toLowerCase()
+    );
+    setEditSelectValue("editSite", matchingSite?.name ?? storedSite);
     document.getElementById("editField").value = gameValue(gameBeingEdited, "Field");
     setEditSelectValue(
         "editLevel",

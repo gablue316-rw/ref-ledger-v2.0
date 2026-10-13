@@ -24,6 +24,18 @@ var logFileFullPathName string = ""
 
 var AuditLog *log.Logger = nil
 
+func copyGameOfficials(
+	officials []model.GameOfficialDoc,
+) []model.GameOfficialDoc {
+	if officials == nil {
+		return nil
+	}
+
+	result := make([]model.GameOfficialDoc, len(officials))
+	copy(result, officials)
+	return result
+}
+
 func GetLogFilePath() string {
 
 	fmt.Println("Getting log file path from environment variable LOG_FILE_PATH...")
@@ -257,10 +269,7 @@ func ConvertJsonToGameDescriptor(file string) ([]model.GameDescriptor, error) {
 			Deductions:  g.Deductions,
 			Association: g.Association,
 			Status:      g.Status,
-			Referee:     g.Referee,
-			U1:          g.U1,
-			U2:          g.U2,
-			ECO:         g.ECO,
+			Officials:   copyGameOfficials(g.Officials),
 			Assignor:    g.Assignor,
 		})
 
@@ -391,9 +400,7 @@ func ConvertGameFiltersToJsonFile(filters model.GFilters) (string, error) {
 		jsonFilters.Date.To = filters.ToDate
 	}
 
-	jsonFilters.Referee = filters.Official
-	jsonFilters.U1 = filters.Official
-	jsonFilters.U2 = filters.Official
+	jsonFilters.Official = ParseCsv(filters.Official)
 	jsonFilters.TenantId = filters.TenantId
 
 	fmt.Println("JSON Filters:", jsonFilters)
@@ -711,10 +718,7 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 		Deductions:  deductions,
 		Association: doc.Association,
 		Status:      doc.Status,
-		Referee:     doc.Referee,
-		U1:          doc.U1,
-		U2:          doc.U2,
-		ECO:         doc.ECO,
+		Officials:   copyGameOfficials(doc.Officials),
 		Assignor:    doc.Assignor,
 	}
 
@@ -895,10 +899,7 @@ func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
 		Deductions:  deductions,
 		Association: gameDescr.Association,
 		Status:      gameDescr.Status,
-		Referee:     gameDescr.Referee,
-		U1:          gameDescr.U1,
-		U2:          gameDescr.U2,
-		ECO:         gameDescr.ECO,
+		Officials:   copyGameOfficials(gameDescr.Officials),
 		Assignor:    gameDescr.Assignor,
 	}
 

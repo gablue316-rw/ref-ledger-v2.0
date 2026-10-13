@@ -7,7 +7,6 @@ import (
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
-	"strconv"
 	"strings"
 	"time"
 
@@ -640,460 +639,464 @@ func getMissingPaidGames(assoc string) []string {
 	return missingGamesStr
 }
 
-func GenerateIncomeReport(assoc []string, tid string) []string {
-
-	err := ec.Init(database.Client)
-	if err != nil {
-		fmt.Println("Failed to initialize expenses collection.")
-		utils.AuditLog.Println("Failed to initialize expenses collection.")
-		return []string{}
-	}
-
-	err = ac.Init(database.Client)
-	if err != nil {
-		fmt.Println("Failed to initialize associations collection.")
-		utils.AuditLog.Println("Failed to initialize associations collection.")
-		return []string{}
-	}
-
-	fmt.Println("Generating Income Report")
-	rept := []string{}
-	expenseRpt := []string{}
-	title := "Income Report\n"
-	expenseRptTitle := "Detail Expense Report\n\n"
-
-	reptTimeMsg := getReportGeneratedDate()
-	assocList := []string{}
-
-	if len(assoc) == 0 {
-		assocList, err = ac.GetAssociationNamesAsStrings(tid)
-		if err != nil {
-			fmt.Println("Failed to retrieve association names.")
-			utils.AuditLog.Println("Failed to retrieve association names.")
-			return []string{}
-		}
-	} else {
-		assocList = assoc
-	}
-
-	heading1 := "               Total      Total     Total      Gross         Total         Total          Net         Total     Total  \n"
-	heading2 := "Association    Games    Game Fees   Travel    Revenue    Assignor Fees   Deductions     Revenue     Expenses    Profit \n"
-	separator := "=======================================================================================================================\n"
-	separator2 := "_______________________________________________________________________________________________________________________\n"
-	reptFmtStr := "%-15s%-9s$%-11s$%-9s$%-10s$%-15s$%-14s$%-11s$%-11s$%-10s\n"
-	expReptFmtStr := "%-15s$%-9s$%-14s%-11s$%-11s$%-14s$%-14s\n"
-
-	expenseHeading1 := "               Total       Total        Total      Total         Total         Total\n"
-	expenseHeading2 := "Association    Dues      Camp Fees      Miles      Food        Equipment      Expenses\n"
-	expenseSeparator := "============================================================================================\n"
-	expenseSeparator2 := "___________________________________________________________________________________________\n"
-
-	maxLineLength := len(heading1)
-
-	newTitle := utils.CenterText(title, maxLineLength)
-	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
-	rept = append(rept, newTitle)
-	rept = append(rept, newReptTimeMsg)
-	rept = append(rept, heading1)
-	rept = append(rept, heading2)
-	rept = append(rept, separator)
-
-	maxLineLength = len(expenseHeading1)
-	newTitle = utils.CenterText(expenseRptTitle, maxLineLength)
-	expenseRpt = append(expenseRpt, newTitle)
-	expenseRpt = append(expenseRpt, expenseHeading1)
-	expenseRpt = append(expenseRpt, expenseHeading2)
-	expenseRpt = append(expenseRpt, expenseSeparator)
-
-	totAssignorFees := int64(0)
-	totDeductions := int64(0)
-	totTravelPay := int64(0)
-	totGameFees := int64(0)
-
-	totDues := int64(0)
-	totCampFees := int64(0)
-	totFood := int64(0)
-	totEquipment := int64(0)
-	totMiles := int64(0)
-	totGrossRev := int64(0)
-	totNetRev := int64(0)
-	netProfit := int64(0)
-	totNetProfit := int64(0)
-	grandTotExpenses := int64(0)
-	totGames := int64(0)
-
-	totExpenses := int64(0)
-
-	for _, a := range assocList {
-
-		numOfGames, err := database.GetTotalGames(a)
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		assignorFees, err := database.GetTotalAssignorFee(a)
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		travelPay, err := database.GetTotalTravelPay(a)
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		deductions, err := database.GetTotalDeductions(a, tid)
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		dues, err := ec.GetExpense(a, database.TenantId, "Dues")
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		miles, err := ec.GetExpense(a, database.TenantId, "Mileage")
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		gameFees, err := database.GetTotalGrossGameFee(a)
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		food, err := ec.GetExpense(a, database.TenantId, "Food")
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		campFees, err := ec.GetExpense(a, database.TenantId, "Camp Fees")
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		equipmentFees, err := ec.GetExpense(a, database.TenantId, "Equipment")
-		if err != nil {
-			fmt.Println(err)
-			return []string{}
-		}
-
-		grossRev := gameFees + travelPay
-		netRev := grossRev - assignorFees - deductions
-		totGrossRev += grossRev
-		totNetRev += netRev
-		totFood += food
-		totGameFees += gameFees
-		totAssignorFees += assignorFees
-		totTravelPay += travelPay
-		totDeductions += deductions
-		totCampFees += campFees
-		totEquipment += equipmentFees
-		totMiles += miles
-		totDues += dues
-		totGames += numOfGames
-
-		totExpenses = dues + equipmentFees + campFees + food
-		grandTotExpenses += totExpenses
-
-		netProfit = netRev - totExpenses
-
-		totNetProfit += netProfit
-
-		assignorFeesStr := utils.ConvertInt64ToAmtStr(assignorFees)
-		travelPayStr := utils.ConvertInt64ToAmtStr(travelPay)
-		totExpStr := utils.ConvertInt64ToAmtStr(totExpenses)
-		gameFeesStr := utils.ConvertInt64ToAmtStr(gameFees)
-		grossRevStr := utils.ConvertInt64ToAmtStr(grossRev)
-		netRevStr := utils.ConvertInt64ToAmtStr(netRev)
-		netProfitStr := utils.ConvertInt64ToAmtStr(netProfit)
-		deductionsStr := utils.ConvertInt64ToAmtStr(deductions)
-		numOfGamesStr := utils.ConvertInt64ToStr(numOfGames)
-
-		rept = append(rept, fmt.Sprintf(reptFmtStr, a, numOfGamesStr, gameFeesStr, travelPayStr, grossRevStr, assignorFeesStr, deductionsStr, netRevStr, totExpStr, netProfitStr))
-
-		dueStr := utils.ConvertInt64ToAmtStr(dues)
-		campFeesStr := utils.ConvertInt64ToAmtStr(campFees)
-		milesStr := utils.ConvertMilesToStr(miles)
-		foodStr := utils.ConvertInt64ToAmtStr(food)
-		equipmentStr := utils.ConvertInt64ToAmtStr(equipmentFees)
-
-		totalExpenseStr := utils.ConvertInt64ToAmtStr(totExpenses)
-		expenseRpt = append(expenseRpt, fmt.Sprintf(expReptFmtStr, a, dueStr, campFeesStr, milesStr, foodStr, equipmentStr, totalExpenseStr))
-
-	}
-	rept = append(rept, separator2)
-
-	totGamesStr := utils.ConvertInt64ToStr(totGames)
-	totGamesFeeStr := utils.ConvertInt64ToAmtStr(totGameFees)
-	totTravelStr := utils.ConvertInt64ToAmtStr(totTravelPay)
-	totGrossRevStr := utils.ConvertInt64ToAmtStr(totGrossRev)
-	totAssignorFeeStr := utils.ConvertInt64ToAmtStr(totAssignorFees)
-	totDeductionsStr := utils.ConvertInt64ToAmtStr(totDeductions)
-	totNetRevStr := utils.ConvertInt64ToAmtStr(totNetRev)
-	totExpenseStr := utils.ConvertInt64ToAmtStr(grandTotExpenses)
-	totNetProfitStr := utils.ConvertInt64ToAmtStr(totNetProfit)
-
-	rept = append(rept, fmt.Sprintf(reptFmtStr, "", totGamesStr, totGamesFeeStr, totTravelStr, totGrossRevStr, totAssignorFeeStr, totDeductionsStr, totNetRevStr, totExpenseStr, totNetProfitStr))
-	rept = append(rept, "\n\n")
-	expenseRpt = append(expenseRpt, expenseSeparator2)
-
-	totDueStr := utils.ConvertInt64ToAmtStr(totDues)
-	totCampFeesStr := utils.ConvertInt64ToAmtStr(totCampFees)
-	totMilesStr := utils.ConvertMilesToStr(totMiles)
-	totFoodStr := utils.ConvertInt64ToAmtStr(totFood)
-	totEquipmentStr := utils.ConvertInt64ToAmtStr(totEquipment)
-	grandTotalExpStr := utils.ConvertInt64ToAmtStr(grandTotExpenses)
-
-	expenseRpt = append(expenseRpt, fmt.Sprintf(expReptFmtStr, "", totDueStr, totCampFeesStr, totMilesStr, totFoodStr, totEquipmentStr, grandTotalExpStr))
-
-	rept = append(rept, expenseRpt...)
-
-	return rept
-}
-
-func GenerateExpenseReportv2(records []model.ExpenseDescriptor) model.ExpenseReportData {
-
-	fmt.Println("Generating Expense Report v2")
-
-	expenseReport := model.ExpenseReportData{
-		Title:    "Expense Report",
-		SubTitle: getReportGeneratedDate(),
-	}
-
-	expenseRow := model.ExpenseReportRow{}
-
-	var totalMileage int64 = 0
-	var totalExpenses int64 = 0
-
-	for _, rec := range records {
-
-		expenseRow.Date = rec.Date
-		expenseRow.ExpenseId = rec.ExpenseId
-		expenseRow.Association = rec.Association
-		expenseRow.Type = rec.Type
-		expenseRow.Description = rec.Description
-
-		if rec.Type == "Mileage" {
-			expenseRow.Mileage = rec.Mileage
-			expenseRow.Amount = "0.00"
-			miles, err := utils.ConvertStrToInt64(TrimMileageStr(rec.Mileage))
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-
-			totalMileage += miles
-			expenseReport.Rows = append(expenseReport.Rows, expenseRow)
-			continue
-		}
-
-		expenseRow.Amount = "$" + rec.Amount
-		expenseRow.Mileage = "0"
-		expense, err := utils.ConvertAmtStrToInt64(rec.Amount)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-
-		totalExpenses += expense
-
-		expenseReport.Rows = append(expenseReport.Rows, expenseRow)
-
-	}
-
-	expenseReport.TotalMileage = utils.ConvertInt64ToStr(totalMileage)
-	expenseReport.TotalExpenses = utils.ConvertInt64ToAmtStr((totalExpenses))
-
-	fmt.Println(expenseReport)
-
-	return expenseReport
-
-}
-
-func GenerateExpenseReport(records []model.ExpenseDescriptor) []string {
-
-	fmt.Println("Generating Expense Report")
-	rept := make([]string, 10, 20)
-	title := "Expense Report\n"
-	reptTimeMsg := getReportGeneratedDate()
-	heading1 := "Expense ID              Date        Type              Mileage     Amount      Association     Game ID     Description\n"
-	separator := "============================================================================================================================================\n"
-	separator2 := "____________________________________________________________________________________________________________________________________________\n"
-	reptFmtStr := "%-24s%-12s%-18s%-12s%-12s%-16s%-12s%-60s\n"
-
-	maxLineLength := len(heading1)
-
-	var expenses AssociationExpenses
-	expenses.Init()
-
-	newTitle := utils.CenterText(title, maxLineLength)
-	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
-	rept = append(rept, newTitle)
-	rept = append(rept, newReptTimeMsg)
-	rept = append(rept, heading1)
-	rept = append(rept, separator)
-
-	var totalNumOfExpenses int = 0
-	var totalMiles int64 = 0
-	var totalExpenses int64 = 0
-	var amtStr string = ""
-	var amt int64 = 0
-	var err error
-	var miles string = ""
-
-	for _, rec := range records {
-
-		amt, err = utils.ConvertAmtStrToInt64(rec.Amount)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-
-		if rec.Type == "Mileage" {
-			miles = TrimMileageStr(rec.Mileage)
-			milesInt64, err := utils.ConvertStrToInt64(miles)
-			if err != nil {
-				fmt.Println(err)
-				continue
-			}
-			totalMiles += milesInt64
-			amtStr = ""
-		} else {
-			amtStr = "$" + rec.Amount
-			totalExpenses += amt
-			miles = ""
-		}
-
-		expenses.UpdateExpense(rec.Association, rec.Type, amt)
-
-		totalNumOfExpenses++
-		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.ExpenseId, rec.Date, rec.Type, miles, amtStr, rec.Association, rec.GameId, rec.Description))
-	}
-
-	totalLineReptFmt := "Total Expenses %-39d%-12d$%-11s\n\n"
-	rept = append(rept, separator2)
-	rept = append(rept, fmt.Sprintf(totalLineReptFmt, totalNumOfExpenses, totalMiles, utils.ConvertInt64ToAmtStr(totalExpenses)))
-
-	rept = append(rept, "Break out Expenses by Association and Type\n\n")
-
-	firstKeys := database.Associations
-	secondKeys := database.ExpenseTypes
-
-	reptLine := ""
-	fmtStr := "      %-12s%-10s\n"
-	for _, fk := range firstKeys {
-
-		totExp := expenses.GetTotalExpensesByAssociation(fk)
-		if totExp == 0 {
-			continue
-		}
-
-		temp := expenses.GetExpenseByType(fk, "Mileage") / 100
-		totMileage := strconv.FormatInt(temp, 10)
-
-		reptLine = reptLine + "   Association: " + fk + " Total Expenses: $" + utils.ConvertInt64ToAmtStr(totExp) + " Total Mileage:" + totMileage + "\n"
-		rept = append(rept, reptLine)
-		reptLine = ""
-
-		for _, sk := range secondKeys {
-			expenseAmt := expenses.GetExpenseByType(fk, sk)
-			line := ""
-			if expenseAmt != 0 {
-				if sk == "Mileage" {
-					continue
-				} else {
-					expStr := "$" + utils.ConvertInt64ToAmtStr(expenseAmt)
-					line = fmt.Sprintf(fmtStr, sk, expStr)
-				}
-				rept = append(rept, line)
-				reptLine = ""
-			}
-		}
-		rept = append(rept, "\n")
-	}
-	return rept
-
-}
-
-func GenerateGameReport(records []model.GameDescriptor) []string {
-
-	fmt.Println("Generating Game Report")
-	rept := make([]string, 10, 20)
-
-	var grandTot int64
-	var totalGames int64
-
-	var ReportAssocGameTotals AssocGameTotalsMap
-	ReportAssocGameTotals.Init()
-
-	title := "Game Report\n"
-	reptTimeMsg := getReportGeneratedDate()
-
-	//                                                                                                                1         1         1         1         1         1         1
-	//                    1         2         3         4         5         6         7         8         9         0         1         2         3         4         5         6
-	//           1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
-	heading0 := "                                                                              Number                                                                                 \n"
-	heading1 := "Game ID  Date             Time       Sport      Site                Field     Of Games    Level      Game Fee   Assoc     Status     Officials                         \n"
-	separator := "======================================================================================================================================================================\n"
-	reptFmtStr := "%-9s%-17s%-11s%-11s%-20s%-10s%-12s%-11s$%-10s%-10s%-11s%-37s\n"
-	dateSeparator := "--------------------------------------------------------------------------------------------------------------------------------------------------------------------\n"
-
-	maxLineLength := len(heading1)
-
-	newTitle := utils.CenterText(title, maxLineLength)
-	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
-
-	rept = append(rept, newTitle)
-	rept = append(rept, newReptTimeMsg)
-	rept = append(rept, heading0)
-	rept = append(rept, heading1)
-	rept = append(rept, separator)
-
-	prevDate := ""
-
-	for _, rec := range records {
-
-		if len(prevDate) == 0 {
-			prevDate = rec.Date
-		}
-
-		if prevDate != rec.Date {
-			rept = append(rept, dateSeparator)
-			prevDate = rec.Date
-		}
-		numOfGames, _ := utils.ConvertStrToInt64(rec.NumOfGames)
-		totalGames += numOfGames
-
-		gameFee := utils.CalculateGameFee(rec)
-		ReportAssocGameTotals.Update(rec.Association, rec.Status, numOfGames, gameFee)
-
-		grandTot += gameFee
-		gameFeeStr := utils.ConvertInt64ToAmtStr(gameFee)
-
-		dateStr := rec.Date + " (" + utils.DayOfWeekAbbreviation(rec.Date) + ")"
-		officialStr := FormatOfficialString(rec.Referee, rec.U1, rec.U2)
-		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.GameId, dateStr, rec.Time, rec.Sport, rec.Site, rec.Field, rec.NumOfGames, rec.Level, gameFeeStr, rec.Association, rec.Status, officialStr))
-	}
-
-	grandTotalLine := "\n\nTotal Number of Games: %d  Total Game Fees: $%s\n"
-	rept = append(rept, fmt.Sprintf(grandTotalLine, totalGames, utils.ConvertInt64ToAmtStr(grandTot)))
-
-	rLines := ReportAssocGameTotals.FormatTotalLine()
-
-	if len(rLines) > 1 {
-		rept = append(rept, "\nBreakdown by Association and Status:\n")
-		rept = append(rept, rLines...)
-	}
-
-	return rept
-
-}
+//
+// Obsolete Code
+//
+
+// func GenerateIncomeReport(assoc []string, tid string) []string {
+
+// 	err := ec.Init(database.Client)
+// 	if err != nil {
+// 		fmt.Println("Failed to initialize expenses collection.")
+// 		utils.AuditLog.Println("Failed to initialize expenses collection.")
+// 		return []string{}
+// 	}
+
+// 	err = ac.Init(database.Client)
+// 	if err != nil {
+// 		fmt.Println("Failed to initialize associations collection.")
+// 		utils.AuditLog.Println("Failed to initialize associations collection.")
+// 		return []string{}
+// 	}
+
+// 	fmt.Println("Generating Income Report")
+// 	rept := []string{}
+// 	expenseRpt := []string{}
+// 	title := "Income Report\n"
+// 	expenseRptTitle := "Detail Expense Report\n\n"
+
+// 	reptTimeMsg := getReportGeneratedDate()
+// 	assocList := []string{}
+
+// 	if len(assoc) == 0 {
+// 		assocList, err = ac.GetAssociationNamesAsStrings(tid)
+// 		if err != nil {
+// 			fmt.Println("Failed to retrieve association names.")
+// 			utils.AuditLog.Println("Failed to retrieve association names.")
+// 			return []string{}
+// 		}
+// 	} else {
+// 		assocList = assoc
+// 	}
+
+// 	heading1 := "               Total      Total     Total      Gross         Total         Total          Net         Total     Total  \n"
+// 	heading2 := "Association    Games    Game Fees   Travel    Revenue    Assignor Fees   Deductions     Revenue     Expenses    Profit \n"
+// 	separator := "=======================================================================================================================\n"
+// 	separator2 := "_______________________________________________________________________________________________________________________\n"
+// 	reptFmtStr := "%-15s%-9s$%-11s$%-9s$%-10s$%-15s$%-14s$%-11s$%-11s$%-10s\n"
+// 	expReptFmtStr := "%-15s$%-9s$%-14s%-11s$%-11s$%-14s$%-14s\n"
+
+// 	expenseHeading1 := "               Total       Total        Total      Total         Total         Total\n"
+// 	expenseHeading2 := "Association    Dues      Camp Fees      Miles      Food        Equipment      Expenses\n"
+// 	expenseSeparator := "============================================================================================\n"
+// 	expenseSeparator2 := "___________________________________________________________________________________________\n"
+
+// 	maxLineLength := len(heading1)
+
+// 	newTitle := utils.CenterText(title, maxLineLength)
+// 	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
+// 	rept = append(rept, newTitle)
+// 	rept = append(rept, newReptTimeMsg)
+// 	rept = append(rept, heading1)
+// 	rept = append(rept, heading2)
+// 	rept = append(rept, separator)
+
+// 	maxLineLength = len(expenseHeading1)
+// 	newTitle = utils.CenterText(expenseRptTitle, maxLineLength)
+// 	expenseRpt = append(expenseRpt, newTitle)
+// 	expenseRpt = append(expenseRpt, expenseHeading1)
+// 	expenseRpt = append(expenseRpt, expenseHeading2)
+// 	expenseRpt = append(expenseRpt, expenseSeparator)
+
+// 	totAssignorFees := int64(0)
+// 	totDeductions := int64(0)
+// 	totTravelPay := int64(0)
+// 	totGameFees := int64(0)
+
+// 	totDues := int64(0)
+// 	totCampFees := int64(0)
+// 	totFood := int64(0)
+// 	totEquipment := int64(0)
+// 	totMiles := int64(0)
+// 	totGrossRev := int64(0)
+// 	totNetRev := int64(0)
+// 	netProfit := int64(0)
+// 	totNetProfit := int64(0)
+// 	grandTotExpenses := int64(0)
+// 	totGames := int64(0)
+
+// 	totExpenses := int64(0)
+
+// 	for _, a := range assocList {
+
+// 		numOfGames, err := database.GetTotalGames(a)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		assignorFees, err := database.GetTotalAssignorFee(a)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		travelPay, err := database.GetTotalTravelPay(a)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		deductions, err := database.GetTotalDeductions(a, tid)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		dues, err := ec.GetExpense(a, database.TenantId, "Dues")
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		miles, err := ec.GetExpense(a, database.TenantId, "Mileage")
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		gameFees, err := database.GetTotalGrossGameFee(a)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		food, err := ec.GetExpense(a, database.TenantId, "Food")
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		campFees, err := ec.GetExpense(a, database.TenantId, "Camp Fees")
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		equipmentFees, err := ec.GetExpense(a, database.TenantId, "Equipment")
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			return []string{}
+// 		}
+
+// 		grossRev := gameFees + travelPay
+// 		netRev := grossRev - assignorFees - deductions
+// 		totGrossRev += grossRev
+// 		totNetRev += netRev
+// 		totFood += food
+// 		totGameFees += gameFees
+// 		totAssignorFees += assignorFees
+// 		totTravelPay += travelPay
+// 		totDeductions += deductions
+// 		totCampFees += campFees
+// 		totEquipment += equipmentFees
+// 		totMiles += miles
+// 		totDues += dues
+// 		totGames += numOfGames
+
+// 		totExpenses = dues + equipmentFees + campFees + food
+// 		grandTotExpenses += totExpenses
+
+// 		netProfit = netRev - totExpenses
+
+// 		totNetProfit += netProfit
+
+// 		assignorFeesStr := utils.ConvertInt64ToAmtStr(assignorFees)
+// 		travelPayStr := utils.ConvertInt64ToAmtStr(travelPay)
+// 		totExpStr := utils.ConvertInt64ToAmtStr(totExpenses)
+// 		gameFeesStr := utils.ConvertInt64ToAmtStr(gameFees)
+// 		grossRevStr := utils.ConvertInt64ToAmtStr(grossRev)
+// 		netRevStr := utils.ConvertInt64ToAmtStr(netRev)
+// 		netProfitStr := utils.ConvertInt64ToAmtStr(netProfit)
+// 		deductionsStr := utils.ConvertInt64ToAmtStr(deductions)
+// 		numOfGamesStr := utils.ConvertInt64ToStr(numOfGames)
+
+// 		rept = append(rept, fmt.Sprintf(reptFmtStr, a, numOfGamesStr, gameFeesStr, travelPayStr, grossRevStr, assignorFeesStr, deductionsStr, netRevStr, totExpStr, netProfitStr))
+
+// 		dueStr := utils.ConvertInt64ToAmtStr(dues)
+// 		campFeesStr := utils.ConvertInt64ToAmtStr(campFees)
+// 		milesStr := utils.ConvertMilesToStr(miles)
+// 		foodStr := utils.ConvertInt64ToAmtStr(food)
+// 		equipmentStr := utils.ConvertInt64ToAmtStr(equipmentFees)
+
+// 		totalExpenseStr := utils.ConvertInt64ToAmtStr(totExpenses)
+// 		expenseRpt = append(expenseRpt, fmt.Sprintf(expReptFmtStr, a, dueStr, campFeesStr, milesStr, foodStr, equipmentStr, totalExpenseStr))
+
+// 	}
+// 	rept = append(rept, separator2)
+
+// 	totGamesStr := utils.ConvertInt64ToStr(totGames)
+// 	totGamesFeeStr := utils.ConvertInt64ToAmtStr(totGameFees)
+// 	totTravelStr := utils.ConvertInt64ToAmtStr(totTravelPay)
+// 	totGrossRevStr := utils.ConvertInt64ToAmtStr(totGrossRev)
+// 	totAssignorFeeStr := utils.ConvertInt64ToAmtStr(totAssignorFees)
+// 	totDeductionsStr := utils.ConvertInt64ToAmtStr(totDeductions)
+// 	totNetRevStr := utils.ConvertInt64ToAmtStr(totNetRev)
+// 	totExpenseStr := utils.ConvertInt64ToAmtStr(grandTotExpenses)
+// 	totNetProfitStr := utils.ConvertInt64ToAmtStr(totNetProfit)
+
+// 	rept = append(rept, fmt.Sprintf(reptFmtStr, "", totGamesStr, totGamesFeeStr, totTravelStr, totGrossRevStr, totAssignorFeeStr, totDeductionsStr, totNetRevStr, totExpenseStr, totNetProfitStr))
+// 	rept = append(rept, "\n\n")
+// 	expenseRpt = append(expenseRpt, expenseSeparator2)
+
+// 	totDueStr := utils.ConvertInt64ToAmtStr(totDues)
+// 	totCampFeesStr := utils.ConvertInt64ToAmtStr(totCampFees)
+// 	totMilesStr := utils.ConvertMilesToStr(totMiles)
+// 	totFoodStr := utils.ConvertInt64ToAmtStr(totFood)
+// 	totEquipmentStr := utils.ConvertInt64ToAmtStr(totEquipment)
+// 	grandTotalExpStr := utils.ConvertInt64ToAmtStr(grandTotExpenses)
+
+// 	expenseRpt = append(expenseRpt, fmt.Sprintf(expReptFmtStr, "", totDueStr, totCampFeesStr, totMilesStr, totFoodStr, totEquipmentStr, grandTotalExpStr))
+
+// 	rept = append(rept, expenseRpt...)
+
+// 	return rept
+// }
+
+// func GenerateExpenseReportv2(records []model.ExpenseDescriptor) model.ExpenseReportData {
+
+// 	fmt.Println("Generating Expense Report v2")
+
+// 	expenseReport := model.ExpenseReportData{
+// 		Title:    "Expense Report",
+// 		SubTitle: getReportGeneratedDate(),
+// 	}
+
+// 	expenseRow := model.ExpenseReportRow{}
+
+// 	var totalMileage int64 = 0
+// 	var totalExpenses int64 = 0
+
+// 	for _, rec := range records {
+
+// 		expenseRow.Date = rec.Date
+// 		expenseRow.ExpenseId = rec.ExpenseId
+// 		expenseRow.Association = rec.Association
+// 		expenseRow.Type = rec.Type
+// 		expenseRow.Description = rec.Description
+
+// 		if rec.Type == "Mileage" {
+// 			expenseRow.Mileage = rec.Mileage
+// 			expenseRow.Amount = "0.00"
+// 			miles, err := utils.ConvertStrToInt64(TrimMileageStr(rec.Mileage))
+// 			if err != nil {
+// 				fmt.Println(err)
+// 				continue
+// 			}
+
+// 			totalMileage += miles
+// 			expenseReport.Rows = append(expenseReport.Rows, expenseRow)
+// 			continue
+// 		}
+
+// 		expenseRow.Amount = "$" + rec.Amount
+// 		expenseRow.Mileage = "0"
+// 		expense, err := utils.ConvertAmtStrToInt64(rec.Amount)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			continue
+// 		}
+
+// 		totalExpenses += expense
+
+// 		expenseReport.Rows = append(expenseReport.Rows, expenseRow)
+
+// 	}
+
+// 	expenseReport.TotalMileage = utils.ConvertInt64ToStr(totalMileage)
+// 	expenseReport.TotalExpenses = utils.ConvertInt64ToAmtStr((totalExpenses))
+
+// 	fmt.Println(expenseReport)
+
+// 	return expenseReport
+
+// }
+
+// func GenerateExpenseReport(records []model.ExpenseDescriptor) []string {
+
+// 	fmt.Println("Generating Expense Report")
+// 	rept := make([]string, 10, 20)
+// 	title := "Expense Report\n"
+// 	reptTimeMsg := getReportGeneratedDate()
+// 	heading1 := "Expense ID              Date        Type              Mileage     Amount      Association     Game ID     Description\n"
+// 	separator := "============================================================================================================================================\n"
+// 	separator2 := "____________________________________________________________________________________________________________________________________________\n"
+// 	reptFmtStr := "%-24s%-12s%-18s%-12s%-12s%-16s%-12s%-60s\n"
+
+// 	maxLineLength := len(heading1)
+
+// 	var expenses AssociationExpenses
+// 	expenses.Init()
+
+// 	newTitle := utils.CenterText(title, maxLineLength)
+// 	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
+// 	rept = append(rept, newTitle)
+// 	rept = append(rept, newReptTimeMsg)
+// 	rept = append(rept, heading1)
+// 	rept = append(rept, separator)
+
+// 	var totalNumOfExpenses int = 0
+// 	var totalMiles int64 = 0
+// 	var totalExpenses int64 = 0
+// 	var amtStr string = ""
+// 	var amt int64 = 0
+// 	var err error
+// 	var miles string = ""
+
+// 	for _, rec := range records {
+
+// 		amt, err = utils.ConvertAmtStrToInt64(rec.Amount)
+// 		if err != nil {
+// 			fmt.Println(err)
+// 			continue
+// 		}
+
+// 		if rec.Type == "Mileage" {
+// 			miles = TrimMileageStr(rec.Mileage)
+// 			milesInt64, err := utils.ConvertStrToInt64(miles)
+// 			if err != nil {
+// 				fmt.Println(err)
+// 				continue
+// 			}
+// 			totalMiles += milesInt64
+// 			amtStr = ""
+// 		} else {
+// 			amtStr = "$" + rec.Amount
+// 			totalExpenses += amt
+// 			miles = ""
+// 		}
+
+// 		expenses.UpdateExpense(rec.Association, rec.Type, amt)
+
+// 		totalNumOfExpenses++
+// 		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.ExpenseId, rec.Date, rec.Type, miles, amtStr, rec.Association, rec.GameId, rec.Description))
+// 	}
+
+// 	totalLineReptFmt := "Total Expenses %-39d%-12d$%-11s\n\n"
+// 	rept = append(rept, separator2)
+// 	rept = append(rept, fmt.Sprintf(totalLineReptFmt, totalNumOfExpenses, totalMiles, utils.ConvertInt64ToAmtStr(totalExpenses)))
+
+// 	rept = append(rept, "Break out Expenses by Association and Type\n\n")
+
+// 	firstKeys := database.Associations
+// 	secondKeys := database.ExpenseTypes
+
+// 	reptLine := ""
+// 	fmtStr := "      %-12s%-10s\n"
+// 	for _, fk := range firstKeys {
+
+// 		totExp := expenses.GetTotalExpensesByAssociation(fk)
+// 		if totExp == 0 {
+// 			continue
+// 		}
+
+// 		temp := expenses.GetExpenseByType(fk, "Mileage") / 100
+// 		totMileage := strconv.FormatInt(temp, 10)
+
+// 		reptLine = reptLine + "   Association: " + fk + " Total Expenses: $" + utils.ConvertInt64ToAmtStr(totExp) + " Total Mileage:" + totMileage + "\n"
+// 		rept = append(rept, reptLine)
+// 		reptLine = ""
+
+// 		for _, sk := range secondKeys {
+// 			expenseAmt := expenses.GetExpenseByType(fk, sk)
+// 			line := ""
+// 			if expenseAmt != 0 {
+// 				if sk == "Mileage" {
+// 					continue
+// 				} else {
+// 					expStr := "$" + utils.ConvertInt64ToAmtStr(expenseAmt)
+// 					line = fmt.Sprintf(fmtStr, sk, expStr)
+// 				}
+// 				rept = append(rept, line)
+// 				reptLine = ""
+// 			}
+// 		}
+// 		rept = append(rept, "\n")
+// 	}
+// 	return rept
+
+// }
+
+// func GenerateGameReport(records []model.GameDescriptor) []string {
+
+// 	fmt.Println("Generating Game Report")
+// 	rept := make([]string, 10, 20)
+
+// 	var grandTot int64
+// 	var totalGames int64
+
+// 	var ReportAssocGameTotals AssocGameTotalsMap
+// 	ReportAssocGameTotals.Init()
+
+// 	title := "Game Report\n"
+// 	reptTimeMsg := getReportGeneratedDate()
+
+// 	//                                                                                                                1         1         1         1         1         1         1
+// 	//                    1         2         3         4         5         6         7         8         9         0         1         2         3         4         5         6
+// 	//           1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+// 	heading0 := "                                                                              Number                                                                                 \n"
+// 	heading1 := "Game ID  Date             Time       Sport      Site                Field     Of Games    Level      Game Fee   Assoc     Status     Officials                         \n"
+// 	separator := "======================================================================================================================================================================\n"
+// 	reptFmtStr := "%-9s%-17s%-11s%-11s%-20s%-10s%-12s%-11s$%-10s%-10s%-11s%-37s\n"
+// 	dateSeparator := "--------------------------------------------------------------------------------------------------------------------------------------------------------------------\n"
+
+// 	maxLineLength := len(heading1)
+
+// 	newTitle := utils.CenterText(title, maxLineLength)
+// 	newReptTimeMsg := utils.CenterText(reptTimeMsg, maxLineLength)
+
+// 	rept = append(rept, newTitle)
+// 	rept = append(rept, newReptTimeMsg)
+// 	rept = append(rept, heading0)
+// 	rept = append(rept, heading1)
+// 	rept = append(rept, separator)
+
+// 	prevDate := ""
+
+// 	for _, rec := range records {
+
+// 		if len(prevDate) == 0 {
+// 			prevDate = rec.Date
+// 		}
+
+// 		if prevDate != rec.Date {
+// 			rept = append(rept, dateSeparator)
+// 			prevDate = rec.Date
+// 		}
+// 		numOfGames, _ := utils.ConvertStrToInt64(rec.NumOfGames)
+// 		totalGames += numOfGames
+
+// 		gameFee := utils.CalculateGameFee(rec)
+// 		ReportAssocGameTotals.Update(rec.Association, rec.Status, numOfGames, gameFee)
+
+// 		grandTot += gameFee
+// 		gameFeeStr := utils.ConvertInt64ToAmtStr(gameFee)
+
+// 		dateStr := rec.Date + " (" + utils.DayOfWeekAbbreviation(rec.Date) + ")"
+// 		officialStr := FormatOfficialString(rec.Referee, rec.U1, rec.U2)
+// 		rept = append(rept, fmt.Sprintf(reptFmtStr, rec.GameId, dateStr, rec.Time, rec.Sport, rec.Site, rec.Field, rec.NumOfGames, rec.Level, gameFeeStr, rec.Association, rec.Status, officialStr))
+// 	}
+
+// 	grandTotalLine := "\n\nTotal Number of Games: %d  Total Game Fees: $%s\n"
+// 	rept = append(rept, fmt.Sprintf(grandTotalLine, totalGames, utils.ConvertInt64ToAmtStr(grandTot)))
+
+// 	rLines := ReportAssocGameTotals.FormatTotalLine()
+
+// 	if len(rLines) > 1 {
+// 		rept = append(rept, "\nBreakdown by Association and Status:\n")
+// 		rept = append(rept, rLines...)
+// 	}
+
+// 	return rept
+
+// }
