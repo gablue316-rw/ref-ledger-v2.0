@@ -6656,6 +6656,59 @@ func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(assoc)
 }
 
+func LoadSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(r)
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	sports, err := uc.GetSportsSupported(database.TenantId)
+	if err != nil {
+		http.Error(w, "Failed to retrieve sports supported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sports)
+}
+
+func SaveSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
+	LogVisitor(r)
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var sports []string
+
+	if err := json.NewDecoder(r.Body).Decode(&sports); err != nil {
+		http.Error(w, "Invalid sports array", http.StatusBadRequest)
+		return
+	}
+
+	if sports == nil {
+		http.Error(w, "A sports array is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := uc.SetSportsSupported(database.TenantId, sports); err != nil {
+		http.Error(
+			w,
+			"Failed to save supported sports",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Supported sports saved.",
+	})
+}
+
 func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
@@ -8099,6 +8152,7 @@ func main() {
 	mux.HandleFunc("/api/loadExpenseTypes", GetExpenseTypes)
 	mux.HandleFunc("/api/loadStatusTypes", GetStatusTypes)
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
+	mux.HandleFunc("/api/loadSportsSupported", LoadSportsSupportedHandler)
 	mux.HandleFunc("/api/loadLevels", GetLevelsHandler)
 	mux.HandleFunc("/api/loadSports", GetSportsHandler)
 	mux.HandleFunc("/api/sports", authRequired(readOnlyForbidden(SportsHandler)))
@@ -8123,6 +8177,7 @@ func main() {
 	mux.HandleFunc("/api/import/games/template", authRequired(readOnlyForbidden(DownloadGamesTemplateHandler)))
 	mux.HandleFunc("/api/deleteExpense", authRequired(readOnlyForbidden(DeleteExpenseHandler)))
 
+	mux.HandleFunc("/api/sports_supported", SaveSportsSupportedHandler)
 	mux.HandleFunc("/api/deleteAssociation/{assocId}",
 		authRequired(readOnlyForbidden(DeleteAssociation)))
 
