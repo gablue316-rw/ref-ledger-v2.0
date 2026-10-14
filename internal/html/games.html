@@ -234,10 +234,16 @@ let roleRequest = 0;
 let roleAbortController = null;
 let formRevision = 0;
 function updateActionButtons() {
-    document.getElementById("addGameBtn").disabled = !pageReady || !rolesReady || isUpdateMode;
-    document.getElementById("updateGameBtn").disabled = !pageReady || !rolesReady || !isUpdateMode;
+    const sport = document.getElementById("sport").value;
+    const allowedSport = userSportsReady && userSports.includes(sport);
+    const preservedSport = isUpdateMode && sport && sport === existingGameSport;
+    document.getElementById("addGameBtn").disabled =
+        !pageReady || !rolesReady || isUpdateMode || !allowedSport;
+    document.getElementById("updateGameBtn").disabled =
+        !pageReady || !rolesReady || !isUpdateMode || !(allowedSport || preservedSport);
     document.getElementById("getGameBtn").disabled = !pageReady;
 }
+
 function setUpdateMode(isUpdate) {
     isUpdateMode = isUpdate;
     document.getElementById("gameId").readOnly = isUpdate;
@@ -447,6 +453,7 @@ async function loadSportOfficialRoles(sport, game = null) {
     }
 }
 function collectOfficialAssignments() {
+    validateGameSport();
     if (!rolesReady || !document.getElementById("sport").value) throw new Error("Select a sport and wait for its official roles to load.");
     return roleFields.map(({ role, assignment, select, preserved }) => {
         if (preserved) return { ...assignment };
@@ -615,33 +622,57 @@ async function loadSites() {
         console.error("Error loading sites:", err);
     }
 }
+let userSports = [];
+let userSportsReady = false;
+let existingGameSport = "";
+
+function populateGameSports(selectedSport = "", savedSport = "") {
+    const select = document.getElementById("sport");
+    select.replaceChildren(new Option("Select Sport", ""));
+    userSports.forEach(sport => select.add(new Option(sport, sport)));
+    if (savedSport && !userSports.includes(savedSport)) {
+        select.add(new Option(savedSport + " (existing game)", savedSport));
+    }
+    select.value = selectedSport;
+}
+
 async function loadSports() {
+    userSportsReady = false;
+    userSports = [];
     try {
-        const response = await fetch("/api/loadSports?active=true");
-        if (!response.ok) {
-            throw new Error("Failed to load sports");
-        }
+        const response = await fetch("/api/loadSportsSupported");
+        if (!response.ok) throw new Error("Unable to load your sports. Reload the page to retry.");
         const sports = await response.json();
-        console.log(sports);
-        const dropdowns = [
-            "sport"
-        ];
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
-            // Keep the first option
-            select.innerHTML =
-                '<option value="">Select Sport</option>';
-            sports.forEach(sport => {
-               const option = document.createElement("option");
-               option.value = sport.name;
-               option.textContent = sport.name;
-               select.appendChild(option);
-            });
-        });
+        // Go may encode a nil []string as null; treat that as an empty list.
+        if (sports !== null && !Array.isArray(sports)) {
+            throw new Error("The user sports response must be an array of sport names.");
+        }
+        if ((sports ?? []).some(sport => typeof sport !== "string")) {
+            throw new Error("The user sports response must contain sport names.");
+        }
+        userSports = [...new Set((sports ?? []).map(sport => sport.trim()).filter(Boolean))];
+        userSportsReady = true;
+        populateGameSports();
+        if (!userSports.length) {
+            document.getElementById("message").innerText =
+                "No sports are selected in Settings. Select your sports before adding games. Find is still available.";
+        }
     } catch (err) {
-        console.error("Error loading sports:", err);
+        populateGameSports();
+        document.getElementById("message").innerText = err.message;
+        console.error("Error loading user sports:", err);
     }
 }
+
+function validateGameSport() {
+    const sport = document.getElementById("sport").value;
+    if (isUpdateMode && sport && sport === existingGameSport) return;
+    if (!userSportsReady) throw new Error("Your sports could not be loaded. Reload the page before choosing a new sport.");
+    if (!sport || !userSports.includes(sport)) {
+        throw new Error("Choose one of your sports from Settings.");
+    }
+}
+
 async function loadOfficials() {
     try {
         const response = await fetch("/api/loadOfficials");
@@ -732,7 +763,8 @@ document.addEventListener("DOMContentLoaded", async function() {
 document.getElementById("clearBtn").addEventListener("click", function () {
     formRevision++;
     document.getElementById("gameForm").reset();
-    document.getElementById("sport").value = "";
+    existingGameSport = "";
+    populateGameSports();
     document.getElementById("status").value = "Pending";
     loadAssignors();
     resetOfficialFields();
@@ -821,7 +853,8 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("time").value = toInputTime(game.Time);
         document.getElementById("site").value = game.Site;
         document.getElementById("field").value = game.Field;
-        ensureSelectedValue("sport", game.Sport);
+        existingGameSport = String(game.Sport ?? "").trim();
+        populateGameSports(existingGameSport, existingGameSport);
         document.getElementById("level").value = game.Level;
         document.getElementById("home").value = game.Home ?? "";
         document.getElementById("visitor").value = game.Visitor ?? "";
@@ -831,10 +864,11 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("assignorFee").value = game.AssignorFee;
         document.getElementById("deductions").value = game.Deductions;
         document.getElementById("status").value = game.Status;
+        resetOfficialFields();
+        setUpdateMode(true);
         const assignorsLoaded = await loadAssignors(game.Assignor);
         if (revision !== formRevision) return;
         if (!assignorsLoaded) return;
-        setUpdateMode(true);
         const loaded = await loadSportOfficialRoles(game.Sport, game);
         if (revision !== formRevision) return;
         if (!loaded) {

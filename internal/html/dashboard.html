@@ -673,7 +673,7 @@ body {
                 <button type="button" id="statusDropdownButton"
                     class="checkbox-dropdown-button" aria-haspopup="true"
                     aria-expanded="false" onclick="toggleCheckboxDropdown('status', event)">
-                    <span id="statusDropdownText">Pending</span>
+                    <span id="statusDropdownText">Select Status</span>
                     <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
                 </button>
                 <div id="statusOptions" class="status-options checkbox-options" role="group" aria-label="Game statuses">
@@ -1140,7 +1140,7 @@ async function loadStatusTypes() {
             checkbox.type = "checkbox";
             checkbox.name = "status";
             checkbox.value = status;
-            checkbox.checked = status.toLowerCase() === "pending";
+            checkbox.checked = false;
 
             label.appendChild(checkbox);
             label.appendChild(document.createTextNode(status));
@@ -2213,7 +2213,7 @@ function updateDropdownText(groupName) {
     const text = document.getElementById(`${groupName}DropdownText`);
 
     if (selectedValues.length === 0) {
-        text.textContent = `Select ${plural}`;
+        text.textContent = groupName === "status" ? "Select Status" : `Select ${plural}`;
     } else if (allOptions.length > 0 && selectedValues.length === allOptions.length) {
         text.textContent = `All ${plural}`;
     } else if (selectedValues.length === 1) {
@@ -2239,46 +2239,58 @@ document.addEventListener("keydown", function (event) {
     }
 });
 
-async function loadSports() {
+let dashboardUserSports = [];
+let dashboardUserSportsReady = false;
+let dashboardUserSportsRequest = null;
+let dashboardUserSportsError = "";
 
-    try {
-        const [searchResponse, editResponse] = await Promise.all([
-            fetch("/api/loadSports"),
-            fetch("/api/loadSports?active=true")
-        ]);
-
-        if (!searchResponse.ok || !editResponse.ok) {
-            const failedResponse = !searchResponse.ok
-                ? searchResponse
-                : editResponse;
-            const text = await failedResponse.text();
-
-            console.error(
-                "loadSports failed:",
-                failedResponse.status,
-                text
-            );
-
-            showMessage(
-                "loadSports failed: " +
-                failedResponse.status +
-                "\n" +
-                text,
-                "error"
-            );
-
-            return;
+async function loadDashboardUserSports() {
+    if (dashboardUserSportsRequest) return dashboardUserSportsRequest;
+    dashboardUserSportsRequest = (async () => {
+        dashboardUserSportsReady = false;
+        dashboardUserSports = [];
+        try {
+            const response = await fetch("/api/loadSportsSupported");
+            if (!response.ok) throw new Error("Unable to load your sports. Close and reopen the edit window to retry.");
+            const data = await response.json();
+            if (data !== null && (!Array.isArray(data) || data.some(sport => typeof sport !== "string"))) {
+                throw new Error("The user sports response must be an array of sport names.");
+            }
+            dashboardUserSports = [...new Set((data ?? []).map(sport => sport.trim()).filter(Boolean))];
+            dashboardUserSportsReady = true;
+            dashboardUserSportsError = "";
+        } catch (error) {
+            dashboardUserSportsError = error.message;
+            console.error("Error loading user sports:", error);
         }
+    })();
+    try {
+        await dashboardUserSportsRequest;
+    } finally {
+        dashboardUserSportsRequest = null;
+    }
+}
 
-        const [sports, activeSports] = await Promise.all([
-            searchResponse.json(),
-            editResponse.json()
-        ]);
-        populateEditSelect(
-            "editSport",
-            activeSports,
-            "Select Sport"
-        );
+function populateDashboardEditSports(game) {
+    const savedSport = String(gameValue(game, "Sport")).trim();
+    populateEditSelect("editSport", dashboardUserSports, "Select Sport");
+    const select = document.getElementById("editSport");
+    if (savedSport && !dashboardUserSports.includes(savedSport)) {
+        select.add(new Option(savedSport + " (existing game)", savedSport));
+    }
+    select.value = savedSport;
+}
+
+async function loadSports() {
+    await Promise.allSettled([loadFilterSports(), loadDashboardUserSports()]);
+}
+
+async function loadFilterSports() {
+    try {
+        const response = await fetch("/api/loadSports");
+        if (!response.ok) throw new Error(`Unable to load sports for filtering (HTTP ${response.status}).`);
+        const sports = await response.json();
+        if (!Array.isArray(sports)) throw new Error("The sports response must be an array.");
         const sportOptions = document.getElementById("sportOptions");
 
         sportOptions.innerHTML = "";
@@ -3017,11 +3029,8 @@ async function openEditGame(gameId, association) {
     document.getElementById("editStatus").value = gameValue(gameBeingEdited, "Status") || "Pending";
     document.getElementById("editDate").value = dateInputValue(gameValue(gameBeingEdited, "Date"));
     document.getElementById("editTime").value = timeInputValue(gameValue(gameBeingEdited, "Time"));
-    setEditSelectValue(
-        "editSport",
-        gameValue(gameBeingEdited, "Sport"),
-        false
-    );
+    if (!dashboardUserSportsReady) await loadDashboardUserSports();
+    populateDashboardEditSports(gameBeingEdited);
     const storedSite = String(gameValue(gameBeingEdited, "Site") || "").trim();
     const matchingSite = dashboardSites.find(site =>
         site.name.toLowerCase() === storedSite.toLowerCase()
@@ -3041,6 +3050,9 @@ async function openEditGame(gameId, association) {
     document.getElementById("editAssignorFee").value = gameValue(gameBeingEdited, "AssignorFee");
     document.getElementById("editDeductions").value = gameValue(gameBeingEdited, "Deductions");
     document.getElementById("editGameError").style.display = "none";
+    if (!dashboardUserSportsReady) {
+        showEditGameError(dashboardUserSportsError + " You can still save with the game's existing sport.");
+    }
     document.getElementById("editGameModalOverlay").classList.add("show");
     document.getElementById("editTime").focus();
     editSportAssignments = new Map();
@@ -3073,6 +3085,14 @@ async function saveEditedGame(event) {
     event.preventDefault();
 
     if (!gameBeingEdited) {
+        return;
+    }
+
+    const selectedSport = document.getElementById("editSport").value.trim();
+    const existingSport = String(gameValue(gameBeingEdited, "Sport")).trim();
+    if (!selectedSport || (selectedSport !== existingSport &&
+        (!dashboardUserSportsReady || !dashboardUserSports.includes(selectedSport)))) {
+        showEditGameError("Choose one of your sports from Settings or retain the game's existing sport.");
         return;
     }
 
@@ -3384,7 +3404,7 @@ function clearFilters() {
     document.getElementById("home").value = "";
     document.getElementById("visitor").value = "";
     document.querySelectorAll('input[name="status"]').forEach(
-        checkbox => checkbox.checked = checkbox.value === "Pending"
+        checkbox => checkbox.checked = false
     );
     updateAllFilterCheckbox("status");
     updateDropdownText("status");

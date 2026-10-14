@@ -5222,6 +5222,77 @@ func (uc *UsersCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
+func (uc *UsersCollection) SetSportsSupported(
+	tenantId string,
+	sports []string,
+) error {
+	if tenantId == "" {
+		return fmt.Errorf("tenant ID is empty")
+	}
+
+	if sports == nil {
+		sports = []string{}
+	}
+
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"sports": sports,
+		},
+	}
+
+	result, err := uc.Coll.UpdateOne(
+		context.TODO(),
+		filter,
+		update,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to save supported sports: %w", err)
+	}
+
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("user not found for tenant ID %q", tenantId)
+	}
+
+	return nil
+}
+
+func (uc *UsersCollection) GetSportsSupported(
+	tenantId string,
+) ([]string, error) {
+	if tenantId == "" {
+		return nil, fmt.Errorf("tenant ID is empty")
+	}
+
+	// No need to check sports here for Get operation
+
+	filter := bson.M{
+		"tenantId": tenantId,
+	}
+
+	var user struct {
+		Sports []string `bson:"sports"`
+	}
+
+	err := uc.Coll.FindOne(context.TODO(), filter).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("user not found for tenant ID %q", tenantId)
+		}
+		return nil, fmt.Errorf("failed to retrieve supported sports: %w", err)
+	}
+
+	if user.Sports == nil {
+		user.Sports = []string{}
+	}
+
+	return user.Sports, nil
+
+}
+
 func (uc *UsersCollection) GetName(tenantId, username string) (string, error) {
 
 	filter := bson.M{
@@ -5892,6 +5963,42 @@ func (sc *SportsCollection) Deactivate(sport Sport) error {
 	sport.Name = strings.TrimSpace(sport.Name)
 
 	fmt.Println("Sport:", sport)
+
+	//
+	// Check if the sport is being called by any users before deactivating it. If it is, return an error.
+	//
+	usersFilter := bson.M{
+		"sports": sport.ID,
+	}
+
+	usersCollection := Client.Database(Database).Collection("users")
+
+	count, err := usersCollection.CountDocuments(context.Background(), usersFilter)
+	if err != nil {
+		return fmt.Errorf("failed to query users collection: %w", err)
+	}
+
+	if count > 0 {
+		return fmt.Errorf("Failed to deactivate sport as it is assigned to users.")
+	}
+
+	//
+	// Check if games are associated with this sport before deactivating it. If there are, return an error.
+	gamesFilter := bson.M{
+		"sport": sport.ID,
+	}
+
+	gamesCollection := Client.Database(Database).Collection("games")
+
+	gamesCount, err := gamesCollection.CountDocuments(context.Background(), gamesFilter)
+	if err != nil {
+		return fmt.Errorf("failed to query games collection: %w", err)
+	}
+
+	if gamesCount > 0 {
+		return fmt.Errorf("Failed to deactivate sport as it is assigned to games.")
+	}
+
 	filter := bson.M{
 		"id": sport.ID,
 	}

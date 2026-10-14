@@ -461,6 +461,27 @@
                 padding: 16px;
             }
         }
+        .active-sports-card { margin-bottom: 25px; }
+        .active-sports-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 24px;
+            border: 0;
+            min-width: 0;
+        }
+        .active-sport-option {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            color: #344054;
+            cursor: pointer;
+        }
+        .active-sport-option input {
+            width: 18px;
+            height: 18px;
+            accent-color: #0b5fa5;
+        }
+        #activeSportsStatus { color: #667085; }
         .settings-left-column { display: flex; flex-direction: column; gap: 25px; min-width: 0; }
         .role-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
         .role-row > input[type="text"] { flex: 1 1 140px; min-width: 0; }
@@ -685,6 +706,24 @@
             role="alert"
             aria-live="polite"
         ></div>
+        <section class="settings-card active-sports-card" aria-labelledby="activeSportsTitle">
+            <div class="card-header">
+                <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                <div>
+                    <h2 id="activeSportsTitle">Active Sports</h2>
+                    <p>Select from the currently active sports.</p>
+                </div>
+            </div>
+            <div class="card-body">
+                <fieldset id="activeSportsList" class="active-sports-list" aria-labelledby="activeSportsTitle"></fieldset>
+                <p id="activeSportsStatus" role="status" aria-live="polite">Loading active sports...</p>
+                <div class="role-actions">
+                    <button type="button" id="saveSupportedSports" class="btn btn-primary" disabled>Save</button>
+                    <button type="button" id="cancelSupportedSports" class="btn btn-secondary" disabled>Cancel</button>
+                </div>
+                <p id="supportedSportsMessage" role="status" aria-live="polite"></p>
+            </div>
+        </section>
         <div class="settings-grid">
             <!-- Sports card -->
             <div id="adminSettingsPanels" class="settings-left-column" hidden>
@@ -1057,12 +1096,18 @@
                     active:
                         sport.active ??
                         sport.Active ??
-                        true
+                        false
                 }));
+                sportsCatalogLoaded = true;
                 renderSports(sports);
+                return true;
             } catch (error) {
+                sportsCatalogLoaded = false;
                 sports = [];
                 renderSports(sports);
+                const status = document.getElementById("activeSportsStatus");
+                status.hidden = false;
+                status.textContent = "Unable to load active sports. Reload the page to try again.";
                 showMessage(
                     error.message ||
                     "Unable to load sports.",
@@ -1114,7 +1159,102 @@
                 );
             }
         }
+        // These selections are separate from the admin controls that activate sports.
+        const selectedActiveSports = new Set();
+        let savedSupportedSports = new Set();
+        let supportedSportsBusy = false;
+        let supportedSportsLoaded = false;
+        let sportsCatalogLoaded = false;
+        function updateSupportedSportsButtons() {
+            const disabled = supportedSportsBusy || !supportedSportsLoaded || !sportsCatalogLoaded;
+            document.getElementById("saveSupportedSports").disabled = disabled;
+            document.getElementById("cancelSupportedSports").disabled = disabled;
+            document.querySelectorAll('#activeSportsList input').forEach(input => {
+                input.disabled = disabled;
+            });
+        }
+        function supportedSportsMessage(message, type = "") {
+            const element = document.getElementById("supportedSportsMessage");
+            element.textContent = message;
+            element.style.color = type === "error" ? "#a32020" : "#155724";
+            element.style.marginTop = message ? "12px" : "0";
+        }
+        document.getElementById("saveSupportedSports").addEventListener("click", async () => {
+            if (supportedSportsBusy || !supportedSportsLoaded || !sportsCatalogLoaded) return;
+            const selected = Array.from(selectedActiveSports).sort((a, b) => a.localeCompare(b));
+            supportedSportsBusy = true;
+            updateSupportedSportsButtons();
+            supportedSportsMessage("Saving supported sports...");
+            try {
+                const response = await fetch("/api/sports_supported", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(selected)
+                });
+                if (response.status === 401 || response.redirected) {
+                    window.location.href = "/login";
+                    return;
+                }
+                const responseText = await response.text();
+                if (!response.ok) {
+                    let message = responseText.trim();
+                    try {
+                        const result = JSON.parse(responseText);
+                        message = result.message || result.error || message;
+                    } catch {}
+                    throw new Error(message || "Unable to save supported sports.");
+                }
+                savedSupportedSports = new Set(selected);
+                supportedSportsMessage("Supported sports saved.", "success");
+            } catch (error) {
+                supportedSportsMessage(error.message || "Unable to save supported sports.", "error");
+            } finally {
+                supportedSportsBusy = false;
+                updateSupportedSportsButtons();
+            }
+        });
+        document.getElementById("cancelSupportedSports").addEventListener("click", () => {
+            if (supportedSportsBusy || !supportedSportsLoaded || !sportsCatalogLoaded) return;
+            selectedActiveSports.clear();
+            savedSupportedSports.forEach(name => selectedActiveSports.add(name));
+            renderActiveSports(sports);
+            supportedSportsMessage("");
+        });
+        function renderActiveSports(sports) {
+            const list = document.getElementById("activeSportsList");
+            const status = document.getElementById("activeSportsStatus");
+            const activeSports = sports
+                .filter(sport => sport.active === true && sport.name)
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name));
+            const available = new Set(activeSports.map(sport => sport.name));
+            for (const name of selectedActiveSports) {
+                if (!available.has(name)) selectedActiveSports.delete(name);
+            }
+            list.replaceChildren();
+            status.textContent = activeSports.length ? "" : "No active sports are available.";
+            status.hidden = activeSports.length > 0;
+            activeSports.forEach(sport => {
+                const label = document.createElement("label");
+                label.className = "active-sport-option";
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.name = "activeSports";
+                checkbox.value = sport.name;
+                checkbox.checked = selectedActiveSports.has(sport.name);
+                checkbox.addEventListener("change", () => {
+                    if (checkbox.checked) selectedActiveSports.add(sport.name);
+                    else selectedActiveSports.delete(sport.name);
+                });
+                const name = document.createElement("span");
+                name.textContent = sport.name;
+                label.append(checkbox, name);
+                list.appendChild(label);
+            });
+            updateSupportedSportsButtons();
+        }
         function renderSports(sports) {
+            renderActiveSports(sports);
             refreshOfficialRolesSports(sports);
             const sportsBody =
                 document.getElementById("sportsBody");
@@ -1879,8 +2019,44 @@
             } catch (error) { roleMessage(error.message, "error"); }
             finally { rolesBusy = false; renderOfficialRoleRows(); }
         });
+        async function loadSupportedSports() {
+            supportedSportsLoaded = false;
+            updateSupportedSportsButtons();
+            supportedSportsMessage("Loading supported sports...");
+            try {
+                const response = await fetch("/api/loadSportsSupported", {
+                    method: "GET",
+                    cache: "no-store"
+                });
+                if (response.status === 401 || response.redirected) {
+                    window.location.href = "/login";
+                    return;
+                }
+                if (!response.ok) {
+                    throw new Error("Unable to load supported sports. Reload the page to try again.");
+                }
+                const result = await response.json();
+                // Older users may not have a sports field yet.
+                const supported = result === null ? [] : result;
+                if (!Array.isArray(supported) ||
+                    !supported.every(name => typeof name === "string")) {
+                    throw new Error("Invalid supported sports response.");
+                }
+                selectedActiveSports.clear();
+                supported.forEach(name => selectedActiveSports.add(name));
+                renderActiveSports(sports);
+                savedSupportedSports = new Set(selectedActiveSports);
+                supportedSportsLoaded = true;
+                supportedSportsMessage("");
+            } catch (error) {
+                supportedSportsMessage(error.message || "Unable to load supported sports.", "error");
+            } finally {
+                updateSupportedSportsButtons();
+            }
+        }
         async function initializeSettings() {
-            await loadSports();
+            const loaded = await loadSports();
+            if (loaded) await loadSupportedSports();
             await loadLevels();
         }
         initializeSettings();
