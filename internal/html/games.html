@@ -98,6 +98,7 @@ body{padding:10px;}
 </div>
 <div class="form-group"><label for="gameId">Game ID</label><input type="number" id="gameId" required></div>
 <div class="form-group"><label for="date">Date</label><input type="date" id="date" required></div>
+<div class="form-group"><label for="taxYear">Tax Year</label><input type="text" id="taxYear" inputmode="numeric" placeholder="YYYY"></div>
 <div class="form-group"><label for="time">Time</label><input type="time" id="time" required></div>
 <div class="form-group">
     <label for="status">Status</label>
@@ -771,6 +772,12 @@ document.getElementById("clearBtn").addEventListener("click", function () {
     setUpdateMode(false);
     document.getElementById("message").innerText = "Ready to enter Games";
 });
+function gameDateTaxYear() {
+    return document.getElementById("date").value.split("-")[0] || "";
+}
+document.getElementById("date").addEventListener("input", function () {
+    document.getElementById("taxYear").value = gameDateTaxYear();
+});
 function toInputDate(dateStr) {
     const d = new Date(dateStr);
     return d.toISOString().split("T")[0];
@@ -850,6 +857,8 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("association").value = game.Association;
         document.getElementById("gameId").value = game.GameId;
         document.getElementById("date").value = toInputDate(game.Date);
+        const savedTaxYear = String(game.TaxYear ?? game.taxYear ?? "").trim();
+        document.getElementById("taxYear").value = savedTaxYear || gameDateTaxYear();
         document.getElementById("time").value = toInputTime(game.Time);
         document.getElementById("site").value = game.Site;
         document.getElementById("field").value = game.Field;
@@ -896,6 +905,7 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value),
         date: document.getElementById("date").value,
+        taxYear: document.getElementById("taxYear").value.trim(),
         time: document.getElementById("time").value,
         site: document.getElementById("site").value,
         field: document.getElementById("field").value,
@@ -959,6 +969,7 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value),
         date: document.getElementById("date").value,
+        taxYear: document.getElementById("taxYear").value.trim(),
         time: document.getElementById("time").value,
         site: document.getElementById("site").value,
         field: document.getElementById("field").value,
