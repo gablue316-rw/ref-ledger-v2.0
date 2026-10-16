@@ -4766,9 +4766,10 @@ func GenerateRevenueReport(w http.ResponseWriter, r *http.Request) {
 	// ?association=MSO
 	// ?association=MSO&association=GOLLC
 	associations := r.URL.Query()["association"]
+	taxYear := r.URL.Query().Get("taxYear")
 
 	revenueReports, err :=
-		database.GetRevenueReports(tId, associations)
+		database.GetRevenueReports(tId, associations, taxYear)
 	if err != nil {
 		fmt.Printf(
 			"GenerateRevenueReport failed: %v\n",
@@ -4828,9 +4829,10 @@ func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
 	// ?association=MSO
 	// ?association=MSO&association=GOLLC
 	associations := r.URL.Query()["association"]
+	taxYear := r.URL.Query().Get("taxYear")
 
 	acctsRecvReports, err :=
-		database.GetReconciliationReports(tId, associations)
+		database.GetReconciliationReports(tId, associations, taxYear)
 	if err != nil {
 		fmt.Printf(
 			"GenerateReconciliationReport failed: %v\n",
@@ -4839,7 +4841,7 @@ func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
 
 		http.Error(
 			w,
-			"Unable to generate financial report",
+			"Unable to generate reconciliation report",
 			http.StatusInternalServerError,
 		)
 		return
@@ -4890,9 +4892,10 @@ func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
 	// ?association=MSO
 	// ?association=MSO&association=GOLLC
 	associations := r.URL.Query()["association"]
+	taxyear := r.URL.Query().Get("taxYear")
 
 	financialReports, err :=
-		database.GetFinancialReports(tId, associations)
+		database.GetFinancialReports(tId, associations, taxyear)
 	if err != nil {
 		fmt.Printf(
 			"GenerateFinancialReport failed: %v\n",

@@ -169,9 +169,17 @@ func loadEmailReportData(tenantID string, req EmailReportRequest) (interface{}, 
 	associations := req.Filters["association"]
 	switch req.ReportType {
 	case "financial":
-		return GetFinancialReports(tenantID, associations)
+		return GetFinancialReports(
+			tenantID,
+			associations,
+			emailFilterValue(req.Filters, "taxYear"),
+		)
 	case "revenue":
-		return GetRevenueReports(tenantID, associations)
+		return GetRevenueReports(
+			tenantID,
+			associations,
+			emailFilterValue(req.Filters, "taxYear"),
+		)
 	case "expense":
 		return GetExpenseReports(
 			tenantID,
@@ -181,7 +189,11 @@ func loadEmailReportData(tenantID string, req EmailReportRequest) (interface{}, 
 	case "accounts-receivable":
 		return GetAccountsReceivableReport(tenantID, associations)
 	case "reconciliation":
-		return GetReconciliationReports(tenantID, associations)
+		return GetReconciliationReports(
+			tenantID,
+			associations,
+			emailFilterValue(req.Filters, "taxYear"),
+		)
 	case "1099":
 		return Get1099Reports(tenantID, associations, emailFilterValue(req.Filters, "taxYear"))
 	case "game":

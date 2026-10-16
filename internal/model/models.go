@@ -362,6 +362,7 @@ type FinancialReport struct {
 	TotalExpenses int64  `json:"totalExpenses"`
 	NetIncome     int64  `json:"netIncome"`
 	TotalMileage  int64  `json:"totalMileage"`
+	TaxYear       string `json:"taxYear"`
 }
 
 type FinancialReportResponse struct {
@@ -370,6 +371,7 @@ type FinancialReportResponse struct {
 	TotalExpenses string `json:"totalExpenses"`
 	NetIncome     string `json:"netIncome"`
 	TotalMileage  string `json:"totalMileage"`
+	TaxYear       string `json:"taxYear"`
 }
 
 type RevenueReport struct {
@@ -381,6 +383,7 @@ type RevenueReport struct {
 	TotAssignorFees int64  `json:"totAssignorFees"`
 	TotDeductions   int64  `json:"totDeductions"`
 	NetRevenue      int64  `json:"netRevenue"`
+	TaxYear         string `json:"taxYear"`
 }
 
 type RevenueReportResponse struct {
@@ -392,6 +395,7 @@ type RevenueReportResponse struct {
 	TotAssignorFees string `json:"totAssignorFees"`
 	TotDeductions   string `json:"totDeductions"`
 	NetRevenue      string `json:"netRevenue"`
+	TaxYear         string `json:"taxYear"`
 }
 
 type ExpenseReport struct {
@@ -432,6 +436,8 @@ type ReconciliationReport struct {
 	Association    string  `json:"association"`
 	PaymentId      string  `json:"paymentId"`
 	PaymentAmt     int64   `json:"paymentAmt"`
+	PaymentDate    string  `json:"paymentDate"`
+	TaxYear        string  `json:"taxYear"`
 	CalculatedAmt  int64   `json:"calculatedAmt"`
 	Status         string  `json:"status"`
 	PaymentGameIds []int64 `json:"paymentGameIds"`
@@ -443,6 +449,8 @@ type ReconciliationReportResponse struct {
 	Association    string  `json:"association"`
 	PaymentId      string  `json:"paymentId"`
 	PaymentAmt     string  `json:"paymentAmt"`
+	PaymentDate    string  `json:"paymentDate"`
+	TaxYear        string  `json:"taxYear"`
 	CalculatedAmt  string  `json:"calculatedAmt"`
 	Status         string  `json:"status"`
 	PaymentGameIds []int64 `json:"paymentGameIds"`
