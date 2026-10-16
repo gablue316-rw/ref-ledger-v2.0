@@ -339,6 +339,7 @@ func ConvertExpenseFilterToJsonFile(filters model.EFilters) (string, error) {
 	jsonFilters.Association = assocValues
 	jsonFilters.GameId = gameIdValues
 	jsonFilters.ExpenseType = expenseValues
+	jsonFilters.TaxYear = filters.TaxYear
 
 	if filters.FromDate != "" || filters.ToDate != "" {
 		jsonFilters.Date = &model.Date{}
@@ -402,6 +403,7 @@ func ConvertGameFiltersToJsonFile(filters model.GFilters) (string, error) {
 
 	jsonFilters.Official = ParseCsv(filters.Official)
 	jsonFilters.TenantId = filters.TenantId
+	jsonFilters.TaxYear = filters.TaxYear
 
 	fmt.Println("JSON Filters:", jsonFilters)
 	// write JSON file
@@ -720,6 +722,7 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 		Status:      doc.Status,
 		Officials:   copyGameOfficials(doc.Officials),
 		Assignor:    doc.Assignor,
+		TaxYear:     doc.TaxYear,
 	}
 
 	return gameDescr
@@ -815,6 +818,7 @@ func ConvertExpenseDescrToExpenseDoc(expenseDescr model.ExpenseDescriptor) model
 		Association: expenseDescr.Association,
 		GameId:      gameId,
 		Description: expenseDescr.Description,
+		TaxYear:     expenseDescr.TaxYear,
 	}
 	return doc
 }
@@ -868,6 +872,7 @@ func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescript
 		Association: doc.Association,
 		GameId:      gameId,
 		Description: doc.Description,
+		TaxYear:     doc.TaxYear,
 	}
 	fmt.Println("ConvertExpenseDocToExpenseDescr: ExpenseDescriptor:", descr)
 	return descr
@@ -901,6 +906,7 @@ func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
 		Status:      gameDescr.Status,
 		Officials:   copyGameOfficials(gameDescr.Officials),
 		Assignor:    gameDescr.Assignor,
+		TaxYear:     gameDescr.TaxYear,
 	}
 
 	return doc

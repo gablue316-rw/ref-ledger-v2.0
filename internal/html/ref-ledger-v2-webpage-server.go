@@ -67,6 +67,7 @@ type Game struct {
 	Status      string                  `json:"status"`
 	Assignor    string                  `json:"assignor"`
 	Officials   []model.GameOfficialDoc `json:"officials"`
+	TaxYear     string                  `json:"taxYear"`
 }
 
 type Expense struct {
@@ -242,6 +243,7 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 		Status:      g.Status,
 		Assignor:    g.Assignor,
 		Officials:   officials,
+		TaxYear:     g.TaxYear,
 	}
 }
 
@@ -4603,6 +4605,7 @@ func GenerateGameReport(
 	assignors := r.URL.Query()["assignor"]
 	officials := r.URL.Query()["official"]
 	ecos := r.URL.Query()["eco"]
+	taxyear := r.URL.Query().Get("taxYear")
 
 	bDate, eDate, err := utils.FormatDateFilter(r.URL.Query().Get("begindate"), r.URL.Query().Get("enddate"))
 	if err != nil {
@@ -4625,6 +4628,7 @@ func GenerateGameReport(
 		ECO:         ecos,
 		BeginDate:   bDate,
 		EndDate:     eDate,
+		TaxYear:     taxyear,
 	}
 
 	fmt.Printf(
@@ -4762,9 +4766,10 @@ func GenerateRevenueReport(w http.ResponseWriter, r *http.Request) {
 	// ?association=MSO
 	// ?association=MSO&association=GOLLC
 	associations := r.URL.Query()["association"]
+	taxYear := r.URL.Query().Get("taxYear")
 
 	revenueReports, err :=
-		database.GetRevenueReports(tId, associations)
+		database.GetRevenueReports(tId, associations, taxYear)
 	if err != nil {
 		fmt.Printf(
 			"GenerateRevenueReport failed: %v\n",
@@ -4824,9 +4829,10 @@ func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
 	// ?association=MSO
 	// ?association=MSO&association=GOLLC
 	associations := r.URL.Query()["association"]
+	taxYear := r.URL.Query().Get("taxYear")
 
 	acctsRecvReports, err :=
-		database.GetReconciliationReports(tId, associations)
+		database.GetReconciliationReports(tId, associations, taxYear)
 	if err != nil {
 		fmt.Printf(
 			"GenerateReconciliationReport failed: %v\n",
@@ -4835,7 +4841,7 @@ func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
 
 		http.Error(
 			w,
-			"Unable to generate financial report",
+			"Unable to generate reconciliation report",
 			http.StatusInternalServerError,
 		)
 		return
@@ -4886,9 +4892,10 @@ func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
 	// ?association=MSO
 	// ?association=MSO&association=GOLLC
 	associations := r.URL.Query()["association"]
+	taxyear := r.URL.Query().Get("taxYear")
 
 	financialReports, err :=
-		database.GetFinancialReports(tId, associations)
+		database.GetFinancialReports(tId, associations, taxyear)
 	if err != nil {
 		fmt.Printf(
 			"GenerateFinancialReport failed: %v\n",
@@ -5011,9 +5018,10 @@ func GenerateExpenseReport(w http.ResponseWriter, r *http.Request) {
 	// ?association=MSO
 	// ?association=MSO&association=GOLLC
 	associations := r.URL.Query()["association"]
+	taxyear := r.URL.Query().Get("taxYear")
 
 	expenseReports, err :=
-		database.GetExpenseReports(tId, associations)
+		database.GetExpenseReports(tId, associations, taxyear)
 	if err != nil {
 		fmt.Printf(
 			"GenerateExpenseReport failed: %v\n",
@@ -5179,7 +5187,6 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	// }
 
 	http.Error(w, "Game not found", http.StatusNotFound)
-	return
 }
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
@@ -5879,6 +5886,10 @@ func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
 		r.URL.Query().Get("association"),
 	)
 
+	taxYear := strings.TrimSpace(
+		r.URL.Query().Get("taxYear"),
+	)
+
 	description := strings.TrimSpace(
 		r.URL.Query().Get("description"),
 	)
@@ -5924,6 +5935,7 @@ func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
 		Amount:      amount,
 		Description: description,
 		TenantId:    database.TenantId,
+		TaxYear:     taxYear,
 	}
 
 	fmt.Println("Expense Filter:", expenseFilter)
@@ -6945,6 +6957,28 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	home := query.Get("home")
 	visitor := query.Get("visitor")
 
+	taxYear := strings.TrimSpace(query.Get("taxYear"))
+
+	if taxYear != "" {
+		valid := len(taxYear) == 4
+
+		for _, digit := range taxYear {
+			if digit < '0' || digit > '9' {
+				valid = false
+				break
+			}
+		}
+
+		if !valid || taxYear < "1000" || taxYear > "9999" {
+			http.Error(
+				w,
+				"Tax Year must be a four-digit year between 1000 and 9999.",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
 	// Convert "today" to the date format expected by FormatDateFilter.
 	if begindate == "today" || enddate == "today" {
 		location, err := time.LoadLocation("America/New_York")
@@ -7016,6 +7050,10 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mongoDbFilter["tenantId"] = tId
+
+	if taxYear != "" {
+		mongoDbFilter["taxYear"] = taxYear
+	}
 
 	if len(statuses) > 0 {
 		mongoDbFilter["status"] = bson.M{"$in": statuses}
@@ -7140,6 +7178,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Status:      game.Status,
 			Association: game.Association,
 			Assignor:    game.Assignor,
+			TaxYear:     game.TaxYear,
 		}
 
 		view.GameFee = fmt.Sprintf("$%.2f", float64(gameFee)/100)

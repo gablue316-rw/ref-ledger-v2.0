@@ -683,6 +683,12 @@ body {
         </div>
 
         <div class="filter-group">
+            <label for="taxYear">Tax Year</label>
+            <input type="text" id="taxYear" inputmode="numeric"
+                maxlength="4" placeholder="All Tax Years">
+        </div>
+
+        <div class="filter-group">
             <label>Date Range</label>
             <div id="dateRangeDropdown" class="checkbox-dropdown">
                 <button type="button" id="dateRangeDropdownButton"
@@ -889,6 +895,7 @@ body {
             <tr>
                 <th>Select / Actions</th>
                 <th>Game ID</th>
+                <th>Tax Year</th>
                 <th>Date</th>
                 <th>Time</th>
                 <th>Sport</th>
@@ -1024,6 +1031,7 @@ body {
 
                 <div class="edit-game-form-grid">
                     <div class="edit-game-field"><label for="editGameId">Game ID</label><input id="editGameId" readonly></div>
+                    <div class="edit-game-field"><label for="editTaxYear">Tax Year</label><input type="text" id="editTaxYear" inputmode="numeric" maxlength="4" pattern="[1-9][0-9]{3}" title="Enter a four-digit year between 1000 and 9999" required></div>
                     <div class="edit-game-field"><label for="editAssociation">Association</label><input id="editAssociation" readonly></div>
                     <div class="edit-game-field"><label for="editStatus">Status</label><select id="editStatus" required><option value="">Loading statuses...</option></select></div>
                     <div class="edit-game-field"><label for="editDate">Date</label><input type="date" id="editDate" required></div>
@@ -1140,7 +1148,7 @@ async function loadStatusTypes() {
             checkbox.type = "checkbox";
             checkbox.name = "status";
             checkbox.value = status;
-            checkbox.checked = false;
+            checkbox.checked = status.toLowerCase() === "pending";
 
             label.appendChild(checkbox);
             label.appendChild(document.createTextNode(status));
@@ -1160,6 +1168,7 @@ async function loadStatusTypes() {
             .forEach(status => {
                 editStatus.add(new Option(status, status));
             });
+        if (gameBeingEdited) populateEditGameStatus();
 
         if (filterStatuses.length === 0) {
             statusOptions.textContent = "No statuses found";
@@ -1407,6 +1416,7 @@ function renderGames(
                 </span>
             </td>
             <td>${gameId}</td>
+            <td>${escapeOfficialHTML(game.TaxYear ?? game.Taxyear ?? game.taxYear ?? game.taxyear ?? "")}</td>
             <td>${game.Date || ""}</td>
             <td>${game.Time || ""}</td>
             <td>${game.Sport || ""}</td>
@@ -1768,10 +1778,22 @@ async function loadAssociations() {
     }
 }
 
+function addTaxYearFilter(params) {
+    const taxYear = document.getElementById("taxYear").value.trim();
+    if (taxYear && !/^[1-9]\d{3}$/.test(taxYear)) {
+        showMessage("Tax Year must be a four-digit year between 1000 and 9999.", "error");
+        document.getElementById("taxYear").focus();
+        return false;
+    }
+    if (taxYear) params.set("taxYear", taxYear);
+    return true;
+}
+
 async function loadPendingGamesTable() {
     const params = new URLSearchParams();
 
     params.append("status", "Pending");
+    if (!addTaxYearFilter(params)) return;
 
     await fetchGames(
         params,
@@ -1904,6 +1926,8 @@ async function loadGames() {
     assignors.forEach(assignor => {
         params.append("assignor", assignor);
     });
+
+    if (!addTaxYearFilter(params)) return;
 
     await fetchGames(params);
     } finally {
@@ -2934,6 +2958,23 @@ document.getElementById("editSport").addEventListener("change", async event => {
     await loadEditOfficialRoles(event.target.value);
 });
 
+function populateEditGameStatus() {
+    const select = document.getElementById("editStatus");
+    select.querySelectorAll("option[data-current-status]").forEach(option => option.remove());
+    const savedStatus = String(gameValue(gameBeingEdited, "Status")).trim() || "Pending";
+    const matchingOption = Array.from(select.options).find(option =>
+        option.value.trim().toLowerCase() === savedStatus.toLowerCase()
+    );
+    if (matchingOption) {
+        select.value = matchingOption.value;
+    } else {
+        const option = new Option(savedStatus, savedStatus);
+        option.dataset.currentStatus = "true";
+        select.add(option);
+        select.value = savedStatus;
+    }
+}
+
 function gameValue(game, pascalName, camelName = null) {
     return game?.[pascalName] ?? game?.[camelName ||
         pascalName.charAt(0).toLowerCase() + pascalName.slice(1)] ?? "";
@@ -3021,12 +3062,13 @@ async function openEditGame(gameId, association) {
     }
 
     document.getElementById("editGameId").value = gameValue(gameBeingEdited, "GameId");
+    document.getElementById("editTaxYear").value = gameBeingEdited.TaxYear ?? gameBeingEdited.Taxyear ?? gameBeingEdited.taxYear ?? gameBeingEdited.taxyear ?? "";
     document.getElementById("editAssociation").value = gameValue(gameBeingEdited, "Association");
     if (dashboardSites.length === 0) {
         await loadSites();
     }
 
-    document.getElementById("editStatus").value = gameValue(gameBeingEdited, "Status") || "Pending";
+    populateEditGameStatus();
     document.getElementById("editDate").value = dateInputValue(gameValue(gameBeingEdited, "Date"));
     document.getElementById("editTime").value = timeInputValue(gameValue(gameBeingEdited, "Time"));
     if (!dashboardUserSportsReady) await loadDashboardUserSports();
@@ -3105,11 +3147,18 @@ async function saveEditedGame(event) {
         showEditGameError("Wait for the official fields to load successfully before saving.");
         return;
     }
+    const taxYear = document.getElementById("editTaxYear").value.trim();
+    if (!/^[1-9]\d{3}$/.test(taxYear)) {
+        showEditGameError("Tax Year must be a four-digit year between 1000 and 9999.");
+        document.getElementById("editTaxYear").focus();
+        return;
+    }
     const gameId = document.getElementById("editGameId").value;
     const association = document.getElementById("editAssociation").value;
     const saveButton = document.getElementById("saveEditGameButton");
     const payload = {
         gameId: Number(gameId),
+        taxYear,
         association,
         date: document.getElementById("editDate").value,
         time: document.getElementById("editTime").value.trim(),
@@ -3400,11 +3449,12 @@ function showGameDeletionModal(details) {
 }
 
 function clearFilters() {
+    document.getElementById("taxYear").value = "";
     document.getElementById("gameId").value = "";
     document.getElementById("home").value = "";
     document.getElementById("visitor").value = "";
     document.querySelectorAll('input[name="status"]').forEach(
-        checkbox => checkbox.checked = false
+        checkbox => checkbox.checked = checkbox.value.toLowerCase() === "pending"
     );
     updateAllFilterCheckbox("status");
     updateDropdownText("status");

@@ -30,6 +30,7 @@ type ExpenseDescriptor struct {
 	Association string
 	GameId      string
 	Description string
+	TaxYear     string
 }
 
 type ExpenseDoc struct {
@@ -41,6 +42,7 @@ type ExpenseDoc struct {
 	Association string `bson:"association,omitempty"`
 	GameId      int64  `bson:"gameId,omitempty"`
 	Description string `bson:"description,omitempty"`
+	TaxYear     string `bson:"taxYear,omitempty"`
 }
 
 type EFilters struct {
@@ -49,6 +51,7 @@ type EFilters struct {
 	ExpenseType string
 	FromDate    string
 	ToDate      string
+	TaxYear     string
 }
 
 type ExpenseFilter struct {
@@ -56,6 +59,7 @@ type ExpenseFilter struct {
 	GameId      []int64  `json:"gameId,omitempty"`
 	ExpenseType []string `json:"type,omitempty"`
 	Date        *Date    `json:"date,omitempty"`
+	TaxYear     string   `json:"taxYear,omitempty"`
 }
 
 type PaymentDescriptor struct {
@@ -95,6 +99,7 @@ type ExpenseRegistryFilter struct {
 	Amount      int64
 	Description string
 	TenantId    string
+	TaxYear     string
 }
 
 type OfficialDescriptor struct {
@@ -152,15 +157,8 @@ type GameDescriptor struct {
 	Deductions  string
 	Association string
 	Status      string
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// Referee string `json:"Referee,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U1 string `json:"U1,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U2 string `json:"U2,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// ECO      string `json:"ECO,omitempty"`
-	Assignor string
+	Assignor    string
+	TaxYear     string
 }
 
 type GameDoc struct {
@@ -182,16 +180,9 @@ type GameDoc struct {
 	Deductions   int64             `bson:"deductions"`
 	Association  string            `bson:"association,omitempty"`
 	Status       string            `bson:"status,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// Referee string `bson:"referee,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U1 string `bson:"u1,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U2 string `bson:"u2,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// ECO      string `bson:"eco,omitempty"`
-	Assignor string `bson:"assignor,omitempty"`
-	TenantId string `bson:"tenantId"`
+	Assignor     string            `bson:"assignor,omitempty"`
+	TenantId     string            `bson:"tenantId"`
+	TaxYear      string            `bson:"taxYear,omitempty"`
 }
 
 type JsonDoc struct {
@@ -212,15 +203,7 @@ type JsonDoc struct {
 	Deductions  string            `json:"deductions"`
 	Association string            `json:"association"`
 	Status      string            `json:"status"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// Referee string `json:"referee,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U1 string `json:"u1,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U2 string `json:"u2,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// ECO      string `json:"eco,omitempty"`
-	Assignor string `json:"assignor"`
+	Assignor    string            `json:"assignor"`
 }
 
 type Filter struct {
@@ -247,6 +230,7 @@ type GFilters struct {
 	Visitor     string
 	GameFee     string
 	TenantId    string
+	TaxYear     string
 }
 
 type GameFilter struct {
@@ -269,6 +253,7 @@ type GameFilter struct {
 	BeginDate   string               `json:"beginDate,omitempty"`
 	EndDate     string               `json:"endDate,omitempty"`
 	TenantId    string               `json:"tenantId"`
+	TaxYear     string               `json:"taxYear,omitempty"`
 }
 
 type Config struct {
@@ -303,15 +288,8 @@ type HtmlResponse struct {
 	Deductions  int64             `json:"deductions" bson:"deductions,omitempty"`
 	Association string            `json:"association" bson:"association,omitempty"`
 	Status      string            `json:"status" bson:"status,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// Referee string `json:"referee,omitempty" bson:"referee,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U1 string `json:"u1,omitempty" bson:"u1,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U2 string `json:"u2,omitempty" bson:"u2,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// ECO      string `json:"eco,omitempty" bson:"eco,omitempty"`
-	Assignor string `json:"assignor" bson:"assignor,omitempty"`
+	Assignor    string            `json:"assignor" bson:"assignor,omitempty"`
+	TaxYear     string            `json:"taxYear" bson:"taxYear,omitempty"`
 }
 
 type OfficialDetailsView struct {
@@ -350,6 +328,7 @@ type GameView struct {
 	AssignorFee   string         `json:"AssignorFee"`
 	Deductions    string         `json:"Deductions"`
 	TotalEarnings string         `json:"TotalEarnings"`
+	TaxYear       string         `json:"TaxYear"`
 }
 
 type ExpenseReportRow struct {
@@ -360,6 +339,7 @@ type ExpenseReportRow struct {
 	Mileage     string
 	Amount      string
 	Description string
+	TaxYear     string
 }
 
 type ExpenseReportData struct {
@@ -382,6 +362,7 @@ type FinancialReport struct {
 	TotalExpenses int64  `json:"totalExpenses"`
 	NetIncome     int64  `json:"netIncome"`
 	TotalMileage  int64  `json:"totalMileage"`
+	TaxYear       string `json:"taxYear"`
 }
 
 type FinancialReportResponse struct {
@@ -390,6 +371,7 @@ type FinancialReportResponse struct {
 	TotalExpenses string `json:"totalExpenses"`
 	NetIncome     string `json:"netIncome"`
 	TotalMileage  string `json:"totalMileage"`
+	TaxYear       string `json:"taxYear"`
 }
 
 type RevenueReport struct {
@@ -401,6 +383,7 @@ type RevenueReport struct {
 	TotAssignorFees int64  `json:"totAssignorFees"`
 	TotDeductions   int64  `json:"totDeductions"`
 	NetRevenue      int64  `json:"netRevenue"`
+	TaxYear         string `json:"taxYear"`
 }
 
 type RevenueReportResponse struct {
@@ -412,6 +395,7 @@ type RevenueReportResponse struct {
 	TotAssignorFees string `json:"totAssignorFees"`
 	TotDeductions   string `json:"totDeductions"`
 	NetRevenue      string `json:"netRevenue"`
+	TaxYear         string `json:"taxYear"`
 }
 
 type ExpenseReport struct {
@@ -422,6 +406,7 @@ type ExpenseReport struct {
 	Equipment   int64  `json:"equipment"`
 	Mileage     int64  `json:"mileage"`
 	Deductions  int64  `json:"deductions"`
+	TaxYear     string `json:"taxYear"`
 }
 
 type ExpenseReportResponse struct {
@@ -432,6 +417,7 @@ type ExpenseReportResponse struct {
 	Equipment   string `json:"equipment"`
 	Mileage     string `json:"mileage"`
 	Deductions  string `json:"deductions"`
+	TaxYear     string `json:"taxYear"`
 }
 
 type AccountsReceivableReport struct {
@@ -450,6 +436,8 @@ type ReconciliationReport struct {
 	Association    string  `json:"association"`
 	PaymentId      string  `json:"paymentId"`
 	PaymentAmt     int64   `json:"paymentAmt"`
+	PaymentDate    string  `json:"paymentDate"`
+	TaxYear        string  `json:"taxYear"`
 	CalculatedAmt  int64   `json:"calculatedAmt"`
 	Status         string  `json:"status"`
 	PaymentGameIds []int64 `json:"paymentGameIds"`
@@ -461,6 +449,8 @@ type ReconciliationReportResponse struct {
 	Association    string  `json:"association"`
 	PaymentId      string  `json:"paymentId"`
 	PaymentAmt     string  `json:"paymentAmt"`
+	PaymentDate    string  `json:"paymentDate"`
+	TaxYear        string  `json:"taxYear"`
 	CalculatedAmt  string  `json:"calculatedAmt"`
 	Status         string  `json:"status"`
 	PaymentGameIds []int64 `json:"paymentGameIds"`
