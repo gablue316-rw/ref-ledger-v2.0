@@ -451,6 +451,12 @@
                 </div>
             </div>
             <div class="form-group">
+                <label for="taxYear">Tax Year</label>
+                <input type="text" id="taxYear" inputmode="numeric"
+                    maxlength="4" pattern="[1-9][0-9]{3}"
+                    placeholder="Select an expense date">
+            </div>
+            <div class="form-group">
                 <label for="expenseType">
                     Expense Type
                 </label>
@@ -521,6 +527,12 @@
                 <div class="col">
                     <label for="filterDate">Date</label>
                     <input type="date" id="filterDate">
+                </div>
+                <div class="col">
+                    <label for="filterTaxYear">Tax Year</label>
+                    <input type="text" id="filterTaxYear" inputmode="numeric"
+                        maxlength="4" pattern="[1-9][0-9]{3}"
+                        placeholder="All Years">
                 </div>
             </div>
             <div class="row">
@@ -640,6 +652,7 @@
                         <th>Edit</th>
                         <th>Delete</th>
                         <th>Expense ID</th>
+                        <th>Tax Year</th>
                         <th>Date</th>
                         <th>Association</th>
                         <th>Expense Type</th>
@@ -730,6 +743,11 @@
                     <input type="date" id="editDate" required>
                 </div>
                 <div class="col">
+                    <label for="editTaxYear">Tax Year</label>
+                    <input type="text" id="editTaxYear" inputmode="numeric"
+                        maxlength="4" pattern="[1-9][0-9]{3}" required>
+                </div>
+                <div class="col">
                     <label for="editExpenseType">Expense Type</label>
                     <select id="editExpenseType" required></select>
                 </div>
@@ -812,6 +830,7 @@ const editExpenseId =
     document.getElementById("editExpenseId");
 const editAssociation =
     document.getElementById("editAssociation");
+const editTaxYear = document.getElementById("editTaxYear");
 const editDate =
     document.getElementById("editDate");
 const editExpenseType =
@@ -827,12 +846,19 @@ const cancelExpenseEditBtn =
 document.addEventListener(
     "DOMContentLoaded",
     function() {
+        setTaxYearFromExpenseDate();
         Promise.all([
             loadAssociations(),
             loadExpenseTypes()
         ]);
     }
 );
+// Default Tax Year from the selected expense date; the user can then override it.
+function setTaxYearFromExpenseDate() {
+    const date = document.getElementById("date").value;
+    document.getElementById("taxYear").value = date ? date.slice(0, 4) : "";
+}
+document.getElementById("date").addEventListener("change", setTaxYearFromExpenseDate);
 function showMessage(message, type = "info") {
     messageBox.className =
         `message-box ${type}`;
@@ -990,7 +1016,20 @@ expenseForm.addEventListener(
             );
             return;
         }
+        const taxYearInput = document.getElementById("taxYear");
+        const enteredTaxYear = taxYearInput.value.trim();
+        if (enteredTaxYear !== "" && !/^[1-9][0-9]{3}$/.test(enteredTaxYear)) {
+            showMessage("Tax Year must be a four-digit year from 1000 to 9999.", "error");
+            taxYearInput.focus();
+            return;
+        }
+        const taxYear = Number(enteredTaxYear || document.getElementById("date").value.slice(0, 4));
+        if (!Number.isInteger(taxYear) || taxYear < 1000 || taxYear > 9999) {
+            showMessage("Select a valid expense date or enter a valid Tax Year.", "error");
+            return;
+        }
         const expense = {
+            taxYear: String(taxYear),
             date:
                 document.getElementById("date").value,
             expenseType:
@@ -1140,6 +1179,7 @@ function openExpenseEditor(expense) {
     editExpenseId.value = String(expense.expenseId || "");
     editAssociation.value = String(expense.association || "");
     editDate.value = toDateInputValue(expense.date);
+    editTaxYear.value = String(expense.taxYear || editDate.value.slice(0, 4));
     editExpenseType.value = String(expense.expenseType || "");
     editAmount.value = String(expense.amount ?? "");
     editDescription.value = String(expense.description || "");
@@ -1180,7 +1220,7 @@ function renderExpenses(expenses) {
     if (expenses.length === 0) {
         expensesBody.innerHTML = `
             <tr>
-                <td colspan="9" class="empty-row">
+                <td colspan="10" class="empty-row">
                     No expenses found.
                 </td>
             </tr>
@@ -1222,7 +1262,7 @@ function renderExpenses(expenses) {
         const amount = isMileage
             ? getExpenseValue(expense, "mileage", "Mileage")
             : getExpenseValue(expense, "amount", "Amount");
-        
+
         const description = getExpenseValue(
             expense,
             "description",
@@ -1266,6 +1306,7 @@ function renderExpenses(expenses) {
                 </button>
             </td>
                     <td>${escapeHtml(expenseId)}</td>
+            <td>${escapeHtml(getExpenseValue(expense, "taxYear", "TaxYear", "Taxyear"))}</td>
             <td>${escapeHtml(date)}</td>
             <td>${escapeHtml(association)}</td>
             <td>${escapeHtml(expenseType)}</td>
@@ -1288,6 +1329,7 @@ function renderExpenses(expenses) {
             expenseId: String(expenseId),
             association: String(association || ""),
             date: String(date || ""),
+            taxYear: String(getExpenseValue(expense, "taxYear", "TaxYear", "Taxyear") || ""),
             expenseType: String(expenseType || ""),
             amount: amount,
             description: String(description || "")
@@ -1315,7 +1357,17 @@ function renderExpenses(expenses) {
 async function loadExpenseRegistry() {
     const searchExpensesBtn =
         document.getElementById("searchExpensesBtn");
+    const taxYearInput = document.getElementById("filterTaxYear");
+    const taxYear = taxYearInput.value.trim();
+    if (taxYear !== "" && !/^[1-9][0-9]{3}$/.test(taxYear)) {
+        showMessage("Tax Year must be a four-digit year from 1000 to 9999, or blank for all years.", "error");
+        taxYearInput.focus();
+        return;
+    }
     const params = new URLSearchParams();
+    if (taxYear !== "") {
+        params.append("taxYear", taxYear);
+    }
     const expenseId = document
         .getElementById("filterExpenseId")
         .value
@@ -1436,7 +1488,14 @@ editExpenseForm.addEventListener(
         // Only editable ExpenseJson fields belong in the JSON body.
         // Expense ID and association are immutable lookup values sent
         // in the URL query string.
+        const taxYear = editTaxYear.value.trim();
+        if (!/^[1-9][0-9]{3}$/.test(taxYear)) {
+            showMessage("Tax Year must be a four-digit year from 1000 to 9999.", "error");
+            editTaxYear.focus();
+            return;
+        }
         const expenseChanges = {
+            taxYear: taxYear,
             date: editDate.value,
             description: editDescription.value.trim(),
             amount: Math.round(enteredAmount * 100),

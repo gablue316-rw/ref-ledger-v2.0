@@ -667,6 +667,10 @@ func GetExpenseRegistry(
 		expenseFilter["description"] = filter.Description
 	}
 
+	if filter.TaxYear != "" {
+		expenseFilter["taxYear"] = filter.TaxYear
+	}
+
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
 		10*time.Second,
@@ -1096,6 +1100,11 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 		mongoFilter["assignor"] = bson.M{
 			"$in": filter.Assignor,
 		}
+	}
+
+	if strings.TrimSpace(filter.TaxYear) != "" {
+		fmt.Println("Adding TaxYear...")
+		mongoFilter["taxYear"] = strings.TrimSpace(filter.TaxYear)
 	}
 
 	var officialConditions bson.A
@@ -4789,6 +4798,7 @@ type Expense struct {
 	Association string
 	GameId      string
 	Description string
+	TaxYear     string
 }
 
 type ExpenseJson struct {
@@ -4799,6 +4809,7 @@ type ExpenseJson struct {
 	Description string `json:"description"`
 	Association string `json:"association"`
 	GameId      int64  `json:"gameId"`
+	TaxYear     string `json:"taxYear"`
 }
 
 type ExpenseDoc struct {
@@ -4810,6 +4821,7 @@ type ExpenseDoc struct {
 	Association string `bson:"association,omitempty"`
 	GameId      int64  `bson:"gameId,omitempty"`
 	Description string `bson:"description,omitempty"`
+	TaxYear     string `bson:"taxYear,omitempty"`
 	TenantId    string `bson:"tenantId"`
 }
 
@@ -4867,6 +4879,7 @@ func (ec *ExpensesCollection) convExpenseToDoc(expense Expense) ExpenseDoc {
 		Association: expense.Association,
 		GameId:      gameId,
 		Description: expense.Description,
+		TaxYear:     expense.TaxYear,
 	}
 }
 
@@ -4884,10 +4897,11 @@ func (ec *ExpensesCollection) ConvJsonToExpense(expenseJson ExpenseJson) Expense
 		Association: expenseJson.Association,
 		GameId:      gameId,
 		Description: expenseJson.Description,
+		TaxYear:     expenseJson.TaxYear,
 	}
 }
 
-func (ec *ExpensesCollection) GetExpense(assoc, tenantId, expenseType string) (int64, error) {
+func (ec *ExpensesCollection) GetExpense(assoc, tenantId, expenseType, taxYear string) (int64, error) {
 
 	totalExpense := int64(0)
 
@@ -4902,6 +4916,10 @@ func (ec *ExpensesCollection) GetExpense(assoc, tenantId, expenseType string) (i
 		"association": assoc,
 		"tenantId":    tenantId,
 		"type":        expenseType,
+	}
+
+	if taxYear != "" {
+		filter["taxYear"] = taxYear
 	}
 
 	// Query to find all documents
@@ -5097,6 +5115,7 @@ func (ec *ExpensesCollection) Update(
 			"amount":      amt,
 			"mileage":     mileage,
 			"expenseType": strings.TrimSpace(expense.Type),
+			"taxYear":     strings.TrimSpace(expense.TaxYear),
 		},
 	}
 
@@ -6775,15 +6794,31 @@ func GetFinancialReports(tId string, associations []string) (map[string]model.Fi
 func GetExpenseReports(
 	tId string,
 	associations []string,
+	taxyear string,
 ) (map[string]model.ExpenseReportResponse, error) {
 
 	ctx := context.Background()
 
-	expenseRecords := make(map[string]model.ExpenseReport)
+	taxyear = strings.TrimSpace(taxyear)
 
-	// Remove empty association names and duplicates.
+	if taxyear != "" {
+		year, err := strconv.Atoi(taxyear)
+		if err != nil || len(taxyear) != 4 ||
+			year < 1000 || year > 9999 {
+			return nil, fmt.Errorf(
+				"tax year must be between 1000 and 9999",
+			)
+		}
+	}
+
+	type reportKey struct {
+		Association string
+		TaxYear     string
+	}
+
+	expenseRecords := make(map[reportKey]model.ExpenseReport)
 	selectedAssociations := make([]string, 0, len(associations))
-	seenAssociations := make(map[string]struct{})
+	allowedAssociations := make(map[string]struct{})
 
 	for _, associationName := range associations {
 		associationName = strings.TrimSpace(associationName)
@@ -6792,193 +6827,189 @@ func GetExpenseReports(
 			continue
 		}
 
-		if _, exists := seenAssociations[associationName]; exists {
+		if _, exists := allowedAssociations[associationName]; exists {
 			continue
 		}
 
-		seenAssociations[associationName] = struct{}{}
+		allowedAssociations[associationName] = struct{}{}
 		selectedAssociations = append(
 			selectedAssociations,
 			associationName,
 		)
 	}
 
-	if len(selectedAssociations) > 0 {
-		// Pre-fill the report with the associations selected
-		// by the customer.
-		for _, associationName := range selectedAssociations {
-			expenseRecords[associationName] = model.ExpenseReport{
-				Association: associationName,
-			}
-		}
-	} else {
-		// No associations were selected, so load every
-		// association belonging to the tenant.
-		associationFilter := bson.M{
-			"tenantId": tId,
-		}
-
+	if len(selectedAssociations) == 0 {
 		associationsColl :=
 			Client.Database(Database).Collection("associations")
 
-		associationCursor, err :=
-			associationsColl.Find(ctx, associationFilter)
+		cursor, err := associationsColl.Find(
+			ctx,
+			bson.M{"tenantId": tId},
+		)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"GetExpenseReports associations query failed: %w",
 				err,
 			)
 		}
+		defer cursor.Close(ctx)
 
-		for associationCursor.Next(ctx) {
+		for cursor.Next(ctx) {
 			var associationDoc AssociationDoc
 
-			if err := associationCursor.Decode(&associationDoc); err != nil {
-				associationCursor.Close(ctx)
-
+			if err := cursor.Decode(&associationDoc); err != nil {
 				return nil, fmt.Errorf(
 					"GetExpenseReports association decode failed: %w",
 					err,
 				)
 			}
 
-			associationName := strings.TrimSpace(
-				associationDoc.Name,
-			)
+			associationName := strings.TrimSpace(associationDoc.Name)
 
-			if associationName == "" {
-				continue
-			}
-
-			expenseRecords[associationName] = model.ExpenseReport{
-				Association: associationName,
+			if associationName != "" {
+				allowedAssociations[associationName] = struct{}{}
 			}
 		}
 
-		if err := associationCursor.Err(); err != nil {
-			associationCursor.Close(ctx)
-
+		if err := cursor.Err(); err != nil {
 			return nil, fmt.Errorf(
 				"GetExpenseReports associations cursor failed: %w",
 				err,
 			)
 		}
+	}
 
-		if err := associationCursor.Close(ctx); err != nil {
-			return nil, fmt.Errorf(
-				"GetExpenseReports failed to close associations cursor: %w",
-				err,
-			)
+	// Pre-fill selected associations when a specific year is requested.
+	if taxyear != "" {
+		for associationName := range allowedAssociations {
+			key := reportKey{
+				Association: associationName,
+				TaxYear:     taxyear,
+			}
+
+			expenseRecords[key] = model.ExpenseReport{
+				Association: associationName,
+				TaxYear:     taxyear,
+			}
 		}
 	}
 
-	// Load games.
-	gameFilter := bson.M{
-		"tenantId": tId,
+	buildFilter := func() bson.M {
+		filter := bson.M{
+			"tenantId": tId,
+		}
+
+		if len(selectedAssociations) > 0 {
+			filter["association"] = bson.M{
+				"$in": selectedAssociations,
+			}
+		}
+
+		if taxyear != "" {
+			filter["taxYear"] = taxyear
+		}
+
+		return filter
 	}
 
-	if len(selectedAssociations) > 0 {
-		gameFilter["association"] = bson.M{
-			"$in": selectedAssociations,
-		}
-	}
+	// Group paid-game deductions by association and tax year.
+	gameFilter := buildFilter()
+	gameFilter["status"] = "Paid"
 
 	gamesColl := Client.Database(Database).Collection("games")
 
 	gameCursor, err := gamesColl.Find(ctx, gameFilter)
 	if err != nil {
 		return nil, fmt.Errorf(
-			"GetFinancialReports games query failed: %w",
+			"GetExpenseReports games query failed: %w",
 			err,
 		)
 	}
+	defer gameCursor.Close(ctx)
 
 	for gameCursor.Next(ctx) {
-		var game model.GameDoc
+		var game struct {
+			Association string `bson:"association"`
+			TaxYear     string `bson:"taxYear"`
+			Deductions  int64  `bson:"deductions"`
+		}
 
 		if err := gameCursor.Decode(&game); err != nil {
-			gameCursor.Close(ctx)
-
 			return nil, fmt.Errorf(
-				"GetFinancialReports game decode failed: %w",
+				"GetExpenseReports game decode failed: %w",
 				err,
 			)
 		}
 
-		record, exists := expenseRecords[game.Association]
-		if !exists {
-			// Ignore games whose association is not in the
-			// associations collection for this tenant.
+		associationName := strings.TrimSpace(game.Association)
+
+		if _, allowed := allowedAssociations[associationName]; !allowed {
 			continue
 		}
 
-		if game.Status == "Paid" {
-			record.Deductions += game.Deductions
+		key := reportKey{
+			Association: associationName,
+			TaxYear:     strings.TrimSpace(game.TaxYear),
 		}
-		expenseRecords[game.Association] = record
+
+		record := expenseRecords[key]
+		record.Association = key.Association
+		record.TaxYear = key.TaxYear
+		record.Deductions += game.Deductions
+
+		expenseRecords[key] = record
 	}
 
 	if err := gameCursor.Err(); err != nil {
-		gameCursor.Close(ctx)
-
 		return nil, fmt.Errorf(
 			"GetExpenseReports games cursor failed: %w",
 			err,
 		)
 	}
 
-	if err := gameCursor.Close(ctx); err != nil {
-		return nil, fmt.Errorf(
-			"GetExpenseReports failed to close games cursor: %w",
-			err,
-		)
-	}
-
-	// Load expenses for the requested associations.
-	expenseFilter := bson.M{
-		"tenantId": tId,
-	}
-
-	if len(selectedAssociations) > 0 {
-		expenseFilter["association"] = bson.M{
-			"$in": selectedAssociations,
-		}
-	}
-
+	// Group expenses by association and tax year.
 	expensesColl :=
 		Client.Database(Database).Collection("expenses")
 
-	expenseCursor, err :=
-		expensesColl.Find(ctx, expenseFilter)
+	expenseCursor, err := expensesColl.Find(ctx, buildFilter())
 	if err != nil {
 		return nil, fmt.Errorf(
 			"GetExpenseReports expenses query failed: %w",
 			err,
 		)
 	}
+	defer expenseCursor.Close(ctx)
 
 	for expenseCursor.Next(ctx) {
-		var expense model.ExpenseDoc
+		var expense struct {
+			Association string `bson:"association"`
+			TaxYear     string `bson:"taxYear"`
+			Type        string `bson:"type"`
+			Amount      int64  `bson:"amount"`
+			Mileage     int64  `bson:"mileage"`
+		}
 
 		if err := expenseCursor.Decode(&expense); err != nil {
-			expenseCursor.Close(ctx)
-
 			return nil, fmt.Errorf(
 				"GetExpenseReports expense decode failed: %w",
 				err,
 			)
 		}
 
-		associationName := strings.TrimSpace(
-			expense.Association,
-		)
+		associationName := strings.TrimSpace(expense.Association)
 
-		record, exists := expenseRecords[associationName]
-		if !exists {
-			// Ignore expenses whose association is not part
-			// of the requested report.
+		if _, allowed := allowedAssociations[associationName]; !allowed {
 			continue
 		}
+
+		key := reportKey{
+			Association: associationName,
+			TaxYear:     strings.TrimSpace(expense.TaxYear),
+		}
+
+		record := expenseRecords[key]
+		record.Association = key.Association
+		record.TaxYear = key.TaxYear
 
 		switch strings.ToLower(strings.TrimSpace(expense.Type)) {
 		case "food":
@@ -6997,35 +7028,33 @@ func GetExpenseReports(
 			record.Mileage += expense.Mileage
 		}
 
-		expenseRecords[associationName] = record
+		expenseRecords[key] = record
 	}
 
 	if err := expenseCursor.Err(); err != nil {
-		expenseCursor.Close(ctx)
-
 		return nil, fmt.Errorf(
 			"GetExpenseReports expenses cursor failed: %w",
 			err,
 		)
 	}
 
-	if err := expenseCursor.Close(ctx); err != nil {
-		return nil, fmt.Errorf(
-			"GetExpenseReports failed to close expenses cursor: %w",
-			err,
-		)
-	}
-
-	// Convert the database totals into values formatted
-	// for the web response.
 	response := make(
 		map[string]model.ExpenseReportResponse,
 		len(expenseRecords),
 	)
 
-	for associationName, record := range expenseRecords {
-		response[associationName] = model.ExpenseReportResponse{
+	for key, record := range expenseRecords {
+		// Length-prefixed association prevents composite-key collisions.
+		responseKey := fmt.Sprintf(
+			"%d:%s:%s",
+			len(key.Association),
+			key.Association,
+			key.TaxYear,
+		)
+
+		response[responseKey] = model.ExpenseReportResponse{
 			Association: record.Association,
+			TaxYear:     record.TaxYear,
 			Food:        formatCurrency(record.Food),
 			Dues:        formatCurrency(record.Dues),
 			CampFees:    formatCurrency(record.CampFees),
@@ -7290,6 +7319,7 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 			AssignorFee: utils.ConvertInt64ToAmtStr(r.AssignorFee),
 			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),
 			Deductions:  utils.ConvertInt64ToAmtStr(r.Deductions),
+			TaxYear:     r.TaxYear,
 		}
 
 		gameRec := model.GameDescriptor{

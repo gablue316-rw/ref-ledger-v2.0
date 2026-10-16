@@ -30,6 +30,7 @@ type ExpenseDescriptor struct {
 	Association string
 	GameId      string
 	Description string
+	TaxYear     string
 }
 
 type ExpenseDoc struct {
@@ -41,6 +42,7 @@ type ExpenseDoc struct {
 	Association string `bson:"association,omitempty"`
 	GameId      int64  `bson:"gameId,omitempty"`
 	Description string `bson:"description,omitempty"`
+	TaxYear     string `bson:"taxYear,omitempty"`
 }
 
 type EFilters struct {
@@ -49,6 +51,7 @@ type EFilters struct {
 	ExpenseType string
 	FromDate    string
 	ToDate      string
+	TaxYear     string
 }
 
 type ExpenseFilter struct {
@@ -56,6 +59,7 @@ type ExpenseFilter struct {
 	GameId      []int64  `json:"gameId,omitempty"`
 	ExpenseType []string `json:"type,omitempty"`
 	Date        *Date    `json:"date,omitempty"`
+	TaxYear     string   `json:"taxYear,omitempty"`
 }
 
 type PaymentDescriptor struct {
@@ -95,6 +99,7 @@ type ExpenseRegistryFilter struct {
 	Amount      int64
 	Description string
 	TenantId    string
+	TaxYear     string
 }
 
 type OfficialDescriptor struct {
@@ -334,6 +339,7 @@ type ExpenseReportRow struct {
 	Mileage     string
 	Amount      string
 	Description string
+	TaxYear     string
 }
 
 type ExpenseReportData struct {
@@ -396,6 +402,7 @@ type ExpenseReport struct {
 	Equipment   int64  `json:"equipment"`
 	Mileage     int64  `json:"mileage"`
 	Deductions  int64  `json:"deductions"`
+	TaxYear     string `json:"taxYear"`
 }
 
 type ExpenseReportResponse struct {
@@ -406,6 +413,7 @@ type ExpenseReportResponse struct {
 	Equipment   string `json:"equipment"`
 	Mileage     string `json:"mileage"`
 	Deductions  string `json:"deductions"`
+	TaxYear     string `json:"taxYear"`
 }
 
 type AccountsReceivableReport struct {

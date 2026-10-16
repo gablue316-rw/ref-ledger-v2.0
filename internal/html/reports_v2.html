@@ -269,10 +269,8 @@
             vertical-align: middle;
         }
 
-        .game-report-table th:nth-child(9),
-        .game-report-table td:nth-child(9),
-        .game-report-table th:nth-child(11),
-        .game-report-table td:nth-child(11),
+        .game-report-table th:nth-child(10),
+        .game-report-table td:nth-child(10),
         .game-report-table th:nth-child(12),
         .game-report-table td:nth-child(12),
         .game-report-table th:nth-child(13),
@@ -280,7 +278,9 @@
         .game-report-table th:nth-child(14),
         .game-report-table td:nth-child(14),
         .game-report-table th:nth-child(15),
-        .game-report-table td:nth-child(15) {
+        .game-report-table td:nth-child(15),
+        .game-report-table th:nth-child(16),
+        .game-report-table td:nth-child(16) {
             text-align: right;
         }
 
@@ -531,6 +531,13 @@
             </div>
 
             <div class="filter-group">
+                <label for="gameTaxYear">Tax Year</label>
+                <input type="text" id="gameTaxYear" inputmode="numeric"
+                    maxlength="4" pattern="[1-9][0-9]{3}"
+                    placeholder="All Years" aria-label="Game report tax year">
+            </div>
+
+            <div class="filter-group">
                 <label for="gameBeginDate">Begin Date</label>
                 <input
                     type="date"
@@ -742,6 +749,13 @@
                         id="expenseAssociationOptions">
                     </div>
                 </div>
+            </div>
+
+            <div class="filter-group">
+                <label for="expenseTaxYear">Tax Year</label>
+                <input type="text" id="expenseTaxYear" inputmode="numeric"
+                    maxlength="4" pattern="[1-9][0-9]{3}"
+                    placeholder="All Years" aria-label="Expense report tax year">
             </div>
 
             <div class="button-row">
@@ -1755,6 +1769,7 @@ function renderGameReport(report) {
 
     const columns = [
         { label: "Game ID", value: row => gameField(row, "gameId", "gameID", "GameId", "GameID") },
+        { label: "Tax Year", value: row => gameField(row, "taxYear", "TaxYear", "Taxyear") },
         { label: "Date", value: row => formatGameDate(gameField(row, "date", "Date", "gameDateTime", "GameDateTime")) },
         { label: "Time", value: row => gameField(row, "time", "Time") },
         { label: "Sport", value: row => gameField(row, "sport", "Sport") },
@@ -1985,9 +2000,14 @@ function renderRevenueReport(report) {
 function renderExpenseReport(report) {
     const rows = getFinancialReportRows(report)
         .filter(row => row && typeof row === "object")
-        .sort((a, b) => String(a.association ?? "").localeCompare(
-            String(b.association ?? "")
-        ));
+        .sort((a, b) => {
+            const associationCompare = String(a.association ?? "").localeCompare(
+                String(b.association ?? "")
+            );
+            return associationCompare || String(a.taxYear ?? "").localeCompare(
+                String(b.taxYear ?? ""), undefined, { numeric: true }
+            );
+        });
 
     if (rows.length === 0) {
         setReportMessage("No expense records were returned.");
@@ -1996,6 +2016,7 @@ function renderExpenseReport(report) {
 
     const columns = [
         { label: "Association", field: "association" },
+        { label: "Tax Year", field: "taxYear" },
         { label: "Food", field: "food" },
         { label: "Dues", field: "dues" },
         { label: "Camp Fees", field: "campFees" },
@@ -2005,7 +2026,7 @@ function renderExpenseReport(report) {
         { label: "Mileage", field: "mileage" }
     ];
 
-    const totalFields = columns.slice(1).map(column => column.field);
+    const totalFields = columns.slice(2).map(column => column.field);
     const totals = Object.fromEntries(totalFields.map(field => [field, 0]));
     const table = document.createElement("table");
     table.className = "financial-report-table";
@@ -2027,7 +2048,7 @@ function renderExpenseReport(report) {
         columns.forEach(column => {
             const cell = tableRow.insertCell();
 
-            if (column.field === "association") {
+            if (column.field === "association" || column.field === "taxYear") {
                 cell.textContent = String(row[column.field] ?? "");
                 return;
             }
@@ -2049,6 +2070,7 @@ function renderExpenseReport(report) {
 
     const totalRow = table.createTFoot().insertRow();
     totalRow.insertCell().textContent = "Grand Total";
+    totalRow.insertCell().textContent = "";
 
     totalFields.forEach(field => {
         const cell = totalRow.insertCell();
@@ -2284,6 +2306,14 @@ async function generateRevenueReport() {
 }
 
 async function generateGameReport() {
+    const taxYearInput = document.getElementById("gameTaxYear");
+    const taxYear = taxYearInput.value.trim();
+    if (taxYear !== "" && !/^[1-9][0-9]{3}$/.test(taxYear)) {
+        setReportMessage("Tax Year must be a four-digit year from 1000 to 9999, or blank for all years.");
+        taxYearInput.focus();
+        return;
+    }
+
     const selectedAssociations =
         selectedValues("gameAssociation");
 
@@ -2343,6 +2373,9 @@ async function generateGameReport() {
     const params = new URLSearchParams();
 
     params.append("type", "Game");
+    if (taxYear !== "") {
+        params.append("taxYear", taxYear);
+    }
 
     associations.forEach(association => {
         params.append("association", association);
@@ -2449,6 +2482,13 @@ async function generateGameReport() {
 }
 
 async function generateExpenseReport() {
+    const taxYearInput = document.getElementById("expenseTaxYear");
+    const taxYear = taxYearInput.value.trim();
+    if (taxYear !== "" && !/^[1-9][0-9]{3}$/.test(taxYear)) {
+        setReportMessage("Tax Year must be a four-digit year from 1000 to 9999.");
+        taxYearInput.focus();
+        return;
+    }
 
     const selectedAssociations = selectedValues("expenseAssociation");
     const allCheckbox = document.querySelector(
@@ -2462,6 +2502,9 @@ async function generateExpenseReport() {
     const params = new URLSearchParams();
 
     params.append("type", "Expense");
+    if (taxYear !== "") {
+        params.append("taxYear", taxYear);
+    }
 
     associations.forEach(association => params.append("association", association));
 
@@ -2798,6 +2841,7 @@ function clearGameReport() {
             ?.setAttribute("aria-expanded", "false");
     });
 
+    document.getElementById("gameTaxYear").value = "";
     document.getElementById("gameBeginDate").value = "";
     document.getElementById("gameEndDate").value = "";
     clearGameDateRangeSelection();
@@ -2830,6 +2874,7 @@ function clearGameReport() {
 }
 
 function clearExpenseReport() {
+    document.getElementById("expenseTaxYear").value = "";
 
     document.querySelectorAll('input[name="expenseAssociation"]').forEach(
         checkbox => checkbox.checked = false

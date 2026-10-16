@@ -61,8 +61,8 @@ func validateEmailReport(req EmailReportRequest) error {
 	}
 	allowed := map[string]bool{"type": true, "association": true}
 	switch req.ReportType {
-	case "financial", "revenue", "expense", "accounts-receivable", "reconciliation":
-	case "1099":
+	case "financial", "revenue", "accounts-receivable", "reconciliation":
+	case "1099", "expense":
 		allowed["taxYear"] = true
 	case "game":
 		for _, key := range []string{"status", "site", "level", "sport", "official", "eco", "assignor", "home", "visitor", "begindate", "enddate"} {
@@ -90,7 +90,9 @@ func validateEmailReport(req EmailReportRequest) error {
 			}
 		}
 	}
-	if req.ReportType == "1099" && emailFilterValue(req.Filters, "taxYear") != "" {
+	if (req.ReportType == "1099" || req.ReportType == "expense") &&
+		emailFilterValue(req.Filters, "taxYear") != "" {
+
 		year, err := strconv.Atoi(emailFilterValue(req.Filters, "taxYear"))
 		if err != nil || year < 1000 || year > 9999 {
 			return invalidEmailReport("Tax Year must be between 1000 and 9999")
@@ -171,7 +173,11 @@ func loadEmailReportData(tenantID string, req EmailReportRequest) (interface{}, 
 	case "revenue":
 		return GetRevenueReports(tenantID, associations)
 	case "expense":
-		return GetExpenseReports(tenantID, associations)
+		return GetExpenseReports(
+			tenantID,
+			associations,
+			emailFilterValue(req.Filters, "taxYear"),
+		)
 	case "accounts-receivable":
 		return GetAccountsReceivableReport(tenantID, associations)
 	case "reconciliation":

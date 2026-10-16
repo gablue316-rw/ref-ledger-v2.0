@@ -4605,6 +4605,7 @@ func GenerateGameReport(
 	assignors := r.URL.Query()["assignor"]
 	officials := r.URL.Query()["official"]
 	ecos := r.URL.Query()["eco"]
+	taxyear := r.URL.Query().Get("taxYear")
 
 	bDate, eDate, err := utils.FormatDateFilter(r.URL.Query().Get("begindate"), r.URL.Query().Get("enddate"))
 	if err != nil {
@@ -4627,6 +4628,7 @@ func GenerateGameReport(
 		ECO:         ecos,
 		BeginDate:   bDate,
 		EndDate:     eDate,
+		TaxYear:     taxyear,
 	}
 
 	fmt.Printf(
@@ -5013,9 +5015,10 @@ func GenerateExpenseReport(w http.ResponseWriter, r *http.Request) {
 	// ?association=MSO
 	// ?association=MSO&association=GOLLC
 	associations := r.URL.Query()["association"]
+	taxyear := r.URL.Query().Get("taxYear")
 
 	expenseReports, err :=
-		database.GetExpenseReports(tId, associations)
+		database.GetExpenseReports(tId, associations, taxyear)
 	if err != nil {
 		fmt.Printf(
 			"GenerateExpenseReport failed: %v\n",
@@ -5880,6 +5883,10 @@ func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
 		r.URL.Query().Get("association"),
 	)
 
+	taxYear := strings.TrimSpace(
+		r.URL.Query().Get("taxYear"),
+	)
+
 	description := strings.TrimSpace(
 		r.URL.Query().Get("description"),
 	)
@@ -5925,6 +5932,7 @@ func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
 		Amount:      amount,
 		Description: description,
 		TenantId:    database.TenantId,
+		TaxYear:     taxYear,
 	}
 
 	fmt.Println("Expense Filter:", expenseFilter)
