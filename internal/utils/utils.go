@@ -720,6 +720,7 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 		Status:      doc.Status,
 		Officials:   copyGameOfficials(doc.Officials),
 		Assignor:    doc.Assignor,
+		TaxYear:     doc.TaxYear,
 	}
 
 	return gameDescr
@@ -901,6 +902,7 @@ func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
 		Status:      gameDescr.Status,
 		Officials:   copyGameOfficials(gameDescr.Officials),
 		Assignor:    gameDescr.Assignor,
+		TaxYear:     gameDescr.TaxYear,
 	}
 
 	return doc

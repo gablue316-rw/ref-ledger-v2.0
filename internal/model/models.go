@@ -152,15 +152,8 @@ type GameDescriptor struct {
 	Deductions  string
 	Association string
 	Status      string
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// Referee string `json:"Referee,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U1 string `json:"U1,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U2 string `json:"U2,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// ECO      string `json:"ECO,omitempty"`
-	Assignor string
+	Assignor    string
+	TaxYear     string
 }
 
 type GameDoc struct {
@@ -182,16 +175,9 @@ type GameDoc struct {
 	Deductions   int64             `bson:"deductions"`
 	Association  string            `bson:"association,omitempty"`
 	Status       string            `bson:"status,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// Referee string `bson:"referee,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U1 string `bson:"u1,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U2 string `bson:"u2,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// ECO      string `bson:"eco,omitempty"`
-	Assignor string `bson:"assignor,omitempty"`
-	TenantId string `bson:"tenantId"`
+	Assignor     string            `bson:"assignor,omitempty"`
+	TenantId     string            `bson:"tenantId"`
+	TaxYear      string            `bson:"taxYear,omitempty"`
 }
 
 type JsonDoc struct {
@@ -212,15 +198,7 @@ type JsonDoc struct {
 	Deductions  string            `json:"deductions"`
 	Association string            `json:"association"`
 	Status      string            `json:"status"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// Referee string `json:"referee,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U1 string `json:"u1,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U2 string `json:"u2,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// ECO      string `json:"eco,omitempty"`
-	Assignor string `json:"assignor"`
+	Assignor    string            `json:"assignor"`
 }
 
 type Filter struct {
@@ -247,6 +225,7 @@ type GFilters struct {
 	Visitor     string
 	GameFee     string
 	TenantId    string
+	TaxYear     string
 }
 
 type GameFilter struct {
@@ -269,6 +248,7 @@ type GameFilter struct {
 	BeginDate   string               `json:"beginDate,omitempty"`
 	EndDate     string               `json:"endDate,omitempty"`
 	TenantId    string               `json:"tenantId"`
+	TaxYear     string               `json:"taxYear,omitempty"`
 }
 
 type Config struct {
@@ -303,15 +283,8 @@ type HtmlResponse struct {
 	Deductions  int64             `json:"deductions" bson:"deductions,omitempty"`
 	Association string            `json:"association" bson:"association,omitempty"`
 	Status      string            `json:"status" bson:"status,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// Referee string `json:"referee,omitempty" bson:"referee,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U1 string `json:"u1,omitempty" bson:"u1,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// U2 string `json:"u2,omitempty" bson:"u2,omitempty"`
-	// // Deprecated: use Officials. Retained for legacy callers/documents.
-	// ECO      string `json:"eco,omitempty" bson:"eco,omitempty"`
-	Assignor string `json:"assignor" bson:"assignor,omitempty"`
+	Assignor    string            `json:"assignor" bson:"assignor,omitempty"`
+	TaxYear     string            `json:"taxYear" bson:"taxYear,omitempty"`
 }
 
 type OfficialDetailsView struct {
@@ -350,6 +323,7 @@ type GameView struct {
 	AssignorFee   string         `json:"AssignorFee"`
 	Deductions    string         `json:"Deductions"`
 	TotalEarnings string         `json:"TotalEarnings"`
+	TaxYear       string         `json:"TaxYear"`
 }
 
 type ExpenseReportRow struct {

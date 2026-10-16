@@ -67,6 +67,7 @@ type Game struct {
 	Status      string                  `json:"status"`
 	Assignor    string                  `json:"assignor"`
 	Officials   []model.GameOfficialDoc `json:"officials"`
+	TaxYear     string                  `json:"taxYear"`
 }
 
 type Expense struct {
@@ -242,6 +243,7 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 		Status:      g.Status,
 		Assignor:    g.Assignor,
 		Officials:   officials,
+		TaxYear:     g.TaxYear,
 	}
 }
 
@@ -5179,7 +5181,6 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	// }
 
 	http.Error(w, "Game not found", http.StatusNotFound)
-	return
 }
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
@@ -6945,6 +6946,28 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	home := query.Get("home")
 	visitor := query.Get("visitor")
 
+	taxYear := strings.TrimSpace(query.Get("taxYear"))
+
+	if taxYear != "" {
+		valid := len(taxYear) == 4
+
+		for _, digit := range taxYear {
+			if digit < '0' || digit > '9' {
+				valid = false
+				break
+			}
+		}
+
+		if !valid || taxYear < "1000" || taxYear > "9999" {
+			http.Error(
+				w,
+				"Tax Year must be a four-digit year between 1000 and 9999.",
+				http.StatusBadRequest,
+			)
+			return
+		}
+	}
+
 	// Convert "today" to the date format expected by FormatDateFilter.
 	if begindate == "today" || enddate == "today" {
 		location, err := time.LoadLocation("America/New_York")
@@ -7016,6 +7039,10 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	mongoDbFilter["tenantId"] = tId
+
+	if taxYear != "" {
+		mongoDbFilter["taxYear"] = taxYear
+	}
 
 	if len(statuses) > 0 {
 		mongoDbFilter["status"] = bson.M{"$in": statuses}
@@ -7140,6 +7167,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Status:      game.Status,
 			Association: game.Association,
 			Assignor:    game.Assignor,
+			TaxYear:     game.TaxYear,
 		}
 
 		view.GameFee = fmt.Sprintf("$%.2f", float64(gameFee)/100)
