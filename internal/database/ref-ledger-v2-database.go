@@ -2701,15 +2701,30 @@ func (ac *AssociationCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
-func (ac *AssociationCollection) ConvAssocJsonToAssoc(aj AssociationJson) Association {
+func (ac *AssociationCollection) ConvAssocJsonToAssoc(
+	association AssociationJson,
+) Association {
 	return Association{
-		Id:        aj.Id,
-		Name:      aj.Name,
-		Contact:   aj.Contact,
-		Phone:     aj.Phone,
-		Email:     aj.Email,
-		Assignors: aj.Assignors,
+		Id:        association.Id,
+		Name:      association.Name,
+		Contact:   association.Contact,
+		Phone:     association.Phone,
+		Email:     association.Email,
+		Assignors: association.Assignors,
 	}
+}
+
+func (ac *AssociationCollection) DeleteAll(tenantid string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	results, err := ac.Coll.DeleteMany(ctx, bson.M{"tenantId": tenantid})
+	if err != nil {
+		ac.LastError = err
+		return fmt.Errorf("Delete failed.  Reason: %v", err)
+	}
+	fmt.Println("Total Records deleted from associations collection for tenantId", tenantid, ":", results.DeletedCount)
+	return nil
 }
 
 func (ac *AssociationCollection) convAssocToDoc(association Association) AssociationDoc {
@@ -3011,19 +3026,6 @@ func (ac *AssociationCollection) Update(association Association, tenantId string
 	}
 
 	fmt.Println("Record updated in", ac.Coll.Name())
-	return nil
-}
-
-func (ac *AssociationCollection) DeleteAll(tenantId string) error {
-
-	var result *mongo.DeleteResult
-
-	result, ac.LastError = ac.Coll.DeleteMany(context.TODO(), bson.M{"tenantId": tenantId})
-	if ac.LastError != nil {
-		return fmt.Errorf("Failed to delete all associations.  Reason: %v", ac.LastError)
-	}
-
-	fmt.Println("Deleted ", result.DeletedCount, " records from ", ac.Coll.Name())
 	return nil
 }
 

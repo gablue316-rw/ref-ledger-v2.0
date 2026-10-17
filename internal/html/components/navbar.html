@@ -1,120 +1,73 @@
-<nav id="main-navbar" class="navbar">
-
-    <div class="nav-links">
-
-        <a href="/home" data-page="home">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </a>
-
-        <a href="/dashboard" data-page="dashboard">
-            <i class="fa-solid fa-chart-column"></i>
-            <span>Dashboard</span>
-        </a>
-
-        <a href="/reports_v2" data-page="reports_v2">
-            <i class="fa-solid fa-file-lines"></i>
-            <span>Reports</span>
-        </a>
-
-        <a href="/games" data-page="games" class="games-nav-link">
-
-            <span class="nav-icon-wrapper">
-
-                <i class="fa-solid fa-calendar-days"></i>
-
-                <span
-                    id="pendingGames"
-                    class="nav-count-badge"
-                    aria-live="polite"
-                    aria-label="0 pending games today and 0 pending games in the next 7 days"
-                    title="Pending games: Today / Next 7 Days"
-                >
-                    0/0
-                </span>
-
-            </span>
-
-            <span>Games</span>
-
-        </a>
-
-        <a href="/officials" data-page="officials">
-            <i class="fa-solid fa-users"></i>
-            <span>Officials</span>
-        </a>
-
-        <a href="/associations" data-page="associations">
-            <i class="fa-solid fa-building-columns"></i>
-            <span>Associations</span>
-        </a>
-
-        <a href="/sites" data-page="sites">
-            <i class="fa-solid fa-location-dot"></i>
-            <span>Sites</span>
-        </a>
-
-        <a href="/expenses" data-page="expenses">
-            <i class="fa-solid fa-receipt"></i>
-            <span>Expenses</span>
-        </a>
-
-        <a href="/payments" data-page="payments">
-            <i class="fa-solid fa-dollar-sign"></i>
-            <span>Payments</span>
-        </a>
-
-        <a href="/settings" data-page="settings">
-            <i class="fa-solid fa-gear"></i>
-            <span>Settings</span>
-        </a>
-        
-        <a href="/contact" data-page="contact">
-            <i class="fa-solid fa-envelope"></i>
-            <span>Contact</span>
-        </a>
-
-        <a href="#" id="logoutBtn">
-            <i class="fa-solid fa-right-from-bracket"></i>
-            <span>Logout</span>
-        </a>
-
-        <a href="/about" id="aboutBtn">
-            <i class="fa-solid fa-circle-info"></i>
-            <span>About</span>
-        </a>
-        
-    </div>
-
-    <div class="user-profile">
-
-        <div id="userAvatar" class="user-avatar">
-
-            <img
-                src="/images/official-avatar.png?v=2"
-                alt="Referee avatar"
-                class="avatar-image"
-            >
-
-        </div>
-
-        <div class="user-details">
-
-            <div id="userName" class="user-name">
-                Loading...
-            </div>
-
-            <div id="userRole" class="user-role">
-            </div>
-
-            <div
-                id="environment-label"
-                class="environment-label"
-                hidden
-            ></div>        
-
-        </div>
-
-    </div>
-
+<nav class="navbar" id="main-navbar">
+<div class="nav-links">
+<a data-page="home" href="/home">
+<i class="fa-solid fa-house"></i>
+<span>Home</span>
+</a>
+<a data-page="dashboard" href="/dashboard">
+<i class="fa-solid fa-chart-column"></i>
+<span>Dashboard</span>
+</a>
+<a data-page="reports_v2" href="/reports_v2">
+<i class="fa-solid fa-file-lines"></i>
+<span>Reports</span>
+</a>
+<a class="games-nav-link" data-page="games" href="/games">
+<span class="nav-icon-wrapper">
+<i class="fa-solid fa-calendar-days"></i>
+<span aria-label="0 pending games today and 0 pending games in the next 7 days" aria-live="polite" class="nav-count-badge" id="pendingGames" title="Pending games: Today / Next 7 Days">
+                        0/0
+                    </span>
+</span>
+<span>Games</span>
+</a>
+<a data-page="officials" href="/officials">
+<i class="fa-solid fa-users"></i>
+<span>Officials</span>
+</a>
+<a data-page="associations" href="/associations">
+<i class="fa-solid fa-building-columns"></i>
+<span>Associations</span>
+</a>
+<a data-page="sites" href="/sites">
+<i class="fa-solid fa-location-dot"></i>
+<span>Sites</span>
+</a>
+<a data-page="expenses" href="/expenses">
+<i class="fa-solid fa-receipt"></i>
+<span>Expenses</span>
+</a>
+<a data-page="payments" href="/payments">
+<i class="fa-solid fa-dollar-sign"></i>
+<span>Payments</span>
+</a>
+<a data-page="settings" href="/settings">
+<i class="fa-solid fa-gear"></i>
+<span>Settings</span>
+</a><a data-page="administration" hidden="" href="/administration" id="administrationNavLink" style="display:none"><i class="fa-solid fa-user-shield"></i><span>Administration</span></a>
+<a data-page="contact" href="/contact">
+<i class="fa-solid fa-envelope"></i>
+<span>Contact</span>
+</a>
+<a href="#" id="logoutBtn">
+<i class="fa-solid fa-right-from-bracket"></i>
+<span>Logout</span>
+</a>
+<a href="/about" id="aboutBtn">
+<i class="fa-solid fa-circle-info"></i>
+<span>About</span>
+</a>
+</div>
+<div class="user-profile">
+<div class="user-avatar" id="userAvatar">
+<img alt="Referee avatar" class="avatar-image" src="/images/official-avatar.png?v=2"/>
+</div>
+<div class="user-details">
+<div class="user-name" id="userName">
+                    Loading...
+                </div>
+<div class="user-role" id="userRole"></div>
+<div class="environment-label" hidden="" id="environment-label"></div>
+</div>
+</div>
 </nav>

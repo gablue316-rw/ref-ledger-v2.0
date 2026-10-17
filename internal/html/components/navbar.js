@@ -100,6 +100,15 @@ async function loadCurrentUser() {
             "Unknown User";
 
         userRole.textContent = formatRole(session.role);
+
+        const adminLink = document.getElementById("administrationNavLink");
+
+        if (adminLink) {
+            const isAdmin = session.role === "admin";
+            adminLink.hidden = !isAdmin;
+            adminLink.style.display = isAdmin ? "" : "none";
+        }
+
     } catch (error) {
         console.error("Unable to load user information:", error);
         userName.textContent = "Unknown User";

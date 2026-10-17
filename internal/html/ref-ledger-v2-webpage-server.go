@@ -168,17 +168,49 @@ func LogRequest(next http.Handler) http.Handler {
 	})
 }
 
-func officialRolesAccess(next http.HandlerFunc) http.HandlerFunc {
-	restricted := readOnlyForbidden(next)
+// adminRequired uses the signed-in session, never a client-supplied role.
+// Keep authRequired outside this wrapper to preserve login redirects for pages.
+func adminRequired(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		session, err := database.GetSession(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		if session.Role != "admin" {
+			http.Error(w, "Administrator access required", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	}
+}
 
+// Catalog reads remain available to authenticated users of other pages.
+// The enclosing route must use authRequired.
+func sportsAccess(next http.HandlerFunc) http.HandlerFunc {
+	restricted := adminRequired(next)
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			next(w, r)
+		case http.MethodPost, http.MethodDelete:
+			restricted(w, r)
+		default:
+			w.Header().Set("Allow", "GET, POST, DELETE")
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}
+}
 
+func officialRolesAccess(next http.HandlerFunc) http.HandlerFunc {
+	restricted := adminRequired(next)
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			next(w, r)
 		case http.MethodPut, http.MethodDelete:
 			restricted(w, r)
-
 		default:
 			w.Header().Set("Allow", "GET, PUT, DELETE")
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -365,6 +397,20 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 			http.StatusInternalServerError,
 		)
 	}
+}
+
+// Serve this file only through the protected /administration route.
+func AdministrationPage(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/administration" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		w.Header().Set("Allow", "GET, HEAD")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	http.ServeFile(w, r, "./internal/html/administration.html")
 }
 
 func SettingsPage(w http.ResponseWriter, r *http.Request) {
@@ -8114,6 +8160,7 @@ func main() {
 	fmt.Println("Registering routes...")
 	utils.AuditLog.Println("Registering routes...")
 	mux := http.NewServeMux()
+	registerAdminUserRoutes(mux)
 
 	mux.Handle("/images/", http.StripPrefix("/images/",
 		http.FileServer(http.Dir("./internal/html/images"))))
@@ -8121,6 +8168,7 @@ func main() {
 	mux.HandleFunc("/api/environment", GetEnvironmentHandler)
 	mux.HandleFunc("/api/about", AboutHandler)
 	mux.HandleFunc("/settings", authRequired(SettingsPage))
+	mux.HandleFunc("/administration", authRequired(adminRequired(AdministrationPage)))
 
 	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
@@ -8193,8 +8241,8 @@ func main() {
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadSportsSupported", LoadSportsSupportedHandler)
 	mux.HandleFunc("/api/loadLevels", GetLevelsHandler)
-	mux.HandleFunc("/api/loadSports", GetSportsHandler)
-	mux.HandleFunc("/api/sports", authRequired(readOnlyForbidden(SportsHandler)))
+	mux.HandleFunc("/api/loadSports", authRequired(GetSportsHandler))
+	mux.HandleFunc("/api/sports", authRequired(sportsAccess(SportsHandler)))
 	mux.HandleFunc("/api/levels", authRequired(readOnlyForbidden(LevelsHandler)))
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
@@ -8204,8 +8252,8 @@ func main() {
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
 	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficial)
-	mux.HandleFunc("/api/sport-active", ActivateSport)
-	mux.HandleFunc("/api/sport-inactive", DeactivateSport)
+	mux.HandleFunc("/api/sport-active", authRequired(adminRequired(ActivateSport)))
+	mux.HandleFunc("/api/sport-inactive", authRequired(adminRequired(DeactivateSport)))
 	mux.HandleFunc("/api/level-active", ActivateLevel)
 	mux.HandleFunc("/api/level-inactive", DeactivateLevel)
 	mux.HandleFunc("/api/updateExpense", authRequired(readOnlyForbidden(UpdateExpense)))
