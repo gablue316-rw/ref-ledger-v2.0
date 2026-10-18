@@ -208,9 +208,10 @@ func adminUsersSearch(w http.ResponseWriter, r *http.Request) {
 		pairs = append(pairs, bson.M{"username": user.Username, "tenantId": user.TenantID})
 	}
 	type storedSession struct {
-		adminUserSession `bson:",inline"`
-		Username         string `bson:"username"`
-		TenantID         string `bson:"tenantId"`
+		SessionID string    `bson:"sessionId"`
+		ExpiresAt time.Time `bson:"expiresAt"`
+		Username  string    `bson:"username"`
+		TenantID  string    `bson:"tenantId"`
 	}
 	sessionMap := make(map[string][]adminUserSession)
 	if len(pairs) > 0 {
@@ -229,7 +230,11 @@ func adminUsersSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, session := range stored {
 			key := session.TenantID + "\x00" + session.Username
-			sessionMap[key] = append(sessionMap[key], session.adminUserSession)
+
+			sessionMap[key] = append(sessionMap[key], adminUserSession{
+				SessionID: session.SessionID,
+				ExpiresAt: session.ExpiresAt,
+			})
 		}
 	}
 	actor, err := database.GetSession(r)
