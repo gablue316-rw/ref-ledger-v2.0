@@ -167,64 +167,15 @@ func UpdateOfficials(parentCtx context.Context, file string) error {
 
 }
 
-func UpdateGamesFromJsonFile(parentCtx context.Context, file string) error {
-
-	fmt.Println("Adding to Games Collection using Json File")
-
-	games, err := utils.ConvertJsonToGameDescriptor(file)
-	newGames := []model.GameDescriptor{}
-
-	if err != nil {
-		return fmt.Errorf("Failed to convert json file %s to GameDescriptor.  Reason: %s", file, err)
-	}
-
-	recordsDeleted := 0
-	validationErrors := 0
-	recordsAppended := 0
-	recordsRead := 0
-
-	for _, g := range games {
-
-		recordsRead++
-
-		if g.Status == "Delete" {
-			DelGame(parentCtx, g.GameId)
-			recordsDeleted++
-			continue
-		}
-
-		checkForDup := true
-		err = ValidateGameDescriptor(parentCtx, g, checkForDup)
-		if err != nil {
-			fmt.Println(err)
-			validationErrors++
-			continue
-		}
-
-		newGames = append(newGames, g)
-
-		recordsAppended++
-	}
-
-	fmt.Println("Records Read", recordsRead, "Records Deleted", recordsDeleted, "Records Appended", recordsAppended, "Validation Errors", validationErrors)
-	if len(newGames) > 0 {
-		AddGames(parentCtx, newGames)
-	}
-
-	return nil
-
-}
-
 // Stubbed out for now
 func ValidateOfficialDescriptor(parentCtx context.Context, p model.OfficialDescriptor) error {
 	return nil
 }
 
-func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, checkForDup bool) error {
+func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, checkForDup bool, tId string) error {
 
 	var errorFormat string = "%s %s not found!  Record Dropped!"
-	var tId string = database.TenantId
-
+	
 	if !GcInitialized {
 		err := gc.Init(database.Client)
 		if err != nil {
@@ -369,6 +320,7 @@ func UpdateGame(
 	parentCtx context.Context,
 	cmd string,
 	gameIds []int64,
+	tId string,
 ) error {
 	if len(gameIds) == 0 {
 		return fmt.Errorf("no game IDs were supplied")
@@ -378,7 +330,6 @@ func UpdateGame(
 		return fmt.Errorf("no update command was supplied")
 	}
 
-	tId := database.TenantId
 
 	if !GcInitialized {
 		if err := gc.Init(database.Client); err != nil {
@@ -541,7 +492,7 @@ func UpdateGame(
 			game.Deductions = "0.00"
 		}
 
-		if err := ValidateGameDescriptor(parentCtx, game, false); err != nil {
+		if err := ValidateGameDescriptor(parentCtx, game, false, tId); err != nil {
 			return fmt.Errorf("validate game %d: %w", id, err)
 		}
 
@@ -559,10 +510,6 @@ func UpdateGame(
 	return nil
 }
 
-func AddGames(parentCtx context.Context, game []model.GameDescriptor) {
-
-	database.InsertGameDocs(parentCtx, game, database.Database, "games", database.TenantId)
-}
 
 func AddOfficials(parentCtx context.Context, official []model.OfficialDescriptor) {
 

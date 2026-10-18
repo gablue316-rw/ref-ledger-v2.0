@@ -113,34 +113,26 @@ func isValidEmail(email string) bool {
 }
 
 func getTenantId(r *http.Request) (string, error) {
-
-	tId := database.TenantId
-
-	fmt.Println("Validating tenant ID")
-	if tId == "na" {
-		fmt.Println("Retrieving session id")
-		cookie, err := r.Cookie("rl_session")
-		if err != nil {
-			fmt.Println("Error retrieving session id.  Reason:", err)
-			return "", err
-		}
-
-		sessionId := cookie.Value
-		fmt.Println("Session ID:", sessionId)
-
-		fmt.Println("Retrieving tenant id for session:", sessionId)
-		tId, err = se.GetTenantID(sessionId)
-
-		if err != nil {
-			return "", err
-		}
-
-		fmt.Println("Updating tenant ID with:", tId)
-		database.UpdateTenantId(tId)
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		return "", fmt.Errorf("retrieving session cookie: %w", err)
 	}
 
-	fmt.Println("Returning tenant ID:", tId)
-	return tId, nil
+	sessionID := strings.TrimSpace(cookie.Value)
+	if sessionID == "" {
+		return "", fmt.Errorf("session ID is empty")
+	}
+
+	tenantID, err := se.GetTenantID(sessionID)
+	if err != nil {
+		return "", fmt.Errorf("retrieving tenant ID from session: %w", err)
+	}
+
+	if strings.TrimSpace(tenantID) == "" || tenantID == "na" {
+		return "", fmt.Errorf("invalid tenant ID in session")
+	}
+
+	return tenantID, nil
 }
 
 func PodInfoHandler(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +152,6 @@ func LogRequest(next http.Handler) http.Handler {
 			podName = "local-dev"
 		}
 
-		getTenantId(r)
 		logPrint := fmt.Sprintf("Pod=%s Method=%s Path=%s RemoteAddr=%s", podName, r.Method, r.URL.Path, r.RemoteAddr)
 		log.Println(logPrint)
 		fmt.Println(logPrint)
@@ -335,17 +326,6 @@ func getCurrentSession(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
 	fmt.Println("getCurrentSession")
-	var tId string = database.TenantId
-	var err error
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
 
 	session, err := database.GetSession(r)
 
@@ -455,15 +435,12 @@ func GetEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	tId := database.TenantId
-	var err error
+	 
+	tId, err := getTenantId(r)
 
-	if tId == "na" {
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
 	}
 
 	association := strings.TrimSpace(r.URL.Query().Get("association"))
@@ -484,10 +461,16 @@ func GetSitesDirectoryHandler(
 ) {
 	LogVisitor(r)
 
-	tenantId := database.TenantId
+	 
+	tId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 	siteName := strings.TrimSpace(r.URL.Query().Get("siteName"))
 
-	sites, err := sc.GetSitesDirectory(tenantId, siteName)
+	sites, err := sc.GetSitesDirectory(tId, siteName)
 	if err != nil {
 		fmt.Println("GetSitesDirectory error:", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -505,7 +488,14 @@ func GetSitesDirectoryHandler(
 func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	associations, err := ac.GetAssociationsDirectory(database.TenantId)
+	 
+	tId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+	associations, err := ac.GetAssociationsDirectory(tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -518,10 +508,17 @@ func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
+	 
+	tId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 	firstName := strings.TrimSpace(r.URL.Query().Get("firstname"))
 	lastName := strings.TrimSpace(r.URL.Query().Get("lastname"))
 
-	officials, err := oc.GetOfficialsDirectory(firstName, lastName, database.TenantId)
+	officials, err := oc.GetOfficialsDirectory(firstName, lastName, tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -535,16 +532,12 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
 
-	var tId string = database.TenantId
-	var err error
+	 
+	tId, err := getTenantId(r)
 
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
 	}
 
 	associations, err := ac.GetAssociationIds(tId)
@@ -560,26 +553,19 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	var tId string = database.TenantId
-	var err error
+	 
+	tId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	fmt.Println("Request path:", r.URL.Path)
-	fmt.Println("TenantId global:", database.TenantId)
+	fmt.Println("TenantId:", tId)
 
 	for _, c := range r.Cookies() {
 		fmt.Println("Cookie:", c.Name, c.Value)
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	/*
@@ -617,23 +603,19 @@ func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	var tId string = database.TenantId
-	var err error
+	 
+	tId, err := getTenantId(r)
+
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	fmt.Println("Request path:", r.URL.Path)
-	fmt.Println("TenantId global:", database.TenantId)
+	fmt.Println("TenantId:", tId)
 
 	for _, c := range r.Cookies() {
 		fmt.Println("Cookie:", c.Name, c.Value)
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	/*
@@ -662,26 +644,19 @@ func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSitesHandler(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 
-	var tId string = database.TenantId
-	var err error
-
 	fmt.Println("Request path:", r.URL.Path)
-	fmt.Println("TenantId global:", database.TenantId)
+	fmt.Println("TenantId:", tId)
 
 	for _, c := range r.Cookies() {
 		fmt.Println("Cookie:", c.Name, c.Value)
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	sites, err := sc.GetSiteNames(tId)
@@ -2400,9 +2375,11 @@ func getOfficialsPreview(token string) (OfficialsImportPreview, bool) {
 }
 
 func CommitAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		writeJSONError(
@@ -2411,15 +2388,6 @@ func CommitAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
 			"Method not allowed.",
 		)
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	var request struct {
@@ -2674,9 +2642,11 @@ func CommitAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		writeJSONError(
@@ -2685,15 +2655,6 @@ func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 			"Method not allowed.",
 		)
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	var request struct {
@@ -2953,8 +2914,11 @@ func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
-
-	tId := database.TenantId
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		writeJSONError(
@@ -2963,20 +2927,6 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			"Method not allowed.",
 		)
 		return
-	}
-
-	if tId == "na" {
-		var err error
-
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	var request struct {
@@ -3478,22 +3428,15 @@ func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PreviewAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
@@ -3699,22 +3642,15 @@ func PreviewAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
@@ -3921,8 +3857,11 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
-	tId := database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	fmt.Println("Previewing games import...")
 
@@ -3930,14 +3869,6 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Allow", http.MethodPost)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	// Allow additional space for multipart boundaries and form metadata.
@@ -4160,22 +4091,15 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PreviewOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
@@ -4406,20 +4330,13 @@ func GetStatusTypes(w http.ResponseWriter, r *http.Request) {
 
 }
 func GetOfficialsHandler(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
-
-	var tId string = database.TenantId
-	var err error
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
 
 	officials, err := oc.GetOfficialsNames(tId)
 	if err != nil {
@@ -4719,6 +4636,12 @@ func GenerateGameReport(
 }
 
 func GenerateAccountsReceivableReport(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	fmt.Println("GenerateAccountsReceivableReport is called")
 	LogVisitor(r)
 
@@ -4729,22 +4652,6 @@ func GenerateAccountsReceivableReport(w http.ResponseWriter, r *http.Request) {
 			http.StatusMethodNotAllowed,
 		)
 		return
-	}
-
-	tId := database.TenantId
-
-	if tId == "na" {
-		var err error
-
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	// Supports:
@@ -4781,6 +4688,12 @@ func GenerateAccountsReceivableReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func GenerateRevenueReport(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	fmt.Println("GenerateReconciliationReport is called")
 	LogVisitor(r)
 
@@ -4791,22 +4704,6 @@ func GenerateRevenueReport(w http.ResponseWriter, r *http.Request) {
 			http.StatusMethodNotAllowed,
 		)
 		return
-	}
-
-	tId := database.TenantId
-
-	if tId == "na" {
-		var err error
-
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	// Supports:
@@ -4844,6 +4741,12 @@ func GenerateRevenueReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	fmt.Println("GenerateReconciliationReport is called")
 	LogVisitor(r)
 
@@ -4854,22 +4757,6 @@ func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
 			http.StatusMethodNotAllowed,
 		)
 		return
-	}
-
-	tId := database.TenantId
-
-	if tId == "na" {
-		var err error
-
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	// Supports:
@@ -4907,6 +4794,12 @@ func GenerateReconciliationReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	fmt.Println("GenerateFinancialReport is called")
 	LogVisitor(r)
 
@@ -4917,22 +4810,6 @@ func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
 			http.StatusMethodNotAllowed,
 		)
 		return
-	}
-
-	tId := database.TenantId
-
-	if tId == "na" {
-		var err error
-
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	// Supports:
@@ -4970,6 +4847,12 @@ func GenerateFinancialReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func Generate1099Report(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	fmt.Println("Generate1099Report is called")
 	LogVisitor(r)
 
@@ -4980,22 +4863,6 @@ func Generate1099Report(w http.ResponseWriter, r *http.Request) {
 			http.StatusMethodNotAllowed,
 		)
 		return
-	}
-
-	tId := database.TenantId
-
-	if tId == "na" {
-		var err error
-
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	// Supports:
@@ -5033,6 +4900,12 @@ func Generate1099Report(w http.ResponseWriter, r *http.Request) {
 }
 
 func GenerateExpenseReport(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	fmt.Println("GenerateExpenseReport is called")
 	LogVisitor(r)
 
@@ -5043,22 +4916,6 @@ func GenerateExpenseReport(w http.ResponseWriter, r *http.Request) {
 			http.StatusMethodNotAllowed,
 		)
 		return
-	}
-
-	tId := database.TenantId
-
-	if tId == "na" {
-		var err error
-
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	// Supports:
@@ -5106,7 +4963,7 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 	// fmt.Println("GenerateReport is called")
 	// LogVisitor(r)
 
-	// var tId string = database.TenantId
+	// var tId string
 	// var err error
 	// //var siteId string
 
@@ -5237,20 +5094,15 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	var game Game
-	var tId string = database.TenantId
-	var err error
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
 
 	fmt.Println("##### UpdateGame Enpoint Called #####")
 
@@ -5270,14 +5122,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("UpdateGame: Game Fee:", game.GameFee)
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
 
 	if game.Status == "Cancelled" {
 		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
@@ -5301,7 +5145,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	gDoc.Association = game.Association
 
 	checkForDup := false
-	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup)
+	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup,tId)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, "Invalid Game", http.StatusBadRequest)
@@ -5331,11 +5175,14 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func SaveGame(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	var game Game
-	var tId string = database.TenantId
-	var err error
 	var gameDesc []model.GameDescriptor
 	var singleGameDesc model.GameDescriptor = model.GameDescriptor{}
 
@@ -5348,14 +5195,6 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("UpdateGame: Game Fee:", game.GameFee)
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
 
 	if game.Status == "Cancelled" {
 		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
@@ -5380,7 +5219,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	gDoc.Association = game.Association
 
 	checkForDup := true
-	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup)
+	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup,tId)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -5409,9 +5248,11 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	fmt.Println("##### Updating Game Status #####")
 
@@ -5469,16 +5310,7 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("##### Game Ids selected", gameIds, "#####")
 
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
-
-	gc.UpdateGameStatus(gameIds, gameUpdate.Status)
+	gc.UpdateGameStatus(gameIds, gameUpdate.Status, tId)
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
@@ -5669,7 +5501,17 @@ func DeletePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := database.DeletePayment(paymentID, association)
+	tid, err := getTenantId(r)
+	if err != nil {
+		http.Error(
+			w,
+			"Failed to retrieve tenant ID",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	err = database.DeletePayment(paymentID, association, tid)
 	if err != nil {
 		http.Error(
 			w,
@@ -5785,6 +5627,12 @@ func ParseGameIds(value string) ([]int64, error) {
 }
 
 func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	paymentId := strings.TrimSpace(r.URL.Query().Get("paymentId"))
 	date := strings.TrimSpace(r.URL.Query().Get("date"))
 	taxYear := strings.TrimSpace(r.URL.Query().Get("taxYear"))
@@ -5866,7 +5714,7 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 		Association: association,
 		Amount:      amount,
 		GameIds:     gameIds,
-		TenantId:    database.TenantId,
+		TenantId:    tId,
 		TaxYear:     taxYear,
 	}
 
@@ -5894,6 +5742,11 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	expenseId := strings.TrimSpace(
 		r.URL.Query().Get("expenseId"),
@@ -5981,7 +5834,7 @@ func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
 		Type:        expenseType,
 		Amount:      amount,
 		Description: description,
-		TenantId:    database.TenantId,
+		TenantId:    tId,
 		TaxYear:     taxYear,
 	}
 
@@ -6010,16 +5863,13 @@ func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
 }
 
 func ValidateLogin(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
-	fmt.Println("Validating Login")
 	var user model.User
-	var err error
-
 	sessionDuration := 15 * time.Minute
 
 	username := strings.ToLower(strings.TrimSpace(r.FormValue("username")))
@@ -6029,13 +5879,12 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Database(database.GetMongoDbName()).
 		Collection("users")
 
-	err = usersCollection.FindOne(
+	err := usersCollection.FindOne(
 		r.Context(),
 		bson.M{"username": username},
 	).Decode(&user)
 
 	if err != nil {
-		fmt.Println("User not found")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
@@ -6044,22 +5893,13 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		[]byte(user.PasswordHash),
 		[]byte(password),
 	)
-
 	if err != nil {
-		fmt.Println("Invalid password")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	// 2. Delete previous sessions if they still exist
-	fmt.Println("Deleting previous sessions")
-	database.DeleteSessions(username)
-
-	// 3. Create session
-	fmt.Println("Creating session")
 	sessionID := uuid.New().String()
 
-	fmt.Println("session ID:", sessionID)
 	session := model.Session{
 		SessionID: sessionID,
 		Username:  user.Username,
@@ -6068,13 +5908,6 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Role:      user.Role,
 	}
 
-	fmt.Println("Updating Tenant ID", user.TenantID, "session for user:", user.Username)
-
-	database.UpdateTenantId(user.TenantID)
-
-	fmt.Println("Storing session in MongoDB")
-
-	// 4. Store in MongoDB
 	_, err = database.Client.
 		Database(database.GetMongoDbName()).
 		Collection("sessions").
@@ -6085,8 +5918,6 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Set cookie
-	fmt.Println("Setting cookie")
 	http.SetCookie(w, &http.Cookie{
 		Name:     "rl_session",
 		Value:    sessionID,
@@ -6100,9 +5931,11 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	var assocJson database.AssociationJson
@@ -6112,15 +5945,6 @@ func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	err = ac.Update(ac.ConvAssocJsonToAssoc(assocJson), tId)
@@ -6136,9 +5960,11 @@ func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateAssociation(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	var assocJson database.AssociationJson
@@ -6148,15 +5974,6 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson), tId)
@@ -6171,9 +5988,11 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateSite(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	var siteJson database.SiteJson
@@ -6182,15 +6001,6 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	err = sc.Add(sc.ConvJsonToSite(siteJson), tId)
@@ -6205,9 +6015,11 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateSite(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	var siteJson database.SiteJson
@@ -6216,15 +6028,6 @@ func UpdateSite(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
-	}
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
 	}
 
 	err = sc.Update(sc.ConvJsonToSite(siteJson), tId)
@@ -6239,11 +6042,17 @@ func UpdateSite(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	LogVisitor(r)
 
 	fmt.Println("Updating Official")
 	var officialJson database.OfficialJson
-	err := json.NewDecoder(r.Body).Decode(&officialJson)
+	err = json.NewDecoder(r.Body).Decode(&officialJson)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
@@ -6251,7 +6060,7 @@ func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Official JSON:", officialJson)
 
-	err = oc.Update(database.TenantId, oc.ConvJsonToOfficial(officialJson))
+	err = oc.Update(tId, oc.ConvJsonToOfficial(officialJson))
 	if err != nil {
 		fmt.Println("Failed to update official")
 		http.Error(w, "Failed to update official", http.StatusInternalServerError)
@@ -6262,17 +6071,23 @@ func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateOfficial(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	LogVisitor(r)
 
 	fmt.Println("Adding Official")
 
 	var officialJson database.OfficialJson
-	err := json.NewDecoder(r.Body).Decode(&officialJson)
+	err = json.NewDecoder(r.Body).Decode(&officialJson)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	err = oc.Add(oc.ConvJsonToOfficial(officialJson), database.TenantId)
+	err = oc.Add(oc.ConvJsonToOfficial(officialJson), tId)
 	if err != nil {
 		fmt.Println("Failed to create official")
 		http.Error(w, "Failed to create official", http.StatusInternalServerError)
@@ -6288,6 +6103,12 @@ type DeleteExpenseRequest struct {
 }
 
 func DeleteExpenseHandler(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	LogVisitor(r)
 
 	if r.Method != http.MethodDelete {
@@ -6297,21 +6118,6 @@ func DeleteExpenseHandler(w http.ResponseWriter, r *http.Request) {
 			http.StatusMethodNotAllowed,
 		)
 		return
-	}
-
-	var tId = database.TenantId
-	var err error
-
-	if tId == "na" {
-		tId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
 	}
 
 	var request DeleteExpenseRequest
@@ -6389,6 +6195,11 @@ func DeleteExpenseHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateExpense(w http.ResponseWriter, r *http.Request) {
+	tenantId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 
@@ -6427,22 +6238,6 @@ func UpdateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tenantId := strings.TrimSpace(database.TenantId)
-
-	if tenantId == "" || tenantId == "na" {
-		var err error
-
-		tenantId, err = getTenantId(r)
-		if err != nil {
-			http.Error(
-				w,
-				"Invalid tenant ID",
-				http.StatusBadRequest,
-			)
-			return
-		}
-	}
-
 	var expenseJSON database.ExpenseJson
 
 	decoder := json.NewDecoder(r.Body)
@@ -6468,7 +6263,7 @@ func UpdateExpense(w http.ResponseWriter, r *http.Request) {
 
 	expense := ec.ConvJsonToExpense(expenseJSON)
 
-	err := ec.Update(
+	err = ec.Update(
 		expense,
 		expenseId,
 		association,
@@ -6500,6 +6295,11 @@ func UpdateExpense(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateExpense(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	var expenseJson database.ExpenseJson
@@ -6519,7 +6319,7 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ec.Add(ec.ConvJsonToExpense(expenseJson), database.TenantId)
+	err = ec.Add(ec.ConvJsonToExpense(expenseJson), tId)
 	if err != nil {
 		fmt.Println("Failed to create expense")
 		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
@@ -6531,6 +6331,11 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	fmt.Println("DeleteAssociation called")
@@ -6542,7 +6347,7 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 	assocId := r.PathValue("assocId")
 
-	err := ac.Delete(assocId, database.TenantId)
+	err = ac.Delete(assocId, tId)
 
 	if err != nil {
 		http.Error(w,
@@ -6557,18 +6362,26 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 func DeleteGame(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+
 	LogVisitor(r)
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+	
 	association := r.PathValue("association")
 	gameId := r.PathValue("gameId")
 
 	fmt.Println("Deleting Game", gameId, "for association", association)
 
-	err := gc.Delete(association, gameId)
+	err = gc.Delete(association, gameId, tId)
 
 	if err != nil {
 		fmt.Println("Delete failed", err)
@@ -6583,6 +6396,11 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	if r.Method != http.MethodDelete {
@@ -6595,7 +6413,7 @@ func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Official", firstname, lastname)
 
-	err := oc.Delete(firstname, lastname, database.TenantId)
+	err = oc.Delete(firstname, lastname, tId)
 
 	if err != nil {
 		http.Error(w,
@@ -6609,6 +6427,11 @@ func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 }
 
 func OfficialsDetailHandler(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	if r.Method != http.MethodGet {
@@ -6625,7 +6448,7 @@ func OfficialsDetailHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request data", http.StatusBadRequest)
 		return
 	}
-	official, err := oc.GetById(id, database.TenantId)
+	official, err := oc.GetById(id, tId)
 
 	if err != nil {
 		http.Error(w, "Invalid request data", http.StatusBadRequest)
@@ -6655,6 +6478,11 @@ func OfficialsDetailHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func DeleteSite(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	if r.Method != http.MethodDelete {
@@ -6666,7 +6494,7 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Site", siteId)
 
-	err := sc.Delete(siteId, database.TenantId)
+	err = sc.Delete(siteId, tId)
 
 	if err != nil {
 		http.Error(w,
@@ -6680,6 +6508,11 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetOfficial(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	if r.Method != http.MethodGet {
@@ -6687,7 +6520,7 @@ func GetOfficial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	official, err := oc.Get(r.PathValue("firstName"), r.PathValue("lastName"), database.TenantId)
+	official, err := oc.Get(r.PathValue("firstName"), r.PathValue("lastName"), tId)
 	if err != nil {
 		http.Error(w, "Official not found", http.StatusNotFound)
 		return
@@ -6698,6 +6531,11 @@ func GetOfficial(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	if r.Method != http.MethodGet {
@@ -6705,7 +6543,7 @@ func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	assoc, err := ac.Get(r.PathValue("assocId"), database.TenantId)
+	assoc, err := ac.Get(r.PathValue("assocId"), tId)
 	if err != nil {
 		http.Error(w, "Association not found", http.StatusNotFound)
 		return
@@ -6716,6 +6554,12 @@ func GetSingleAssociation(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoadSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	LogVisitor(r)
 
 	if r.Method != http.MethodGet {
@@ -6723,7 +6567,7 @@ func LoadSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sports, err := uc.GetSportsSupported(database.TenantId)
+	sports, err := uc.GetSportsSupported(tId)
 	if err != nil {
 		http.Error(w, "Failed to retrieve sports supported", http.StatusInternalServerError)
 		return
@@ -6734,6 +6578,12 @@ func LoadSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func SaveSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
 	LogVisitor(r)
 
 	if r.Method != http.MethodPost {
@@ -6753,7 +6603,7 @@ func SaveSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := uc.SetSportsSupported(database.TenantId, sports); err != nil {
+	if err := uc.SetSportsSupported(tId, sports); err != nil {
 		http.Error(
 			w,
 			"Failed to save supported sports",
@@ -6769,6 +6619,11 @@ func SaveSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSingleSite(w http.ResponseWriter, r *http.Request) {
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	if r.Method != http.MethodGet {
@@ -6776,7 +6631,7 @@ func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	site, err := sc.Get(r.PathValue("siteId"), database.TenantId)
+	site, err := sc.Get(r.PathValue("siteId"), tId)
 	if err != nil {
 		http.Error(w, "Site not found", http.StatusNotFound)
 		return
@@ -6814,16 +6669,6 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if tId == "na" {
-		fmt.Println("Invalid Tenant Id")
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 
 	json.NewEncoder(w).Encode(game)
@@ -6831,24 +6676,17 @@ func GetSingleGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetPendingGamesCount(w http.ResponseWriter, r *http.Request) {
-
-	var tId string = database.TenantId
-	var err error
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	fmt.Println("GetPendingGamesCount has been called")
 
 	w.Header().Set("Content-Type", "application/json")
 
 	// Use your application's tenant ID.
-	if tId == "na" {
-		fmt.Println("Invalid Tenant Id")
-		tId, err = getTenantId(r)
-
-		if err != nil {
-			http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-			return
-		}
-	}
 
 	_, todaysCount, err := gc.GetTodaysPendingGames(tId)
 

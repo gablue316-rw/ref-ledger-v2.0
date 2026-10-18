@@ -41,8 +41,6 @@ var ExpenseTypes []string = []string{"Camp Fee", "Dues", "Equipment", "Food", "M
 var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending", "Deleted"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
-var TenantId string = "na"
-
 type EnvironmentInfo struct {
 	Environment string `json:"environment"`
 	HostLabel   string `json:"hostLabel"`
@@ -799,9 +797,9 @@ func GetPaymentRegistry(
 	return paymentRecords, nil
 }
 
-func DeletePayment(paymentId, association string) error {
+func DeletePayment(paymentId, association, tid string) error {
 
-	doc, err := GetPayment(paymentId, association)
+	doc, err := GetPayment(paymentId, association, tid)
 	if err != nil {
 		return fmt.Errorf(
 			"DeletePayment failure getting payment: %w",
@@ -906,7 +904,7 @@ func QueryAggregatedGames(parentCtx context.Context, dbase, collection string, f
 	return gameRecords, nil
 }
 
-func PaymentExists(doc model.PaymentDoc) (bool, error) {
+func PaymentExists(doc model.PaymentDoc, tenantId string) (bool, error) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
@@ -920,7 +918,7 @@ func PaymentExists(doc model.PaymentDoc) (bool, error) {
 	filter = bson.M{
 		"paymentId":   doc.PaymentId,
 		"association": doc.Association,
-		"tenantId":    TenantId,
+		"tenantId":    tenantId,
 	}
 
 	// Query to find all documents
@@ -1471,12 +1469,6 @@ func DeleteSessions(username string) {
 	fmt.Printf("Deleted %d sessions for user %s\n", result.DeletedCount, username)
 }
 
-func UpdateTenantId(tenantId string) {
-	log.Printf("Changing Tenant ID from %s to %s", TenantId, tenantId)
-	TenantId = tenantId
-	log.Printf("Tenant ID is now %s", TenantId)
-}
-
 func GetSession(r *http.Request) (*model.Session, error) {
 
 	cookie, err := r.Cookie("rl_session")
@@ -1787,7 +1779,7 @@ func GetOfficialsCollection(parentCtx context.Context) ([]model.OfficialDoc, err
 	return results, nil
 }
 
-func GetPayment(paymentId, association string) (model.PaymentDoc, error) {
+func GetPayment(paymentId, association, tid string) (model.PaymentDoc, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
@@ -1797,7 +1789,7 @@ func GetPayment(paymentId, association string) (model.PaymentDoc, error) {
 	filter := bson.M{
 		"paymentId":   paymentId,
 		"association": association,
-		"tenantId":    TenantId,
+		"tenantId":    tid,
 	}
 
 	var result model.PaymentDoc
@@ -2199,7 +2191,7 @@ func InsertPaymentDocs(
 		doc.TenantId = tId
 		doc.TaxYear = taxYear
 
-		paymentExists, err := PaymentExists(doc)
+		paymentExists, err := PaymentExists(doc, tId)
 		if err != nil {
 			totalErrors++
 			fmt.Println(err)
@@ -2361,7 +2353,7 @@ func UpdatePaymentDocs(
 		doc.TenantId = tId
 		doc.TaxYear = taxYear
 
-		paymentExists, err := PaymentExists(doc)
+		paymentExists, err := PaymentExists(doc, tId)
 		if err != nil {
 			totalErrors++
 			fmt.Println(err)
@@ -3727,12 +3719,11 @@ func (gc *GameCollection) Get(association string, gameId string, tenantId string
 
 }
 
-func (gc *GameCollection) Delete(association string, gameId string) error {
+func (gc *GameCollection) Delete(association, gameId, tid string) error {
 
 	var filter bson.M
 	var result *mongo.DeleteResult
-	var tId string = TenantId
-
+	
 	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
 	if err != nil {
 		return fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
@@ -3741,7 +3732,7 @@ func (gc *GameCollection) Delete(association string, gameId string) error {
 	filter = bson.M{
 		"gameId":      gameIdInt64,
 		"association": association,
-		"tenantId":    tId,
+		"tenantId":    tid,
 	}
 
 	result, gc.LastError = gc.Coll.DeleteOne(context.TODO(), filter)
@@ -3832,11 +3823,10 @@ func (gc *GameCollection) Add(
 	return nil
 }
 
-func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
+func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status, tid string) {
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
-	var tId string = TenantId
 	update := bson.M{}
 	filter := bson.M{}
 
@@ -3892,7 +3882,7 @@ func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status string) {
 		filter = bson.M{
 			"gameId":      id,
 			"association": game.Association,
-			"tenantId":    tId,
+			"tenantId":    tid,
 		}
 
 		err = UpdateOneDoc(ctx, filter, update, Database, "games")
