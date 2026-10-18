@@ -530,6 +530,25 @@
 </head>
 <body>
 <div id="navbar-container"></div>
+<dialog class="user-action-dialog" id="adminPasswordDialog" aria-labelledby="adminPasswordTitle">
+<form id="adminPasswordForm">
+<div class="user-dialog-body">
+<h2 id="adminPasswordTitle">Change password</h2>
+<p>Set a new password for <strong id="adminPasswordUsername"></strong>.</p>
+<div class="form-group"><label for="adminNewPassword">New password</label>
+<input class="form-control" id="adminNewPassword" type="password" autocomplete="new-password" required aria-describedby="adminPasswordHint"/></div>
+<div class="form-group"><label for="adminConfirmPassword">Confirm password</label>
+<input class="form-control" id="adminConfirmPassword" type="password" autocomplete="new-password" required/></div>
+<p id="adminPasswordHint">Enter the same password in both fields. Password requirements are checked by the server.</p>
+<p class="user-action-error" id="adminPasswordError" role="alert"></p>
+</div>
+<div class="user-dialog-footer">
+<button class="btn btn-secondary" id="adminPasswordCancel" type="button">Cancel</button>
+<button class="btn btn-primary" id="adminPasswordSave" type="submit">Save password</button>
+</div>
+</form>
+</dialog>
+
 <div aria-hidden="true" aria-labelledby="sportDeleteModalTitle" aria-modal="true" class="delete-modal-overlay" id="sportDeleteModal" role="dialog">
 <div class="delete-modal">
 <div class="delete-modal-body">
@@ -600,10 +619,11 @@
 <th scope="col">Actions</th>
 <th scope="col">Login name (email)</th>
 <th scope="col">Customer name</th>
+<th scope="col">Role</th>
 <th scope="col">Tenant ID</th>
 <th scope="col">Sessions</th>
 </tr></thead>
-<tbody id="adminUsersBody"><tr><td class="empty-row" colspan="5">Loading users…</td></tr></tbody>
+<tbody id="adminUsersBody"><tr><td class="empty-row" colspan="6">Loading users…</td></tr></tbody>
 </table>
 </div>
 <div class="users-pagination">
@@ -629,6 +649,10 @@
 <div class="form-group" hidden="" id="adminDeleteConfirmation">
 <label for="adminConfirmEmail">Type the user's exact email address to confirm permanent deletion</label>
 <input autocomplete="off" class="form-control" id="adminConfirmEmail" spellcheck="false" type="text"/>
+</div>
+<div class="form-group" hidden id="adminRoleGroup">
+<label for="adminRoleSelect">Role</label>
+<select class="form-control" id="adminRoleSelect" disabled></select>
 </div>
 <p class="user-action-error" id="adminActionError" role="alert"></p>
 </div>
@@ -1396,10 +1420,75 @@ loadSports();
     const confirm = byId('adminActionConfirm');
     const cancel = byId('adminActionCancel');
     const confirmEmail = byId('adminConfirmEmail');
+    const roleSelect = byId('adminRoleSelect');
+    let rolesLoading = false;
     let users = [], offset = 0, hasMore = false, loading = false, busy = false;
     let search = { username: '', name: '' };
     let requestNumber = 0, selectedAction = null, focusReturn = null;
     const pageSize = 50;
+
+    const passwordDialog = byId('adminPasswordDialog');
+    const passwordForm = byId('adminPasswordForm');
+    const newPassword = byId('adminNewPassword');
+    const confirmPassword = byId('adminConfirmPassword');
+    const passwordSave = byId('adminPasswordSave');
+    const passwordCancel = byId('adminPasswordCancel');
+    let passwordUser = null;
+    function openPassword(user) {
+        passwordUser = user;
+        passwordForm.reset();
+        byId('adminPasswordError').textContent = '';
+        byId('adminPasswordUsername').textContent = user.username;
+        passwordDialog.showModal();
+        newPassword.focus();
+    }
+    passwordCancel.addEventListener('click', () => { if (!busy) passwordDialog.close(); });
+    passwordDialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
+    passwordDialog.addEventListener('close', () => {
+        passwordForm.reset();
+        passwordUser = null;
+        byId('adminPasswordError').textContent = '';
+        if (focusReturn?.isConnected) focusReturn.focus();
+    });
+    passwordForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (busy || !passwordUser || !passwordForm.reportValidity()) return;
+        if (newPassword.value !== confirmPassword.value) {
+            byId('adminPasswordError').textContent = 'The passwords do not match.';
+            confirmPassword.focus();
+            return;
+        }
+        const user = passwordUser;
+        busy = true;
+        updateButtons();
+        passwordSave.disabled = passwordCancel.disabled = true;
+        newPassword.disabled = confirmPassword.disabled = true;
+        passwordSave.textContent = 'Saving…';
+        byId('adminPasswordError').textContent = '';
+        try {
+            const result = await request('/api/admin/users/password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Ref-Ledger-Admin': '1' },
+                body: JSON.stringify({ userId: user.id, newPassword: newPassword.value })
+            });
+            busy = false;
+            passwordForm.reset();
+            passwordDialog.close();
+            message(result.message || `Password changed for ${user.username}.`, 'success');
+            if (result.currentSessionCancelled) { window.location.href = '/login'; return; }
+            await loadUsers(true);
+        } catch (error) {
+            byId('adminPasswordError').textContent = error.message;
+            passwordForm.reset();
+            newPassword.focus();
+        } finally {
+            busy = false;
+            passwordSave.disabled = passwordCancel.disabled = false;
+            newPassword.disabled = confirmPassword.disabled = false;
+            passwordSave.textContent = 'Save password';
+            updateButtons();
+        }
+    });
 
     function message(text, type = '') {
         byId('adminUsersMessage').textContent = text;
@@ -1426,7 +1515,8 @@ loadSports();
         byId('adminUsersSearchForm').querySelectorAll('button').forEach(button => {
             button.disabled = loading || busy;
         });
-        confirm.disabled = busy || (selectedAction?.kind === 'delete' && confirmEmail.value !== selectedAction.user.username);
+        roleSelect.disabled = busy || rolesLoading;
+        confirm.disabled = busy || (selectedAction?.kind === 'role' && (rolesLoading || !roleSelect.value || roleSelect.value === selectedAction.user.role)) || (selectedAction?.kind === 'delete' && confirmEmail.value !== selectedAction.user.username);
         cancel.disabled = busy;
         confirmEmail.disabled = busy;
     }
@@ -1445,7 +1535,8 @@ loadSports();
         button.addEventListener('click', () => {
             if (loading || busy) return;
             focusReturn = button;
-            openAction(action);
+            if (action.kind === 'password') openPassword(action.user);
+            else openAction(action);
         });
         return button;
     }
@@ -1463,7 +1554,7 @@ loadSports();
         if (!users.length) {
             const row = document.createElement('tr');
             const cell = textCell(row, 'No users match your search.', 'empty-row');
-            cell.colSpan = 5;
+            cell.colSpan = 6;
             tableBody.appendChild(row);
         }
         users.forEach(user => {
@@ -1476,7 +1567,9 @@ loadSports();
                 iconButton('trash-can', user.isCurrentUser ? 'You cannot delete your signed-in account' : `Delete ${user.username} and all account data`,
                     { kind: 'delete', user }, user.isCurrentUser || busy),
                 iconButton('arrow-right-from-bracket', `Cancel all sessions for ${user.username}`,
-                    { kind: 'all', user }, !sessions.length || busy)
+                    { kind: 'all', user }, !sessions.length || busy),
+                iconButton('user-pen', `Change role for ${user.username}`, { kind: 'role', user }, busy),
+                iconButton('key', `Change password for ${user.username}`, { kind: 'password', user }, busy)
             );
             actionsCell.appendChild(actions);
             row.appendChild(actionsCell);
@@ -1488,6 +1581,7 @@ loadSports();
                 email.appendChild(label);
             }
             textCell(row, user.name);
+            textCell(row, user.role);
             textCell(row, user.tenantId, 'users-tenant');
             const sessionsCell = document.createElement('td');
             if (!sessions.length) sessionsCell.textContent = 'No sessions';
@@ -1551,13 +1645,17 @@ loadSports();
         }
     }
 
-    function openAction(action) {
+    async function openAction(action) {
         selectedAction = action;
         const deleting = action.kind === 'delete';
+        const editingRole = action.kind === 'role';
+        byId('adminRoleGroup').hidden = !editingRole;
+        roleSelect.replaceChildren();
+        rolesLoading = editingRole;
         dialog.dataset.action = deleting ? 'delete' : 'sessions';
-        byId('adminActionTitle').textContent = deleting ? 'Permanently delete user?' :
+        byId('adminActionTitle').textContent = editingRole ? 'Change user role' : deleting ? 'Permanently delete user?' :
             action.kind === 'all' ? 'Cancel all sessions?' : 'Cancel this session?';
-        byId('adminActionWarning').textContent = deleting ?
+        byId('adminActionWarning').textContent = editingRole ? 'Choose the role for this user.' : deleting ?
             'WARNING: This permanently deletes the user account, ALL records belonging to this tenant (including games, payments, expenses, officials, sites, associations, and settings), and every session. This cannot be undone. Shared global sports and role definitions remain.' :
             `${action.kind === 'all' ? 'Every session for this user will be cancelled.' : 'Only the selected session will be cancelled.'} The user will need to sign in again on affected sessions. All user data will be preserved.` +
             (action.user.isCurrentUser ? ' This may sign you out of Administration.' : '');
@@ -1569,10 +1667,48 @@ loadSports();
         byId('adminDeleteConfirmation').hidden = !deleting;
         byId('adminActionError').textContent = '';
         confirmEmail.value = '';
-        confirm.textContent = deleting ? 'Delete user and all records' : action.kind === 'all' ? 'Cancel all sessions' : 'Cancel session';
+        confirm.textContent = editingRole ? 'Save role' : deleting ? 'Delete user and all records' : action.kind === 'all' ? 'Cancel all sessions' : 'Cancel session';
         updateButtons();
         dialog.showModal();
         if (deleting) confirmEmail.focus(); else cancel.focus();
+        if (editingRole) {
+            const option = document.createElement('option');
+            option.textContent = 'Loading roles…';
+            option.value = '';
+            roleSelect.appendChild(option);
+            try {
+                const data = await request('/api/admin/roles');
+                if (selectedAction !== action || !dialog.open) return;
+                if (!Array.isArray(data.roles) || data.roles.some(role => typeof role !== 'string' || !role.trim())) {
+                    throw new Error('The backend returned an invalid role list.');
+                }
+                const roles = [...new Set(data.roles)];
+                roleSelect.replaceChildren();
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = roles.length ? 'Select a role' : 'No roles available';
+                roleSelect.appendChild(placeholder);
+                roles.forEach(role => {
+                    const item = document.createElement('option');
+                    item.value = role;
+                    item.textContent = role;
+                    roleSelect.appendChild(item);
+                });
+                roleSelect.value = roles.includes(action.user.role) ? action.user.role : '';
+                if (!roles.length) throw new Error('No roles are configured in the backend.');
+            } catch (error) {
+                if (selectedAction === action && dialog.open) {
+                    roleSelect.replaceChildren();
+                    byId('adminActionError').textContent = error.message;
+                }
+            } finally {
+                if (selectedAction === action && dialog.open) {
+                    rolesLoading = false;
+                    updateButtons();
+                    roleSelect.focus();
+                }
+            }
+        }
     }
 
     function closeAction() {
@@ -1585,6 +1721,7 @@ loadSports();
     dialog.addEventListener('cancel', event => { if (busy) event.preventDefault(); });
     dialog.addEventListener('close', () => { if (!busy) selectedAction = null; });
     confirmEmail.addEventListener('input', updateButtons);
+    roleSelect.addEventListener('change', updateButtons);
     byId('adminUserActionForm').addEventListener('submit', async event => {
         event.preventDefault();
         if (!selectedAction || busy || confirm.disabled) return;
@@ -1592,23 +1729,24 @@ loadSports();
         busy = true;
         updateButtons();
         byId('adminActionError').textContent = '';
-        confirm.textContent = action.kind === 'delete' ? 'Deleting…' : 'Cancelling…';
+        confirm.textContent = action.kind === 'role' ? 'Saving…' : action.kind === 'delete' ? 'Deleting…' : 'Cancelling…';
         try {
             const deleting = action.kind === 'delete';
-            const payload = deleting ? { userId: action.user.id, confirmationUsername: confirmEmail.value } :
+            const editingRole = action.kind === 'role';
+            const payload = editingRole ? { userId: action.user.id, role: roleSelect.value } : deleting ? { userId: action.user.id, confirmationUsername: confirmEmail.value } :
                 { userId: action.user.id, allSessions: action.kind === 'all', sessionId: action.sessionId || '' };
-            const result = await request(deleting ? '/api/admin/users/delete' : '/api/admin/users/sessions/cancel', {
+            const result = await request(editingRole ? '/api/admin/users/role' : deleting ? '/api/admin/users/delete' : '/api/admin/users/sessions/cancel', {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Ref-Ledger-Admin': '1' },
                 body: JSON.stringify(payload)
             });
             busy = false;
             closeAction();
             message(result.message || 'Action completed.', 'success');
-            if (result.currentSessionCancelled) { window.location.href = '/login'; return; }
+            if (result.currentSessionCancelled || (editingRole && action.user.isCurrentUser)) { window.location.href = '/login'; return; }
             await loadUsers(true);
         } catch (error) {
             byId('adminActionError').textContent = error.message;
-            confirm.textContent = action.kind === 'delete' ? 'Delete user and all records' :
+            confirm.textContent = action.kind === 'role' ? 'Save role' : action.kind === 'delete' ? 'Delete user and all records' :
                 action.kind === 'all' ? 'Cancel all sessions' : 'Cancel session';
         } finally { busy = false; updateButtons(); }
     });
@@ -1633,4 +1771,3 @@ loadSports();
 })();
 </script></body>
 </html>
-
