@@ -1,21 +1,13 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-    <title>Ref Ledger V2.0 - Settings</title>
-    <link
-        rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-    >
-    <link
-        rel="stylesheet"
-        href="/components/navbar.css?v=12"
-    >
-    <style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Ref Ledger V2.0 - Settings</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
+<link href="/components/navbar.css?v=12" rel="stylesheet"/>
+<style>
         [hidden] {
             display: none !important;
         }
@@ -494,454 +486,209 @@
     </style>
 </head>
 <body>
-    <div id="navbar-container">
-    <nav id="main-navbar" class="navbar">
-        <div class="nav-links">
-            <a href="/" data-page="home">
-                <i class="fa-solid fa-house"></i>
-                <span>Home</span>
-            </a>
-            <a href="/dashboard" data-page="dashboard">
-                <i class="fa-solid fa-chart-column"></i>
-                <span>Dashboard</span>
-            </a>
-            <a href="/reports" data-page="reports">
-                <i class="fa-solid fa-file-lines"></i>
-                <span>Reports</span>
-            </a>
-            <a href="/games" data-page="games" class="games-nav-link">
-                <span class="nav-icon-wrapper">
-                    <i class="fa-solid fa-calendar-days"></i>
-                    <span
-                        id="pendingGames"
-                        class="nav-count-badge"
-                        aria-live="polite"
-                        aria-label="0 pending games today and 0 pending games in the next 7 days"
-                        title="Pending games: Today / Next 7 Days"
-                    >
+<div id="navbar-container">
+<nav class="navbar" id="main-navbar">
+<div class="nav-links">
+<a data-page="home" href="/home">
+<i class="fa-solid fa-house"></i>
+<span>Home</span>
+</a>
+<a data-page="dashboard" href="/dashboard">
+<i class="fa-solid fa-chart-column"></i>
+<span>Dashboard</span>
+</a>
+<a data-page="reports_v2" href="/reports_v2">
+<i class="fa-solid fa-file-lines"></i>
+<span>Reports</span>
+</a>
+<a class="games-nav-link" data-page="games" href="/games">
+<span class="nav-icon-wrapper">
+<i class="fa-solid fa-calendar-days"></i>
+<span aria-label="0 pending games today and 0 pending games in the next 7 days" aria-live="polite" class="nav-count-badge" id="pendingGames" title="Pending games: Today / Next 7 Days">
                         0/0
                     </span>
-                </span>
-                <span>Games</span>
-            </a>
-            <a href="/officials" data-page="officials">
-                <i class="fa-solid fa-users"></i>
-                <span>Officials</span>
-            </a>
-            <a href="/associations" data-page="associations">
-                <i class="fa-solid fa-building-columns"></i>
-                <span>Associations</span>
-            </a>
-            <a href="/sites" data-page="sites">
-                <i class="fa-solid fa-location-dot"></i>
-                <span>Sites</span>
-            </a>
-            <a href="/expenses" data-page="expenses">
-                <i class="fa-solid fa-receipt"></i>
-                <span>Expenses</span>
-            </a>
-            <a href="/payments" data-page="payments">
-                <i class="fa-solid fa-dollar-sign"></i>
-                <span>Payments</span>
-            </a>
-            <a href="/settings" data-page="settings" class="active">
-                <i class="fa-solid fa-gear"></i>
-                <span>Settings</span>
-            </a>
-            <a href="/contact" data-page="contact">
-                <i class="fa-solid fa-envelope"></i>
-                <span>Contact</span>
-            </a>
-            <a href="#" id="logoutBtn">
-                <i class="fa-solid fa-right-from-bracket"></i>
-                <span>Logout</span>
-            </a>
-            <a href="/about" id="aboutBtn">
-                <i class="fa-solid fa-circle-info"></i>
-                <span>About</span>
-            </a>
-        </div>
-        <div class="user-profile">
-            <div id="userAvatar" class="user-avatar">
-                <img
-                    src="/images/official-avatar.png?v=2"
-                    alt="Referee avatar"
-                    class="avatar-image"
-                >
-            </div>
-            <div class="user-details">
-                <div id="userName" class="user-name">
+</span>
+<span>Games</span>
+</a>
+<a data-page="officials" href="/officials">
+<i class="fa-solid fa-users"></i>
+<span>Officials</span>
+</a>
+<a data-page="associations" href="/associations">
+<i class="fa-solid fa-building-columns"></i>
+<span>Associations</span>
+</a>
+<a data-page="sites" href="/sites">
+<i class="fa-solid fa-location-dot"></i>
+<span>Sites</span>
+</a>
+<a data-page="expenses" href="/expenses">
+<i class="fa-solid fa-receipt"></i>
+<span>Expenses</span>
+</a>
+<a data-page="payments" href="/payments">
+<i class="fa-solid fa-dollar-sign"></i>
+<span>Payments</span>
+</a>
+<a data-page="settings" href="/settings">
+<i class="fa-solid fa-gear"></i>
+<span>Settings</span>
+</a><a data-page="administration" hidden="" href="/administration" id="administrationNavLink" style="display:none"><i class="fa-solid fa-user-shield"></i><span>Administration</span></a>
+<a data-page="contact" href="/contact">
+<i class="fa-solid fa-envelope"></i>
+<span>Contact</span>
+</a>
+<a href="#" id="logoutBtn">
+<i class="fa-solid fa-right-from-bracket"></i>
+<span>Logout</span>
+</a>
+<a href="/about" id="aboutBtn">
+<i class="fa-solid fa-circle-info"></i>
+<span>About</span>
+</a>
+</div>
+<div class="user-profile">
+<div class="user-avatar" id="userAvatar">
+<img alt="Referee avatar" class="avatar-image" src="/images/official-avatar.png?v=2"/>
+</div>
+<div class="user-details">
+<div class="user-name" id="userName">
                     Loading...
                 </div>
-                <div id="userRole" class="user-role"></div>
-                <div
-                    id="environment-label"
-                    class="environment-label"
-                    hidden
-                ></div>
-            </div>
-        </div>
-    </nav>
-    </div>
-    <div
-        id="sportDeleteModal"
-        class="delete-modal-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="sportDeleteModalTitle"
-        aria-hidden="true"
-    >
-        <div class="delete-modal">
-            <div class="delete-modal-body">
-                <div class="delete-modal-header">
-                    <div class="delete-modal-icon">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </div>
-                    <div>
-                        <h2
-                            id="sportDeleteModalTitle"
-                            class="delete-modal-title"
-                        >
+<div class="user-role" id="userRole"></div>
+<div class="environment-label" hidden="" id="environment-label"></div>
+</div>
+</div>
+</nav>
+</div>
+
+<div aria-hidden="true" aria-labelledby="levelDeleteModalTitle" aria-modal="true" class="delete-modal-overlay" id="levelDeleteModal" role="dialog">
+<div class="delete-modal">
+<div class="delete-modal-body">
+<div class="delete-modal-header">
+<div class="delete-modal-icon">
+<i class="fa-solid fa-trash-can"></i>
+</div>
+<div>
+<h2 class="delete-modal-title" id="levelDeleteModalTitle">
                             Confirm deletion
                         </h2>
-                        <p class="delete-modal-subtitle">
+<p class="delete-modal-subtitle">
                             This action cannot be undone.
                         </p>
-                    </div>
-                </div>
-                <p class="delete-modal-message">
-                    You are about to permanently delete this sport.
-                </p>
-                <div
-                    id="sportDeleteName"
-                    class="delete-modal-record"
-                ></div>
-            </div>
-            <div class="delete-modal-footer">
-                <button
-                    id="cancelSportDeleteButton"
-                    class="delete-modal-button delete-modal-cancel"
-                    type="button"
-                >
-                    Cancel
-                </button>
-                <button
-                    id="confirmSportDeleteButton"
-                    class="delete-modal-button delete-modal-confirm"
-                    type="button"
-                >
-                    <i class="fa-solid fa-trash-can"></i>
-                    Delete
-                </button>
-            </div>
-        </div>
-    </div>
-    <div
-        id="levelDeleteModal"
-        class="delete-modal-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="levelDeleteModalTitle"
-        aria-hidden="true"
-    >
-        <div class="delete-modal">
-            <div class="delete-modal-body">
-                <div class="delete-modal-header">
-                    <div class="delete-modal-icon">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </div>
-                    <div>
-                        <h2
-                            id="levelDeleteModalTitle"
-                            class="delete-modal-title"
-                        >
-                            Confirm deletion
-                        </h2>
-                        <p class="delete-modal-subtitle">
-                            This action cannot be undone.
-                        </p>
-                    </div>
-                </div>
-                <p class="delete-modal-message">
+</div>
+</div>
+<p class="delete-modal-message">
                     You are about to permanently delete this level.
                 </p>
-                <div
-                    id="levelDeleteName"
-                    class="delete-modal-record"
-                ></div>
-            </div>
-            <div class="delete-modal-footer">
-                <button
-                    id="cancelLevelDeleteButton"
-                    class="delete-modal-button delete-modal-cancel"
-                    type="button"
-                >
+<div class="delete-modal-record" id="levelDeleteName"></div>
+</div>
+<div class="delete-modal-footer">
+<button class="delete-modal-button delete-modal-cancel" id="cancelLevelDeleteButton" type="button">
                     Cancel
                 </button>
-                <button
-                    id="confirmLevelDeleteButton"
-                    class="delete-modal-button delete-modal-confirm"
-                    type="button"
-                >
-                    <i class="fa-solid fa-trash-can"></i>
+<button class="delete-modal-button delete-modal-confirm" id="confirmLevelDeleteButton" type="button">
+<i class="fa-solid fa-trash-can"></i>
                     Delete
                 </button>
-            </div>
-        </div>
-    </div>
-    <main class="container">
-        <header class="page-header">
-            <h1>
-                <i class="fa-solid fa-gear"></i>
+</div>
+</div>
+</div>
+<main class="container">
+<header class="page-header">
+<h1>
+<i class="fa-solid fa-gear"></i>
                 Settings
             </h1>
-            <p>
-                Configure the sports and competition levels available
-                throughout Ref Ledger.
-            </p>
-        </header>
-        <div
-            id="messageBox"
-            class="message-box"
-            role="alert"
-            aria-live="polite"
-        ></div>
-        <section class="settings-card active-sports-card" aria-labelledby="activeSportsTitle">
-            <div class="card-header">
-                <i class="fa-solid fa-list-check" aria-hidden="true"></i>
-                <div>
-                    <h2 id="activeSportsTitle">Active Sports</h2>
-                    <p>Select from the currently active sports.</p>
-                </div>
-            </div>
-            <div class="card-body">
-                <fieldset id="activeSportsList" class="active-sports-list" aria-labelledby="activeSportsTitle"></fieldset>
-                <p id="activeSportsStatus" role="status" aria-live="polite">Loading active sports...</p>
-                <div class="role-actions">
-                    <button type="button" id="saveSupportedSports" class="btn btn-primary" disabled>Save</button>
-                    <button type="button" id="cancelSupportedSports" class="btn btn-secondary" disabled>Cancel</button>
-                </div>
-                <p id="supportedSportsMessage" role="status" aria-live="polite"></p>
-            </div>
-        </section>
-        <div class="settings-grid">
-            <!-- Sports card -->
-            <div id="adminSettingsPanels" class="settings-left-column" hidden>
+<p>Select your active sports and manage competition levels.</p>
+</header>
+<div aria-live="polite" class="message-box" id="messageBox" role="alert"></div>
+<section aria-labelledby="activeSportsTitle" class="settings-card active-sports-card">
+<div class="card-header">
+<i aria-hidden="true" class="fa-solid fa-list-check"></i>
+<div>
+<h2 id="activeSportsTitle">Active Sports</h2>
+<p>Select from the currently active sports.</p>
+</div>
+</div>
+<div class="card-body">
+<fieldset aria-labelledby="activeSportsTitle" class="active-sports-list" id="activeSportsList"></fieldset>
+<p aria-live="polite" id="activeSportsStatus" role="status">Loading active sports...</p>
+<div class="role-actions">
+<button class="btn btn-primary" disabled="" id="saveSupportedSports" type="button">Save</button>
+<button class="btn btn-secondary" disabled="" id="cancelSupportedSports" type="button">Cancel</button>
+</div>
+<p aria-live="polite" id="supportedSportsMessage" role="status"></p>
+</div>
+</section>
+<div class="settings-grid" style="grid-template-columns: minmax(0, 1fr)">
+<!-- Sports card -->
+
 <section class="settings-card">
-                <div class="card-header">
-                    <i class="fa-solid fa-basketball"></i>
-                    <div>
-                        <h2>Sports</h2>
-                        <p>Add and manage available sports.</p>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <form id="sportForm">
-                        <input
-                            id="sportOriginalId"
-                            type="hidden"
-                        >
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="sportName">
-                                    Sport name
-                                </label>
-                                <input
-                                    id="sportName"
-                                    class="form-control"
-                                    type="text"
-                                    maxlength="50"
-                                    placeholder="Example: Basketball"
-                                    required
-                                >
-                            </div>
-                            <button
-                                id="saveSportButton"
-                                class="btn btn-primary"
-                                type="submit"
-                            >
-                                <i class="fa-solid fa-plus"></i>
-                                Add Sport
-                            </button>
-                        </div>
-                        <button
-                            id="cancelSportEditButton"
-                            class="btn btn-secondary"
-                            type="button"
-                            hidden
-                        >
-                            Cancel Edit
-                        </button>
-                    </form>
-                    <hr class="section-divider">
-                    <div class="list-header">
-                        <h3>Configured Sports</h3>
-                        <span
-                            id="sportsCount"
-                            class="record-count"
-                        >
-                            0 sports
-                        </span>
-                    </div>
-                    <div class="settings-table-wrapper">
-                        <table class="settings-table">
-                            <thead>
-                                <tr>
-                                    <th>Sport</th>
-                                    <th>Status</th>
-                                    <th aria-label="Actions"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="sportsBody">
-                                <tr>
-                                    <td colspan="3" class="empty-row">
-                                        No sports have been configured.
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-<section class="settings-card official-roles-card" aria-labelledby="officialRolesTitle">
-                <div class="card-header">
-                    <i class="fa-solid fa-user-tag" aria-hidden="true"></i>
-                    <div><h2 id="officialRolesTitle">Official Roles</h2>
-                    <p>Choose a sport and define the official role titles.</p></div>
-                </div>
-                <div class="card-body">
-                    <div class="form-group">
-                        <label for="officialRolesSport">Sport</label>
-                        <select id="officialRolesSport" class="form-control">
-                            <option value="">Select a sport</option>
-                        </select>
-                    </div>
-                    <form id="officialRolesForm">
-                        <fieldset id="officialRolesFields" disabled style="border:0;min-width:0;">
-                            <p id="officialRolesEmpty">Select a sport to configure its roles.</p>
-                            <div id="officialRolesList"></div>
-                            <div class="role-actions">
-                                <button type="button" id="addOfficialRole" class="btn btn-secondary">Add Role</button>
-                                <button type="submit" id="saveOfficialRoles" class="btn btn-primary">Save Roles</button>
-                                <button type="button" id="clearOfficialRoles" class="btn btn-secondary">Clear</button>
-                            </div>
-                        </fieldset>
-                    </form>
-                    <p id="officialRolesMessage" role="status" aria-live="polite"></p>
-                </div>
-            </section>
-            </div>
-<section class="settings-card">
-                <div class="card-header">
-                    <i class="fa-solid fa-layer-group"></i>
-                    <div>
-                        <h2>Levels</h2>
-                        <p>Add and manage your available levels.</p>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <form id="levelForm">
-                        <input
-                            id="levelOriginalId"
-                            type="hidden"
-                        >
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="levelName">
+<div class="card-header">
+<i class="fa-solid fa-layer-group"></i>
+<div>
+<h2>Levels</h2>
+<p>Add and manage your available levels.</p>
+</div>
+</div>
+<div class="card-body">
+<form id="levelForm">
+<input id="levelOriginalId" type="hidden"/>
+<div class="form-row">
+<div class="form-group">
+<label for="levelName">
                                     Level name
                                 </label>
-                                <input
-                                    id="levelName"
-                                    class="form-control"
-                                    type="text"
-                                    maxlength="50"
-                                    placeholder="Example: Varsity"
-                                    required
-                                >
-                            </div>
-                            <button
-                                id="saveLevelButton"
-                                class="btn btn-primary"
-                                type="submit"
-                            >
-                                <i class="fa-solid fa-plus"></i>
+<input class="form-control" id="levelName" maxlength="50" placeholder="Example: Varsity" required="" type="text"/>
+</div>
+<button class="btn btn-primary" id="saveLevelButton" type="submit">
+<i class="fa-solid fa-plus"></i>
                                 Add Level
                             </button>
-                        </div>
-                        <button
-                            id="cancelLevelEditButton"
-                            class="btn btn-secondary"
-                            type="button"
-                            hidden
-                        >
+</div>
+<button class="btn btn-secondary" hidden="" id="cancelLevelEditButton" type="button">
                             Cancel Edit
                         </button>
-                    </form>
-                    <hr class="section-divider">
-                    <div class="list-header">
-                        <h3>Configured Levels</h3>
-                        <span
-                            id="levelsCount"
-                            class="record-count"
-                        >
+</form>
+<hr class="section-divider"/>
+<div class="list-header">
+<h3>Configured Levels</h3>
+<span class="record-count" id="levelsCount">
                             0 levels
                         </span>
-                    </div>
-                    <div class="settings-table-wrapper">
-                        <table class="settings-table">
-                            <thead>
-                                <tr>
-                                    <th>Level</th>
-                                    <th>Status</th>
-                                    <th aria-label="Actions"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="levelsBody">
-                                <tr>
-                                    <td colspan="3" class="empty-row">
+</div>
+<div class="settings-table-wrapper">
+<table class="settings-table">
+<thead>
+<tr>
+<th>Level</th>
+<th>Status</th>
+<th aria-label="Actions"></th>
+</tr>
+</thead>
+<tbody id="levelsBody">
+<tr>
+<td class="empty-row" colspan="3">
                                         No levels have been configured.
                                     </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-        </div>
-        <div class="settings-note">
-            <i class="fa-solid fa-circle-info"></i>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+</div>
+<div class="settings-note">
+<i class="fa-solid fa-circle-info"></i>
             Levels already used by games should be marked inactive
             instead of deleted. Inactive choices will remain on existing games
             but will not be available when creating new games.
         </div>
-    </main>
-    <script src="/components/navbar.js?v=12"></script>
-    <script>
-    
-        // navbar.js fills userRole from the signed-in user's session.
-        // Keep admin panels hidden until that role is available.
-        function updateAdminSettingsVisibility() {
-            const role = document.getElementById("userRole");
-            const isAdmin = (role?.textContent || "").trim().toLowerCase() === "admin";
-            document.getElementById("adminSettingsPanels").hidden = !isAdmin;
-        }
+</main>
 
-        const adminRoleObserver = new MutationObserver(
-            updateAdminSettingsVisibility
-        );
 
-        adminRoleObserver.observe(
-            document.getElementById("navbar-container"),
-            {
-                childList: true,
-                subtree: true,
-                characterData: true
-            }
-        );
-
-        updateAdminSettingsVisibility();
-
-        function showMessage(message, type = "info") {
+<script src="/components/navbar.js?v=12"></script><script>        function showMessage(message, type = "info") {
             const messageBox = document.getElementById("messageBox");
             messageBox.textContent = message;
             messageBox.className = `message-box ${type}`;
@@ -1064,6 +811,11 @@
                     "error"
                 );
             }
+        }
+        function escapeHtml(value) {
+            const element = document.createElement("div");
+            element.textContent = value ?? "";
+            return element.innerHTML;
         }
         async function loadSports() {
             try {
@@ -1253,59 +1005,7 @@
             });
             updateSupportedSportsButtons();
         }
-        function renderSports(sports) {
-            renderActiveSports(sports);
-            refreshOfficialRolesSports(sports);
-            const sportsBody =
-                document.getElementById("sportsBody");
-            const sportsCount =
-                document.getElementById("sportsCount");
-            sportsBody.innerHTML = "";
-            sportsCount.textContent =
-                `${sports.length} sport${sports.length === 1 ? "" : "s"}`;
-            if (sports.length === 0) {
-                sportsBody.innerHTML = `
-                    <tr>
-                        <td colspan="3" class="empty-row">
-                            No sports have been configured.
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            sports.forEach(sport => {
-                const row = document.createElement("tr");
-                row.innerHTML = `
-                    <td>${escapeHtml(sport.name)}</td>
-                    <td>
-                        ${createStatusToggle("sport", sport)}
-                    </td>
-                    <td>
-                        <div class="action-buttons">
-                            <button
-                                class="icon-button edit-button"
-                                type="button"
-                                title="Edit ${escapeHtml(sport.name)}"
-                                aria-label="Edit ${escapeHtml(sport.name)}"
-                                onclick="editSport('${sport.id}')"
-                            >
-                                <i class="fa-solid fa-pen"></i>
-                            </button>
-                            <button
-                                class="icon-button delete-button"
-                                type="button"
-                                title="Delete ${escapeHtml(sport.name)}"
-                                aria-label="Delete ${escapeHtml(sport.name)}"
-                                onclick="deleteSport('${sport.id}')"
-                            >
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                `;
-                sportsBody.appendChild(row);
-            });
-        }
+function renderSports(sports) { renderActiveSports(sports); }
         function renderLevels(levels) {
             const levelsBody =
                 document.getElementById("levelsBody");
@@ -1357,25 +1057,6 @@
                 levelsBody.appendChild(row);
             });
         }
-        function editSport(sportId) {
-            const sport = sports.find(
-                item => item.id === sportId
-            );
-            if (!sport) {
-                return;
-            }
-            document.getElementById("sportOriginalId").value =
-                sport.id;
-            document.getElementById("sportName").value =
-                sport.name;
-            document.getElementById("saveSportButton").innerHTML = `
-                <i class="fa-solid fa-floppy-disk"></i>
-                Save Sport
-            `;
-            document.getElementById(
-                "cancelSportEditButton"
-            ).hidden = false;
-        }
         function editLevel(levelId) {
             const level = levels.find(
                 item => item.id === levelId
@@ -1394,132 +1075,6 @@
             document.getElementById(
                 "cancelLevelEditButton"
             ).hidden = false;
-        }
-        let sportPendingDeletion = null;
-        function deleteSport(sportId) {
-            sportPendingDeletion = sports.find(
-                item => item.id === sportId
-            );
-            if (!sportPendingDeletion) {
-                return;
-            }
-            document.getElementById("sportDeleteName").textContent =
-                sportPendingDeletion.name;
-            const modal =
-                document.getElementById("sportDeleteModal");
-            modal.classList.add("open");
-            modal.setAttribute("aria-hidden", "false");
-            document.getElementById(
-                "confirmSportDeleteButton"
-            ).focus();
-        }
-        function closeSportDeleteModal() {
-            const modal =
-                document.getElementById("sportDeleteModal");
-            modal.classList.remove("open");
-            modal.setAttribute("aria-hidden", "true");
-            sportPendingDeletion = null;
-        }
-        async function confirmSportDelete() {
-            if (!sportPendingDeletion) {
-                return;
-            }
-            if (rolesBusy) {
-                showMessage("Wait for the official roles operation to finish before deleting a sport.", "info");
-                return;
-            }
-            const sport = sportPendingDeletion;
-            const confirmButton = document.getElementById(
-                "confirmSportDeleteButton"
-            );
-            confirmButton.disabled = true;
-            confirmButton.innerHTML = `
-                <i class="fa-solid fa-spinner fa-spin"></i>
-                Deleting...
-            `;
-            try {
-                const params = new URLSearchParams({
-                    id: sport.id
-                });
-                const response = await fetch(
-                    `/api/sports?${params.toString()}`,
-                    {
-                        method: "DELETE"
-                    }
-                );
-                if (response.status === 401 || response.redirected) {
-                    window.location.href = "/login";
-                    return;
-                }
-                if (response.status === 403) {
-                    closeSportDeleteModal();
-                    showMessage(
-                        "Permission denied. You cannot delete sports.",
-                        "error"
-                    );
-                    return;
-                }
-                const responseText = await response.text();
-                let responseData = {};
-                if (responseText) {
-                    try {
-                        responseData = JSON.parse(responseText);
-                    } catch {
-                        responseData = {};
-                    }
-                }
-                if (!response.ok) {
-                    throw new Error(
-                        responseData.message ||
-                        responseText.trim() ||
-                        `Unable to delete ${sport.name}.`
-                    );
-                }
-                let roleCleanupError = "";
-                // Only delete role settings after the sport deletion succeeds.
-                rolesBusy = true;
-                ++roleRequestNumber;
-                renderOfficialRoleRows();
-                try {
-                    await officialRolesRequest(
-                        `${officialRolesEndpoint}?${new URLSearchParams({ sport: sport.name })}`,
-                        { method: "DELETE" }
-                    );
-                } catch (error) {
-                    roleCleanupError = error.message || "Unable to delete official roles.";
-                } finally {
-                    rolesBusy = false;
-                    roleDrafts.delete(sport.name);
-                    if (selectedRoleSport === sport.name) {
-                        selectedRoleSport = "";
-                        document.getElementById("officialRolesSport").value = "";
-                        roleMessage("");
-                    }
-                    renderOfficialRoleRows();
-                }
-                await loadSports();
-                resetSportForm();
-                closeSportDeleteModal();
-                showMessage(
-                    roleCleanupError
-                        ? `${sport.name} was deleted, but its official role settings could not be deleted: ${roleCleanupError}`
-                        : `${sport.name} and its official role settings deleted successfully.`,
-                    roleCleanupError ? "error" : "success"
-                );
-            } catch (error) {
-                closeSportDeleteModal();
-                showMessage(
-                    error.message ||
-                    `Unable to delete ${sport.name}.`,
-                    "error"
-                );
-            } finally {
-                confirmButton.disabled = false;
-                confirmButton.innerHTML = `
-                    <i class="fa-solid fa-trash-can"></i>
-                    Delete
-                `;
-            }
         }
         let levelPendingDeletion = null;
         function deleteLevel(levelId) {
@@ -1620,17 +1175,6 @@
                 `;
             }
         }
-        function resetSportForm() {
-            document.getElementById("sportForm").reset();
-            document.getElementById("sportOriginalId").value = "";
-            document.getElementById("saveSportButton").innerHTML = `
-                <i class="fa-solid fa-plus"></i>
-                Add Sport
-            `;
-            document.getElementById(
-                "cancelSportEditButton"
-            ).hidden = true;
-        }
         function resetLevelForm() {
             document.getElementById("levelForm").reset();
             document.getElementById("levelOriginalId").value = "";
@@ -1642,74 +1186,6 @@
                 "cancelLevelEditButton"
             ).hidden = true;
         }
-        function escapeHtml(value) {
-            const element = document.createElement("div");
-            element.textContent = value ?? "";
-            return element.innerHTML;
-        }
-        document
-            .getElementById("sportForm")
-            .addEventListener("submit", async event => {
-                event.preventDefault();
-                const sportName = document
-                    .getElementById("sportName")
-                    .value
-                    .trim();
-                if (!sportName) {
-                    showMessage("Sport name is required.", "error");
-                    return;
-                }
-                const saveButton =
-                    document.getElementById("saveSportButton");
-                saveButton.disabled = true;
-                showMessage("Adding sport...", "info");
-                try {
-                    const response = await fetch("/api/sports", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            id: sportName,
-                            name: sportName,
-                            active: false
-                        })
-                    });
-                    if (response.status === 401) {
-                        window.location.href = "/login";
-                        return;
-                    }
-                    const responseText = await response.text();
-                    let responseData = {};
-                    if (responseText) {
-                        try {
-                            responseData = JSON.parse(responseText);
-                        } catch {
-                            responseData = {};
-                        }
-                    }
-                    if (!response.ok) {
-                        throw new Error(
-                            responseData.message ||
-                            responseText.trim() ||
-                            "Unable to add sport."
-                        );
-                    }
-                    await loadSports();
-                    resetSportForm();
-                    showMessage(
-                        "Sport added as inactive. Add its official roles, then activate the sport.",
-                        "success"
-                    );
-                } catch (error) {
-                    showMessage(
-                        error.message || "Unable to add sport.",
-                        "error"
-                    );
-                } finally {
-                    saveButton.disabled = false;
-                }
-            });
         document
             .getElementById("levelForm")
             .addEventListener("submit", async event => {
@@ -1774,17 +1250,8 @@
                 }
             });
         document
-            .getElementById("cancelSportEditButton")
-            .addEventListener("click", resetSportForm);
-        document
             .getElementById("cancelLevelEditButton")
             .addEventListener("click", resetLevelForm);
-        document
-            .getElementById("cancelSportDeleteButton")
-            .addEventListener("click", closeSportDeleteModal);
-        document
-            .getElementById("confirmSportDeleteButton")
-            .addEventListener("click", confirmSportDelete);
         document
             .getElementById("cancelLevelDeleteButton")
             .addEventListener("click", closeLevelDeleteModal);
@@ -1792,233 +1259,15 @@
             .getElementById("confirmLevelDeleteButton")
             .addEventListener("click", confirmLevelDelete);
         document
-            .getElementById("sportDeleteModal")
-            .addEventListener("click", event => {
-                if (event.target.id === "sportDeleteModal") {
-                    closeSportDeleteModal();
-                }
-            });
-        document
             .getElementById("levelDeleteModal")
             .addEventListener("click", event => {
                 if (event.target.id === "levelDeleteModal") {
                     closeLevelDeleteModal();
                 }
             });
-        document.addEventListener("keydown", event => {
-            if (event.key !== "Escape") {
-                return;
-            }
-            if (
-                document
-                    .getElementById("sportDeleteModal")
-                    .classList.contains("open")
-            ) {
-                closeSportDeleteModal();
-            }
-            if (
-                document
-                    .getElementById("levelDeleteModal")
-                    .classList.contains("open")
-            ) {
-                closeLevelDeleteModal();
-            }
-        });
-        // Backend contract (tenantId must come from the authenticated session):
-        // GET /api/settings/official-roles?sport=Basketball -> { sport, roles: [...] }
-        // GET returns 404 when this sport has no configuration yet.
-        // PUT /api/settings/official-roles with { sport, roles: [...] } -> 2xx.
-        // DELETE /api/settings/official-roles?sport=Basketball -> 2xx, even if no roles exist.
-        // Update only this sport's officialRoles entry; preserve other settings.
-        // Generate stable role IDs on creation; validate sport ownership and titles.
-        const officialRolesEndpoint = "/api/settings/official-roles";
-        const roleDrafts = new Map();
-        let selectedRoleSport = "";
-        let roleRequestNumber = 0;
-        let rolesBusy = false;
-        function roleMessage(message, type = "info") {
-            const element = document.getElementById("officialRolesMessage");
-            element.textContent = message;
-            element.dataset.type = type;
-        }
-        function refreshOfficialRolesSports(availableSports) {
-            const select = document.getElementById("officialRolesSport");
-            const previous = select.value;
-            select.replaceChildren(new Option("Select a sport", ""));
-            const names = new Set();
-            availableSports.forEach(sport => {
-                if (!sport.name || names.has(sport.name)) return;
-                names.add(sport.name);
-                select.add(new Option(sport.name + (sport.active ? "" : " (inactive)"), sport.name));
-            });
-            select.value = names.has(previous) ? previous : "";
-            if (previous && !select.value) {
-                selectedRoleSport = "";
-                ++roleRequestNumber;
-                rolesBusy = false;
-                renderOfficialRoleRows();
-                roleMessage("Select an available sport to configure its roles.");
-            }
-        }
-        function renderOfficialRoleRows(focusIndex = -1) {
-            const list = document.getElementById("officialRolesList");
-            list.replaceChildren();
-            const roles = roleDrafts.get(selectedRoleSport) || [];
-            document.getElementById("officialRolesFields").disabled = !selectedRoleSport || rolesBusy;
-            document.getElementById("officialRolesSport").disabled = rolesBusy;
-            const empty = document.getElementById("officialRolesEmpty");
-            empty.hidden = roles.length > 0;
-            empty.textContent = selectedRoleSport ? "No roles defined. Click Add Role to begin." : "Select a sport to configure its roles.";
-            roles.forEach((role, index) => {
-                const row = document.createElement("div");
-                row.className = "role-row";
-                const input = document.createElement("input");
-                input.className = "form-control";
-                input.type = "text";
-                input.required = true;
-                input.value = role.title;
-                input.placeholder = "Enter role title";
-                input.setAttribute("aria-label", `Role ${index + 1} title`);
-                input.addEventListener("input", () => { role.title = input.value; });
-                row.append(input);
-                const statusWrapper = document.createElement("div");
-                statusWrapper.className = "status-toggle-wrapper";
-                const statusLabel = document.createElement("label");
-                statusLabel.className = "status-toggle";
-                const checkbox = document.createElement("input");
-                checkbox.type = "checkbox";
-                checkbox.setAttribute("role", "switch");
-                checkbox.checked = role.active ?? true;
-                role.active = checkbox.checked;
-                const slider = document.createElement("span");
-                slider.className = "status-toggle-slider";
-                slider.setAttribute("aria-hidden", "true");
-                const statusText = document.createElement("span");
-                statusText.className = "status-toggle-text";
-                const updateRoleStatusLabel = () => {
-                    const name = role.title.trim() || `Role ${index + 1}`;
-                    statusText.textContent = checkbox.checked ? "Active" : "Inactive";
-                    statusLabel.title = `Set ${name} ${checkbox.checked ? "inactive" : "active"}`;
-                    checkbox.setAttribute("aria-label", `${name} is ${statusText.textContent}. Toggle status.`);
-                };
-                checkbox.addEventListener("change", () => {
-                    role.active = checkbox.checked;
-                    updateRoleStatusLabel();
-                    roleMessage("Role status changed. Click Save Roles to save your changes.");
-                });
-                input.addEventListener("input", updateRoleStatusLabel);
-                updateRoleStatusLabel();
-                statusLabel.append(checkbox, slider);
-                statusWrapper.append(statusLabel, statusText);
-                row.append(statusWrapper);
-                const button = (label, text, disabled, action) => {
-                    const element = document.createElement("button");
-                    element.type = "button";
-                    element.className = "btn btn-secondary";
-                    element.textContent = text;
-                    element.title = label;
-                    element.setAttribute("aria-label", label);
-                    element.disabled = disabled;
-                    element.addEventListener("click", action);
-                    row.append(element);
-                };
-                button(`Move role ${index + 1} up`, "↑", index === 0, () => {
-                    [roles[index - 1], roles[index]] = [roles[index], roles[index - 1]];
-                    renderOfficialRoleRows(index - 1);
-                });
-                button(`Move role ${index + 1} down`, "↓", index === roles.length - 1, () => {
-                    [roles[index + 1], roles[index]] = [roles[index], roles[index + 1]];
-                    renderOfficialRoleRows(index + 1);
-                });
-                button(`Remove role ${index + 1}`, "Remove", false, () => {
-                    roles.splice(index, 1);
-                    renderOfficialRoleRows(Math.min(index, roles.length - 1));
-                });
-                list.append(row);
-                if (index === focusIndex) input.focus();
-            });
-        }
-        async function officialRolesRequest(url, options = {}) {
-            const response = await fetch(url, options);
-            if (response.status === 401 || response.redirected) {
-                window.location.href = "/login";
-                throw new Error("Please sign in again.");
-            }
-            const text = await response.text();
-            let data = {};
-            try { data = text ? JSON.parse(text) : {}; } catch {}
-            if (response.status === 404 && (!options.method || options.method === "GET")) return { roles: [] };
-            if (!response.ok) throw new Error(data.message || data.error || `Unable to access official role settings (${response.status}).`);
-            if ((!options.method || options.method === "GET") && !Array.isArray(data.roles)) {
-                throw new Error("The official roles response must contain a roles array.");
-            }
-            return data;
-        }
-        document.getElementById("officialRolesSport").addEventListener("change", async event => {
-            selectedRoleSport = event.target.value;
-            const sport = selectedRoleSport;
-            const request = ++roleRequestNumber;
-            roleMessage("");
-            if (!sport || roleDrafts.has(sport)) { renderOfficialRoleRows(); return; }
-            rolesBusy = true;
-            renderOfficialRoleRows();
-            roleMessage("Loading official roles...");
-            try {
-                const data = await officialRolesRequest(`${officialRolesEndpoint}?${new URLSearchParams({ sport })}`);
-                if (request !== roleRequestNumber) return;
-                roleDrafts.set(sport, data.roles.map(role => ({ ...role, title: String(role.title ?? "") }))
-                    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)));
-                roleMessage("");
-            } catch (error) {
-                if (request !== roleRequestNumber) return;
-                // Do not enable Save after a failed load, which could overwrite existing roles.
-                selectedRoleSport = "";
-                document.getElementById("officialRolesSport").value = "";
-                roleMessage(error.message, "error");
-            } finally {
-                if (request === roleRequestNumber) { rolesBusy = false; renderOfficialRoleRows(); }
-            }
-        });
-        document.getElementById("clearOfficialRoles").addEventListener("click", () => {
-            if (rolesBusy) return;
-            roleDrafts.delete(selectedRoleSport);
-            selectedRoleSport = "";
-            ++roleRequestNumber;
-            document.getElementById("officialRolesSport").value = "";
-            renderOfficialRoleRows();
-            roleMessage("");
-        });
-        document.getElementById("addOfficialRole").addEventListener("click", () => {
-            if (!selectedRoleSport || rolesBusy) return;
-            const roles = roleDrafts.get(selectedRoleSport);
-            roles.push({ roleId: crypto.randomUUID(), title: "", active: true });
-            renderOfficialRoleRows(roles.length - 1);
-            roleMessage("");
-        });
-        document.getElementById("officialRolesForm").addEventListener("submit", async event => {
-            event.preventDefault();
-            if (!selectedRoleSport || rolesBusy) return;
-            const sport = selectedRoleSport;
-            const roles = roleDrafts.get(sport).map((role, index) => ({
-                ...role, title: role.title.trim(), displayOrder: index + 1
-            }));
-            if (roles.some(role => !role.title)) { roleMessage("Enter a title for every role.", "error"); return; }
-            const titles = roles.map(role => role.title.toLowerCase());
-            if (new Set(titles).size !== titles.length) { roleMessage("Role titles must be unique within this sport.", "error"); return; }
-            if (!roles.length && !window.confirm(`Save ${sport} with no official roles?`)) return;
-            rolesBusy = true;
-            renderOfficialRoleRows();
-            roleMessage("Saving official roles...");
-            try {
-                await officialRolesRequest(officialRolesEndpoint, {
-                    method: "PUT", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sport, roles })
-                });
-                roleDrafts.set(sport, roles);
-                roleMessage(`Official roles saved for ${sport}.`, "success");
-            } catch (error) { roleMessage(error.message, "error"); }
-            finally { rolesBusy = false; renderOfficialRoleRows(); }
-        });
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeLevelDeleteModal();
+});
         async function loadSupportedSports() {
             supportedSportsLoaded = false;
             updateSupportedSportsButtons();
@@ -2060,6 +1309,5 @@
             await loadLevels();
         }
         initializeSettings();
-    </script>
-</body>
+</script></body>
 </html>

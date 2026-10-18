@@ -2,178 +2,148 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Create Account - Ref Ledger</title>
-
 <style>
-body {
-    margin: 0;
-    font-family: Arial, Helvetica, sans-serif;
-    background: #f4f6f9;
-    color: #0f172a;
-}
-
-.container {
-    max-width: 420px;
-    margin: 80px auto;
-    background: white;
-    padding: 30px;
-    border-radius: 10px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
-}
-
-h1 {
-    text-align: center;
-    color: #082b4f;
-}
-
-label {
-    display: block;
-    margin-top: 15px;
-    font-weight: bold;
-}
-
-input {
-    width: 100%;
-    padding: 10px;
-    margin-top: 6px;
-    box-sizing: border-box;
-}
-
-button {
-    width: 100%;
-    margin-top: 20px;
-    padding: 12px;
-    background: #082b4f;
-    color: white;
-    border: none;
-    cursor: pointer;
-    font-size: 16px;
-}
-
-button:hover {
-    background: #0b3d70;
-}
-
-#message {
-    margin-top: 15px;
-    font-weight: bold;
-    text-align: center;
-    color: #b00020;
-}
-
-.login-link {
-    text-align: center;
-    margin-top: 18px;
-}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f4f6f9; color: #0f172a; line-height: 1.6; }
+[hidden] { display: none !important; }
+.container { max-width: 460px; margin: 60px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+.container.introduction { max-width: 800px; }
+h1 { text-align: center; color: #082b4f; line-height: 1.25; }
+label { display: block; margin-top: 15px; font-weight: bold; }
+input { width: 100%; padding: 10px; margin-top: 6px; font: inherit; }
+button, .button { display: block; width: 100%; margin-top: 20px; padding: 12px; background: #082b4f; color: white; border: none; border-radius: 5px; cursor: pointer; font: inherit; text-align: center; text-decoration: none; }
+button:hover, .button:hover { background: #0b3d70; }
+button:disabled { opacity: .65; cursor: wait; }
+:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+#message { margin-top: 15px; font-weight: bold; text-align: center; color: #b00020; }
+.login-link, .welcome { text-align: center; }
+.login-link { margin-top: 18px; }
+.success { color: #166534; font-weight: bold; text-align: center; }
+ol { padding-left: 28px; }
+li { margin: 20px 0; padding-left: 6px; }
+h2 { font-size: 19px; color: #082b4f; margin: 0 0 5px; }
+p { margin: 6px 0; }
+.note { padding: 16px; background: #eef4fb; border-left: 4px solid #082b4f; border-radius: 4px; }
+@media (max-width: 600px) { .container { margin: 20px 12px; padding: 22px; } }
 </style>
 </head>
-
 <body>
+<main class="container" id="accountContainer">
+    <section id="signupSection" aria-labelledby="signupHeading">
+        <h1 id="signupHeading">Create Account</h1>
+        <form id="createAccountForm">
+            <label for="username">Email Address</label>
+            <input type="email" id="username" name="username" placeholder="Email Address" autocomplete="username" required>
+            <label for="name">Name</label>
+            <input id="name" name="name" type="text" autocomplete="name" required>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="new-password" required>
+            <label for="confirmPassword">Confirm Password</label>
+            <input id="confirmPassword" name="confirmPassword" type="password" autocomplete="new-password" required>
+            <button type="submit" id="createAccountButton">Create Account</button>
+        </form>
+        <div id="message" role="status" aria-live="polite"></div>
+        <div class="login-link">Already have an account? <a href="/login">Login</a></div>
+    </section>
 
-<div class="container">
-    <h1>Create Account</h1>
-
-    <form id="createAccountForm">
-        <label for="username">Email Address</label>
-        <input
-            type="email"
-            id="username"
-            name="username"
-            placeholder="Email Address"
-            required
-        >
-
-        <label for="name">Name</label>
-        <input
-            id="name"
-            type="text"
-            required
-        >
-        <label for="password">Password</label>
-        <input
-            id="password"
-            type="password"
-            required
-        >
-
-        <label for="confirmPassword">Confirm Password</label>
-        <input
-            id="confirmPassword"
-            type="password"
-            required
-        >
-
-        <button type="submit">Create Account</button>
-    </form>
-
-    <div id="message"></div>
-
-    <div class="login-link">
-        Already have an account?
-        <a href="/login">Login</a>
-    </div>
-</div>
-
+    <section id="introductionSection" aria-labelledby="introductionHeading" hidden>
+        <p class="success">Your account has been created successfully.</p>
+        <h1 id="introductionHeading" tabindex="-1">Welcome to Ref Ledger!</h1>
+        <p class="welcome">Before adding your first game, sign in and set up the information you will use to track your officiating.</p>
+        <ol>
+            <li>
+                <h2>Set up your associations</h2>
+                <p>Open Associations and add each organization you officiate for. Enter the association name and any other details requested, then save it.</p>
+                <p>You will select an association when recording games, payments, and expenses.</p>
+            </li>
+            <li>
+                <h2>Add your officials</h2>
+                <p>Open Officials and add yourself and the officials you work with. Enter each official's name and available contact information, then save the record.</p>
+                <p>These officials will be available when assigning the officiating crew to a game.</p>
+            </li>
+            <li>
+                <h2>Add your sites</h2>
+                <p>Open Sites and add the schools, parks, gyms, or other locations where you officiate. Save each site using a name you will recognize when entering a game.</p>
+            </li>
+            <li>
+                <h2>Select your sports</h2>
+                <p>Open Settings, find the sports selection, and select the sports you officiate, such as Basketball or Softball. Save your selections.</p>
+                <p>Your selected sports will be available when adding or updating games.</p>
+            </li>
+            <li>
+                <h2>Set up your levels</h2>
+                <p>Open Levels and add the competition levels you officiate, such as Junior Varsity, Varsity, or College. Save each level so you can select it when entering games.</p>
+            </li>
+        </ol>
+        <div class="note"><strong>Ready to get started?</strong> Continue to Login and sign in with the email address and password you just created. Complete these setup steps, then open Games to add your first game. Use the Dashboard to review and manage your schedule.</div>
+        <a class="button" href="/login">Continue to Login</a>
+    </section>
+</main>
 <script>
-document
-    .getElementById("createAccountForm")
-    .addEventListener("submit", createAccount);
+const form = document.getElementById("createAccountForm");
+const submitButton = document.getElementById("createAccountButton");
+const messageBox = document.getElementById("message");
+let submitting = false;
+let accountCreated = false;
+
+form.addEventListener("submit", createAccount);
 
 async function createAccount(event) {
     event.preventDefault();
-
-    const form = event.target;
-
-    // Trigger browser validation (including email validation)
-    if (!form.reportValidity()) {
-        return;
-    }
+    if (submitting || accountCreated || !form.reportValidity()) return;
 
     const username = document.getElementById("username").value.trim().toLowerCase();
     const name = document.getElementById("name").value.trim();
     const password = document.getElementById("password").value;
     const confirmPassword = document.getElementById("confirmPassword").value;
-    const messageBox = document.getElementById("message");
+    messageBox.textContent = "";
 
-    messageBox.innerText = "";
-
-    if (password !== confirmPassword) {
-        messageBox.innerText = "Passwords do not match.";
+    if (!username || !name) {
+        messageBox.textContent = "Email address and name are required.";
         return;
     }
+    if (password !== confirmPassword) {
+        messageBox.textContent = "Passwords do not match.";
+        return;
+    }
+
+    submitting = true;
+    submitButton.disabled = true;
+    submitButton.textContent = "Creating Account...";
 
     try {
         const response = await fetch("/api/createAccount", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                username: username,
-                name: name,
-                password: password
-            })
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, name, password })
         });
 
-        const data = await response.json();
-
-        if (response.ok) {
-            messageBox.style.color = "green";
-            messageBox.innerText = "Account created. Redirecting to login...";
-
-            setTimeout(() => {
-                window.location.href = "/login";
-            }, 1000);
-        } else {
-            messageBox.style.color = "#b00020";
-            messageBox.innerText = data.message || "Error creating account.";
+        if (!response.ok) {
+            let data = {};
+            try { data = await response.json(); } catch (_) { /* Use fallback message. */ }
+            messageBox.textContent = typeof data.message === "string"
+                ? data.message : "Error creating account.";
+            return;
         }
+
+        accountCreated = true;
+        form.reset();
+        document.getElementById("signupSection").hidden = true;
+        document.getElementById("introductionSection").hidden = false;
+        document.getElementById("accountContainer").classList.add("introduction");
+        document.title = "Welcome - Ref Ledger";
+        window.scrollTo(0, 0);
+        document.getElementById("introductionHeading").focus();
     } catch (err) {
-        messageBox.style.color = "#b00020";
-        messageBox.innerText = "Unable to contact server.";
+        messageBox.textContent = "Unable to contact server. If you may have already submitted this form, try logging in before submitting again.";
+    } finally {
+        submitting = false;
+        submitButton.disabled = accountCreated;
+        submitButton.textContent = "Create Account";
     }
 }
 </script>
-
 </body>
 </html>
