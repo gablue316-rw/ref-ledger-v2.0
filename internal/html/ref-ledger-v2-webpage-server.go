@@ -5094,11 +5094,12 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
-	tId, err := getTenantId(r)
-	if err != nil {
-		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-		return
-	}
+
+    tId, err := getTenantId(r)
+    if err != nil || tId == "" || tId == "na" {
+	    http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+	    return
+    }
 
 	LogVisitor(r)
 	var game Game
@@ -5114,6 +5115,14 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Updating game with game id", utils.ConvertIntToStr(game.GameId), "for association", game.Association)
 
+	fmt.Printf(
+   	    "UpdateGame lookup: database=%q gameId=%d association=%q tenantId=%q\n",
+	    database.Database,
+	    game.GameId,
+	    game.Association,
+	    tId,
+    )
+	
 	singleGameDesc, err = gc.Get(game.Association, utils.ConvertIntToStr(game.GameId), tId)
 	if err != nil {
 		fmt.Println(err)
@@ -5134,44 +5143,60 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	singleGameDesc = GameDocToGameDescr(game)
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
-		api.DelGame(context.TODO(), singleGameDesc.GameId)
+		api.DelGame(context.TODO(), singleGameDesc.GameId,tId)
 		return
 	}
 
 	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
-	var gDoc model.GameDoc = model.GameDoc{}
-
-	gDoc.GameId = int64(game.GameId)
-	gDoc.Association = game.Association
-
-	checkForDup := false
-	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup,tId)
+	
+	err = api.ValidateGameDescriptor(
+	    r.Context(),
+	    singleGameDesc,
+	    false,
+	    tId,
+    )
+    
 	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "Invalid Game", http.StatusBadRequest)
-		return
-	}
+	    fmt.Printf(
+		    "UpdateGame validation failed: gameId=%d sport=%q level=%q error=%v\n",
+		    game.GameId,
+		    game.Sport,
+		    game.Level,
+		    err,
+	    )
+	    http.Error(
+		    w,
+		    "Invalid Game: "+err.Error(),
+		    http.StatusBadRequest,
+	    )
+	    return
+    }
 
-	gameExists, err := database.GameExists(gDoc)
-
+	err = database.UpdateOneGameDoc(
+		r.Context(),
+		singleGameDesc,
+		database.Database,
+		"games",
+		tId,
+	)
 	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "Invalid Game", http.StatusBadRequest)
+		fmt.Printf(
+			"UpdateGame failed: database=%q gameId=%q association=%q tenantId=%q error=%v\n",
+			database.Database,
+			singleGameDesc.GameId,
+			singleGameDesc.Association,
+			tId,
+			err,
+		)
+		http.Error(
+			w,
+			"Unable to update game",
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
-	if gameExists {
-		err = database.UpdateOneGameDoc(context.TODO(), singleGameDesc, database.Database, "games", tId)
-		if err != nil {
-			fmt.Println(err)
-			http.Error(w, "Invalid Game", http.StatusBadRequest)
-			return
-		}
-		return
-	}
-
-	http.Error(w, "Game not found", http.StatusBadRequest)
-
+	w.WriteHeader(http.StatusOK)
 }
 
 func SaveGame(w http.ResponseWriter, r *http.Request) {
@@ -5208,7 +5233,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
-		api.DelGame(context.TODO(), singleGameDesc.GameId)
+		api.DelGame(context.TODO(), singleGameDesc.GameId,tId)
 		return
 	}
 

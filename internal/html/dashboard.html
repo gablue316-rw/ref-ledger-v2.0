@@ -3250,19 +3250,32 @@ async function saveEditedGame(event) {
         }
 
         closeEditGame();
+    } catch (err) {
+        console.error("Failed to update game:", err);
+        showEditGameError(
+            err.message || `Failed to update game ${gameId}.`
+        );
+        return;
+    } finally {
+        saveButton.disabled = false;
+    }
+
+    try {
         await loadGames();
 
         if (typeof loadPendingGames === "function") {
             await loadPendingGames();
         }
-
-        showMessage(`Game ${gameId} updated successfully.`, "info");
     } catch (err) {
-        console.error("Failed to update game:", err);
-        showEditGameError(err.message || `Failed to update game ${gameId}.`);
-    } finally {
-        saveButton.disabled = false;
+        console.error("Game saved, but refresh failed:", err);
+        showMessage(
+            `Game ${gameId} was saved, but the page could not refresh. Reload the page.`,
+            "info"
+        );
+        return;
     }
+
+    showMessage(`Game ${gameId} updated successfully.`, "info");
 }
 
 document.getElementById("editGameForm").addEventListener("submit", saveEditedGame);
