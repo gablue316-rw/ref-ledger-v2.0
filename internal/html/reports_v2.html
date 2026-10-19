@@ -1274,27 +1274,11 @@ async function loadLevels() {
                 text = value;
             }
             else if (level && typeof level === "object") {
+                // Games store the level name; IDs identify Settings records only.
                 value = String(
-                    level.id ??
-                    level.ID ??
-                    level.levelId ??
-                    level.LevelId ??
-                    level.levelID ??
-                    level.LevelID ??
-                    level.name ??
-                    level.Name ??
-                    level.level ??
-                    level.Level ??
-                    ""
+                    level.name ?? level.Name ?? level.level ?? level.Level ?? ""
                 ).trim();
-
-                text = String(
-                    level.name ??
-                    level.Name ??
-                    level.level ??
-                    level.Level ??
-                    value
-                ).trim();
+                text = value;
             }
 
             if (value !== "" && !seenLevels.has(value)) {

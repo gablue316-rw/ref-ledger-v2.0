@@ -109,12 +109,12 @@ body{padding:10px;}
 </div>
 </div>
 <div class="card">
-<div class="card-title">Location & Sport</div>
+<div class="card-title">Sport and Location</div>
 <div class="form-grid">
 <div class="form-group">
-    <label for="site">Site</label>
-    <select id="site">
-        <option value="">Select Site</option>
+    <label for="sport">Sport</label>
+    <select id="sport" disabled>
+        <option value="">Select Sport</option>
     </select>
 </div>
 <div class="form-group">
@@ -123,15 +123,15 @@ body{padding:10px;}
         <option value="">Select Level</option>
     </select>
 </div>
-<div class="form-group"><label for="home">Home</label><input type="text" id="home" value="TBD"></div>
-<div class="form-group"><label for="visitor">Visitor</label><input type="text" id="visitor" value="TBD"></div>
-<div class="form-group"><label for="field">Field</label><input type="text" id="field"></div>
 <div class="form-group">
-    <label for="sport">Sport</label>
-    <select id="sport" disabled>
-        <option value="">Select Sport</option>
+    <label for="site">Site</label>
+    <select id="site">
+        <option value="">Select Site</option>
     </select>
 </div>
+<div class="form-group"><label for="field">Field</label><input type="text" id="field"></div>
+<div class="form-group"><label for="home">Home</label><input type="text" id="home" value="TBD"></div>
+<div class="form-group"><label for="visitor">Visitor</label><input type="text" id="visitor" value="TBD"></div>
 </div>
 </div>
 <div class="card">
@@ -151,7 +151,7 @@ body{padding:10px;}
     <span class="role-hint-icon" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
     <div>
         <span class="role-hint-title">Official fields follow your sport</span>
-        <span id="officialRolesMessage" class="role-hint-message">Choose a sport in Location &amp; Sport. Its official fields will appear here automatically.</span>
+        <span id="officialRolesMessage" class="role-hint-message">Choose a sport in Sport and Location. Its official fields will appear here automatically.</span>
     </div>
 </div>
 <div id="officialFields" class="official-fields form-grid" aria-label="Sport official assignments"></div>
@@ -263,7 +263,7 @@ function resetOfficialFields() {
     rolesReady = false;
     roleFields = [];
     document.getElementById("officialFields").replaceChildren();
-    roleHint("Choose a sport in Location & Sport. Its official fields will appear here automatically.");
+    roleHint("Choose a sport in Sport and Location. Its official fields will appear here automatically.");
     updateActionButtons();
 }
 function normalizeRole(role) {
@@ -415,7 +415,7 @@ async function loadSportOfficialRoles(sport, game = null) {
     roleFields = [];
     document.getElementById("officialFields").replaceChildren();
     updateActionButtons();
-    if (!sport) { roleHint("Choose a sport in Location & Sport. Its official fields will appear here automatically."); return false; }
+    if (!sport) { roleHint("Choose a sport in Sport and Location. Its official fields will appear here automatically."); return false; }
     roleHint(`Loading official roles for ${sport}...`);
     try {
         if (officialsLoadError) throw new Error(officialsLoadError);
@@ -476,6 +476,8 @@ function ensureSelectedValue(id, value) {
 }
 document.getElementById("sport").addEventListener("change", async function () {
     formRevision++;
+    populateSportLevels();
+    document.getElementById("gameFee").value = "0.00";
     await loadSportOfficialRoles(this.value);
 });
 document
@@ -569,31 +571,45 @@ async function loadAssociations() {
         console.error("Error loading associations:", err);
     }
 }
+// /api/levels returns gameFee as a dollar string, converted from stored cents.
+function formatLevelGameFee(value) {
+    const amount = Number(value ?? 0);
+    return Number.isFinite(amount) && amount >= 0 ? amount.toFixed(2) : "0.00";
+}
+document.getElementById("level").addEventListener("change", function () {
+    const option = this.selectedOptions[0];
+    document.getElementById("gameFee").value =
+        formatLevelGameFee(option?.dataset.gameFee);
+});
+let gameLevelCatalog = [];
+function populateSportLevels(savedLevel = "", preserveSaved = false) {
+    const sport = document.getElementById("sport").value;
+    const select = document.getElementById("level");
+    select.replaceChildren(new Option(sport ? "Select Level" : "Select Sport First", ""));
+    gameLevelCatalog.filter(level => sport && level.sport === sport).forEach(level => {
+        const option = new Option(level.name, level.name);
+        option.dataset.gameFee = formatLevelGameFee(level.gameFee ?? level.GameFee);
+        select.add(option);
+    });
+    if (preserveSaved && savedLevel && !Array.from(select.options).some(option => option.value === savedLevel)) {
+        select.add(new Option(savedLevel + " (saved level)", savedLevel));
+    }
+    select.value = savedLevel;
+}
 async function loadLevels() {
     try {
-        const response = await fetch("/api/levels?active=true")
-        if (!response.ok) {
-            throw new Error("Failed to load levels");
-        }
+        const response = await fetch("/api/levels?active=true", { cache: "no-store" });
+        if (!response.ok) throw new Error("Failed to load levels");
         const levels = await response.json();
-        console.log(levels);
-        const dropdowns = [
-            "level"
-        ];
-        dropdowns.forEach(id => {
-            const select = document.getElementById(id);
-            // Keep the first option
-            select.innerHTML =
-                '<option value="">Select Level</option>';
-            levels.forEach(level => {
-               const option = document.createElement("option");
-               option.value = level.name;
-               option.textContent = level.name;
-               select.appendChild(option);
-            });
-        });
+        if (!Array.isArray(levels)) throw new Error("Invalid levels response");
+        gameLevelCatalog = levels;
+        const savedLevel = document.getElementById("level").value;
+        populateSportLevels(savedLevel, Boolean(savedLevel));
+        return true;
     } catch (err) {
         console.error("Error loading levels:", err);
+        document.getElementById("message").innerText = "Unable to load levels. Reload the page to try again.";
+        return false;
     }
 }
 async function loadSites() {
@@ -766,6 +782,8 @@ document.getElementById("clearBtn").addEventListener("click", function () {
     document.getElementById("gameForm").reset();
     existingGameSport = "";
     populateGameSports();
+    populateSportLevels();
+    document.getElementById("gameFee").value = "0.00";
     document.getElementById("status").value = "Pending";
     loadAssignors();
     resetOfficialFields();
@@ -848,6 +866,9 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
             return;
         }
         const game = await response.json();
+        if (revision !== formRevision) return;
+        if (!await loadLevels()) return;
+        if (revision !== formRevision) return;
         console.log(
             "Find officials:",
             JSON.stringify(game.Officials ?? game.officials, null, 2)
@@ -864,7 +885,7 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("field").value = game.Field;
         existingGameSport = String(game.Sport ?? "").trim();
         populateGameSports(existingGameSport, existingGameSport);
-        document.getElementById("level").value = game.Level;
+        populateSportLevels(String(game.Level ?? ""), true);
         document.getElementById("home").value = game.Home ?? "";
         document.getElementById("visitor").value = game.Visitor ?? "";
         document.getElementById("numOfGames").value = game.NumOfGames;

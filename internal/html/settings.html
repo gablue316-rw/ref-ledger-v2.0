@@ -133,7 +133,7 @@
         }
         .form-row {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
+            grid-template-columns: minmax(0, 1fr) minmax(100px, 120px) auto;
             gap: 10px;
             align-items: end;
         }
@@ -629,18 +629,26 @@
 <i class="fa-solid fa-layer-group"></i>
 <div>
 <h2>Levels</h2>
-<p>Add and manage your available levels.</p>
+<p>Manage levels and game fees for each sport. Edit unassigned levels to select their sport.</p>
 </div>
 </div>
 <div class="card-body">
 <form id="levelForm">
 <input id="levelOriginalId" type="hidden"/>
+<div class="form-group">
+<label for="levelSport">Sport</label>
+<select class="form-control" id="levelSport" required><option value="">Select Sport</option></select>
+</div>
 <div class="form-row">
 <div class="form-group">
 <label for="levelName">
                                     Level name
                                 </label>
 <input class="form-control" id="levelName" maxlength="50" placeholder="Example: Varsity" required="" type="text"/>
+</div>
+<div class="form-group">
+<label for="levelGameFee">Game Fee</label>
+<input class="form-control" id="levelGameFee" type="number" min="0" step="0.01" value="0.00" required="" inputmode="decimal"/>
 </div>
 <button class="btn btn-primary" id="saveLevelButton" type="submit">
 <i class="fa-solid fa-plus"></i>
@@ -662,14 +670,16 @@
 <table class="settings-table">
 <thead>
 <tr>
+<th>Sport</th>
 <th>Level</th>
+<th>Game Fee</th>
 <th>Status</th>
 <th aria-label="Actions"></th>
 </tr>
 </thead>
 <tbody id="levelsBody">
 <tr>
-<td class="empty-row" colspan="3">
+<td class="empty-row" colspan="5">
                                         No levels have been configured.
                                     </td>
 </tr>
@@ -895,6 +905,8 @@
                 levels = loadedLevels.map(level => ({
                     id: level.id ?? level.ID ?? "",
                     name: level.name ?? level.Name ?? "",
+                    sport: level.sport ?? level.Sport ?? "",
+                    gameFee: formatGameFee(level.gameFee ?? level.GameFee ?? 0),
                     active:
                         level.active ??
                         level.Active ??
@@ -1005,7 +1017,30 @@
             });
             updateSupportedSportsButtons();
         }
-function renderSports(sports) { renderActiveSports(sports); }
+function populateLevelSports(selected = document.getElementById("levelSport").value) {
+    const select = document.getElementById("levelSport");
+    select.replaceChildren(new Option("Select Sport", ""));
+    sports.filter(sport => sport.name).slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach(sport => select.add(new Option(sport.name, sport.name)));
+    if (selected && !Array.from(select.options).some(option => option.value === selected)) {
+        select.add(new Option(selected + " (saved sport)", selected));
+    }
+    select.value = selected;
+}
+function renderSports(sports) { renderActiveSports(sports); populateLevelSports(); }
+        // API gameFee values are dollar amounts (for example, "75.00").
+        function formatGameFee(value) {
+            const amount = Number(value);
+            return Number.isFinite(amount) && amount >= 0
+                ? amount.toFixed(2) : "0.00";
+        }
+        document.getElementById("levelGameFee").addEventListener("blur", event => {
+            if (event.target.value === "") event.target.value = "0.00";
+            if (event.target.checkValidity()) {
+                event.target.value = formatGameFee(event.target.value);
+            }
+        });
         function renderLevels(levels) {
             const levelsBody =
                 document.getElementById("levelsBody");
@@ -1017,7 +1052,7 @@ function renderSports(sports) { renderActiveSports(sports); }
             if (levels.length === 0) {
                 levelsBody.innerHTML = `
                     <tr>
-                        <td colspan="3" class="empty-row">
+                        <td colspan="5" class="empty-row">
                             No levels have been configured.
                         </td>
                     </tr>
@@ -1027,7 +1062,9 @@ function renderSports(sports) { renderActiveSports(sports); }
             levels.forEach(level => {
                 const row = document.createElement("tr");
                 row.innerHTML = `
+                    <td>${escapeHtml(level.sport || "Not assigned")}</td>
                     <td>${escapeHtml(level.name)}</td>
+                    <td>${formatGameFee(level.gameFee)}</td>
                     <td>
                         ${createStatusToggle("level", level)}
                     </td>
@@ -1066,8 +1103,11 @@ function renderSports(sports) { renderActiveSports(sports); }
             }
             document.getElementById("levelOriginalId").value =
                 level.id;
+            populateLevelSports(level.sport);
+            document.getElementById("levelName").readOnly = true;
             document.getElementById("levelName").value =
                 level.name;
+            document.getElementById("levelGameFee").value = formatGameFee(level.gameFee);
             document.getElementById("saveLevelButton").innerHTML = `
                 <i class="fa-solid fa-floppy-disk"></i>
                 Save Level
@@ -1085,7 +1125,7 @@ function renderSports(sports) { renderActiveSports(sports); }
                 return;
             }
             document.getElementById("levelDeleteName").textContent =
-                levelPendingDeletion.name;
+                [levelPendingDeletion.sport || "Not assigned", levelPendingDeletion.name].join(" — ");
             const modal =
                 document.getElementById("levelDeleteModal");
             modal.classList.add("open");
@@ -1177,6 +1217,7 @@ function renderSports(sports) { renderActiveSports(sports); }
         }
         function resetLevelForm() {
             document.getElementById("levelForm").reset();
+            document.getElementById("levelName").readOnly = false;
             document.getElementById("levelOriginalId").value = "";
             document.getElementById("saveLevelButton").innerHTML = `
                 <i class="fa-solid fa-plus"></i>
@@ -1198,19 +1239,36 @@ function renderSports(sports) { renderActiveSports(sports); }
                     showMessage("Level name is required.", "error");
                     return;
                 }
+                const levelSport = document.getElementById("levelSport").value.trim();
+                if (!levelSport) {
+                    showMessage("Select a sport for this level.", "error");
+                    return;
+                }
+                const feeInput = document.getElementById("levelGameFee");
+                if (feeInput.value === "") feeInput.value = "0.00";
+                if (!feeInput.checkValidity()) {
+                    feeInput.reportValidity();
+                    return;
+                }
+                const gameFee = formatGameFee(feeInput.value);
+                feeInput.value = gameFee;
+                const originalId = document.getElementById("levelOriginalId").value;
+                const editing = originalId !== "";
                 const saveButton =
                     document.getElementById("saveLevelButton");
                 saveButton.disabled = true;
-                showMessage("Adding level...", "info");
+                showMessage(editing ? "Saving level..." : "Adding level...", "info");
                 try {
                     const response = await fetch("/api/levels", {
-                        method: "POST",
+                        method: editing ? "PUT" : "POST",
                         headers: {
                             "Content-Type": "application/json"
                         },
                         body: JSON.stringify({
-                            id: levelName,
-                            name: levelName
+                            id: originalId || levelName,
+                            name: levelName,
+                            sport: levelSport,
+                            gameFee: gameFee
                         })
                     });
                     if (response.status === 401 || response.redirected) {
@@ -1237,7 +1295,7 @@ function renderSports(sports) { renderActiveSports(sports); }
                     resetLevelForm();
                     showMessage(
                         responseData.message ||
-                        "Level added successfully",
+                        editing ? "Level saved successfully" : "Level added successfully",
                         "success"
                     );
                 } catch (error) {
