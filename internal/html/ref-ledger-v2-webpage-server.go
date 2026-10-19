@@ -574,7 +574,7 @@ func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 	*/
 	activeOnly := r.URL.Query().Get("active") == "true"
 
-	levels, err := lc.GetLevels(tId, activeOnly)
+	levels, err := lc.GetLevels(tId, activeOnly, strings.TrimSpace(r.URL.Query().Get("sport")))
 	if err != nil {
 		http.Error(
 			w,
@@ -7831,6 +7831,32 @@ func DeactivateLevel(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func UpdateLevel(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPut {
+        w.Header().Set("Allow", "PUT")
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+    tenantId, err := getTenantId(r)
+    if err != nil || strings.TrimSpace(tenantId) == "" || tenantId == "na" {
+        http.Error(w, "Unable to determine tenant ID", http.StatusUnauthorized)
+        return
+    }
+    var level database.Level
+    if err := json.NewDecoder(r.Body).Decode(&level); err != nil {
+        http.Error(w, "Invalid level data", http.StatusBadRequest)
+        return
+    }
+    if err := lc.Update(level, tenantId); err != nil {
+        status := http.StatusBadRequest
+        if errors.Is(err, mongo.ErrNoDocuments) { status = http.StatusNotFound }
+        http.Error(w, err.Error(), status)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{"message": "Level sport and game fee saved successfully"})
+}
+
 func LevelsHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
@@ -7840,13 +7866,16 @@ func LevelsHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		AddLevel(w, r)
 
+	case http.MethodPut:
+        UpdateLevel(w, r)
+
 	case http.MethodDelete:
 		DelLevel(w, r)
 
 	default:
 		w.Header().Set(
 			"Allow",
-			"GET, POST, DELETE",
+			"GET, POST, PUT, DELETE",
 		)
 
 		http.Error(

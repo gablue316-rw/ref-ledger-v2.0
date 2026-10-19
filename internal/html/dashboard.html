@@ -2004,12 +2004,52 @@ async function fetchGames(
     }
 }
 
+// Level API fees are dollar strings, converted from MongoDB integer cents.
+const dashboardLevelFees = new Map();
+let dashboardActiveLevels = [];
+function dashboardLevelFeeKey(sport, level) {
+    return JSON.stringify([sport, level]);
+}
+function setDashboardLevelCatalog(levels) {
+    dashboardActiveLevels = levels;
+    dashboardLevelFees.clear();
+    levels.forEach(level => {
+        dashboardLevelFees.set(dashboardLevelFeeKey(level.sport ?? "", level.name),
+            formatDashboardLevelFee(level.gameFee ?? level.GameFee));
+    });
+}
+function populateSportEditLevels(savedLevel = "", preserveSaved = false) {
+    const sport = document.getElementById("editSport").value;
+    const choices = dashboardActiveLevels.filter(level => level.sport === sport && sport);
+    populateEditSelect("editLevel", choices, sport ? "Select Level" : "Select Sport First");
+    const select = document.getElementById("editLevel");
+    // A saved inactive or unassigned level is retained only while loading its game.
+    if (preserveSaved && savedLevel && !Array.from(select.options).some(option => option.value === savedLevel)) {
+        select.add(new Option(savedLevel + " (saved level)", savedLevel));
+    }
+    select.value = savedLevel;
+}
+async function refreshDashboardEditLevels() {
+    const response = await fetch("/api/levels?active=true", { cache: "no-store" });
+    if (!response.ok) throw new Error("Unable to load sport-specific levels. Please try again.");
+    const levels = await response.json();
+    if (!Array.isArray(levels)) throw new Error("Invalid levels response.");
+    setDashboardLevelCatalog(levels);
+}
+function formatDashboardLevelFee(value) {
+    const amount = Number(value ?? 0);
+    return Number.isFinite(amount) && amount >= 0 ? amount.toFixed(2) : "0.00";
+}
+document.getElementById("editLevel").addEventListener("change", function () {
+    document.getElementById("editGameFee").value =
+        formatDashboardLevelFee(dashboardLevelFees.get(dashboardLevelFeeKey(document.getElementById("editSport").value, this.value)));
+});
 async function loadLevels() {
 
     try {
         const [searchResponse, editResponse] = await Promise.all([
-            fetch("/api/levels"),
-            fetch("/api/levels?active=true")
+            fetch("/api/levels", { cache: "no-store" }),
+            fetch("/api/levels?active=true", { cache: "no-store" })
         ]);
 
         if (!searchResponse.ok || !editResponse.ok) {
@@ -2039,11 +2079,9 @@ async function loadLevels() {
             searchResponse.json(),
             editResponse.json()
         ]);
-        populateEditSelect(
-            "editLevel",
-            activeLevels,
-            "Select Level"
-        );
+        setDashboardLevelCatalog(activeLevels);
+        const savedEditLevel = document.getElementById("editLevel").value;
+        populateSportEditLevels(savedEditLevel, Boolean(savedEditLevel));
         const levelOptions =
             document.getElementById("levelOptions");
 
@@ -2065,7 +2103,10 @@ async function loadLevels() {
         allLabel.appendChild(allText);
         levelOptions.appendChild(allLabel);
 
+        const filterLevelNames = new Set();
         levels.forEach(level => {
+            if (filterLevelNames.has(level.name)) return;
+            filterLevelNames.add(level.name);
             const label = document.createElement("label");
             label.className = "level-option";
 
@@ -2955,6 +2996,8 @@ async function loadEditOfficialRoles(sport, game = null) {
 document.getElementById("editSport").addEventListener("change", async event => {
     if (editOfficialsReady) editSportAssignments.set(editOfficialsSport, collectEditOfficials());
     document.getElementById("editGameError").style.display = "none";
+    populateSportEditLevels();
+    document.getElementById("editGameFee").value = "0.00";
     await loadEditOfficialRoles(event.target.value);
 });
 
@@ -3055,6 +3098,7 @@ async function openEditGame(gameId, association) {
         }
 
         gameBeingEdited = await response.json();
+        await refreshDashboardEditLevels();
     } catch (error) {
         console.error("Failed to load game for editing:", error);
         showMessage(error.message || `Game ${gameId} could not be loaded for editing.`, "error");
@@ -3079,11 +3123,7 @@ async function openEditGame(gameId, association) {
     );
     setEditSelectValue("editSite", matchingSite?.name ?? storedSite);
     document.getElementById("editField").value = gameValue(gameBeingEdited, "Field");
-    setEditSelectValue(
-        "editLevel",
-        gameValue(gameBeingEdited, "Level"),
-        false
-    );
+    populateSportEditLevels(String(gameValue(gameBeingEdited, "Level") || ""), true);
     document.getElementById("editHome").value = gameValue(gameBeingEdited, "Home");
     document.getElementById("editVisitor").value = gameValue(gameBeingEdited, "Visitor");
     document.getElementById("editNumOfGames").value = gameValue(gameBeingEdited, "NumOfGames") || 1;
