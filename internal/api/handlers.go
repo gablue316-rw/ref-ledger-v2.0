@@ -104,14 +104,31 @@ func DecryptEmailCredentials(userName, password string) (string, string) {
 
 }
 
-func DelGame(parentCtx context.Context, gameId string) {
+func DelGame(parentCtx context.Context, gameId, tId string) {
+	if tId == "" || tId == "na" {
+		fmt.Println("DelGame: Invalid tenant ID")
+		return
+	}
 
-	fmt.Println("Deleting game with Game Id:", gameId)
-	gId, _ := utils.ConvertStrToInt64(gameId)
-	filter := bson.M{"gameId": gId}
+	gId, err := utils.ConvertStrToInt64(gameId)
+	if err != nil || gId <= 0 {
+		fmt.Printf("DelGame: Invalid game ID %q\n", gameId)
+		return
+	}
 
-	database.DeleteOneDoc(parentCtx, filter, database.GetMongoDbName(), "games")
+	fmt.Println("Deleting game with Game Id:", gId, "for tenant:", tId)
 
+	filter := bson.M{
+		"gameId":   gId,
+		"tenantId": tId,
+	}
+
+	database.DeleteOneDoc(
+		parentCtx,
+		filter,
+		database.GetMongoDbName(),
+		"games",
+	)
 }
 
 func UpdateOfficials(parentCtx context.Context, file string) error {
