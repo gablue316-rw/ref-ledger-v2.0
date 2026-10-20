@@ -151,7 +151,7 @@
         .btn-delete-selected { background-color: #dc2626; }
         .btn-delete-selected:hover:not(:disabled) { background-color: #b91c1c; }
         .select-column,
-        .delete-column {
+        .delete-column, .edit-column {
             width: 70px;
             text-align: center;
         }
@@ -244,6 +244,13 @@
         tr:nth-child(even) {
              background-color: #f9fafb;
         }
+        .row-edit-btn { border:0; background:transparent; color:#2563eb; cursor:pointer; font-size:17px; padding:6px 9px; border-radius:5px; }
+        .row-edit-btn:hover { color:white; background:#2563eb; }
+        .edit-modal { margin:auto; width:min(600px,calc(100% - 32px)); max-height:90vh; overflow:auto; padding:24px; border:0; border-radius:12px; }
+        .edit-modal::backdrop { background:rgba(15,23,42,.65); }
+        .edit-modal h2 { margin-bottom:20px; }
+        .edit-modal input[readonly] { background:#e2e8f0; cursor:not-allowed; }
+        .edit-error { color:#b91c1c; margin-top:12px; }
     </style>
 </head>
 <body>
@@ -347,11 +354,12 @@
            <thead>
                <tr>
                    <th class="select-column">Select</th>
+                   <th class="delete-column">Delete</th>
+                   <th class="edit-column">Edit</th>
                    <th>Site Name</th>
                    <th>Contact Name</th>
                    <th>Contact Number</th>
                    <th>Contact Email</th>
-                   <th class="delete-column">Delete</th>
                </tr>
            </thead>
            <tbody>
@@ -359,6 +367,20 @@
        </table>
     </div>
 </div>
+<dialog id="editSiteModal" class="edit-modal" aria-labelledby="editSiteTitle">
+    <h2 id="editSiteTitle">Edit Site</h2>
+    <form id="editSiteForm">
+        <div class="form-group"><label for="editSiteName">Site Name</label><input type="text" id="editSiteName" readonly aria-readonly="true"></div>
+        <div class="form-group"><label for="editSiteContact">Contact Name</label><input type="text" id="editSiteContact"></div>
+        <div class="form-group"><label for="editSitePhone">Contact Number</label><input type="text" id="editSitePhone"></div>
+        <div class="form-group"><label for="editSiteEmail">Contact Email</label><input type="email" id="editSiteEmail"></div>
+        <p id="editSiteError" class="edit-error" role="alert"></p>
+        <div class="button-row">
+            <button type="submit" id="saveSiteChanges" class="btn btn-save">Save Changes</button>
+            <button type="button" id="cancelSiteEdit" class="btn btn-modal-cancel">Cancel</button>
+        </div>
+    </form>
+</dialog>
 <dialog id="deleteConfirmationModal" class="delete-modal" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalMessage">
     <div class="delete-modal-content">
         <div class="delete-modal-header">
@@ -412,6 +434,63 @@ document.querySelector("#sitesForm .button-row").addEventListener("click", funct
 function clearSitesForm() {
     document.getElementById("sitesForm").reset();
 }
+
+// Interacting with the registry clears the entry fields above it.
+document.getElementById("directorySection").addEventListener("click", clearSitesForm);
+const editSiteModal = document.getElementById("editSiteModal");
+let siteBeingEdited = null;
+let siteEditSaving = false;
+function openSiteEditor(site, row) {
+    siteBeingEdited = { site, row, name: site.Name };
+    for (const field of ["Name", "Contact", "Phone", "Email"]) {
+        document.getElementById("editSite" + field).value = site[field] ?? "";
+    }
+    document.getElementById("editSiteError").textContent = "";
+    editSiteModal.showModal();
+    document.getElementById("editSiteContact").focus();
+}
+document.getElementById("cancelSiteEdit").addEventListener("click", () => editSiteModal.close());
+editSiteModal.addEventListener("cancel", event => { if (siteEditSaving) event.preventDefault(); });
+editSiteModal.addEventListener("close", () => { siteBeingEdited = null; });
+document.getElementById("editSiteForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    if (!siteBeingEdited || siteEditSaving) return;
+    const editing = siteBeingEdited;
+    // Use the original site name even if the read-only input is changed externally.
+    const payload = { name: editing.name };
+    for (const field of ["Contact", "Phone", "Email"]) {
+        payload[field.toLowerCase()] = document.getElementById("editSite" + field).value;
+    }
+    siteEditSaving = true;
+    document.getElementById("saveSiteChanges").disabled = true;
+    document.getElementById("cancelSiteEdit").disabled = true;
+    document.getElementById("editSiteError").textContent = "";
+    try {
+        const response = await fetch("/api/sites-update", {
+            method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)
+        });
+        if (response.status === 401 || response.redirected) {
+            window.location.href = "/login";
+            return;
+        }
+        const message = await response.text();
+        if (response.status === 403) throw new Error("Permission denied. Read-only users cannot update sites.");
+        if (!response.ok) throw new Error(message || "Unable to update site.");
+        ["Name", "Contact", "Phone", "Email"].forEach((field, index) => {
+            editing.site[field] = payload[field.toLowerCase()];
+            editing.row.cells[index + 3].textContent = editing.site[field];
+        });
+        messageBox.textContent = message || "Site updated successfully.";
+        editSiteModal.close();
+    } catch (error) {
+        document.getElementById("editSiteError").textContent = error.message || "Server unavailable.";
+    } finally {
+        siteEditSaving = false;
+        document.getElementById("saveSiteChanges").disabled = false;
+        document.getElementById("cancelSiteEdit").disabled = false;
+    }
+});
+
 function confirmSiteDeletion(message, target) {
     document.getElementById("deleteModalMessage").textContent = message;
     document.getElementById("deleteModalTarget").textContent = target;
@@ -545,11 +624,17 @@ document.getElementById("sitesForm").addEventListener("submit", async function(e
                 "Permission denied. Read-only users cannot enter sites.";
             return;
         }
-        const message = await response.text();
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Site saved successfully."
-                : message || "Error saving site.";
+        const message = (await response.text()).trim();
+        const messageElement = document.getElementById("message");
+
+        messageElement.textContent =
+            message || (response.ok
+                ? "Site saved successfully."
+                : "Error saving site.");
+        messageElement.style.color = response.ok ? "green" : "red";
+        if (response.ok) {
+            clearSitesForm();
+        }
     } catch(err) {
         document.getElementById("message").innerText = "Server unavailable.";
     }
@@ -593,6 +678,7 @@ document.getElementById("directoryBtn")
 .addEventListener("click", async function () {
     const requestVersion = ++directoryRequestVersion;
     const siteName = document.getElementById("siteName").value.trim();
+    clearSitesForm();
     const params = new URLSearchParams();
     if (siteName) params.set("siteName", siteName);
     const directoryURL = params.size
@@ -642,10 +728,6 @@ document.getElementById("directoryBtn")
                         aria-label="Select ${escapeHTML(site.Name || "site")}"
                     >
                 </td>
-                <td>${escapeHTML(site.Name)}</td>
-                <td>${escapeHTML(site.Contact)}</td>
-                <td>${escapeHTML(site.Phone)}</td>
-                <td>${escapeHTML(site.Email)}</td>
                 <td class="delete-column">
                     <button
                         type="button"
@@ -656,15 +738,16 @@ document.getElementById("directoryBtn")
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
+                <td class="edit-column"><button type="button" class="row-edit-btn" title="Edit site" aria-label="Edit ${escapeHTML(site.Name || "site")}"><i class="fa-solid fa-pencil"></i></button></td>
+                <td>${escapeHTML(site.Name)}</td>
+                <td>${escapeHTML(site.Contact)}</td>
+                <td>${escapeHTML(site.Phone)}</td>
+                <td>${escapeHTML(site.Email)}</td>
+
             `;
             row.querySelector(".site-check").addEventListener("change", updateSiteSelection);
-            row.addEventListener("click", function (event) {
-                if (event.target.closest(".site-check, .row-delete-btn")) return;
-                document.getElementById("siteName").value = site.Name || "";
-                document.getElementById("contactName").value = site.Contact || "";
-                document.getElementById("contactNumber").value = site.Phone || "";
-                document.getElementById("contactEmail").value = site.Email || "";
-                messageBox.innerText = "Site loaded.";
+            row.querySelector(".row-edit-btn").addEventListener("click", function () {
+                openSiteEditor(site, row);
             });
             row.querySelector(".row-delete-btn").addEventListener("click", async function () {
                 const description = site.Name;

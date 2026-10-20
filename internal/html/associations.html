@@ -189,7 +189,7 @@
         }
 
         .select-column,
-        .delete-column {
+        .delete-column, .edit-column {
             width: 70px;
             text-align: center !important;
         }
@@ -266,6 +266,13 @@
             .delete-modal-actions .btn { width:auto; }
         }
 
+        .row-edit-btn { border:none; background:transparent; color:#2563eb; cursor:pointer; font-size:17px; padding:6px 9px; border-radius:5px; }
+        .row-edit-btn:hover { background:#2563eb; color:white; }
+        .edit-modal { margin:auto; width:min(680px,calc(100% - 32px)); max-height:90vh; overflow:auto; padding:24px; border:0; border-radius:12px; }
+        .edit-modal::backdrop { background:rgba(15,23,42,.65); }
+        .edit-modal h2 { margin-bottom:20px; }
+        .edit-modal input[readonly] { background:#e2e8f0; cursor:not-allowed; }
+        .edit-error { color:#b91c1c; margin-top:12px; }
     </style>
 </head>
 
@@ -415,18 +422,36 @@
         <thead>
             <tr>
                 <th class="select-column">Select</th>
+                <th class="delete-column">Delete</th>
+                <th class="edit-column">Edit</th>
                 <th>ID</th>
                 <th>Association</th>
                 <th>Contact</th>
                 <th>Phone</th>
                 <th>Email</th>
                 <th>Assignors</th>
-                <th class="delete-column">Delete</th>
             </tr>
         </thead>
         <tbody></tbody>
     </table>
 </div>
+
+<dialog id="editAssociationModal" class="edit-modal" aria-labelledby="editAssociationTitle">
+    <h2 id="editAssociationTitle">Edit Association</h2>
+    <form id="editAssociationForm">
+        <div class="form-group"><label for="editAssociationId">Association ID</label><input type="text" id="editAssociationId" readonly aria-readonly="true"></div>
+        <div class="form-group"><label for="editAssociationName">Association Name</label><input type="text" id="editAssociationName"></div>
+        <div class="form-group"><label for="editAssociationContact">Contact Name</label><input type="text" id="editAssociationContact"></div>
+        <div class="form-group"><label for="editAssociationPhone">Contact Number</label><input type="text" id="editAssociationPhone"></div>
+        <div class="form-group"><label for="editAssociationEmail">Contact Email</label><input type="email" id="editAssociationEmail"></div>
+        <div class="form-group"><label for="editAssociationAssignors">Assignors (comma-separated)</label><input type="text" id="editAssociationAssignors"></div>
+        <p id="editAssociationError" class="edit-error" role="alert"></p>
+        <div class="button-row">
+            <button type="submit" id="saveAssociationChanges" class="btn btn-edit">Save Changes</button>
+            <button type="button" id="cancelAssociationEdit" class="btn btn-modal-cancel">Cancel</button>
+        </div>
+    </form>
+</dialog>
 
 <dialog id="deleteConfirmationModal" class="delete-modal" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalMessage">
     <div class="delete-modal-content">
@@ -455,6 +480,83 @@
 <script src="/components/navbar.js?v=12"></script>
 
 <script>
+
+
+function escapeAssociationHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[character]));
+}
+const editAssociationModal = document.getElementById("editAssociationModal");
+let associationBeingEdited = null;
+let associationEditSaving = false;
+function openAssociationEditor(association, row) {
+    associationBeingEdited = { association, row, id: association.Id };
+    for (const field of ["Id", "Name", "Contact", "Phone", "Email", "Assignors"]) {
+        document.getElementById("editAssociation" + field).value = association[field] ?? "";
+    }
+    document.getElementById("editAssociationError").textContent = "";
+    editAssociationModal.showModal();
+    document.getElementById("editAssociationName").focus();
+}
+document.getElementById("cancelAssociationEdit").addEventListener("click", () => editAssociationModal.close());
+editAssociationModal.addEventListener("cancel", event => {
+    if (associationEditSaving) event.preventDefault();
+});
+editAssociationModal.addEventListener("close", () => { associationBeingEdited = null; });
+document.getElementById("editAssociationForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    if (!associationBeingEdited || associationEditSaving) return;
+    const editing = associationBeingEdited;
+    // Always submit the original ID, regardless of the displayed input value.
+    const payload = { id: editing.id };
+    for (const field of ["Name", "Contact", "Phone", "Email", "Assignors"]) {
+        payload[field.toLowerCase()] = document.getElementById("editAssociation" + field).value;
+    }
+    associationEditSaving = true;
+    document.getElementById("saveAssociationChanges").disabled = true;
+    document.getElementById("cancelAssociationEdit").disabled = true;
+    document.getElementById("editAssociationError").textContent = "";
+    try {
+        const response = await fetch("/api/associations-update", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+        });
+        const message = await response.text();
+        if (!response.ok) throw new Error(message || "Unable to update association.");
+        const fields = ["Id", "Name", "Contact", "Phone", "Email", "Assignors"];
+        fields.forEach((field, index) => {
+            editing.association[field] = payload[field.toLowerCase()];
+            editing.row.cells[index + 3].textContent = editing.association[field];
+        });
+        if (document.getElementById("assocId").value === String(editing.id)) {
+            ["assocName", "contactName", "contactNumber", "contactEmail", "assignors"].forEach((id, index) => {
+                document.getElementById(id).value = payload[fields[index + 1].toLowerCase()];
+            });
+        }
+        document.getElementById("message").textContent = message || "Association updated successfully.";
+        editAssociationModal.close();
+    } catch (error) {
+        document.getElementById("editAssociationError").textContent = error.message || "Server unavailable.";
+    } finally {
+        associationEditSaving = false;
+        document.getElementById("saveAssociationChanges").disabled = false;
+        document.getElementById("cancelAssociationEdit").disabled = false;
+    }
+});
+
+// Clear the registry immediately when using the main association actions.
+function clearAssociationRegistry() {
+    document.querySelector("#associationsTable tbody").replaceChildren();
+    document.getElementById("directorySection").style.display = "none";
+    selectAllAssociations.checked = false;
+    selectAllAssociations.indeterminate = false;
+    deleteSelectedBtn.disabled = true;
+}
+
+for (const buttonId of ["getAssocBtn", "editBtn", "deleteBtn", "clearAssocBtn"]) {
+    document.getElementById(buttonId).addEventListener("click", clearAssociationRegistry);
+}
+document.querySelector('#associationForm button[type="submit"]').addEventListener("click", clearAssociationRegistry);
+// Also handle Add when the form is submitted using Enter.
+document.getElementById("associationForm").addEventListener("submit", clearAssociationRegistry);
 
 function clearAssociationsForm() {
     document.getElementById("associationForm").reset();
@@ -611,12 +713,15 @@ document.getElementById("associationForm").addEventListener("submit", async func
             body: JSON.stringify(association)
         });
 
-        const message = await response.text();
+        // const message = await response.text();
+        const message = (await response.text()).trim();
+        const messageElement = document.getElementById("message");
 
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Association saved successfully."
-                : message || "Error saving association.";
+        messageElement.textContent =
+            message || (response.ok
+                ? "Association saved successfully."
+                : "Error saving association.");
+        messageElement.style.color = response.ok ? "green" : "red";
 
         if (response.ok) {
            clearAssociationsForm();
@@ -662,6 +767,7 @@ document
 
 
 document.getElementById("directoryBtn").addEventListener("click", async function () {
+    clearAssociationsForm();
     try {
         const response = await fetch(`/api/associationsDirectory?t=${Date.now()}`);
 
@@ -694,32 +800,37 @@ document.getElementById("directoryBtn").addEventListener("click", async function
                     <input
                         type="checkbox"
                         class="association-check"
-                        value="${association.Id || ""}"
-                        aria-label="Select ${association.Name || association.Id || "association"}"
+                        value="${escapeAssociationHtml(association.Id || "")}"
+                        aria-label="Select ${escapeAssociationHtml(association.Name || association.Id || "association")}"
                     >
                 </td>
-                <td>${association.Id || ""}</td>
-                <td>${association.Name || ""}</td>
-                <td>${association.Contact || ""}</td>
-                <td>${association.Phone || ""}</td>
-                <td>${association.Email || ""}</td>
-                <td>${association.Assignors || ""}</td>
                 <td class="delete-column">
                     <button
                         type="button"
                         class="row-delete-btn"
                         title="Delete association"
-                        aria-label="Delete ${association.Name || association.Id || "association"}"
+                        aria-label="Delete ${escapeAssociationHtml(association.Name || association.Id || "association")}"
                     >
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
+                <td class="edit-column"><button type="button" class="row-edit-btn" title="Edit association" aria-label="Edit association"><i class="fa-solid fa-pencil"></i></button></td>
+                <td>${escapeAssociationHtml(association.Id || "")}</td>
+                <td>${escapeAssociationHtml(association.Name || "")}</td>
+                <td>${escapeAssociationHtml(association.Contact || "")}</td>
+                <td>${escapeAssociationHtml(association.Phone || "")}</td>
+                <td>${escapeAssociationHtml(association.Email || "")}</td>
+                <td>${escapeAssociationHtml(association.Assignors || "")}</td>
+
             `;
 
+            row.querySelector(".row-edit-btn").addEventListener("click", function () {
+                openAssociationEditor(association, row);
+            });
             row.querySelector(".association-check").addEventListener("change", updateAssociationSelection);
 
             row.addEventListener("click", function (event) {
-                if (event.target.closest(".association-check, .row-delete-btn")) {
+                if (event.target.closest(".association-check, .row-delete-btn, .row-edit-btn")) {
                     return;
                 }
 
