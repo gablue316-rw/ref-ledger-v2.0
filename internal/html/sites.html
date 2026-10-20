@@ -624,11 +624,14 @@ document.getElementById("sitesForm").addEventListener("submit", async function(e
                 "Permission denied. Read-only users cannot enter sites.";
             return;
         }
-        const message = await response.text();
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Site saved successfully."
-                : message || "Error saving site.";
+        const message = (await response.text()).trim();
+        const messageElement = document.getElementById("message");
+
+        messageElement.textContent =
+            message || (response.ok
+                ? "Site saved successfully."
+                : "Error saving site.");
+        messageElement.style.color = response.ok ? "green" : "red";
         if (response.ok) {
             clearSitesForm();
         }

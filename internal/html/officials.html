@@ -271,22 +271,57 @@ byId("importOfficialsBtn").addEventListener("click", () => { window.location.hre
 byId("clearBtn").addEventListener("click", () => { clearOfficialsDirectory(); clearOfficialForm(); showMessage("Form cleared."); });
 async function saveMainOfficial(update) {
     if (!byId("officialsForm").reportValidity()) return;
+
+    const messageElement = byId("message");
     const official = readMainForm();
-    if (!official.firstName || !official.lastName) return showMessage("Enter both First Name and Last Name first.");
-    showMessage(update ? "Updating Official" : "Saving Official");
+
+    if (!official.firstName || !official.lastName) {
+        messageElement.style.color = "red";
+        showMessage("Enter both First Name and Last Name first.");
+        return;
+    }
+
+    messageElement.style.color = "";
+    showMessage(update ? "Updating Official..." : "Saving Official...");
+
     try {
-        const response = await fetch(update ? "/api/officials-update" : "/api/officials", {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(official)
-        });
+        const response = await fetch(
+            update ? "/api/officials-update" : "/api/officials",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(official)
+            }
+        );
+
         if (requiresLogin(response)) return;
-        if (response.status === 403) return showMessage(`Permission denied. Read-only users cannot ${update ? "update" : "add"} officials.`);
-        const message = await response.text();
-        showMessage(message || (response.ok ? `Official ${update ? "updated" : "saved"} successfully.` : `Error ${update ? "updating" : "saving"} official.`));
+
+        const message = (await response.text()).trim();
+        messageElement.style.color = response.ok ? "green" : "red";
+
+        if (response.status === 403) {
+            showMessage(
+                `Permission denied. Read-only users cannot ${update ? "update" : "add"} officials.`
+            );
+            return;
+        }
+
+        showMessage(
+            message || (
+                response.ok
+                    ? `Official ${update ? "updated" : "saved"} successfully.`
+                    : `Error ${update ? "updating" : "saving"} official.`
+            )
+        );
+
         if (response.ok) {
             clearOfficialsDirectory();
             if (!update) clearOfficialForm();
         }
-    } catch { showMessage("Server unavailable."); }
+    } catch {
+        messageElement.style.color = "red";
+        showMessage("Server unavailable.");
+    }
 }
 byId("officialsForm").addEventListener("submit", event => { event.preventDefault(); saveMainOfficial(false); });
 byId("updateOfficialBtn").addEventListener("click", () => saveMainOfficial(true));

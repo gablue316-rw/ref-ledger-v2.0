@@ -2762,9 +2762,7 @@ func (ac *AssociationCollection) Exists(id string, tenantId string) (bool, error
 
 func (ac *AssociationCollection) Add(association Association, tenantId string) error {
 
-	var addRes *mongo.InsertOneResult
-	var updRes *mongo.UpdateResult
-	var update bool = false
+	var result *mongo.InsertOneResult
 
 	if tenantId == "na" {
 		fmt.Println("Invalid Tenant ID")
@@ -2779,32 +2777,19 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 	}
 
 	if assocExists {
-		fmt.Println("association with ID", association.Id, "already exists")
-		update = true
+		return fmt.Errorf("association with ID %q already exists", association.Id)
 	}
 
 	doc := ac.convAssocToDoc(association)
 	doc.TenantId = tenantId
 
-	if update {
-		updRes, ac.LastError = ac.Coll.ReplaceOne(ctx, bson.M{"id": association.Id, "tenantId": tenantId}, doc)
-	} else {
-		addRes, ac.LastError = ac.Coll.InsertOne(ctx, doc)
-	}
+	result, ac.LastError = ac.Coll.InsertOne(ctx, doc)
 
 	if ac.LastError != nil {
-		if update {
-			return fmt.Errorf("Update failed.  Reason: %v", ac.LastError)
-		} else {
-			return fmt.Errorf("Insert failed.  Reason: %v", ac.LastError)
-		}
+		return fmt.Errorf("Insert failed.  Reason: %v", ac.LastError)
 	}
 
-	if update {
-		fmt.Println("Updated ID:", updRes.UpsertedID)
-	} else {
-		fmt.Println("Inserted ID:", addRes.InsertedID)
-	}
+	fmt.Println("Inserted ID:", result.InsertedID)
 
 	return nil
 }
@@ -3352,20 +3337,24 @@ func (sc *SiteCollection) Init(client *mongo.Client) error {
 }
 
 func (sc *SiteCollection) Add(site Site, tenantId string) error {
-
-	var result *mongo.InsertOneResult
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	fmt.Println("Adding site:", site, "for tenant ID:", tenantId)
 
 	doc := sc.convSiteToDoc(site)
 	doc.TenantId = tenantId
 
-	result, sc.LastError = sc.Coll.InsertOne(ctx, doc)
-	if sc.LastError != nil {
-		return fmt.Errorf("Insert failed.  Reason: %v", sc.LastError)
-	}
-	fmt.Println("Inserted ID:", result.InsertedID)
+	result, err := sc.Coll.InsertOne(ctx, doc)
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return fmt.Errorf("site %q already exists", doc.Name)
+		}
 
+		return fmt.Errorf("failed to insert site: %w", err)
+	}
+
+	fmt.Println("Inserted ID:", result.InsertedID)
 	return nil
 }
 
@@ -3723,7 +3712,7 @@ func (gc *GameCollection) Delete(association, gameId, tid string) error {
 
 	var filter bson.M
 	var result *mongo.DeleteResult
-	
+
 	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
 	if err != nil {
 		return fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
@@ -4334,6 +4323,8 @@ func (oc *OfficialCollection) IsIndexed() (bool, error, int) {
 }
 
 func (oc *OfficialCollection) CreateIndices() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	index := mongo.IndexModel{
 		Keys: bson.D{
@@ -4342,16 +4333,16 @@ func (oc *OfficialCollection) CreateIndices() error {
 			{Key: "firstName", Value: 1},
 		},
 		Options: options.Index().
-			SetName("tenant_last_first"),
+			SetName("tenant_last_first").
+			SetUnique(true),
 	}
 
-	name, err := oc.Coll.Indexes().CreateOne(context.Background(), index)
+	name, err := oc.Coll.Indexes().CreateOne(ctx, index)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create unique officials index: %w", err)
 	}
 
 	fmt.Println("Created index:", name)
-
 	return nil
 }
 
@@ -4391,27 +4382,28 @@ func (oc *OfficialCollection) GetOfficialView(official, tenantId string) (model.
 }
 
 func (oc *OfficialCollection) Add(official Official, tenantId string) error {
-
-	var result *mongo.InsertOneResult
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
 	doc, err := oc.convOfficialToDoc(official, tenantId, true)
 	if err != nil {
-		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
+		return fmt.Errorf("failed to convert official to document: %w", err)
 	}
 
 	doc.TenantId = tenantId
 
-	result, oc.LastError = oc.Coll.InsertOne(ctx, doc)
-	if oc.LastError != nil {
-		return fmt.Errorf("Insert failed.  Reason: %v", oc.LastError)
-	}
-	fmt.Println("Inserted ID:", result.InsertedID)
+	result, err := oc.Coll.InsertOne(ctx, doc)
+	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return fmt.Errorf("Official already exists.")
+		}
 
+		return fmt.Errorf("failed to insert official: %w", err)
+	}
+
+	fmt.Println("Inserted ID:", result.InsertedID)
 	return nil
 }
-
 func getOfficialsId(fname, lname, tenantId string) (int64, error) {
 
 	var filter bson.M
@@ -5442,8 +5434,8 @@ func (uc *UsersCollection) GetNumOfUserAccounts() (int64, error) {
 }
 
 type Level struct {
-    Sport string `bson:"sport" json:"sport"`
-	GameFee int64 `bson:"gameFee" json:"-"`
+	Sport    string `bson:"sport" json:"sport"`
+	GameFee  int64  `bson:"gameFee" json:"-"`
 	ID       string `bson:"id" json:"id"`
 	Name     string `bson:"name" json:"name"`
 	Active   bool   `bson:"active" json:"active"`
@@ -5452,31 +5444,37 @@ type Level struct {
 
 // BSON stores cents; the HTTP API exchanges dollar strings.
 func (level Level) MarshalJSON() ([]byte, error) {
-    type levelAlias Level
-    return json.Marshal(struct {
-        levelAlias
-        GameFee string `json:"gameFee"`
-    }{
-        levelAlias: levelAlias(level),
-        GameFee: utils.ConvertInt64ToAmtStr(level.GameFee),
-    })
+	type levelAlias Level
+	return json.Marshal(struct {
+		levelAlias
+		GameFee string `json:"gameFee"`
+	}{
+		levelAlias: levelAlias(level),
+		GameFee:    utils.ConvertInt64ToAmtStr(level.GameFee),
+	})
 }
 
 func (level *Level) UnmarshalJSON(data []byte) error {
-    type levelAlias Level
-    var wire struct {
-        levelAlias
-        GameFee string `json:"gameFee"`
-    }
-    if err := json.Unmarshal(data, &wire); err != nil { return err }
-    fee, err := normalizeLevelGameFee(wire.GameFee)
-    if err != nil { return err }
-    // The normalized string has exactly two fractional digits.
-    cents, err := strconv.ParseInt(strings.ReplaceAll(fee, ".", ""), 10, 64)
-    if err != nil { return fmt.Errorf("invalid game fee: %w", err) }
-    *level = Level(wire.levelAlias)
-    level.GameFee = cents
-    return nil
+	type levelAlias Level
+	var wire struct {
+		levelAlias
+		GameFee string `json:"gameFee"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	fee, err := normalizeLevelGameFee(wire.GameFee)
+	if err != nil {
+		return err
+	}
+	// The normalized string has exactly two fractional digits.
+	cents, err := strconv.ParseInt(strings.ReplaceAll(fee, ".", ""), 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid game fee: %w", err)
+	}
+	*level = Level(wire.levelAlias)
+	level.GameFee = cents
+	return nil
 }
 
 type LevelsCollection struct {
@@ -5495,86 +5493,126 @@ func (lc *LevelsCollection) Init(client *mongo.Client) error {
 }
 
 func (lc *LevelsCollection) Add(level Level, tenantId string) error {
-    level.Name = strings.TrimSpace(level.Name)
-    level.Sport = strings.TrimSpace(level.Sport)
-    level.TenantID = strings.TrimSpace(tenantId)
-    if level.Name == "" || level.Sport == "" || level.TenantID == "" || level.TenantID == "na" {
-        return fmt.Errorf("level name, sport, and valid tenant ID are required")
-    }
-    if level.GameFee < 0 { return fmt.Errorf("game fee cannot be negative") }
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
-    if err := lc.validateLevelSport(ctx, level.Sport); err != nil { return err }
-    err := lc.Coll.FindOne(ctx, bson.M{
-        "tenantId": level.TenantID, "sport": level.Sport, "name": level.Name,
-    }).Err()
-    if err == nil { return fmt.Errorf("level %q already exists for %s", level.Name, level.Sport) }
-    if !errors.Is(err, mongo.ErrNoDocuments) { return fmt.Errorf("failed to check level: %w", err) }
-    // Independent IDs allow the same level name in different sports.
-    level.ID = primitive.NewObjectID().Hex()
-    level.Active = true
-    if _, err := lc.Coll.InsertOne(ctx, level); err != nil {
-        if mongo.IsDuplicateKeyError(err) { return fmt.Errorf("duplicate level; check sport-level indexes: %w", err) }
-        return fmt.Errorf("failed to add level: %w", err)
-    }
-    return nil
+	level.Name = strings.TrimSpace(level.Name)
+	level.Sport = strings.TrimSpace(level.Sport)
+	level.TenantID = strings.TrimSpace(tenantId)
+	if level.Name == "" || level.Sport == "" || level.TenantID == "" || level.TenantID == "na" {
+		return fmt.Errorf("level name, sport, and valid tenant ID are required")
+	}
+	if level.GameFee < 0 {
+		return fmt.Errorf("game fee cannot be negative")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := lc.validateLevelSport(ctx, level.Sport); err != nil {
+		return err
+	}
+	err := lc.Coll.FindOne(ctx, bson.M{
+		"tenantId": level.TenantID, "sport": level.Sport, "name": level.Name,
+	}).Err()
+	if err == nil {
+		return fmt.Errorf("level %q already exists for %s", level.Name, level.Sport)
+	}
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf("failed to check level: %w", err)
+	}
+	// Independent IDs allow the same level name in different sports.
+	level.ID = primitive.NewObjectID().Hex()
+	level.Active = true
+	if _, err := lc.Coll.InsertOne(ctx, level); err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return fmt.Errorf("duplicate level; check sport-level indexes: %w", err)
+		}
+		return fmt.Errorf("failed to add level: %w", err)
+	}
+	return nil
 }
 
 func (lc *LevelsCollection) validateLevelSport(ctx context.Context, sport string) error {
-    err := lc.DB.Collection("sports").FindOne(ctx, bson.M{"name": sport}).Err()
-    if errors.Is(err, mongo.ErrNoDocuments) { return fmt.Errorf("unknown sport %q", sport) }
-    if err != nil { return fmt.Errorf("failed to validate sport: %w", err) }
-    return nil
+	err := lc.DB.Collection("sports").FindOne(ctx, bson.M{"name": sport}).Err()
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf("unknown sport %q", sport)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to validate sport: %w", err)
+	}
+	return nil
 }
 
 func normalizeLevelGameFee(value string) (string, error) {
-    value = strings.TrimSpace(value)
-    if value == "" { return "0.00", nil }
-    parts := strings.Split(value, ".")
-    if len(parts) > 2 || parts[0] == "" { return "", fmt.Errorf("game fee must be a non-negative amount with at most two decimal places") }
-    for _, part := range parts {
-        for _, digit := range part {
-            if digit < '0' || digit > '9' { return "", fmt.Errorf("invalid game fee") }
-        }
-    }
-    fraction := "00"
-    if len(parts) == 2 {
-        if len(parts[1]) > 2 { return "", fmt.Errorf("game fee must have at most two decimal places") }
-        fraction = (parts[1] + "00")[:2]
-    }
-    whole := strings.TrimLeft(parts[0], "0")
-    if whole == "" { whole = "0" }
-    if len(whole) > 12 { return "", fmt.Errorf("game fee is too large") }
-    return whole + "." + fraction, nil
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "0.00", nil
+	}
+	parts := strings.Split(value, ".")
+	if len(parts) > 2 || parts[0] == "" {
+		return "", fmt.Errorf("game fee must be a non-negative amount with at most two decimal places")
+	}
+	for _, part := range parts {
+		for _, digit := range part {
+			if digit < '0' || digit > '9' {
+				return "", fmt.Errorf("invalid game fee")
+			}
+		}
+	}
+	fraction := "00"
+	if len(parts) == 2 {
+		if len(parts[1]) > 2 {
+			return "", fmt.Errorf("game fee must have at most two decimal places")
+		}
+		fraction = (parts[1] + "00")[:2]
+	}
+	whole := strings.TrimLeft(parts[0], "0")
+	if whole == "" {
+		whole = "0"
+	}
+	if len(whole) > 12 {
+		return "", fmt.Errorf("game fee is too large")
+	}
+	return whole + "." + fraction, nil
 }
 
 // Update assigns the sport and fee for an existing level owned by this tenant.
 func (lc *LevelsCollection) Update(level Level, tenantId string) error {
-    level.ID = strings.TrimSpace(level.ID)
-    level.Sport = strings.TrimSpace(level.Sport)
-    tenantId = strings.TrimSpace(tenantId)
-    if level.ID == "" || tenantId == "" || tenantId == "na" || level.Sport == "" {
-        return fmt.Errorf("level ID, sport, and valid tenant ID are required")
-    }
-    if level.GameFee < 0 { return fmt.Errorf("game fee cannot be negative") }
-    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-    defer cancel()
-    filter := bson.M{"id": level.ID, "tenantId": tenantId}
-    var existing Level
-    if err := lc.Coll.FindOne(ctx, filter).Decode(&existing); err != nil { return err }
-    if err := lc.validateLevelSport(ctx, level.Sport); err != nil { return err }
-    // Keep the saved name and stable ID when assigning a sport or changing a fee.
-    err := lc.Coll.FindOne(ctx, bson.M{
-        "tenantId": tenantId, "sport": level.Sport, "name": existing.Name,
-        "id": bson.M{"$ne": existing.ID},
-    }).Err()
-    if err == nil { return fmt.Errorf("level %q already exists for %s", existing.Name, level.Sport) }
-    if !errors.Is(err, mongo.ErrNoDocuments) { return fmt.Errorf("failed to check level: %w", err) }
-    result, err := lc.Coll.UpdateOne(ctx, filter,
-        bson.M{"$set": bson.M{"sport": level.Sport, "gameFee": level.GameFee}})
-    if err != nil { return fmt.Errorf("failed to update level: %w", err) }
-    if result.MatchedCount == 0 { return mongo.ErrNoDocuments }
-    return nil
+	level.ID = strings.TrimSpace(level.ID)
+	level.Sport = strings.TrimSpace(level.Sport)
+	tenantId = strings.TrimSpace(tenantId)
+	if level.ID == "" || tenantId == "" || tenantId == "na" || level.Sport == "" {
+		return fmt.Errorf("level ID, sport, and valid tenant ID are required")
+	}
+	if level.GameFee < 0 {
+		return fmt.Errorf("game fee cannot be negative")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	filter := bson.M{"id": level.ID, "tenantId": tenantId}
+	var existing Level
+	if err := lc.Coll.FindOne(ctx, filter).Decode(&existing); err != nil {
+		return err
+	}
+	if err := lc.validateLevelSport(ctx, level.Sport); err != nil {
+		return err
+	}
+	// Keep the saved name and stable ID when assigning a sport or changing a fee.
+	err := lc.Coll.FindOne(ctx, bson.M{
+		"tenantId": tenantId, "sport": level.Sport, "name": existing.Name,
+		"id": bson.M{"$ne": existing.ID},
+	}).Err()
+	if err == nil {
+		return fmt.Errorf("level %q already exists for %s", existing.Name, level.Sport)
+	}
+	if !errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf("failed to check level: %w", err)
+	}
+	result, err := lc.Coll.UpdateOne(ctx, filter,
+		bson.M{"$set": bson.M{"sport": level.Sport, "gameFee": level.GameFee}})
+	if err != nil {
+		return fmt.Errorf("failed to update level: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return mongo.ErrNoDocuments
+	}
+	return nil
 }
 
 func (lc *LevelsCollection) Activate(level Level, tenantId string) error {
@@ -5668,13 +5706,17 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
 		return fmt.Errorf("tenant ID is required")
 	}
 
-    var existing Level
-    if err := lc.Coll.FindOne(context.Background(), bson.M{
-        "id": levelID, "tenantId": tenantID,
-    }).Decode(&existing); err != nil { return err }
-    gamesFilter := bson.M{"tenantId": tenantID, "level": existing.Name}
-    // Unassigned legacy levels may be referenced by any sport.
-    if existing.Sport != "" { gamesFilter["sport"] = existing.Sport }
+	var existing Level
+	if err := lc.Coll.FindOne(context.Background(), bson.M{
+		"id": levelID, "tenantId": tenantID,
+	}).Decode(&existing); err != nil {
+		return err
+	}
+	gamesFilter := bson.M{"tenantId": tenantID, "level": existing.Name}
+	// Unassigned legacy levels may be referenced by any sport.
+	if existing.Sport != "" {
+		gamesFilter["sport"] = existing.Sport
+	}
 
 	gamesCollection := Client.Database(Database).Collection("games")
 
@@ -5722,9 +5764,9 @@ func (lc *LevelsCollection) GetLevels(tenantId string, activeOnly bool, sports .
 		"tenantId": tenantId,
 	}
 
-    if len(sports) > 0 && strings.TrimSpace(sports[0]) != "" {
-        filter["sport"] = strings.TrimSpace(sports[0])
-    }
+	if len(sports) > 0 && strings.TrimSpace(sports[0]) != "" {
+		filter["sport"] = strings.TrimSpace(sports[0])
+	}
 
 	if activeOnly {
 		filter["active"] = true
@@ -5735,7 +5777,7 @@ func (lc *LevelsCollection) GetLevels(tenantId string, activeOnly bool, sports .
 	opts := options.Find().
 		SetSort(bson.D{
 			{Key: "sport", Value: 1},
-            {Key: "name", Value: 1},
+			{Key: "name", Value: 1},
 		})
 
 	cursor, err := lc.Coll.Find(ctx, filter, opts)
@@ -5759,7 +5801,6 @@ func (lc *LevelsCollection) GetLevels(tenantId string, activeOnly bool, sports .
 	}
 
 	fmt.Println("Total levels found for tenant", tenantId, ":", len(levels))
-
 
 	return levels, nil
 }

@@ -887,7 +887,7 @@ body {
         id="gamesCount"
         class="games-count"
         aria-live="polite">
-        0 assignments displayed
+        0 assignments displayed — Total number of games: 0 — Total assignment earnings: $0.00
     </div>
 
     <table class="games-table">
@@ -1221,13 +1221,14 @@ function hideMessage() {
     div.style.display = "none";
 }
 
-function updateGamesCount(count, totalFees) {
+function updateGamesCount(assignmentCount, gameCount, totalFees) {
     const gamesCount =
         document.getElementById("gamesCount");
 
     gamesCount.textContent =
-        `${count} ${count === 1 ? "assignment" : "assignments"} displayed — ` +
-        `Total game fees: ${formatCurrency(totalFees)}`;
+        `${assignmentCount} ${assignmentCount === 1 ? "assignment" : "assignments"} displayed — ` +
+        `Total number of games: ${gameCount} — ` +
+        `Total assignment earnings: ${formatCurrency(totalFees)}`;
 }
 
 function formatCurrency(amount) {
@@ -1301,8 +1302,16 @@ function renderGames(
 ) {
     displayedDashboardGames = Array.isArray(games) ? games : [];
     const tbody = document.getElementById("gamesBody");
-    const displayedGameCount =
-        Array.isArray(games) ? games.length : 0;
+    const displayedGameCount = displayedDashboardGames.reduce(
+        (total, game) => {
+            const count = Number(game.NumOfGames ?? game.numOfGames ?? 0);
+
+            return total + (
+                Number.isInteger(count) && count > 0 ? count : 0
+            );
+        },
+        0
+    );
 
     const totalGameFees = Array.isArray(games)
         ? games.reduce((total, game) => {
@@ -1321,11 +1330,11 @@ function renderGames(
    
         tbody.innerHTML = "";
 
-    updateGamesCount(displayedGameCount, totalGameFees);
+    updateGamesCount(displayedDashboardGames.length, displayedGameCount, totalGameFees);
 
     document.getElementById("selectAll").checked = false;
 
-    if (displayedGameCount === 0) {
+    if (displayedDashboardGames.length === 0) {
         showMessage(emptyMessage, messageType);
         return;
     }

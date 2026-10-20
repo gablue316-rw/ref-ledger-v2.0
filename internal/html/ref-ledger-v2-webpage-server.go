@@ -435,7 +435,6 @@ func GetEnvironmentHandler(w http.ResponseWriter, r *http.Request) {
 func GetAssignorsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	 
 	tId, err := getTenantId(r)
 
 	if err != nil {
@@ -461,7 +460,6 @@ func GetSitesDirectoryHandler(
 ) {
 	LogVisitor(r)
 
-	 
 	tId, err := getTenantId(r)
 
 	if err != nil {
@@ -488,7 +486,6 @@ func GetSitesDirectoryHandler(
 func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	 
 	tId, err := getTenantId(r)
 
 	if err != nil {
@@ -508,7 +505,6 @@ func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	 
 	tId, err := getTenantId(r)
 
 	if err != nil {
@@ -532,7 +528,6 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 
 	LogVisitor(r)
 
-	 
 	tId, err := getTenantId(r)
 
 	if err != nil {
@@ -553,7 +548,6 @@ func GetAssociationsHandler(w http.ResponseWriter, r *http.Request) {
 func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	 
 	tId, err := getTenantId(r)
 
 	if err != nil {
@@ -603,7 +597,6 @@ func GetLevelsHandler(w http.ResponseWriter, r *http.Request) {
 func GetSportsHandler(w http.ResponseWriter, r *http.Request) {
 	LogVisitor(r)
 
-	 
 	tId, err := getTenantId(r)
 
 	if err != nil {
@@ -5095,11 +5088,11 @@ func GenerateReport(w http.ResponseWriter, r *http.Request) {
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
-    tId, err := getTenantId(r)
-    if err != nil || tId == "" || tId == "na" {
-	    http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-	    return
-    }
+	tId, err := getTenantId(r)
+	if err != nil || tId == "" || tId == "na" {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
 
 	LogVisitor(r)
 	var game Game
@@ -5116,13 +5109,13 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Updating game with game id", utils.ConvertIntToStr(game.GameId), "for association", game.Association)
 
 	fmt.Printf(
-   	    "UpdateGame lookup: database=%q gameId=%d association=%q tenantId=%q\n",
-	    database.Database,
-	    game.GameId,
-	    game.Association,
-	    tId,
-    )
-	
+		"UpdateGame lookup: database=%q gameId=%d association=%q tenantId=%q\n",
+		database.Database,
+		game.GameId,
+		game.Association,
+		tId,
+	)
+
 	singleGameDesc, err = gc.Get(game.Association, utils.ConvertIntToStr(game.GameId), tId)
 	if err != nil {
 		fmt.Println(err)
@@ -5143,34 +5136,34 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	singleGameDesc = GameDocToGameDescr(game)
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
-		api.DelGame(context.TODO(), singleGameDesc.GameId,tId)
+		api.DelGame(context.TODO(), singleGameDesc.GameId, tId)
 		return
 	}
 
 	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
-	
+
 	err = api.ValidateGameDescriptor(
-	    r.Context(),
-	    singleGameDesc,
-	    false,
-	    tId,
-    )
-    
+		r.Context(),
+		singleGameDesc,
+		false,
+		tId,
+	)
+
 	if err != nil {
-	    fmt.Printf(
-		    "UpdateGame validation failed: gameId=%d sport=%q level=%q error=%v\n",
-		    game.GameId,
-		    game.Sport,
-		    game.Level,
-		    err,
-	    )
-	    http.Error(
-		    w,
-		    "Invalid Game: "+err.Error(),
-		    http.StatusBadRequest,
-	    )
-	    return
-    }
+		fmt.Printf(
+			"UpdateGame validation failed: gameId=%d sport=%q level=%q error=%v\n",
+			game.GameId,
+			game.Sport,
+			game.Level,
+			err,
+		)
+		http.Error(
+			w,
+			"Invalid Game: "+err.Error(),
+			http.StatusBadRequest,
+		)
+		return
+	}
 
 	err = database.UpdateOneGameDoc(
 		r.Context(),
@@ -5233,7 +5226,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
-		api.DelGame(context.TODO(), singleGameDesc.GameId,tId)
+		api.DelGame(context.TODO(), singleGameDesc.GameId, tId)
 		return
 	}
 
@@ -5244,7 +5237,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	gDoc.Association = game.Association
 
 	checkForDup := true
-	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup,tId)
+	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup, tId)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -6003,13 +5996,13 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 
 	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson), tId)
 	if err != nil {
-		fmt.Println("Failed to create association")
-		http.Error(w, "Failed to create association", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Association added successfully"))
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprint(w, "Association added successfully.")
 }
 
 func CreateSite(w http.ResponseWriter, r *http.Request) {
@@ -6030,13 +6023,13 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 
 	err = sc.Add(sc.ConvJsonToSite(siteJson), tId)
 	if err != nil {
-		fmt.Println("Failed to create site")
-		http.Error(w, "Failed to create site", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Site added successfully"))
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprint(w, "Site saved successfully.")
 }
 
 func UpdateSite(w http.ResponseWriter, r *http.Request) {
@@ -6112,14 +6105,17 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
+
 	err = oc.Add(oc.ConvJsonToOfficial(officialJson), tId)
 	if err != nil {
-		fmt.Println("Failed to create official")
-		http.Error(w, "Failed to create official", http.StatusInternalServerError)
+		fmt.Println("Failed to create official:", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
-	w.Write([]byte("Official created successfully"))
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+	fmt.Fprint(w, "Official created successfully")
 }
 
 type DeleteExpenseRequest struct {
@@ -6400,7 +6396,7 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
-	
+
 	association := r.PathValue("association")
 	gameId := r.PathValue("gameId")
 
@@ -7857,29 +7853,31 @@ func DeactivateLevel(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateLevel(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodPut {
-        w.Header().Set("Allow", "PUT")
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-        return
-    }
-    tenantId, err := getTenantId(r)
-    if err != nil || strings.TrimSpace(tenantId) == "" || tenantId == "na" {
-        http.Error(w, "Unable to determine tenant ID", http.StatusUnauthorized)
-        return
-    }
-    var level database.Level
-    if err := json.NewDecoder(r.Body).Decode(&level); err != nil {
-        http.Error(w, "Invalid level data", http.StatusBadRequest)
-        return
-    }
-    if err := lc.Update(level, tenantId); err != nil {
-        status := http.StatusBadRequest
-        if errors.Is(err, mongo.ErrNoDocuments) { status = http.StatusNotFound }
-        http.Error(w, err.Error(), status)
-        return
-    }
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(map[string]string{"message": "Level sport and game fee saved successfully"})
+	if r.Method != http.MethodPut {
+		w.Header().Set("Allow", "PUT")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	tenantId, err := getTenantId(r)
+	if err != nil || strings.TrimSpace(tenantId) == "" || tenantId == "na" {
+		http.Error(w, "Unable to determine tenant ID", http.StatusUnauthorized)
+		return
+	}
+	var level database.Level
+	if err := json.NewDecoder(r.Body).Decode(&level); err != nil {
+		http.Error(w, "Invalid level data", http.StatusBadRequest)
+		return
+	}
+	if err := lc.Update(level, tenantId); err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			status = http.StatusNotFound
+		}
+		http.Error(w, err.Error(), status)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": "Level sport and game fee saved successfully"})
 }
 
 func LevelsHandler(w http.ResponseWriter, r *http.Request) {
@@ -7892,7 +7890,7 @@ func LevelsHandler(w http.ResponseWriter, r *http.Request) {
 		AddLevel(w, r)
 
 	case http.MethodPut:
-        UpdateLevel(w, r)
+		UpdateLevel(w, r)
 
 	case http.MethodDelete:
 		DelLevel(w, r)
@@ -8439,11 +8437,7 @@ func main() {
 		return
 	}
 
-	result, err, numOfIndices = oc.IsIndexed()
-
-	if result == false && numOfIndices != 2 {
-		err = oc.CreateIndices()
-	}
+	err = oc.CreateIndices()
 
 	if err != nil {
 		fmt.Println("Failed to create indices for Officials Collection.  Reason:", err)

@@ -713,12 +713,15 @@ document.getElementById("associationForm").addEventListener("submit", async func
             body: JSON.stringify(association)
         });
 
-        const message = await response.text();
+        // const message = await response.text();
+        const message = (await response.text()).trim();
+        const messageElement = document.getElementById("message");
 
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Association saved successfully."
-                : message || "Error saving association.";
+        messageElement.textContent =
+            message || (response.ok
+                ? "Association saved successfully."
+                : "Error saving association.");
+        messageElement.style.color = response.ok ? "green" : "red";
 
         if (response.ok) {
            clearAssociationsForm();
