@@ -190,92 +190,138 @@ func ValidateOfficialDescriptor(parentCtx context.Context, p model.OfficialDescr
 	return nil
 }
 
-func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, checkForDup bool, tId string) error {
+func ValidateGameDescriptor(
+	parentCtx context.Context,
+	g model.GameDescriptor,
+	checkForDup bool,
+	tId string,
+) error {
+	const errorFormat = "%s %s not found! Record Dropped!"
 
-	var errorFormat string = "%s %s not found!  Record Dropped!"
-	var dollarAmountPattern = regexp.MustCompile(`^\$?[0-9]+(\.[0-9]{1,2})?$`)
+	dollarAmountPattern := regexp.MustCompile(
+		`^\$?[0-9]+(\.[0-9]{1,2})?$`,
+	)
 
 	if !GcInitialized {
-		err := gc.Init(database.Client)
-		if err != nil {
-			fmt.Println("Games Collection is not initialized")
-			return fmt.Errorf("Games Collection is not initialized")
+		if err := gc.Init(database.Client); err != nil {
+			return fmt.Errorf(
+				"games collection is not initialized: %w",
+				err,
+			)
 		}
 		GcInitialized = true
 	}
 
 	if !OcInitialized {
-		err := oc.Init(database.Client)
-		if err != nil {
-			fmt.Println("Officials Collection is not initialized")
-			return fmt.Errorf("Officials Collection is not initialized")
+		if err := oc.Init(database.Client); err != nil {
+			return fmt.Errorf(
+				"officials collection is not initialized: %w",
+				err,
+			)
 		}
 		OcInitialized = true
 	}
 
 	if !AcInitialized {
-		err := ac.Init(database.Client)
-		if err != nil {
-			fmt.Println("Association Collection is not initialized")
-			return fmt.Errorf("Association Collection is not initialized")
+		if err := ac.Init(database.Client); err != nil {
+			return fmt.Errorf(
+				"association collection is not initialized: %w",
+				err,
+			)
 		}
 		AcInitialized = true
 	}
 
 	if !dollarAmountPattern.MatchString(g.GameFee) {
-		return fmt.Errorf("invalid Game Fee amount %q: use numbers with an optional $ and up to two decimal places", g.GameFee)
+		return fmt.Errorf(
+			"invalid Game Fee amount %q: use numbers with an optional $ and up to two decimal places",
+			g.GameFee,
+		)
 	}
+
 	if !dollarAmountPattern.MatchString(g.TravelPay) {
-		return fmt.Errorf("invalid Travel Pay amount %q: use numbers with an optional $ and up to two decimal places", g.TravelPay)
+		return fmt.Errorf(
+			"invalid Travel Pay amount %q: use numbers with an optional $ and up to two decimal places",
+			g.TravelPay,
+		)
 	}
+
 	if !dollarAmountPattern.MatchString(g.AssignorFee) {
-		return fmt.Errorf("invalid Assignor Fee amount %q: use numbers with an optional $ and up to two decimal places", g.AssignorFee)
+		return fmt.Errorf(
+			"invalid Assignor Fee amount %q: use numbers with an optional $ and up to two decimal places",
+			g.AssignorFee,
+		)
 	}
+
 	if !dollarAmountPattern.MatchString(g.Deductions) {
-		return fmt.Errorf("invalid Deductions amount %q: use numbers with an optional $ and up to two decimal places", g.Deductions)
+		return fmt.Errorf(
+			"invalid Deductions amount %q: use numbers with an optional $ and up to two decimal places",
+			g.Deductions,
+		)
 	}
 
-	var assignor string = strings.TrimSpace(g.Assignor)
-	var gameid string = strings.TrimSpace(g.GameId)
-	var assoc string = strings.TrimSpace(g.Association)
+	assignor := strings.TrimSpace(g.Assignor)
+	gameIDText := strings.TrimSpace(g.GameId)
+	association := strings.TrimSpace(g.Association)
 
-	fmt.Println("Validating Game with game id", gameid, "for association", assoc)
+	gameID, err := strconv.ParseInt(gameIDText, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid game ID: %q", gameIDText)
+	}
 
+	fmt.Println(
+		"Validating game with game ID",
+		gameIDText,
+		"for association",
+		association,
+	)
+
+	// For new games, check whether this game ID already exists
+	// for the same tenant and association.
 	if checkForDup {
-		exists, err := gc.Exists(assoc, gameid, tId)
+		exists, err := gc.Exists(association, gameIDText, tId)
 		if err != nil {
-			return fmt.Errorf("failed to check for duplicate game: %w", err)
+			return fmt.Errorf(
+				"failed to check for duplicate game: %w",
+				err,
+			)
 		}
+
 		if exists {
 			return fmt.Errorf(
 				"duplicate game: game ID %s for association %s",
-				gameid, assoc,
+				gameIDText,
+				association,
 			)
 		}
 	}
 
-	// Retrieve game IDs by date and time to check for duplicates based on date and time
-	//
-	fmt.Println("Verifying that there are no duplicate games for the same date and time")
-	fmt.Println("Getting game IDs by date and time")
-	gameIds, err := gc.GetGameIdsByDateTime(tId, g.Date, g.Time)
-	fmt.Println("Game IDs retrieved:", gameIds)
-
+	// Check the requested date and time for both adds and updates.
+	matches, err := gc.GetGameIdsByDateTime(tId, g.Date, g.Time)
 	if err != nil {
-		return fmt.Errorf("error retrieving game IDs by date and time: %s", err.Error())
+		return fmt.Errorf(
+			"error retrieving games by date and time: %w",
+			err,
+		)
 	}
 
-	gameId, err := strconv.ParseInt(g.GameId, 10, 64)
+	for _, existingGame := range matches {
+		isCurrentGame :=
+			existingGame.GameId == gameID &&
+				existingGame.Association == association
 
-	if err != nil {
-		return fmt.Errorf("invalid game ID: %s", g.GameId)
-	}
-
-	fmt.Println("Checking for Game Ids with duplicate date and time")
-	for _, existingGameId := range gameIds {
-		if existingGameId != gameId {
-			return fmt.Errorf("duplicate game found for the same date and time")
+		// An update may match itself, but not another game.
+		if !checkForDup && isCurrentGame {
+			continue
 		}
+
+		return fmt.Errorf(
+			"duplicate date and time: game %d for association %s already exists on %s at %s",
+			existingGame.GameId,
+			existingGame.Association,
+			g.Date,
+			g.Time,
+		)
 	}
 
 	for _, assignment := range g.Officials {
@@ -284,42 +330,46 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 			role = assignment.RoleId
 		}
 
-		officialId := strings.TrimSpace(assignment.OfficialId)
+		officialID := strings.TrimSpace(assignment.OfficialId)
 		name := strings.TrimSpace(assignment.Name)
 
-		if officialId == "Unassigned" {
-			officialId = ""
+		if officialID == "Unassigned" {
+			officialID = ""
 		}
 
-		if officialId == "" && (name == "" || name == "Unassigned") {
+		if officialID == "" &&
+			(name == "" || name == "Unassigned") {
 			continue
 		}
 
-		if officialId != "" {
-			id, err := strconv.ParseInt(officialId, 10, 64)
+		if officialID != "" {
+			id, err := strconv.ParseInt(officialID, 10, 64)
 			if err != nil || id <= 0 {
 				return fmt.Errorf(
 					"invalid officialId %q for role %q",
-					officialId, role,
+					officialID,
+					role,
 				)
 			}
 
 			if _, err := oc.GetById(id, tId); err != nil {
 				return fmt.Errorf(
 					"invalid official for role %q: %w",
-					role, err,
+					role,
+					err,
 				)
 			}
 
 			continue
 		}
 
-		// Support imports containing a name within the Officials array.
+		// Support imports containing a name without an official ID.
 		parts := strings.Fields(name)
 		if len(parts) < 2 {
 			return fmt.Errorf(
 				"invalid official name %q for role %q",
-				name, role,
+				name,
+				role,
 			)
 		}
 
@@ -330,17 +380,32 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 		); err != nil {
 			return fmt.Errorf(
 				"invalid official %q for role %q: %w",
-				name, role, err,
+				name,
+				role,
+				err,
 			)
 		}
 	}
-	fmt.Println("Assignor=", assignor)
+
 	if assignor != "Unassigned" {
-		results, err := ac.AssignorExists(assignor, tId, g.Association)
-		if !results || err != nil {
+		exists, err := ac.AssignorExists(
+			assignor,
+			tId,
+			association,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"failed to validate assignor %q: %w",
+				assignor,
+				err,
+			)
+		}
+
+		if !exists {
 			return fmt.Errorf(errorFormat, "Assignor", assignor)
 		}
 	}
+
 	return nil
 }
 

@@ -636,6 +636,17 @@ body {
 .group-text-btn:hover { color: #1d4ed8; }
 .group-text-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 3px; }
 .group-text-btn:disabled { opacity: 0.5; cursor: wait; }
+/* Notes use the existing game editor and save endpoint. */
+.notes-game-btn { padding: 4px; border: 0; background: transparent; color: #2563eb; font-size: 18px; cursor: pointer; }
+.notes-game-btn.notes-empty { color: #9ca3af; }
+.notes-game-btn:hover { color: #1d4ed8; }
+.notes-game-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.game-notes-field { margin-top: 18px; }
+.game-notes-field textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font: inherit; resize: vertical; }
+.game-notes-field small { color: #64748b; }
+#editGameModalOverlay.notes-only .edit-game-modal { max-width: 560px; }
+#editGameModalOverlay.notes-only .edit-game-form-grid,
+#editGameModalOverlay.notes-only .edit-officials-section { display: none; }
 </style>
 </head>
 
@@ -1055,6 +1066,11 @@ body {
                     <p id="editOfficialsMessage" role="status">Choose a sport to load its official fields.</p>
                     <div id="editOfficialsFields" class="edit-game-form-grid"></div>
                 </section>
+                <div class="edit-game-field game-notes-field">
+                    <label for="editNotes">Notes</label>
+                    <textarea id="editNotes" rows="4" maxlength="150" aria-describedby="editNotesRemaining"></textarea>
+                    <small id="editNotesRemaining" aria-live="polite">150 characters left</small>
+                </div>
                 <div id="editGameError" class="edit-game-error" role="alert"></div>
             </div>
 
@@ -1413,6 +1429,14 @@ function renderGames(
             </button>
         `;
 
+        const hasNotes = String(game.Notes ?? game.notes ?? "").length > 0;
+        const notesGameButton = `
+            <button type="button" class="notes-game-btn ${hasNotes ? "" : "notes-empty"}"
+                title="${hasNotes ? "View or update notes" : "Add notes"}"
+                aria-label="${hasNotes ? "View or update notes" : "Add notes"}"
+                onclick="openEditGame(decodeURIComponent('${encodedGameId}'), decodeURIComponent('${encodedAssociation}'), true)">
+                <i class="fa-solid fa-note-sticky" aria-hidden="true"></i>
+            </button>`;
         const officialsHtml = renderOfficialAssignments(game);
 
         row.innerHTML = `
@@ -1422,6 +1446,7 @@ function renderGames(
                     ${completeGameButton}
                     ${editGameButton}
                     ${deleteGameButton}
+                    ${notesGameButton}
                 </span>
             </td>
             <td>${gameId}</td>
@@ -3083,7 +3108,8 @@ function timeInputValue(value) {
     return `${String(hours).padStart(2, "0")}:${minutes}`;
 }
 
-async function openEditGame(gameId, association) {
+async function openEditGame(gameId, association, notesOnly = false) {
+    if (document.getElementById("editGameModalOverlay").classList.contains("show")) return;
     gameBeingEdited = null;
     editAssignorsReady = false;
     editAssignorsVersion++;
@@ -3114,6 +3140,10 @@ async function openEditGame(gameId, association) {
         return;
     }
 
+    document.getElementById("editNotes").value = gameValue(gameBeingEdited, "Notes");
+    updateNotesRemaining();
+    document.getElementById("editGameModalOverlay").classList.toggle("notes-only", notesOnly);
+    document.getElementById("editGameModalTitle").textContent = notesOnly ? `Notes — Game ${gameId}` : "Update game";
     document.getElementById("editGameId").value = gameValue(gameBeingEdited, "GameId");
     document.getElementById("editTaxYear").value = gameBeingEdited.TaxYear ?? gameBeingEdited.Taxyear ?? gameBeingEdited.taxYear ?? gameBeingEdited.taxyear ?? "";
     document.getElementById("editAssociation").value = gameValue(gameBeingEdited, "Association");
@@ -3145,7 +3175,7 @@ async function openEditGame(gameId, association) {
         showEditGameError(dashboardUserSportsError + " You can still save with the game's existing sport.");
     }
     document.getElementById("editGameModalOverlay").classList.add("show");
-    document.getElementById("editTime").focus();
+    document.getElementById(notesOnly ? "editNotes" : "editTime").focus();
     editSportAssignments = new Map();
     await Promise.all([
         loadEditAssignors(gameBeingEdited),
@@ -3153,7 +3183,8 @@ async function openEditGame(gameId, association) {
     ]);
 }
 
-function closeEditGame() {
+function closeEditGame(force = false) {
+    if (document.getElementById("saveEditGameButton").disabled && force !== true) return;
     editAssignorsVersion++;
     editAssignorsReady = false;
     editOfficialsVersion++;
@@ -3161,7 +3192,9 @@ function closeEditGame() {
     editOfficialRows = [];
     document.getElementById("editOfficialsFields").replaceChildren();
     document.getElementById("editGameModalOverlay").classList.remove("show");
+    document.getElementById("editGameModalOverlay").classList.remove("notes-only");
     document.getElementById("editGameForm").reset();
+    updateNotesRemaining();
     document.getElementById("editGameError").style.display = "none";
     gameBeingEdited = null;
 }
@@ -3179,6 +3212,11 @@ async function saveEditedGame(event) {
         return;
     }
 
+    if (document.getElementById("editNotes").value.length > 150) {
+        showEditGameError("Notes must be 150 characters or fewer.");
+        document.getElementById("editNotes").focus();
+        return;
+    }
     const selectedSport = document.getElementById("editSport").value.trim();
     const existingSport = String(gameValue(gameBeingEdited, "Sport")).trim();
     if (!selectedSport || (selectedSport !== existingSport &&
@@ -3208,6 +3246,7 @@ async function saveEditedGame(event) {
     const payload = {
         gameId: Number(gameId),
         taxYear,
+        notes: document.getElementById("editNotes").value,
         association,
         date: document.getElementById("editDate").value,
         time: document.getElementById("editTime").value.trim(),
@@ -3258,7 +3297,7 @@ async function saveEditedGame(event) {
             throw new Error(errorText || `HTTP ${response.status}`);
         }
 
-        closeEditGame();
+        closeEditGame(true);
     } catch (err) {
         console.error("Failed to update game:", err);
         showEditGameError(
@@ -3287,6 +3326,16 @@ async function saveEditedGame(event) {
     showMessage(`Game ${gameId} updated successfully.`, "info");
 }
 
+function updateNotesRemaining() {
+    const remaining = 150 - document.getElementById("editNotes").value.length;
+    document.getElementById("editNotesRemaining").textContent = `${remaining} characters left`;
+}
+document.getElementById("editNotes").addEventListener("input", updateNotesRemaining);
+document.getElementById("editGameForm").addEventListener("invalid", () => {
+    document.getElementById("editGameModalOverlay").classList.remove("notes-only");
+    document.getElementById("editGameModalTitle").textContent = "Update game";
+    showEditGameError("Check the game's required fields before saving.");
+}, true);
 document.getElementById("editGameForm").addEventListener("submit", saveEditedGame);
 document.getElementById("cancelEditGameButton").addEventListener("click", closeEditGame);
 document.getElementById("editGameModalOverlay").addEventListener("click", event => {
