@@ -60,6 +60,15 @@ type SiteName struct {
 	Name string `json:"name"`
 }
 
+func ValidStatus(status string) bool {
+	for _, s := range PermittedGameStatusValues {
+		if status == s {
+			return true
+		}
+	}
+	return false
+}
+
 func convertDateStringToTime(date, gameTime string) (time.Time, error) {
 
 	loc, err := time.LoadLocation("America/New_York")
@@ -3946,6 +3955,23 @@ func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int,
 
 }
 
+func (gc *GameCollection) DupGamesWithDateAndTime(tId, date, time string) (bool, error) {
+	ctx := context.Background()
+
+	filter := bson.M{
+		"tenantId": tId,
+		"date":     date,
+		"time":     time,
+	}
+
+	count, err := gc.Coll.CountDocuments(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
 func (gc *GameCollection) GetTomorrowsPendingGames(tId string) ([]model.GameDoc, int, error) {
 
 	ctx := context.Background()
@@ -5261,6 +5287,24 @@ func (uc *UsersCollection) SetSportsSupported(
 	}
 
 	return nil
+}
+
+func (uc *UsersCollection) IsSportSupported(
+	tenantId string,
+	sport string,
+) (bool, error) {
+	sports, err := uc.GetSportsSupported(tenantId)
+	if err != nil {
+		return false, err
+	}
+
+	for _, s := range sports {
+		if s == sport {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (uc *UsersCollection) GetSportsSupported(

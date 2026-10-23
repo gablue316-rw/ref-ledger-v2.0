@@ -15,6 +15,7 @@ import (
 
 	"crypto/rand"
 	"encoding/hex"
+	"unicode/utf8"
 
 	"os"
 	"sort"
@@ -25,6 +26,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"regexp"
 	"unicode"
 
 	"ref-ledger-v2/internal/api"
@@ -69,6 +71,7 @@ type Game struct {
 	Assignor    string                  `json:"assignor"`
 	Officials   []model.GameOfficialDoc `json:"officials"`
 	TaxYear     string                  `json:"taxYear"`
+	Notes       string                  `json:"notes"`
 }
 
 type Expense struct {
@@ -268,6 +271,7 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 		Assignor:    g.Assignor,
 		Officials:   officials,
 		TaxYear:     g.TaxYear,
+		Notes:       g.Notes,
 	}
 }
 
@@ -925,6 +929,7 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 	headers := []string{
 		"gameId",
 		"date",
+		"taxyear",
 		"time",
 		"sport",
 		"site",
@@ -950,6 +955,7 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"assignor",
 		"home",
 		"visitor",
+		"notes",
 	}
 
 	if err := csvWriter.Write(headers); err != nil {
@@ -974,6 +980,7 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 	exampleRow := []string{
 		"777",
 		"10/1/2026",
+		"2026",
 		"7:00 PM",
 		"Softball",
 		"Mill Creek High School",
@@ -999,6 +1006,7 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"Charlie Davis",
 		"Mill Creek",
 		"Buford",
+		"Game Suspended due to Rain",
 	}
 
 	if err := csvWriter.Write(exampleRow); err != nil {
@@ -1097,6 +1105,7 @@ const previewExpiration = 15 * time.Minute
 type GameImportData struct {
 	GameId      int64                   `json:"gameId"`
 	Date        string                  `json:"date"`
+	TaxYear     string                  `json:"taxYear"`
 	Time        string                  `json:"time"`
 	Sport       string                  `json:"sport"`
 	Site        string                  `json:"site"`
@@ -1113,6 +1122,7 @@ type GameImportData struct {
 	Status      string                  `json:"status"`
 	Officials   []model.GameOfficialDoc `json:"officials"`
 	Assignor    string                  `json:"assignor"`
+	Notes       string                  `json:"notes"`
 }
 
 type GamePreviewRow struct {
@@ -1440,6 +1450,7 @@ func validateGamesCSVHeader(header []string) error {
 	expected := []string{
 		"gameid",
 		"date",
+		"taxyear",
 		"time",
 		"sport",
 		"site",
@@ -1465,6 +1476,7 @@ func validateGamesCSVHeader(header []string) error {
 		"assignor",
 		"home",
 		"visitor",
+		"notes",
 	}
 
 	if len(header) != len(expected) {
@@ -1559,14 +1571,19 @@ func buildGamePreviewRow(
 	rowNumber int,
 	record []string,
 	tId string,
+	seenDateTimes map[string]bool,
 ) GamePreviewRow {
 
-	const expectedColumns = 27
-	const firstOfficialColumn = 14
+	const expectedColumns = 29
+	const firstOfficialColumn = 15
 	const maxOfficialColumns = 10
-	const assignorColumn = 24
-	const homeColumn = 25
-	const visitorColumn = 26
+	const assignorColumn = 25
+	const homeColumn = 26
+	const visitorColumn = 27
+	const notesColumn = 28
+
+	var dateValid bool
+	var timeValid bool
 
 	row := GamePreviewRow{
 		RowNumber: rowNumber,
@@ -1581,7 +1598,7 @@ func buildGamePreviewRow(
 	)
 
 	numOfGames, _ := strconv.ParseInt(
-		csvColumn(record, 6),
+		csvColumn(record, 7),
 		10,
 		64,
 	)
@@ -1589,22 +1606,46 @@ func buildGamePreviewRow(
 	row.Data = GameImportData{
 		GameId:      gameId,
 		Date:        csvColumn(record, 1),
-		Time:        csvColumn(record, 2),
-		Sport:       csvColumn(record, 3),
-		Site:        csvColumn(record, 4),
-		Field:       csvColumn(record, 5),
+		TaxYear:     csvColumn(record, 2),
+		Time:        csvColumn(record, 3),
+		Sport:       csvColumn(record, 4),
+		Site:        csvColumn(record, 5),
+		Field:       csvColumn(record, 6),
 		NumOfGames:  numOfGames,
-		Level:       csvColumn(record, 7),
-		GameFee:     csvColumn(record, 8),
-		TravelPay:   csvColumn(record, 9),
-		AssignorFee: csvColumn(record, 10),
-		Deductions:  csvColumn(record, 11),
-		Association: csvColumn(record, 12),
-		Status:      csvColumn(record, 13),
+		Level:       csvColumn(record, 8),
+		GameFee:     csvColumn(record, 9),
+		TravelPay:   csvColumn(record, 10),
+		AssignorFee: csvColumn(record, 11),
+		Deductions:  csvColumn(record, 12),
+		Association: csvColumn(record, 13),
+		Status:      csvColumn(record, 14),
 		Officials:   make([]model.GameOfficialDoc, 0),
 		Assignor:    csvColumn(record, assignorColumn),
 		Home:        csvColumn(record, homeColumn),
 		Visitor:     csvColumn(record, visitorColumn),
+		Notes:       csvColumn(record, notesColumn),
+	}
+
+	sportSupported, err := uc.IsSportSupported(tId, row.Data.Sport)
+	if err != nil {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Failed to check if sport %q is supported%v",
+				row.Data.Sport,
+				err,
+			),
+		)
+	}
+
+	if !sportSupported {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Sport %q is not supported",
+				row.Data.Sport,
+			),
+		)
 	}
 
 	if len(record) != expectedColumns {
@@ -1617,6 +1658,149 @@ func buildGamePreviewRow(
 			),
 		)
 		return row
+	}
+
+	row.Data.Date = strings.TrimSpace(row.Data.Date)
+	row.Data.TaxYear = strings.TrimSpace(row.Data.TaxYear)
+
+	var gameDate time.Time
+	dateValid = false
+	timeValid = false
+
+	if database.ValidStatus(row.Data.Status) == false {
+		row.Errors = append(row.Errors, fmt.Sprintf("Invalid game status: %q", row.Data.Status))
+	}
+
+	if row.Data.Date == "" {
+		row.Errors = append(row.Errors, "Game date is required")
+	} else {
+		var err error
+		gameDate, err = time.Parse("1/2/2006", row.Data.Date)
+		if err != nil {
+			row.Errors = append(
+				row.Errors,
+				"Invalid game date; expected a valid date in M/D/YYYY format",
+			)
+		} else {
+			dateValid = true
+		}
+	}
+
+	// Default a blank tax year only when the game date is valid.
+	if row.Data.TaxYear == "" && dateValid {
+		row.Data.TaxYear = strconv.Itoa(gameDate.Year())
+	}
+
+	// A supplied or derived tax year must contain exactly four digits
+	// and be between 1000 and 9999.
+	if row.Data.TaxYear != "" {
+		taxYear, err := strconv.Atoi(row.Data.TaxYear)
+
+		digitsOnly := len(row.Data.TaxYear) == 4
+		for _, char := range row.Data.TaxYear {
+			if char < '0' || char > '9' {
+				digitsOnly = false
+				break
+			}
+		}
+
+		if !digitsOnly || err != nil || taxYear < 1000 || taxYear > 9999 {
+			row.Errors = append(
+				row.Errors,
+				"Invalid tax year; expected a four-digit year between 1000 and 9999",
+			)
+		}
+	}
+
+	var dollarAmountPattern = regexp.MustCompile(`^\$?[0-9]+(\.[0-9]{1,2})?$`)
+	var timePattern = regexp.MustCompile(`^(1[0-2]|[1-9]):[0-5][0-9] (AM|PM)$`)
+
+	if !dollarAmountPattern.MatchString(row.Data.GameFee) {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Invalid Game Fee: %q",
+				row.Data.GameFee,
+			),
+		)
+	}
+	if !dollarAmountPattern.MatchString(row.Data.TravelPay) {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Invalid Travel Pay: %q",
+				row.Data.TravelPay,
+			),
+		)
+	}
+	if !dollarAmountPattern.MatchString(row.Data.AssignorFee) {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Invalid Assignor Fee: %q",
+				row.Data.AssignorFee,
+			),
+		)
+	}
+	if !dollarAmountPattern.MatchString(row.Data.Deductions) {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Invalid Deductions: %q",
+				row.Data.Deductions,
+			),
+		)
+	}
+
+	if !timePattern.MatchString(row.Data.Time) {
+		row.Errors = append(
+			row.Errors,
+			fmt.Sprintf(
+				"Invalid Time: %q; use h:mm AM or h:mm PM",
+				row.Data.Time,
+			),
+		)
+	} else {
+		timeValid = true
+	}
+
+	if dateValid && timeValid {
+
+		key := row.Data.Date + "|" + row.Data.Time
+
+		if seenDateTimes[key] {
+			row.Errors = append(
+				row.Errors,
+				"Duplicate game in file with date and time",
+			)
+		} else {
+			dupGames, err := gc.DupGamesWithDateAndTime(tId, row.Data.Date, row.Data.Time)
+			if err != nil {
+				row.Errors = append(
+					row.Errors,
+					fmt.Sprintf(
+						"Error occurred while checking for duplicate games with date %q and time %q: %v",
+						row.Data.Date,
+						row.Data.Time,
+						err,
+					),
+				)
+			} else if dupGames {
+				row.Errors = append(
+					row.Errors,
+					"Game with the same date and time already exists",
+				)
+			} else {
+				seenDateTimes[key] = true
+			}
+		}
+	}
+
+	// Set this after all validation checks.
+	row.Valid = len(row.Errors) == 0
+
+	if utf8.RuneCountInString(row.Data.Notes) > 150 {
+		row.Errors = append(row.Errors, "Notes cannot exceed 150 characters.")
 	}
 
 	/*
@@ -3102,13 +3286,21 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		if strings.TrimSpace(data.TaxYear) == "" {
+			gameDate, err := time.Parse("1/2/2006", strings.TrimSpace(data.Date))
+			if err == nil {
+				data.TaxYear = strconv.Itoa(gameDate.Year())
+			}
+		}
+
 		game := model.GameDescriptor{
-			GameId: gameIDText,
-			Date:   data.Date,
-			Time:   data.Time,
-			Sport:  data.Sport,
-			Site:   data.Site,
-			Field:  data.Field,
+			GameId:  gameIDText,
+			Date:    data.Date,
+			TaxYear: data.TaxYear,
+			Time:    data.Time,
+			Sport:   data.Sport,
+			Site:    data.Site,
+			Field:   data.Field,
 			NumOfGames: utils.ConvertInt64ToStr(
 				data.NumOfGames,
 			),
@@ -3123,6 +3315,7 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			Status:      data.Status,
 			Officials:   data.Officials,
 			Assignor:    data.Assignor,
+			Notes:       data.Notes,
 		}
 
 		err = gc.Add(tId, game)
@@ -3921,6 +4114,7 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 	rows := make([]GamePreviewRow, 0)
 	gamesInFile := make(map[int64]int)
 	csvRowNumber := 1
+	seenDateTimes := make(map[string]bool)
 
 	for {
 		record, readErr := csvReader.Read()
@@ -3965,6 +4159,7 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			csvRowNumber,
 			record,
 			tId,
+			seenDateTimes,
 		)
 
 		gameId := previewRow.Data.GameId
@@ -5108,6 +5303,11 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Updating game with game id", utils.ConvertIntToStr(game.GameId), "for association", game.Association)
 
+	if utf8.RuneCountInString(game.Notes) > 150 {
+		http.Error(w, "Notes cannot exceed 150 characters.", http.StatusBadRequest)
+		return
+	}
+
 	fmt.Printf(
 		"UpdateGame lookup: database=%q gameId=%d association=%q tenantId=%q\n",
 		database.Database,
@@ -5209,6 +5409,11 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	err = json.NewDecoder(r.Body).Decode(&game)
 	if err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if utf8.RuneCountInString(game.Notes) > 150 {
+		http.Error(w, "Notes cannot exceed 150 characters.", http.StatusBadRequest)
 		return
 	}
 

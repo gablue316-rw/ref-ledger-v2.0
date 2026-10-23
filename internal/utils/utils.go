@@ -255,6 +255,7 @@ func ConvertJsonToGameDescriptor(file string) ([]model.GameDescriptor, error) {
 		gameDescr = append(gameDescr, model.GameDescriptor{
 			GameId:      strconv.FormatInt(g.GameId, 10),
 			Date:        g.Date,
+			TaxYear:     g.TaxYear,
 			Time:        g.Time,
 			Sport:       g.Sport,
 			Site:        g.Site,
@@ -271,6 +272,7 @@ func ConvertJsonToGameDescriptor(file string) ([]model.GameDescriptor, error) {
 			Status:      g.Status,
 			Officials:   copyGameOfficials(g.Officials),
 			Assignor:    g.Assignor,
+			Notes:       g.Notes,
 		})
 
 	}
@@ -723,6 +725,7 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 		Officials:   copyGameOfficials(doc.Officials),
 		Assignor:    doc.Assignor,
 		TaxYear:     doc.TaxYear,
+		Notes:       doc.Notes,
 	}
 
 	return gameDescr
@@ -907,6 +910,7 @@ func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
 		Officials:   copyGameOfficials(gameDescr.Officials),
 		Assignor:    gameDescr.Assignor,
 		TaxYear:     gameDescr.TaxYear,
+		Notes:       gameDescr.Notes,
 	}
 
 	return doc
