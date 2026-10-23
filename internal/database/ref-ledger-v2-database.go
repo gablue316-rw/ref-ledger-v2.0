@@ -41,6 +41,11 @@ var ExpenseTypes []string = []string{"Camp Fee", "Dues", "Equipment", "Food", "M
 var PermittedGameStatusValues []string = []string{"Cancelled", "Completed", "Paid", "Pending", "Deleted"}
 var Associations []string = []string{"GOLLC", "MCBOA", "MSO"} // Won'b be needed after developing the Association Collection
 
+type GameDateTimeMatch struct {
+	GameId      int64  `bson:"gameId"`
+	Association string `bson:"association"`
+}
+
 type EnvironmentInfo struct {
 	Environment string `json:"environment"`
 	HostLabel   string `json:"hostLabel"`
@@ -4093,8 +4098,9 @@ func (gc *GameCollection) GetTodaysPendingGames(tId string) ([]model.GameDoc, in
 
 }
 
-func (gc *GameCollection) GetGameIdsByDateTime(tId, date, timeStamp string) ([]int64, error) {
-
+func (gc *GameCollection) GetGameIdsByDateTime(
+	tId, date, timeStamp string,
+) ([]GameDateTimeMatch, error) {
 	ctx := context.Background()
 
 	filter := bson.M{
@@ -4103,26 +4109,25 @@ func (gc *GameCollection) GetGameIdsByDateTime(tId, date, timeStamp string) ([]i
 		"time":     timeStamp,
 	}
 
-	cursor, err := gc.Coll.Find(ctx, filter)
+	findOptions := options.Find().SetProjection(bson.M{
+		"_id":         0,
+		"gameId":      1,
+		"association": 1,
+	})
+
+	cursor, err := gc.Coll.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
 
-	var gameIds []int64
-	for cursor.Next(ctx) {
-		var game model.GameDoc
-		if err := cursor.Decode(&game); err != nil {
-			return nil, err
-		}
-		gameIds = append(gameIds, game.GameId)
-	}
+	var matches []GameDateTimeMatch
 
-	if err := cursor.Err(); err != nil {
+	if err := cursor.All(ctx, &matches); err != nil {
 		return nil, err
 	}
 
-	return gameIds, nil
+	return matches, nil
 }
 
 func SetGamesCompleted(tenantId string, gameIDs []int64) error {
@@ -7469,6 +7474,7 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),
 			Deductions:  utils.ConvertInt64ToAmtStr(r.Deductions),
 			TaxYear:     r.TaxYear,
+			Notes:       r.Notes,
 		}
 
 		gameRec := model.GameDescriptor{

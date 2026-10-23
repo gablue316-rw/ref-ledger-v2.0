@@ -7290,6 +7290,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			Association: game.Association,
 			Assignor:    game.Assignor,
 			TaxYear:     game.TaxYear,
+			Notes:       game.Notes,
 		}
 
 		view.GameFee = fmt.Sprintf("$%.2f", float64(gameFee)/100)

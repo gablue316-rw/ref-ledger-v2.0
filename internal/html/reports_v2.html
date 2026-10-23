@@ -316,7 +316,16 @@
         #emailReportDialog textarea { min-height: 90px; resize: vertical; }
         .email-report-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
         #emailReportStatus { margin-top: 12px; white-space: pre-wrap; }
-    </style>
+    /* Keep complete notes readable, including line breaks and long words. */
+.game-report-table td.game-report-notes {
+    min-width: 220px;
+    max-width: 320px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    text-align: left;
+    vertical-align: top;
+}
+</style>
 </head>
 
 <body>
@@ -1792,7 +1801,8 @@ function renderGameReport(report) {
         { label: "Status", value: row => gameField(row, "status", "Status") },
         { label: "Officials", value: row => getOfficials(row) },
         { label: "ECO", value: row => gameField(row, "eco", "Eco", "ECO") || "Unassigned" },
-        { label: "Assignor", value: row => gameField(row, "assignor", "Assignor") || "Unassigned" }
+        { label: "Assignor", value: row => gameField(row, "assignor", "Assignor") || "Unassigned" },
+        { label: "Notes", className: "game-report-notes", value: row => gameField(row, "notes", "Notes") }
     ];
 
     let totalGames = 0;
@@ -1821,7 +1831,9 @@ function renderGameReport(report) {
 
         const tableRow = tbody.insertRow();
         columns.forEach(column => {
-            tableRow.insertCell().textContent = String(column.value(row) ?? "");
+            const cell = tableRow.insertCell();
+            if (column.className) cell.className = column.className;
+            cell.textContent = String(column.value(row) ?? "");
         });
     });
 
