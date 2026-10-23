@@ -39,7 +39,7 @@ body {
 .btn:disabled{opacity:.55;cursor:not-allowed;}
 .form-group{display:flex;flex-direction:column;}
 .form-group label{font-weight:bold;margin-bottom:5px;}
-.form-group input,.form-group select{padding:10px;border:1px solid #ccc;border-radius:5px;}
+.form-group input,.form-group select,.form-group textarea{padding:10px;border:1px solid #ccc;border-radius:5px;}
 .button-row{background:#fff;padding:15px 20px;border-radius:10px;margin-bottom:20px;display:flex;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
 .btn{border:none;color:white;padding:12px 20px;border-radius:5px;cursor:pointer;font-weight:bold;}
 .btn-add{background:#16a34a;}
@@ -99,6 +99,11 @@ body{padding:10px;}
 <div class="form-group"><label for="gameId">Game ID</label><input type="number" id="gameId" required></div>
 <div class="form-group"><label for="date">Date</label><input type="date" id="date" required></div>
 <div class="form-group"><label for="taxYear">Tax Year</label><input type="text" id="taxYear" inputmode="numeric" placeholder="YYYY"></div>
+<div class="form-group" style="grid-column:1 / -1;">
+    <label for="notes">Notes (150 characters maximum)</label>
+    <textarea id="notes" name="notes" maxlength="150" rows="3" style="resize:vertical;" aria-describedby="notesRemaining"></textarea>
+    <small id="notesRemaining" style="margin-top:5px;color:#64748b;">150 characters left</small>
+</div>
 <div class="form-group"><label for="time">Time</label><input type="time" id="time" required></div>
 <div class="form-group">
     <label for="status">Status</label>
@@ -790,6 +795,17 @@ document.getElementById("clearBtn").addEventListener("click", function () {
     setUpdateMode(false);
     document.getElementById("message").innerText = "Ready to enter Games";
 });
+function updateNotesRemaining() {
+    const remaining = Math.max(0, 150 - document.getElementById("notes").value.length);
+    document.getElementById("notesRemaining").textContent =
+        `${remaining} character${remaining === 1 ? "" : "s"} left`;
+}
+document.getElementById("notes").addEventListener("input", updateNotesRemaining);
+document.getElementById("gameForm").addEventListener("reset", function () {
+    // Reset fires before the browser restores the form values.
+    setTimeout(updateNotesRemaining, 0);
+});
+updateNotesRemaining();
 function gameDateTaxYear() {
     return document.getElementById("date").value.split("-")[0] || "";
 }
@@ -880,6 +896,8 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         document.getElementById("date").value = toInputDate(game.Date);
         const savedTaxYear = String(game.TaxYear ?? game.taxYear ?? "").trim();
         document.getElementById("taxYear").value = savedTaxYear || gameDateTaxYear();
+        document.getElementById("notes").value = game.Notes ?? game.notes ?? "";
+        updateNotesRemaining();
         document.getElementById("time").value = toInputTime(game.Time);
         document.getElementById("site").value = game.Site;
         document.getElementById("field").value = game.Field;
@@ -919,6 +937,11 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         document.getElementById("message").innerText = "Wait for the association assignors to load successfully before saving.";
         return;
     }
+    if (document.getElementById("notes").value.length > 150) {
+        document.getElementById("message").innerText = "Notes cannot exceed 150 characters.";
+        document.getElementById("notes").focus();
+        return;
+    }
     let assignments;
     try { assignments = collectOfficialAssignments(); }
     catch (err) { document.getElementById("message").innerText = err.message; return; }
@@ -927,6 +950,7 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         gameId: parseInt(document.getElementById("gameId").value),
         date: document.getElementById("date").value,
         taxYear: document.getElementById("taxYear").value.trim(),
+        notes: document.getElementById("notes").value,
         time: document.getElementById("time").value,
         site: document.getElementById("site").value,
         field: document.getElementById("field").value,
@@ -983,6 +1007,11 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         document.getElementById("message").innerText = "Wait for the association assignors to load successfully before saving.";
         return;
     }
+    if (document.getElementById("notes").value.length > 150) {
+        document.getElementById("message").innerText = "Notes cannot exceed 150 characters.";
+        document.getElementById("notes").focus();
+        return;
+    }
     let assignments;
     try { assignments = collectOfficialAssignments(); }
     catch (err) { document.getElementById("message").innerText = err.message; return; }
@@ -991,6 +1020,7 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         gameId: parseInt(document.getElementById("gameId").value),
         date: document.getElementById("date").value,
         taxYear: document.getElementById("taxYear").value.trim(),
+        notes: document.getElementById("notes").value,
         time: document.getElementById("time").value,
         site: document.getElementById("site").value,
         field: document.getElementById("field").value,

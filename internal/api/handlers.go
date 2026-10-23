@@ -8,6 +8,7 @@ import (
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -192,7 +193,8 @@ func ValidateOfficialDescriptor(parentCtx context.Context, p model.OfficialDescr
 func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, checkForDup bool, tId string) error {
 
 	var errorFormat string = "%s %s not found!  Record Dropped!"
-	
+	var dollarAmountPattern = regexp.MustCompile(`^\$?[0-9]+(\.[0-9]{1,2})?$`)
+
 	if !GcInitialized {
 		err := gc.Init(database.Client)
 		if err != nil {
@@ -218,6 +220,19 @@ func ValidateGameDescriptor(parentCtx context.Context, g model.GameDescriptor, c
 			return fmt.Errorf("Association Collection is not initialized")
 		}
 		AcInitialized = true
+	}
+
+	if !dollarAmountPattern.MatchString(g.GameFee) {
+		return fmt.Errorf("invalid Game Fee amount %q: use numbers with an optional $ and up to two decimal places", g.GameFee)
+	}
+	if !dollarAmountPattern.MatchString(g.TravelPay) {
+		return fmt.Errorf("invalid Travel Pay amount %q: use numbers with an optional $ and up to two decimal places", g.TravelPay)
+	}
+	if !dollarAmountPattern.MatchString(g.AssignorFee) {
+		return fmt.Errorf("invalid Assignor Fee amount %q: use numbers with an optional $ and up to two decimal places", g.AssignorFee)
+	}
+	if !dollarAmountPattern.MatchString(g.Deductions) {
+		return fmt.Errorf("invalid Deductions amount %q: use numbers with an optional $ and up to two decimal places", g.Deductions)
 	}
 
 	var assignor string = strings.TrimSpace(g.Assignor)
@@ -346,7 +361,6 @@ func UpdateGame(
 	if strings.TrimSpace(cmd) == "" {
 		return fmt.Errorf("no update command was supplied")
 	}
-
 
 	if !GcInitialized {
 		if err := gc.Init(database.Client); err != nil {
@@ -526,7 +540,6 @@ func UpdateGame(
 
 	return nil
 }
-
 
 func AddOfficials(parentCtx context.Context, official []model.OfficialDescriptor) {
 

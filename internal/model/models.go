@@ -159,6 +159,7 @@ type GameDescriptor struct {
 	Status      string
 	Assignor    string
 	TaxYear     string
+	Notes       string
 }
 
 type GameDoc struct {
@@ -183,11 +184,13 @@ type GameDoc struct {
 	Assignor     string            `bson:"assignor,omitempty"`
 	TenantId     string            `bson:"tenantId"`
 	TaxYear      string            `bson:"taxYear,omitempty"`
+	Notes        string            `bson:"notes,omitempty"`
 }
 
 type JsonDoc struct {
 	Officials   []GameOfficialDoc `json:"officials"`
 	GameId      int64             `json:"gameId"`
+	TaxYear     string            `json:"taxYear"`
 	Date        string            `json:"date"`
 	Time        string            `json:"time"`
 	Sport       string            `json:"sport"`
@@ -204,6 +207,7 @@ type JsonDoc struct {
 	Association string            `json:"association"`
 	Status      string            `json:"status"`
 	Assignor    string            `json:"assignor"`
+	Notes       string            `json:"notes"`
 }
 
 type Filter struct {
@@ -290,6 +294,7 @@ type HtmlResponse struct {
 	Status      string            `json:"status" bson:"status,omitempty"`
 	Assignor    string            `json:"assignor" bson:"assignor,omitempty"`
 	TaxYear     string            `json:"taxYear" bson:"taxYear,omitempty"`
+	Notes       string            `json:"notes" bson:"notes,omitempty"`
 }
 
 type OfficialDetailsView struct {
@@ -329,6 +334,7 @@ type GameView struct {
 	Deductions    string         `json:"Deductions"`
 	TotalEarnings string         `json:"TotalEarnings"`
 	TaxYear       string         `json:"TaxYear"`
+	Notes         string         `json:"Notes"`
 }
 
 type ExpenseReportRow struct {
