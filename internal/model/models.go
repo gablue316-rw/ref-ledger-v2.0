@@ -184,7 +184,7 @@ type GameDoc struct {
 	Assignor     string            `bson:"assignor,omitempty"`
 	TenantId     string            `bson:"tenantId"`
 	TaxYear      string            `bson:"taxYear,omitempty"`
-	Notes        string            `bson:"notes,omitempty"`
+	Notes        string            `bson:"notes"`
 }
 
 type JsonDoc struct {
@@ -294,7 +294,7 @@ type HtmlResponse struct {
 	Status      string            `json:"status" bson:"status,omitempty"`
 	Assignor    string            `json:"assignor" bson:"assignor,omitempty"`
 	TaxYear     string            `json:"taxYear" bson:"taxYear,omitempty"`
-	Notes       string            `json:"notes" bson:"notes,omitempty"`
+	Notes       string            `json:"notes" bson:"notes"`
 }
 
 type OfficialDetailsView struct {
