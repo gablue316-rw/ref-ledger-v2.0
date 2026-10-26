@@ -884,6 +884,13 @@ body {
             onclick="updateSelectedStatus()">
             Update Status
         </button>
+        <button
+            type="button"
+            class="btn update-btn"
+            onclick="updateSelectedStatus('Completed')">
+            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+            Mark Selected Completed
+        </button>
     </div>
 
     <div
@@ -1384,7 +1391,10 @@ function renderGames(
                     class="complete-game-btn"
                     title="Mark game ${gameId} as completed"
                     aria-label="Mark game ${gameId} as completed"
-                    onclick="markGameCompleted(${JSON.stringify(gameId)})">
+                    onclick="markGameCompleted(
+                        decodeURIComponent('${encodedAssociation}'),
+                        decodeURIComponent('${encodedGameId}')
+                    )">
                     <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                 </button>
             `
@@ -2599,8 +2609,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     loadPendingGamesTable();
 });
 
-async function updateSelectedStatus() {
-    const newStatus =
+async function updateSelectedStatus(statusOverride = "") {
+    const newStatus = statusOverride ||
         document.getElementById("bulkStatus").value;
 
     if (!newStatus) {
@@ -2648,9 +2658,16 @@ async function updateSelectedStatus() {
         return;
     }
 
-    const selectedGames = updateableCheckboxes.map(
-        checkbox => Number(checkbox.value)
-    );
+    // IDs can repeat across associations. The API supplies tenantId from the session.
+    const selectedGames = updateableCheckboxes.map(checkbox => ({
+        gameId: Number(checkbox.value),
+        association: decodeURIComponent(checkbox.dataset.association || "")
+    }));
+    if (selectedGames.some(game =>
+        !Number.isSafeInteger(game.gameId) || !game.association.trim())) {
+        showMessage("A selected game is missing a valid game ID or association.", "error");
+        return;
+    }
 
     try {
         const response = await fetch(
@@ -2661,7 +2678,7 @@ async function updateSelectedStatus() {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    gameIds: selectedGames,
+                    games: selectedGames,
                     status: newStatus
                 })
             }
@@ -2672,9 +2689,7 @@ async function updateSelectedStatus() {
 
             console.error("Update failed:", text);
 
-            throw new Error(
-                `HTTP ${response.status}`
-            );
+            throw new Error(text || `HTTP ${response.status}`);
         }
 
 
@@ -2702,12 +2717,16 @@ async function updateSelectedStatus() {
 
     } catch (err) {
         console.error(err);
-        showMessage("Failed to update game status.", "error");
+        showMessage(err.message || "Failed to update game status.", "error");
     }
 }
 
-async function markGameCompleted(gameId) {
-    const confirmed = await confirmGameCompletion(gameId);
+async function markGameCompleted(association, gameId) {
+    if (!Number.isSafeInteger(Number(gameId)) || !String(association || "").trim()) {
+        showMessage("A valid game ID and association are required.", "error");
+        return;
+    }
+    const confirmed = await confirmGameCompletion(association, gameId);
 
     if (!confirmed) {
         return;
@@ -2722,7 +2741,7 @@ async function markGameCompleted(gameId) {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    gameIds: [Number(gameId)],
+                    games: [{ gameId: Number(gameId), association }],
                     status: "Completed"
                 })
             }
@@ -2732,7 +2751,7 @@ async function markGameCompleted(gameId) {
             const text = await response.text();
 
             console.error("Update failed:", text);
-            throw new Error(`HTTP ${response.status}`);
+            throw new Error(text || `HTTP ${response.status}`);
         }
 
         await loadGames();
@@ -2744,13 +2763,13 @@ async function markGameCompleted(gameId) {
     } catch (err) {
         console.error(err);
         showMessage(
-            `Failed to update game ${gameId}.`,
+            err.message || `Failed to update game ${gameId}.`,
             "error"
         );
     }
 }
 
-function confirmGameCompletion(gameId) {
+function confirmGameCompletion(association, gameId) {
     const overlay = document.getElementById(
         "completionModalOverlay"
     );
@@ -2764,7 +2783,7 @@ function confirmGameCompletion(gameId) {
         "confirmCompletionButton"
     );
 
-    gameDetails.textContent = `Game ID: ${gameId}`;
+    gameDetails.textContent = `Association: ${association} — Game ID: ${gameId}`;
     overlay.classList.add("show");
 
     return new Promise(resolve => {
@@ -3133,6 +3152,11 @@ async function openEditGame(gameId, association, notesOnly = false) {
         }
 
         gameBeingEdited = await response.json();
+        // Preserve the selected identity independently of the edit form fields.
+        gameBeingEdited.dashboardIdentity = {
+            gameId: Number(gameId),
+            association: String(association)
+        };
         await refreshDashboardEditLevels();
     } catch (error) {
         console.error("Failed to load game for editing:", error);
@@ -3240,8 +3264,11 @@ async function saveEditedGame(event) {
         document.getElementById("editTaxYear").focus();
         return;
     }
-    const gameId = document.getElementById("editGameId").value;
-    const association = document.getElementById("editAssociation").value;
+    const { gameId, association } = gameBeingEdited.dashboardIdentity;
+    if (!Number.isSafeInteger(gameId) || !association.trim()) {
+        showEditGameError("A valid game ID and association are required.");
+        return;
+    }
     const saveButton = document.getElementById("saveEditGameButton");
     const payload = {
         gameId: Number(gameId),

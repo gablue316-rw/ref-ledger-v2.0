@@ -51,6 +51,8 @@ var Client *mongo.Client
 var uri string
 var dbName string
 
+const MaxNotesLength = 150
+
 type Game struct {
 	Association string                  `json:"association"`
 	GameId      int                     `json:"gameId"`
@@ -93,9 +95,14 @@ type Payment struct {
 	TaxYear     int     `json:"taxYear"`
 }
 
+type GameStatusTarget struct {
+	GameId      int64  `json:"gameId"`
+	Association string `json:"association"`
+}
+
 type GameStatusUpdate struct {
-	GameIds json.RawMessage `json:"gameIds"`
-	Status  string          `json:"status"`
+	Games  []GameStatusTarget `json:"games"`
+	Status string             `json:"status"`
 }
 
 var ac database.AssociationCollection
@@ -1053,7 +1060,6 @@ func DownloadSitesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 	defer csvWriter.Flush()
 
 	headers := []string{
-		"siteId",
 		"siteName",
 		"contactName",
 		"contactNumber",
@@ -1079,7 +1085,6 @@ func DownloadSitesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		only the header row.
 	*/
 	exampleRow := []string{
-		"ALBI",
 		"Al Bishop Softball Complex",
 		"John Smith",
 		"404-555-1212",
@@ -1415,7 +1420,6 @@ func validateAssociationsCSVHeader(header []string) error {
 func validateSitesCSVHeader(header []string) error {
 
 	expected := []string{
-		"siteid",
 		"sitename",
 		"contactname",
 		"contactnumber",
@@ -1692,7 +1696,7 @@ func buildGamePreviewRow(
 	}
 
 	// A supplied or derived tax year must contain exactly four digits
-	// and be between 1000 and 9999.
+	// and be between utils.MinTaxYear and utils.MaxTaxYear.
 	if row.Data.TaxYear != "" {
 		taxYear, err := strconv.Atoi(row.Data.TaxYear)
 
@@ -1704,10 +1708,14 @@ func buildGamePreviewRow(
 			}
 		}
 
-		if !digitsOnly || err != nil || taxYear < 1000 || taxYear > 9999 {
+		if !digitsOnly || err != nil || taxYear < utils.MinTaxYear || taxYear > utils.MaxTaxYear {
 			row.Errors = append(
 				row.Errors,
-				"Invalid tax year; expected a four-digit year between 1000 and 9999",
+				fmt.Sprintf(
+					"Invalid tax year; expected a four-digit year between %d and %d",
+					utils.MinTaxYear,
+					utils.MaxTaxYear,
+				),
 			)
 		}
 	}
@@ -1799,8 +1807,8 @@ func buildGamePreviewRow(
 	// Set this after all validation checks.
 	row.Valid = len(row.Errors) == 0
 
-	if utf8.RuneCountInString(row.Data.Notes) > 150 {
-		row.Errors = append(row.Errors, "Notes cannot exceed 150 characters.")
+	if utf8.RuneCountInString(row.Data.Notes) > MaxNotesLength {
+		row.Errors = append(row.Errors, fmt.Sprintf("Notes cannot exceed %d characters.", MaxNotesLength))
 	}
 
 	/*
@@ -2177,11 +2185,11 @@ func buildSitePreviewRow(rowNumber int, record []string) SitePreviewRow {
 		Errors:    make([]string, 0),
 	}
 
-	if len(record) != 5 {
+	if len(record) != 4 {
 		row.Errors = append(
 			row.Errors,
 			fmt.Sprintf(
-				"Expected 5 columns but found %d",
+				"Expected 4 columns but found %d",
 				len(record),
 			),
 		)
@@ -2189,28 +2197,19 @@ func buildSitePreviewRow(rowNumber int, record []string) SitePreviewRow {
 		/* Still copy any available values so the user can see what was read from the CSV. */
 
 		row.Data = SiteImportData{
-			SiteId:        csvColumn(record, 0),
-			SiteName:      csvColumn(record, 1),
-			ContactName:   csvColumn(record, 2),
-			ContactNumber: csvColumn(record, 3),
-			ContactEmail:  csvColumn(record, 4),
+			SiteName:      csvColumn(record, 0),
+			ContactName:   csvColumn(record, 1),
+			ContactNumber: csvColumn(record, 2),
+			ContactEmail:  csvColumn(record, 3),
 		}
 		return row
 	}
 
 	row.Data = SiteImportData{
-		SiteId:        strings.TrimSpace(record[0]),
-		SiteName:      strings.TrimSpace(record[1]),
-		ContactName:   strings.TrimSpace(record[2]),
-		ContactNumber: strings.TrimSpace(record[3]),
-		ContactEmail:  strings.TrimSpace(record[4]),
-	}
-
-	if row.Data.SiteId == "" {
-		row.Errors = append(
-			row.Errors,
-			"Site ID is required",
-		)
+		SiteName:      strings.TrimSpace(record[0]),
+		ContactName:   strings.TrimSpace(record[1]),
+		ContactNumber: strings.TrimSpace(record[2]),
+		ContactEmail:  strings.TrimSpace(record[3]),
 	}
 
 	if row.Data.SiteName == "" {
@@ -4112,7 +4111,13 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows := make([]GamePreviewRow, 0)
-	gamesInFile := make(map[int64]int)
+	type gameImportKey struct {
+		GameId      int64
+		Association string
+	}
+
+	gamesInFile := make(map[gameImportKey]int)
+
 	csvRowNumber := 1
 	seenDateTimes := make(map[string]bool)
 
@@ -4165,16 +4170,24 @@ func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 		gameId := previewRow.Data.GameId
 
 		if gameId != 0 {
-			if previousRow, found := gamesInFile[gameId]; found {
+			key := gameImportKey{
+				GameId:      gameId,
+				Association: previewRow.Data.Association,
+			}
+
+			if previousRow, found := gamesInFile[key]; found {
 				previewRow.Errors = append(
 					previewRow.Errors,
 					fmt.Sprintf(
-						"Duplicate game in CSV file; first appeared on row %d",
+						"Duplicate game ID %d for association %q in CSV file; "+
+							"first appeared on row %d",
+						gameId,
+						previewRow.Data.Association,
 						previousRow,
 					),
 				)
 			} else {
-				gamesInFile[gameId] = csvRowNumber
+				gamesInFile[key] = csvRowNumber
 			}
 		}
 
@@ -5303,8 +5316,8 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Updating game with game id", utils.ConvertIntToStr(game.GameId), "for association", game.Association)
 
-	if utf8.RuneCountInString(game.Notes) > 150 {
-		http.Error(w, "Notes cannot exceed 150 characters.", http.StatusBadRequest)
+	if utf8.RuneCountInString(game.Notes) > MaxNotesLength {
+		http.Error(w, fmt.Sprintf("Notes cannot exceed %d characters.", MaxNotesLength), http.StatusBadRequest)
 		return
 	}
 
@@ -5412,8 +5425,8 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if utf8.RuneCountInString(game.Notes) > 150 {
-		http.Error(w, "Notes cannot exceed 150 characters.", http.StatusBadRequest)
+	if utf8.RuneCountInString(game.Notes) > MaxNotesLength {
+		http.Error(w, fmt.Sprintf("Notes cannot exceed %d characters.", MaxNotesLength), http.StatusBadRequest)
 		return
 	}
 
@@ -5471,73 +5484,165 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
-	tId, err := getTenantId(r)
-	if err != nil {
-		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	fmt.Println("##### Updating Game Status #####")
+	tId, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusUnauthorized)
+		return
+	}
 
 	LogVisitor(r)
 
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	var request GameStatusUpdate
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	var gameUpdate GameStatusUpdate
-
-	err = json.NewDecoder(r.Body).Decode(&gameUpdate)
-	if err != nil {
-		fmt.Println("err:", err)
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		http.Error(w, "Provide one JSON object", http.StatusBadRequest)
 		return
 	}
 
-	if gameUpdate.Status == "" {
-		http.Error(w, "status is required", http.StatusBadRequest)
+	request.Status = strings.TrimSpace(request.Status)
+
+	if request.Status == "Delete" {
+		http.Error(
+			w,
+			"Use the game deletion endpoint to delete games.",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
-	fmt.Println("##### Game Status to be set to:", gameUpdate.Status, "#####")
-	var gameIds []int64
+	if !database.ValidStatus(request.Status) {
+		http.Error(w, "Invalid game status", http.StatusBadRequest)
+		return
+	}
 
-	// Supports dashboard JSON:
-	// { "gameIds": [101, 102], "status": "Completed" }
-	err = json.Unmarshal(gameUpdate.GameIds, &gameIds)
+	if len(request.Games) == 0 {
+		http.Error(w, "At least one game is required", http.StatusBadRequest)
+		return
+	}
 
-	if err != nil {
-		// Supports existing gameStatus.html JSON:
-		// { "gameIds": "101,102", "status": "Completed" }
-		var gameIdString string
+	// Validate the complete request before updating any records.
+	uniqueGames := make([]GameStatusTarget, 0, len(request.Games))
+	seen := make(map[GameStatusTarget]bool)
 
-		err = json.Unmarshal(gameUpdate.GameIds, &gameIdString)
-		if err != nil {
-			http.Error(w, "invalid gameIds", http.StatusBadRequest)
+	for _, game := range request.Games {
+		game.Association = strings.TrimSpace(game.Association)
+
+		if game.GameId <= 0 || game.Association == "" {
+			http.Error(
+				w,
+				"Each game requires a positive game ID and an association.",
+				http.StatusBadRequest,
+			)
 			return
 		}
 
-		gameIds, err = utils.ConvertGameIdStrToInt(gameIdString)
-		if err != nil {
-			fmt.Println("err:", err)
-			http.Error(w, "invalid gameIds", http.StatusBadRequest)
-			return
+		if !seen[game] {
+			seen[game] = true
+			uniqueGames = append(uniqueGames, game)
 		}
 	}
 
-	if len(gameIds) == 0 {
-		http.Error(w, "no game IDs supplied", http.StatusBadRequest)
+	if gc.Coll == nil {
+		http.Error(
+			w,
+			"Games collection is not available",
+			http.StatusInternalServerError,
+		)
 		return
 	}
 
-	fmt.Println("##### Game Ids selected", gameIds, "#####")
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
 
-	gc.UpdateGameStatus(gameIds, gameUpdate.Status, tId)
+	updated := 0
+	failures := make([]string, 0)
 
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Game status updated successfully"))
+	for _, game := range uniqueGames {
+		filter := bson.M{
+			"gameId":      game.GameId,
+			"association": game.Association,
+			"tenantId":    tId,
+			// Check this during the write so Paid games cannot be changed.
+			"status": bson.M{"$ne": "Paid"},
+		}
+
+		fields := bson.M{
+			"status": request.Status,
+		}
+
+		if request.Status == "Cancelled" {
+			fields["gameFee"] = int64(0)
+			fields["travelPay"] = int64(0)
+			fields["assignorFee"] = int64(0)
+			fields["deductions"] = int64(0)
+		}
+
+		result, err := gc.Coll.UpdateOne(
+			ctx,
+			filter,
+			bson.M{"$set": fields},
+		)
+
+		if err != nil {
+			log.Printf(
+				"UpdateGameStatus failed: tenantId=%q association=%q gameId=%d error=%v",
+				tId,
+				game.Association,
+				game.GameId,
+				err,
+			)
+
+			failures = append(failures, fmt.Sprintf(
+				"%s game %d: database update failed",
+				game.Association,
+				game.GameId,
+			))
+			continue
+		}
+
+		if result.MatchedCount == 0 {
+			failures = append(failures, fmt.Sprintf(
+				"%s game %d: game not found or already Paid",
+				game.Association,
+				game.GameId,
+			))
+			continue
+		}
+
+		// An already-matching status is also a successful request.
+		updated++
+	}
+
+	if len(failures) > 0 {
+		http.Error(
+			w,
+			fmt.Sprintf(
+				"%d of %d games updated. %s",
+				updated,
+				len(uniqueGames),
+				strings.Join(failures, "; "),
+			),
+			http.StatusConflict,
+		)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintf(w, "%d game statuses updated successfully.", updated)
 }
 
 func CreatePayment(
@@ -5559,10 +5664,10 @@ func CreatePayment(
 		return
 	}
 
-	if payment.TaxYear < 1000 || payment.TaxYear > 9999 {
+	if payment.TaxYear < utils.MinTaxYear || payment.TaxYear > utils.MaxTaxYear {
 		http.Error(
 			w,
-			"Tax Year must be between 1000 and 9999.",
+			fmt.Sprintf("Tax Year must be between %d and %d.", utils.MinTaxYear, utils.MaxTaxYear),
 			http.StatusBadRequest,
 		)
 		return
@@ -5637,10 +5742,10 @@ func UpdatePayment(
 		return
 	}
 
-	if payment.TaxYear < 1000 || payment.TaxYear > 9999 {
+	if payment.TaxYear < utils.MinTaxYear || payment.TaxYear > utils.MaxTaxYear {
 		http.Error(
 			w,
-			"Tax Year must be between 1000 and 9999.",
+			fmt.Sprintf("Tax Year must be between %d and %d.", utils.MinTaxYear, utils.MaxTaxYear),
 			http.StatusBadRequest,
 		)
 		return
@@ -5863,10 +5968,10 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 	// A blank tax year includes all years.
 	if taxYear != "" {
 		year, err := strconv.Atoi(taxYear)
-		if err != nil || year < 1000 || year > 9999 {
+		if err != nil || year < utils.MinTaxYear || year > utils.MaxTaxYear {
 			http.Error(
 				w,
-				"Tax Year must be between 1000 and 9999, or blank for all years.",
+				fmt.Sprintf("Tax Year must be between %d and %d, or blank for all years.", utils.MinTaxYear, utils.MaxTaxYear),
 				http.StatusBadRequest,
 			)
 			return
@@ -7080,10 +7185,10 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if !valid || taxYear < "1000" || taxYear > "9999" {
+		if !valid || taxYear < fmt.Sprintf("%d", utils.MinTaxYear) || taxYear > fmt.Sprintf("%d", utils.MaxTaxYear) {
 			http.Error(
 				w,
-				"Tax Year must be a four-digit year between 1000 and 9999.",
+				fmt.Sprintf("Tax Year must be a four-digit year between %d and %d.", utils.MinTaxYear, utils.MaxTaxYear),
 				http.StatusBadRequest,
 			)
 			return

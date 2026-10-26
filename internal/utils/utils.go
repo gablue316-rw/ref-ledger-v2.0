@@ -24,6 +24,17 @@ var logFileFullPathName string = ""
 
 var AuditLog *log.Logger = nil
 
+const (
+	MinTaxYear = 2000
+	MaxTaxYear = 2100
+)
+
+var ErrInvalidTaxYear = fmt.Errorf(
+	"invalid tax year; expected a four-digit year between %d and %d",
+	MinTaxYear,
+	MaxTaxYear,
+)
+
 func copyGameOfficials(
 	officials []model.GameOfficialDoc,
 ) []model.GameOfficialDoc {

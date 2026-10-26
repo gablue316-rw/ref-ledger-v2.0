@@ -1,6 +1,5 @@
-<html>
-<!-- importAssociations.html -->
 <!DOCTYPE html>
+<!-- importSites.html -->
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -423,7 +422,7 @@ tr:nth-child(even) {
             </ol>
 
             <div class="template-format">
-                <code>siteId,siteName,contactName,contactNumber,contactEmail</code>
+                <code>siteName,contactName,contactNumber,contactEmail</code>
             </div>
         </div>
 
@@ -527,11 +526,11 @@ tr:nth-child(even) {
                     <tr>
                         <th>CSV Row</th>
                         <th>Status</th>
-                        <th>Site ID</th>
                         <th>Site Name</th>
                         <th>Contact Name</th>
                         <th>Contact Number</th>
                         <th>Contact Email</th>
+                        <th>Errors</th>
                     </tr>
                 </thead>
 
@@ -554,7 +553,7 @@ tr:nth-child(even) {
                 >
 
                 <label for="skipDuplicates">
-                    Skip sites whose IDs already exist.
+                    Skip sites whose names already exist.
                 </label>
             </div>
 
@@ -648,7 +647,7 @@ csvFile.addEventListener("change", function () {
         selectedFile.textContent = "No file selected.";
 
         showMessage(
-            "Select an Sites CSV file to begin.",
+            "Select a Sites CSV file to begin.",
             "info"
         );
 
@@ -695,7 +694,7 @@ importSitesForm.addEventListener(
 
         if (csvFile.files.length === 0) {
             showMessage(
-                "Select an Sites CSV file.",
+                "Select a Sites CSV file.",
                 "error"
             );
 
@@ -978,11 +977,6 @@ function displayPreview(result) {
 
         appendCell(
             tableRow,
-            getValue(data, "siteId", "SiteId")
-        );
-
-        appendCell(
-            tableRow,
             getValue(data, "siteName", "SiteName")
         );
 
@@ -1000,12 +994,7 @@ function displayPreview(result) {
             tableRow,
             getValue(data, "contactEmail", "ContactEmail")
         );
-
-        appendCell(
-            tableRow,
-            getValue(data, "assignors", "Assignors")
-        );        
-        
+            
         const errorCell =
             document.createElement("td");
 
