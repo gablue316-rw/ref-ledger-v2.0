@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"encoding/base64"
 	"encoding/json"
@@ -202,6 +203,43 @@ func ValidateGameDescriptor(
 		`^\$?[0-9]+(\.[0-9]{1,2})?$`,
 	)
 
+	// Require a valid game date within the permitted year range.
+	gameDateText := strings.TrimSpace(g.Date)
+	if gameDateText == "" {
+		return fmt.Errorf("game date is required")
+	}
+
+	gameDate, err := time.Parse("1/2/2006", gameDateText)
+	if err != nil {
+		return fmt.Errorf(
+			"invalid game date %q: expected M/D/YYYY",
+			gameDateText,
+		)
+	}
+
+	if gameDate.Year() < utils.MinTaxYear ||
+		gameDate.Year() > utils.MaxTaxYear {
+		return fmt.Errorf(
+			"invalid game date; expected a date between 1/1/%d and 12/31/%d",
+			utils.MinTaxYear,
+			utils.MaxTaxYear,
+		)
+	}
+
+	// Default a blank tax year to the game date's year.
+	taxYearText := strings.TrimSpace(g.TaxYear)
+	if taxYearText == "" {
+		taxYearText = strconv.Itoa(gameDate.Year())
+	}
+
+	taxYear, err := strconv.Atoi(taxYearText)
+	if err != nil ||
+		len(taxYearText) != 4 ||
+		taxYear < utils.MinTaxYear ||
+		taxYear > utils.MaxTaxYear {
+		return utils.ErrInvalidTaxYear
+	}
+
 	if !GcInitialized {
 		if err := gc.Init(database.Client); err != nil {
 			return fmt.Errorf(
@@ -276,8 +314,7 @@ func ValidateGameDescriptor(
 		association,
 	)
 
-	// For new games, check whether this game ID already exists
-	// for the same tenant and association.
+	// For new games, check for the same ID, tenant, and association.
 	if checkForDup {
 		exists, err := gc.Exists(association, gameIDText, tId)
 		if err != nil {

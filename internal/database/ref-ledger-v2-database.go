@@ -556,50 +556,61 @@ func CalcSingleGameFee(game model.GameDescriptor) (int64, error) {
 
 }
 
-func GetSingleGame(parentCtx context.Context, gameId string) (model.GameDescriptor, error) {
+func GetSingleGame(
+	parentCtx context.Context,
+	gameId, association, tenantId string,
+) (model.GameDescriptor, error) {
+	id, err := strconv.ParseInt(strings.TrimSpace(gameId), 10, 64)
+	if err != nil || id <= 0 {
+		return model.GameDescriptor{}, fmt.Errorf("invalid game ID %q", gameId)
+	}
+
+	if strings.TrimSpace(association) == "" ||
+		strings.TrimSpace(tenantId) == "" ||
+		tenantId == "na" {
+		return model.GameDescriptor{}, fmt.Errorf(
+			"association and valid tenant ID are required",
+		)
+	}
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
-	id, err := utils.ConvertStrToInt64(gameId)
-
-	if err != nil {
-		fmt.Println(err)
-		return model.GameDescriptor{}, err
-	}
-
 	filter := bson.M{
-		"gameId": id,
+		"gameId":      id,
+		"association": association,
+		"tenantId":    tenantId,
 	}
 
-	db := Client.Database(Database)
-	coll := db.Collection("games")
+	coll := Client.Database(Database).Collection("games")
 
-	cursor, err := coll.Find(ctx, filter)
-
+	// Read at most two records so duplicate composite identities are detected.
+	cursor, err := coll.Find(ctx, filter, options.Find().SetLimit(2))
 	if err != nil {
-		return model.GameDescriptor{}, err
+		return model.GameDescriptor{}, fmt.Errorf("find game: %w", err)
 	}
 	defer cursor.Close(ctx)
-	var results []model.GameDoc
-	var gameRecord model.GameDescriptor
 
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return model.GameDescriptor{}, err
+	var games []model.GameDoc
+	if err := cursor.All(ctx, &games); err != nil {
+		return model.GameDescriptor{}, fmt.Errorf("read game: %w", err)
 	}
 
-	if len(results) == 0 {
-		return model.GameDescriptor{}, fmt.Errorf("game not found")
-	}
-	if len(results) > 1 {
-		return model.GameDescriptor{}, fmt.Errorf("Error!  Multiple game documents found!")
+	if len(games) == 0 {
+		return model.GameDescriptor{}, fmt.Errorf(
+			"game %d for association %q: %w",
+			id, association, mongo.ErrNoDocuments,
+		)
 	}
 
-	gameRecord = convertGameDocWithOfficials(results[0])
+	if len(games) > 1 {
+		return model.GameDescriptor{}, fmt.Errorf(
+			"multiple games found for game ID %d, association %q, tenant ID %q",
+			id, association, tenantId,
+		)
+	}
 
-	return gameRecord, nil
+	return convertGameDocWithOfficials(games[0]), nil
 }
 
 func QueryOfficials(parentCtx context.Context, dbase, collection, assoc, official string) ([]model.OfficialDescriptor, error) {
@@ -821,7 +832,11 @@ func DeletePayment(paymentId, association, tid string) error {
 		)
 	}
 
-	err = SetGamesCompleted(doc.TenantId, doc.GameIds)
+	err = SetGamesCompleted(
+		doc.TenantId,
+		doc.Association,
+		doc.GameIds,
+	)
 
 	if err != nil {
 		return fmt.Errorf(
@@ -836,11 +851,18 @@ func DeletePayment(paymentId, association, tid string) error {
 	db := Client.Database(Database)
 	coll := db.Collection("payments")
 
-	_, err = coll.DeleteOne(ctx, bson.M{"paymentId": paymentId})
+	result, err := coll.DeleteOne(ctx, bson.M{
+		"paymentId":   paymentId,
+		"association": association,
+		"tenantId":    tid,
+	})
 	if err != nil {
 		return fmt.Errorf("DeleteOne failure.  Reason: %s", err)
 	}
 
+	if result.DeletedCount != 1 {
+		return fmt.Errorf("payment not found")
+	}
 	return nil
 }
 
@@ -2013,61 +2035,95 @@ func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescript
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
 }
 
-func UpdateGameStatusToPaid(parentCtx context.Context, gameIds []int64) int {
+func UpdateGameStatusToPaid(
+	parentCtx context.Context,
+	gameIds []int64,
+	association, tenantId string,
+) (int, error) {
+	if strings.TrimSpace(association) == "" ||
+		strings.TrimSpace(tenantId) == "" ||
+		tenantId == "na" {
+		return 0, fmt.Errorf("association and valid tenant ID are required")
+	}
+
+	// Validate all IDs before making changes.
+	uniqueIDs := make([]int64, 0, len(gameIds))
+	seen := make(map[int64]bool)
+
+	for _, id := range gameIds {
+		if id <= 0 {
+			return 0, fmt.Errorf("invalid game ID %d", id)
+		}
+		if !seen[id] {
+			seen[id] = true
+			uniqueIDs = append(uniqueIDs, id)
+		}
+	}
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-	collectionName := coll.Name()
-	fmt.Println("Updating Games Status to Paid for game ids:", gameIds)
+	coll := Client.Database(Database).Collection("games")
+	updated := 0
+	var updateErrors []error
 
-	recordsUpdated := 0
-	totalErrors := 0
-
-	var game model.GameDescriptor = model.GameDescriptor{}
-
-	for _, id := range gameIds {
-
-		gameIdStr, err := utils.ConvertSingleGameIdToStr(id)
-
+	for _, id := range uniqueIDs {
+		// Check the complete identity and detect duplicate documents.
+		game, err := GetSingleGame(
+			ctx,
+			strconv.FormatInt(id, 10),
+			association,
+			tenantId,
+		)
 		if err != nil {
-			fmt.Println("Failed to convert Game Id to string.  Reason:", err)
+			updateErrors = append(updateErrors, err)
 			continue
 		}
 
-		game, err = GetSingleGame(parentCtx, gameIdStr)
-
-		if err != nil {
-			utils.AuditLog.Printf("Failed to get game record for GameId %s.  Reason: %v", gameIdStr, err)
+		if game.Status == "Paid" {
 			continue
 		}
 
-		if game.Status == "Pending" || game.Status == "Completed" {
-
-			filter := bson.M{
-				"gameId": id,
-			}
-
-			update := bson.M{
-				"$set": bson.M{
-					"status": "Paid",
-				},
-			}
-
-			err = UpdateOneDoc(ctx, filter, update, Database, "games")
-			if err != nil {
-				totalErrors++
-				fmt.Println(err)
-			} else {
-				recordsUpdated++
-			}
+		if game.Status != "Pending" && game.Status != "Completed" {
+			updateErrors = append(updateErrors, fmt.Errorf(
+				"game %d for association %q cannot become Paid from status %q",
+				id, association, game.Status,
+			))
+			continue
 		}
+
+		filter := bson.M{
+			"gameId":      id,
+			"association": association,
+			"tenantId":    tenantId,
+			// Recheck status during the write.
+			"status": game.Status,
+		}
+
+		result, err := coll.UpdateOne(
+			ctx,
+			filter,
+			bson.M{"$set": bson.M{"status": "Paid"}},
+		)
+		if err != nil {
+			updateErrors = append(updateErrors, fmt.Errorf(
+				"update game %d to Paid: %w", id, err,
+			))
+			continue
+		}
+
+		if result.MatchedCount == 0 {
+			updateErrors = append(updateErrors, fmt.Errorf(
+				"game %d for association %q was removed or its status changed; reload and retry",
+				id, association,
+			))
+			continue
+		}
+
+		updated += int(result.ModifiedCount)
 	}
 
-	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
-	return recordsUpdated
+	return updated, errors.Join(updateErrors...)
 }
 
 func VerifyGameStatus(gameIds []int64, association, tenantId string) []error {
@@ -2290,7 +2346,22 @@ func InsertPaymentDocs(
 		}
 
 		recordsInserted++
-		gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
+		paidCount, paidErr := UpdateGameStatusToPaid(
+			ctx,
+			gameIds,
+			v.Association,
+			tId,
+		)
+		gamesUpdatedToPaid += paidCount
+
+		if paidErr != nil {
+			totalErrors++
+			importErrors = append(importErrors, fmt.Errorf(
+				"payment %s was saved, but some game status updates failed: %w",
+				doc.PaymentId,
+				paidErr,
+			))
+		}
 	}
 
 	fmt.Println(
@@ -2497,7 +2568,22 @@ func UpdatePaymentDocs(
 		}
 
 		recordsUpdated++
-		gamesUpdatedToPaid += UpdateGameStatusToPaid(ctx, gameIds)
+		paidCount, paidErr := UpdateGameStatusToPaid(
+			ctx,
+			gameIds,
+			v.Association,
+			tId,
+		)
+		gamesUpdatedToPaid += paidCount
+
+		if paidErr != nil {
+			totalErrors++
+			importErrors = append(importErrors, fmt.Errorf(
+				"payment %s was saved, but some game status updates failed: %w",
+				doc.PaymentId,
+				paidErr,
+			))
+		}
 	}
 
 	fmt.Println(
@@ -2615,9 +2701,59 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 			fmt.Println(err)
 			continue
 		}
+
+		if doc.GameDateTime.Year() < utils.MinTaxYear ||
+			doc.GameDateTime.Year() > utils.MaxTaxYear {
+
+			totalErrors++
+			fmt.Printf(
+				"Game %s: invalid game date; expected a date between 1/1/%d and 12/31/%d\n",
+				v.GameId,
+				utils.MinTaxYear,
+				utils.MaxTaxYear,
+			)
+			continue
+		}
+
+		// Default a blank tax year to the game date's year.
+		taxYearText := strings.TrimSpace(v.TaxYear)
+		if taxYearText == "" {
+			taxYearText = strconv.Itoa(doc.GameDateTime.Year())
+		}
+
+		taxYear, err := strconv.Atoi(taxYearText)
+		if err != nil ||
+			len(taxYearText) != 4 ||
+			taxYear < utils.MinTaxYear ||
+			taxYear > utils.MaxTaxYear {
+
+			totalErrors++
+			fmt.Printf("Game %s: %v\n", v.GameId, utils.ErrInvalidTaxYear)
+			continue
+		}
+
+		doc.TaxYear = taxYearText
+
 		if err := prepareGameOfficials(ctx, coll.Database(), &doc, nil); err != nil {
 			totalErrors++
-			fmt.Println(err)
+			fmt.Println(err) // Default a blank tax year to the game date's year.
+			taxYearText := strings.TrimSpace(v.TaxYear)
+			if taxYearText == "" {
+				taxYearText = strconv.Itoa(doc.GameDateTime.Year())
+			}
+
+			taxYear, err := strconv.Atoi(taxYearText)
+			if err != nil ||
+				len(taxYearText) != 4 ||
+				taxYear < utils.MinTaxYear ||
+				taxYear > utils.MaxTaxYear {
+
+				totalErrors++
+				fmt.Printf("Game %s: %v\n", v.GameId, utils.ErrInvalidTaxYear)
+				continue
+			}
+
+			doc.TaxYear = taxYearText
 			continue
 		}
 
@@ -3826,80 +3962,80 @@ func (gc *GameCollection) Add(
 	return nil
 }
 
-func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status, tid string) {
+// func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status, tid string) {
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-	update := bson.M{}
-	filter := bson.M{}
+// 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+// 	defer cancel()
+// 	update := bson.M{}
+// 	filter := bson.M{}
 
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-	collectionName := coll.Name()
-	fmt.Println("##### Updating Games Status to", status, "for game ids:", gameIds, "#####")
+// 	db := Client.Database(Database)
+// 	coll := db.Collection("games")
+// 	collectionName := coll.Name()
+// 	fmt.Println("##### Updating Games Status to", status, "for game ids:", gameIds, "#####")
 
-	recordsUpdated := 0
-	totalErrors := 0
+// 	recordsUpdated := 0
+// 	totalErrors := 0
 
-	if status == "Cancelled" {
-		fmt.Println("##### Cancelling game....setting financials to 0.00 #####")
-		update = bson.M{
-			"$set": bson.M{
-				"gameFee":     int64(0),
-				"travelPay":   int64(0),
-				"assignorFee": int64(0),
-				"deductions":  int64(0),
-				"status":      "Cancelled",
-			},
-		}
-	} else {
-		update = bson.M{
-			"$set": bson.M{
-				"status": status,
-			},
-		}
-	}
-	var game model.GameDescriptor = model.GameDescriptor{}
+// 	if status == "Cancelled" {
+// 		fmt.Println("##### Cancelling game....setting financials to 0.00 #####")
+// 		update = bson.M{
+// 			"$set": bson.M{
+// 				"gameFee":     int64(0),
+// 				"travelPay":   int64(0),
+// 				"assignorFee": int64(0),
+// 				"deductions":  int64(0),
+// 				"status":      "Cancelled",
+// 			},
+// 		}
+// 	} else {
+// 		update = bson.M{
+// 			"$set": bson.M{
+// 				"status": status,
+// 			},
+// 		}
+// 	}
+// 	var game model.GameDescriptor = model.GameDescriptor{}
 
-	for _, id := range gameIds {
+// 	for _, id := range gameIds {
 
-		gameIdStr, err := utils.ConvertSingleGameIdToStr(id)
+// 		gameIdStr, err := utils.ConvertSingleGameIdToStr(id)
 
-		if err != nil {
-			fmt.Println("Failed to convert Game Id to string.  Reason:", err)
-			continue
-		}
+// 		if err != nil {
+// 			fmt.Println("Failed to convert Game Id to string.  Reason:", err)
+// 			continue
+// 		}
 
-		game, err = GetSingleGame(ctx, gameIdStr)
+// 		game, err = GetSingleGame(ctx, gameIdStr)
 
-		if err != nil {
-			fmt.Println("Failed to get game record.  Reason:", err)
-			continue
-		}
+// 		if err != nil {
+// 			fmt.Println("Failed to get game record.  Reason:", err)
+// 			continue
+// 		}
 
-		if game.Status == status {
-			fmt.Println("Game Id", id, "already set to status", status)
-			continue
-		}
+// 		if game.Status == status {
+// 			fmt.Println("Game Id", id, "already set to status", status)
+// 			continue
+// 		}
 
-		filter = bson.M{
-			"gameId":      id,
-			"association": game.Association,
-			"tenantId":    tid,
-		}
+// 		filter = bson.M{
+// 			"gameId":      id,
+// 			"association": game.Association,
+// 			"tenantId":    tid,
+// 		}
 
-		err = UpdateOneDoc(ctx, filter, update, Database, "games")
-		if err != nil {
-			totalErrors++
-			fmt.Println(err)
-		} else {
-			recordsUpdated++
-		}
+// 		err = UpdateOneDoc(ctx, filter, update, Database, "games")
+// 		if err != nil {
+// 			totalErrors++
+// 			fmt.Println(err)
+// 		} else {
+// 			recordsUpdated++
+// 		}
 
-	}
+// 	}
 
-	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
-}
+// 	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
+// }
 
 func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int, error) {
 
@@ -4130,17 +4266,39 @@ func (gc *GameCollection) GetGameIdsByDateTime(
 	return matches, nil
 }
 
-func SetGamesCompleted(tenantId string, gameIDs []int64) error {
+func SetGamesCompleted(
+	tenantId, association string,
+	gameIDs []int64,
+) error {
+	if strings.TrimSpace(association) == "" ||
+		strings.TrimSpace(tenantId) == "" ||
+		tenantId == "na" {
+		return fmt.Errorf("association and valid tenant ID are required")
+	}
 
-	ctx := context.Background()
 	if len(gameIDs) == 0 {
 		return fmt.Errorf("no game IDs were provided")
 	}
 
-	db := Client.Database(Database)
-	coll := db.Collection("games")
+	uniqueIDs := make([]int64, 0, len(gameIDs))
+	seen := make(map[int64]bool)
 
-	session, err := coll.Database().Client().StartSession()
+	for _, id := range gameIDs {
+		if id <= 0 {
+			return fmt.Errorf("invalid game ID %d", id)
+		}
+		if !seen[id] {
+			seen[id] = true
+			uniqueIDs = append(uniqueIDs, id)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	coll := Client.Database(Database).Collection("games")
+
+	session, err := Client.StartSession()
 	if err != nil {
 		return fmt.Errorf("failed to start MongoDB session: %w", err)
 	}
@@ -4148,55 +4306,45 @@ func SetGamesCompleted(tenantId string, gameIDs []int64) error {
 
 	_, err = session.WithTransaction(
 		ctx,
-		func(sessionCtx mongo.SessionContext) (interface{}, error) {
+		func(tx mongo.SessionContext) (interface{}, error) {
+			for _, id := range uniqueIDs {
+				filter := bson.M{
+					"gameId":      id,
+					"association": association,
+					"tenantId":    tenantId,
+				}
 
-			filter := bson.M{
-				"tenantId": tenantId,
-				"gameId": bson.M{
-					"$in": gameIDs,
-				},
-			}
+				count, err := coll.CountDocuments(tx, filter)
+				if err != nil {
+					return nil, fmt.Errorf("check game %d: %w", id, err)
+				}
+				if count != 1 {
+					return nil, fmt.Errorf(
+						"expected one game for ID %d and association %q; found %d",
+						id, association, count,
+					)
+				}
 
-			update := bson.M{
-				"$set": bson.M{
-					"status": "Completed",
-				},
-			}
-
-			result, err := coll.UpdateMany(
-				sessionCtx,
-				filter,
-				update,
-			)
-			if err != nil {
-				return nil, fmt.Errorf(
-					"failed to update games: %w",
-					err,
+				result, err := coll.UpdateOne(
+					tx,
+					filter,
+					bson.M{"$set": bson.M{"status": "Completed"}},
 				)
-			}
-
-			/*
-			   If even one requested game was not found,
-			   return an error. Returning the error causes
-			   WithTransaction to roll back the updates.
-			*/
-			if result.MatchedCount != int64(len(gameIDs)) {
-				return nil, fmt.Errorf(
-					"expected to update %d games, but only %d were found",
-					len(gameIDs),
-					result.MatchedCount,
-				)
+				if err != nil {
+					return nil, fmt.Errorf(
+						"update game %d to Completed: %w", id, err,
+					)
+				}
+				if result.MatchedCount != 1 {
+					return nil, fmt.Errorf("game %d was not found", id)
+				}
 			}
 
 			return nil, nil
 		},
 	)
-
 	if err != nil {
-		return fmt.Errorf(
-			"game status transaction was rolled back: %w",
-			err,
-		)
+		return fmt.Errorf("game status transaction was rolled back: %w", err)
 	}
 
 	return nil
