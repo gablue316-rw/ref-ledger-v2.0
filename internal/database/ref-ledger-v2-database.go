@@ -452,49 +452,52 @@ func GetTotalGrossGameFee(assoc string) (int64, error) {
 
 }
 
-func GetGameFee(gameIds []int64, tId string, status string) (int64, error) {
+func GetGameFee(gameIds []int64, tId, status, association string) (int64, error) {
+	if strings.TrimSpace(tId) == "" || tId == "na" {
+		return 0, fmt.Errorf("GetGameFee: valid tenant ID is required")
+	}
+	if strings.TrimSpace(association) == "" {
+		return 0, fmt.Errorf("GetGameFee: association is required")
+	}
+	// An empty selection must never total every game for the tenant.
+	if len(gameIds) == 0 {
+		return 0, nil
+	}
+	for _, id := range gameIds {
+		if id <= 0 {
+			return 0, fmt.Errorf("GetGameFee: invalid game ID %d", id)
+		}
+	}
 
-	totGameFee := int64(0)
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	filter := bson.M{
-		"tenantId": tId,
+		"tenantId":    tId,
+		"association": association,
+		"gameId":      bson.M{"$in": gameIds},
 	}
-
 	if status != "" {
 		filter["status"] = status
 	}
 
-	if len(gameIds) > 0 {
-		filter["gameId"] = bson.M{
-			"$in": gameIds,
-		}
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	// Query to find all documents
+	coll := Client.Database(Database).Collection("games")
 	cursor, err := coll.Find(ctx, filter)
 	if err != nil {
-		return totGameFee, fmt.Errorf("GetGameFee failure.  Reason: %s", err)
+		return 0, fmt.Errorf("GetGameFee query failed: %w", err)
 	}
+	defer cursor.Close(ctx)
 
 	var results []model.GameDoc
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return totGameFee, fmt.Errorf("GetGameFee failure.  Reason: %s", err)
+	if err := cursor.All(ctx, &results); err != nil {
+		return 0, fmt.Errorf("GetGameFee read failed: %w", err)
 	}
 
-	for _, r := range results {
-
-		totGameFee += r.GameFee*r.NumOfGames + r.TravelPay - r.Deductions - r.AssignorFee
+	var total int64
+	for _, game := range results {
+		total += game.GameFee*game.NumOfGames + game.TravelPay - game.Deductions - game.AssignorFee
 	}
-
-	return totGameFee, nil
+	return total, nil
 }
 
 // Used by HTML Web Pages
@@ -2307,7 +2310,7 @@ func InsertPaymentDocs(
 			continue
 		}
 
-		totalGameFee, err := GetGameFee(gameIds, tId, "")
+		totalGameFee, err := GetGameFee(gameIds, tId, "", v.Association)
 		if err != nil {
 			utils.AuditLog.Printf(
 				"Failed to get game fee for Game Ids %v. Reason: %v",
@@ -2494,7 +2497,7 @@ func UpdatePaymentDocs(
 		// and added games need to become Paid. That reconciliation still
 		// needs to be implemented separately.
 
-		totalGameFee, err := GetGameFee(gameIds, tId, "")
+		totalGameFee, err := GetGameFee(gameIds, tId, "", v.Association)
 		if err != nil {
 			utils.AuditLog.Printf(
 				"Failed to get game fee for Game Ids %v. Reason: %v",

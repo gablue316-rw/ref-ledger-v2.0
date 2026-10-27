@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -3834,25 +3835,35 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
-
-	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+(oneMB))
+	// Allow additional space for multipart boundaries and form metadata.
+	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+oneMB)
 
 	if err := r.ParseMultipartForm(maxCSVSize); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "The CSV upload is invalid or exceeds the 5 MB limit.")
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The CSV upload is invalid or exceeds the 5 MB limit.",
+		)
 		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
 	}
 
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "An Officials CSV file is required.")
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"A Sites CSV file is required.",
+		)
 		return
 	}
-
 	defer file.Close()
 
 	if err := validateCSVFile(fileHeader); err != nil {
@@ -3861,21 +3872,24 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csvReader := csv.NewReader(file)
-
-	/* Allow variable-length records so we can report a useful row-level error instead of stopping immediately. */
 	csvReader.FieldsPerRecord = -1
-
-	/* This trims spaces that appear outside quoted CSV values. For example: John, Smith is treated similarly to: John,Smith */
 	csvReader.TrimLeadingSpace = true
 
 	header, err := csvReader.Read()
 	if err == io.EOF {
-		writeJSONError(w, http.StatusBadRequest, "The CSV file is empty.")
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The CSV file is empty.",
+		)
 		return
 	}
-
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "Unable to read the CSV header: "+err.Error())
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Unable to read the CSV header: "+err.Error(),
+		)
 		return
 	}
 
@@ -3885,52 +3899,54 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows := make([]SitePreviewRow, 0)
-
-	/* Used to detect duplicates inside the uploaded CSV file. */
 	namesInFile := make(map[string]int)
 	csvRowNumber := 1
 
 	for {
 		record, readErr := csvReader.Read()
-
 		if readErr == io.EOF {
 			break
 		}
 
 		csvRowNumber++
+
+		if readErr == nil && isBlankCSVRecord(record) {
+			continue
+		}
+
 		if len(rows) >= maxCSVRows {
-			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("The CSV file contains more than %d data rows.", maxCSVRows))
+			writeJSONError(
+				w,
+				http.StatusBadRequest,
+				fmt.Sprintf(
+					"The CSV file contains more than %d data rows.",
+					maxCSVRows,
+				),
+			)
 			return
 		}
 
 		if readErr != nil {
-			rows = append(
-				rows,
-				SitePreviewRow{
-					RowNumber: csvRowNumber,
-					Valid:     false,
-					Data:      SiteImportData{},
-					Errors: []string{
-						"Unable to parse CSV row: " + readErr.Error(),
-					},
+			rows = append(rows, SitePreviewRow{
+				RowNumber: csvRowNumber,
+				Valid:     false,
+				Data:      SiteImportData{},
+				Errors: []string{
+					"Unable to parse CSV row: " + readErr.Error(),
 				},
-			)
-			/* Some CSV syntax errors leave the reader unable to continue reliably. Stop after recording the error. */
+			})
 			break
 		}
 
-		if isBlankCSVRecord(record) {
-			continue
-		}
-
-		previewRow := buildSitePreviewRow(
-			csvRowNumber,
-			record,
+		previewRow := buildSitePreviewRow(csvRowNumber, record)
+		previewRow.Data.SiteName = strings.TrimSpace(
+			previewRow.Data.SiteName,
 		)
 
-		nameKey := normalizeSiteId(previewRow.Data.SiteId)
+		// Compare names without regard to case or surrounding spaces.
+		nameKey := strings.ToLower(previewRow.Data.SiteName)
 
-		if nameKey != "|" {
+		if nameKey != "" {
 			if previousRow, found := namesInFile[nameKey]; found {
 				previewRow.Errors = append(
 					previewRow.Errors,
@@ -3945,7 +3961,6 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		previewRow.Valid = len(previewRow.Errors) == 0
-
 		rows = append(rows, previewRow)
 	}
 
@@ -3957,22 +3972,20 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	/* Check MongoDB for sites that already exist. This only runs for rows that passed the basic CSV validation. */
 
+	// Check existing sites only for rows that passed CSV validation.
 	for i := range rows {
 		if !rows[i].Valid {
 			continue
 		}
 
-		siteId := rows[i].Data.SiteId
-
-		exists, err := sc.Exists(siteId, tId)
-
+		name := rows[i].Data.SiteName
+		exists, err := sc.Exists(name, tId)
 		if err != nil {
 			log.Printf(
 				"PreviewSitesImportHandler: duplicate lookup failed for tenant %s, site %s: %v",
 				tId,
-				rows[i].Data.SiteId,
+				name,
 				err,
 			)
 			writeJSONError(
@@ -4029,16 +4042,13 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	saveSitesPreview(preview)
 	removeExpiredSitesPreviews()
 
-	response := SitesPreviewResponse{
+	writeJSON(w, http.StatusOK, SitesPreviewResponse{
 		PreviewToken: previewToken,
 		TotalRows:    len(rows),
 		ValidRows:    validRows,
 		InvalidRows:  invalidRows,
 		Rows:         rows,
-	}
-
-	writeJSON(w, http.StatusOK, response)
-
+	})
 }
 
 func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
@@ -8796,6 +8806,8 @@ func main() {
 	mux.HandleFunc("/api/environment", GetEnvironmentHandler)
 	mux.HandleFunc("/api/about", AboutHandler)
 	mux.HandleFunc("/settings", authRequired(SettingsPage))
+	mux.HandleFunc("/api/settings/export-records", authRequired(ExportRecordsHandler))
+	mux.HandleFunc("/api/settings/delete-records", authRequired(readOnlyForbidden(DeleteRecordsHandler)))
 	mux.HandleFunc("/administration", authRequired(adminRequired(AdministrationPage)))
 
 	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
@@ -9026,4 +9038,399 @@ func main() {
 		log.Fatal(err)
 	}
 
+}
+
+// Data exports use the current session's tenant and an explicit collection allowlist.
+var dataCollectionNames = []string{"associations", "expenses", "games", "levels", "officials", "payments", "sites"}
+
+func selectedDataCollections(names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, fmt.Errorf("Select at least one collection.")
+	}
+	seen := map[string]bool{}
+	for _, name := range names {
+		valid := false
+		for _, allowed := range dataCollectionNames {
+			if name == allowed {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, fmt.Errorf("Unsupported collection: %s", name)
+		}
+		seen[name] = true
+	}
+	out := []string{}
+	for _, name := range dataCollectionNames {
+		if seen[name] {
+			out = append(out, name)
+		}
+	}
+	return out, nil
+}
+
+// Match existing BSON spellings (including fields without explicit BSON tags).
+func exportValue(doc bson.M, names ...string) any {
+	for _, name := range names {
+		if value, ok := doc[name]; ok {
+			return value
+		}
+		for key, value := range doc {
+			if strings.EqualFold(strings.ReplaceAll(key, "_", ""), strings.ReplaceAll(name, "_", "")) {
+				return value
+			}
+		}
+	}
+	return nil
+}
+func exportText(value any) string {
+	if value == nil {
+		return ""
+	}
+	switch v := value.(type) {
+	case string:
+		return v
+	case primitive.A:
+		parts := make([]string, len(v))
+		for i, x := range v {
+			parts[i] = exportText(x)
+		}
+		return strings.Join(parts, ",")
+	case []string:
+		return strings.Join(v, ",")
+	default:
+		return fmt.Sprint(value)
+	}
+}
+func exportCents(value any) (string, error) {
+	if value == nil || strings.TrimSpace(exportText(value)) == "" {
+		return "0.00", nil
+	}
+	cents, err := strconv.ParseInt(exportText(value), 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("invalid stored cents value %q", exportText(value))
+	}
+	// Avoid floating point rounding, including for large stored amounts.
+	negative := cents < 0
+	var magnitude uint64
+	if negative {
+		magnitude = uint64(-(cents + 1)) + 1
+	} else {
+		magnitude = uint64(cents)
+	}
+	text := fmt.Sprintf("%d.%02d", magnitude/100, magnitude%100)
+	if negative {
+		text = "-" + text
+	}
+	return text, nil
+}
+func dataExportHeader(name string) []string {
+	switch name {
+	case "associations":
+		return []string{"associationId", "associationName", "contactName", "contactNumber", "contactEmail", "assignors(comma-separated)"}
+	case "officials":
+		return []string{"firstname", "lastname", "phone", "email", "address"}
+	case "sites":
+		return []string{"sitename", "contactname", "contactnumber", "contactemail"}
+	case "games":
+		return []string{"gameid", "date", "taxyear", "time", "sport", "site", "field", "numofgames", "level", "gamefee", "travelpay", "assignorfee", "deductions", "association", "status", "official1", "official2", "official3", "official4", "official5", "official6", "official7", "official8", "official9", "official10", "assignor", "home", "visitor", "notes"}
+	case "levels":
+		return []string{"sport", "name", "gameFee", "active"}
+	case "expenses":
+		return []string{"date", "taxYear", "type", "amount", "association", "description"}
+	case "payments":
+		return []string{"paymentId", "paymentDate", "taxYear", "paymentAmt", "association", "gameIds(comma-separated)"}
+	}
+	return nil
+}
+func dataExportRow(name string, doc bson.M) ([]string, error) {
+	get := func(names ...string) string { return exportText(exportValue(doc, names...)) }
+	var row []string
+	switch name {
+	case "associations":
+		row = []string{get("id", "associationId"), get("name", "associationName"), get("contact", "contactName"), get("phone", "contactNumber"), get("email", "contactEmail"), get("assignors")}
+	case "officials":
+		row = []string{get("firstName"), get("lastName"), get("phone"), get("email"), get("address")}
+	case "sites":
+		row = []string{get("name", "siteName"), get("contact", "contactName"), get("phone", "contactNumber"), get("email", "contactEmail")}
+	case "levels":
+		row = []string{get("sport"), get("name"), get("gameFee"), get("active")}
+	case "expenses":
+		// The CSV uses one amount column for money or mileage, selected by type.
+		value := get("amount")
+		if strings.EqualFold(strings.TrimSpace(get("type")), "Mileage") {
+			value = get("mileage")
+		}
+		row = []string{get("date"), get("taxYear"), get("type"), value, get("association"), get("description")}
+	case "payments":
+		row = []string{get("paymentId"), get("paymentDate"), get("taxYear"), get("paymentAmt"), get("association"), get("gameIds")}
+	case "games":
+		row = make([]string, 29)
+		for i, field := range dataExportHeader(name) {
+			if i < 15 || i > 24 {
+				row[i] = get(field)
+			}
+		}
+		// Use the same active-role order as buildGamePreviewRow; sorting only
+		// stored officials would shift columns when a role is absent.
+		roles, err := database.GetOfficialRoles(get("sport"))
+		if err != nil {
+			return nil, err
+		}
+		sort.SliceStable(roles.Roles, func(i, j int) bool { return roles.Roles[i].DisplayOrder < roles.Roles[j].DisplayOrder })
+		var stored struct {
+			Officials []model.GameOfficialDoc `bson:"officials"`
+		}
+		encoded, err := bson.Marshal(bson.M{"officials": exportValue(doc, "officials")})
+		if err != nil {
+			return nil, err
+		}
+		if err = bson.Unmarshal(encoded, &stored); err != nil {
+			return nil, err
+		}
+		matched := map[int]bool{}
+		position := 0
+		for _, role := range roles.Roles {
+			if !role.Active {
+				continue
+			}
+			if position == 10 {
+				return nil, fmt.Errorf("sport %s has more than ten active roles", get("sport"))
+			}
+			row[15+position] = "Unassigned"
+			found := false
+			for i, official := range stored.Officials {
+				if official.RoleId == role.RoleId {
+					if found {
+						return nil, fmt.Errorf("duplicate stored assignment for %s", role.Title)
+					}
+					found = true
+					row[15+position] = official.Name
+					matched[i] = true
+				}
+			}
+			// Support older games with the original role fields.
+			if len(stored.Officials) == 0 {
+				legacy := get(strings.ToLower(role.Title))
+				if legacy != "" {
+					row[15+position] = legacy
+				}
+			}
+			position++
+		}
+		for i, official := range stored.Officials {
+			if !matched[i] && official.Name != "" && !strings.EqualFold(official.Name, "Unassigned") {
+				return nil, fmt.Errorf("game %s has an assigned inactive or unknown role %s; cannot export without losing its assignment", get("gameId"), official.Title)
+			}
+		}
+	}
+	// Amounts and legacy expense mileage are stored in hundredths; export both divided by 100.
+	money := map[string][]int{"games": {9, 10, 11, 12}, "levels": {2}, "expenses": {3}, "payments": {3}}
+	for _, index := range money[name] {
+		value, err := exportCents(row[index])
+		if err != nil {
+			return nil, err
+		}
+		row[index] = value
+	}
+	if name == "expenses" {
+		if strings.EqualFold(strings.TrimSpace(get("type")), "Mileage") {
+			// Remove unnecessary decimal zeros without losing fractional miles.
+			row[3] = strings.TrimRight(strings.TrimRight(row[3], "0"), ".")
+		} else {
+			row[3] = "$" + row[3]
+		}
+	}
+	return row, nil
+}
+
+func ExportRecordsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil || strings.TrimSpace(tId) == "" {
+		writeJSONError(w, 401, "Invalid tenant.")
+		return
+	}
+	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		writeJSONError(w, 415, "JSON is required.")
+		return
+	}
+	var request struct {
+		Collections []string `json:"collections"`
+		Prefix      string   `json:"prefix"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8192)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(&request); err != nil {
+		writeJSONError(w, 400, "Invalid export request.")
+		return
+	}
+	names, err := selectedDataCollections(request.Collections)
+	if err != nil {
+		writeJSONError(w, 400, err.Error())
+		return
+	}
+	prefix := strings.TrimSpace(request.Prefix)
+	if prefix == "" {
+		prefix = "ref-ledger"
+	}
+	if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$`).MatchString(prefix) {
+		writeJSONError(w, 400, "Use a prefix of 1–80 letters, numbers, hyphens or underscores.")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	// Stage output on disk: errors never result in a successful partial download.
+	file, err := os.CreateTemp("", "ref-ledger-export-*")
+	if err != nil {
+		writeJSONError(w, 500, "Unable to create export.")
+		return
+	}
+	defer os.Remove(file.Name())
+	defer file.Close()
+	var archive *zip.Writer
+	if len(names) > 1 {
+		archive = zip.NewWriter(file)
+	}
+	db := database.Client.Database(database.GetMongoDbName())
+	for _, name := range names {
+		var destination io.Writer = file
+		if archive != nil {
+			destination, err = archive.Create(prefix + "-" + name + ".csv")
+			if err != nil {
+				break
+			}
+		}
+		writer := csv.NewWriter(destination)
+		writer.UseCRLF = true
+		err = writer.Write(dataExportHeader(name))
+		if err != nil {
+			break
+		}
+		cursor, findErr := db.Collection(name).Find(ctx, bson.M{"tenantId": tId}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+		if findErr != nil {
+			err = findErr
+			break
+		}
+		for cursor.Next(ctx) {
+			var doc bson.M
+			if err = cursor.Decode(&doc); err != nil {
+				break
+			}
+			var row []string
+			row, err = dataExportRow(name, doc)
+			if err != nil {
+				break
+			}
+			if err = writer.Write(row); err != nil {
+				break
+			}
+		}
+		if err == nil {
+			err = cursor.Err()
+		}
+		cursor.Close(ctx)
+		writer.Flush()
+		if err == nil {
+			err = writer.Error()
+		}
+		if err != nil {
+			break
+		}
+	}
+	if archive != nil {
+		closeErr := archive.Close()
+		if err == nil {
+			err = closeErr
+		}
+	}
+	if err != nil {
+		log.Printf("ExportRecordsHandler: tenant=%s error=%v", tId, err)
+		writeJSONError(w, 500, "Export could not be completed. Check the server log for details.")
+		return
+	}
+	filename := prefix + "-" + names[0] + ".csv"
+	contentType := "text/csv; charset=utf-8"
+	if archive != nil {
+		filename = prefix + "-export.zip"
+		contentType = "application/zip"
+	}
+	if _, err = file.Seek(0, io.SeekStart); err != nil {
+		writeJSONError(w, 500, "Unable to read export.")
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, filename, time.Time{}, file)
+}
+
+func DeleteRecordsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil || strings.TrimSpace(tId) == "" {
+		writeJSONError(w, 401, "Invalid tenant.")
+		return
+	}
+	// Requiring JSON prevents cross-site HTML forms from submitting deletions.
+	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		writeJSONError(w, 415, "JSON is required.")
+		return
+	}
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
+		writeJSONError(w, 403, "Cross-site deletion is forbidden.")
+		return
+	}
+	var request struct {
+		Collections  []string `json:"collections"`
+		Confirmation string   `json:"confirmation"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8192)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(&request); err != nil || request.Confirmation != "DELETE" {
+		writeJSONError(w, 400, "Select collections and confirm with DELETE.")
+		return
+	}
+	names, err := selectedDataCollections(request.Collections)
+	if err != nil {
+		writeJSONError(w, 400, err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	session, err := database.Client.StartSession()
+	if err != nil {
+		writeJSONError(w, 500, "Unable to start deletion.")
+		return
+	}
+	defer session.EndSession(ctx)
+	result, err := session.WithTransaction(ctx, func(sc mongo.SessionContext) (any, error) {
+		counts := map[string]int64{}
+		for _, name := range names {
+			deleted, deleteErr := database.Client.Database(database.GetMongoDbName()).Collection(name).DeleteMany(sc, bson.M{"tenantId": tId})
+			if deleteErr != nil {
+				return nil, deleteErr
+			}
+			counts[name] = deleted.DeletedCount
+		}
+		return counts, nil
+	})
+	if err != nil {
+		log.Printf("DeleteRecordsHandler: tenant=%s error=%v", tId, err)
+		writeJSONError(w, 500, "Deletion was not confirmed. MongoDB transactions require a replica set or sharded cluster. Check your records before retrying.")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"success": true, "deletedCounts": result})
 }
