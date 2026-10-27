@@ -543,7 +543,93 @@
                 font-size: 14px;
             }
         }
-    </style>
+    
+[hidden] { display: none !important; }
+#paymentsImportPanel { margin-bottom:25px; border:1px solid #e4e7ec; border-radius:12px; background:white; overflow:hidden; }
+#paymentsImportPanel .card-header { display:flex; gap:12px; align-items:center; padding:20px 22px; background:#082b4f; color:white; }
+#paymentsImportPanel .card-body { padding:22px; }
+#paymentsImportPanel .form-group { margin-bottom:16px; }
+#paymentsImportPanel .form-group label { display:block; margin-bottom:7px; font-weight:bold; }
+#paymentsImportPanel .form-control { width:100%; padding:10px; border:1px solid #cfd4dc; border-radius:6px; }
+#paymentsImportPanel .settings-table-wrapper { width:100%; overflow-x:auto; border:1px solid #cbd5e1; border-radius:7px; }
+#paymentsImportPanel table { width:100%; min-width:900px; border-collapse:collapse; }
+#paymentsImportPanel th { background:#2563eb; color:white; padding:11px; white-space:nowrap; text-align:left; }
+#paymentsImportPanel td { padding:11px; border-bottom:1px solid #ddd; vertical-align:top; }
+#paymentsImportPanel tbody tr:nth-child(even) { background:#f9fafb; }
+#paymentsImportPanel .status-valid { color:#15803d; font-weight:bold; }
+#paymentsImportPanel .status-error, #paymentsImportPanel .error-list { color:#b91c1c; }
+#paymentsImportPanel .summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:15px; margin:20px 0; }
+#paymentsImportPanel .summary-card { padding:18px; border:1px solid #e2e8f0; border-radius:8px; text-align:center; }
+#paymentsImportPanel .summary-card.total { background:#eff6ff; }
+#paymentsImportPanel .summary-card.valid { background:#f0fdf4; }
+#paymentsImportPanel .summary-card.invalid { background:#fef2f2; }
+#paymentsImportPanel .summary-number { display:block; font-size:28px; font-weight:bold; margin-bottom:5px; }
+#paymentsImportPanel .total .summary-number { color:#1d4ed8; }
+#paymentsImportPanel .valid .summary-number { color:#15803d; }
+#paymentsImportPanel .invalid .summary-number { color:#b91c1c; }
+#paymentsImportPanel .import-options { margin:20px 0; padding:18px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:7px; }
+#paymentsImportPanel .import-options label { display:block; margin-top:12px; }
+@media(max-width:550px) { #paymentsImportPanel .summary-grid { grid-template-columns:1fr; } }
+
+
+/* Matching import/export cards can share this responsive tools area. */
+.payment-data-tools { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr)); gap:24px; margin:25px 0; align-items:start; }
+.payment-data-tools > section { min-width:0; }
+#paymentsImportPanel { margin:0; }
+#paymentsImportPanel .btn { min-height:42px; padding:10px 18px; border:0; border-radius:6px; font-weight:600; cursor:pointer; }
+#paymentsImportPanel .btn-primary { color:#fff; background:#0b5fa5; }
+#paymentsImportPanel .btn-primary:hover:not(:disabled) { background:#084b83; }
+#paymentsImportPanel .btn-secondary { color:#344054; background:#e9edf2; }
+#paymentsImportPanel .btn-secondary:hover:not(:disabled) { background:#dce2e9; }
+#paymentsImportPanel .btn:disabled { color:#fff; background:#52667a; opacity:1; cursor:not-allowed; }
+#paymentsImportPanel .btn:focus-visible { outline:3px solid #60a5fa; outline-offset:3px; }
+
+#paymentsImportPanel #clearRecordsImport,
+#paymentsImportPanel #clearRecordsPreview { color:#fff; background:#dc2626; }
+#paymentsImportPanel #clearRecordsImport:hover:not(:disabled),
+#paymentsImportPanel #clearRecordsPreview:hover:not(:disabled) { background:#b91c1c; }
+#paymentsImportPanel #confirmRecordsImport { color:#fff; background:#16a34a; }
+#paymentsImportPanel #confirmRecordsImport:hover:not(:disabled) { background:#15803d; }
+#paymentsImportPanel #confirmRecordsImport:disabled,
+#paymentsImportPanel #clearRecordsImport:disabled,
+#paymentsImportPanel #clearRecordsPreview:disabled { opacity:.55; cursor:not-allowed; }
+#paymentsImportPanel .import-options { margin:20px 0; padding:18px; }
+#paymentsImportPanel .import-options h3 { margin:0 0 12px; }
+#paymentsImportPanel .import-options label {
+ display:flex; align-items:flex-start; gap:10px; margin:0 0 8px;
+ padding:0; font-weight:normal; line-height:1.4;
+}
+#paymentsImportPanel .import-options label:last-child { margin-bottom:0; }
+#paymentsImportPanel .import-options input[type="radio"] {
+ flex:0 0 auto; width:16px; height:16px; min-height:0;
+ margin:3px 0 0; padding:0; accent-color:#2563eb;
+}
+
+#paymentsExportPanel { min-width:0; border:1px solid #e4e7ec; border-radius:12px; background:#fff; overflow:hidden; }
+#paymentsExportPanel .card-header { display:flex; gap:12px; align-items:center; padding:20px 22px; background:#082b4f; color:#fff; }
+#paymentsExportPanel .card-body { padding:22px; }
+#paymentsExportPanel .form-group { margin-bottom:16px; }
+#paymentsExportPanel label { display:block; margin-bottom:7px; font-weight:bold; }
+#paymentsExportPanel .form-control { box-sizing:border-box; width:100%; padding:10px; border:1px solid #cfd4dc; border-radius:6px; }
+#paymentsExportButton { color:#fff; background:#0b5fa5; min-height:42px; padding:10px 18px; border:0; border-radius:6px; font-weight:600; cursor:pointer; }
+#paymentsExportButton:hover:not(:disabled) { background:#084b83; }
+#paymentsExportButton:disabled { background:#52667a; cursor:not-allowed; }
+#paymentsExportButton:focus-visible { outline:3px solid #60a5fa; outline-offset:3px; }
+
+#paymentsImportPanel #downloadPaymentsTemplate { display:block; margin:0 0 14px; color:#fff; background:#7c3aed; }
+#paymentsImportPanel #downloadPaymentsTemplate:hover { background:#6d28d9; }
+#paymentsImportPanel #paymentOpenFile { display:block; color:#fff; background:#2563eb; }
+#paymentsImportPanel #paymentOpenFile:hover:not(:disabled) { background:#1d4ed8; }
+#paymentsImportPanel #paymentStandardPicker,
+#paymentsImportPanel #paymentForgetFile { display:block; color:#fff; background:#64748b; }
+#paymentsImportPanel #paymentStandardPicker:hover:not(:disabled),
+#paymentsImportPanel #paymentForgetFile:hover:not(:disabled) { background:#475569; }
+#paymentsImportPanel #paymentFileHelp { margin:12px 0 0; color:#52627a; line-height:1.5; }
+#paymentsImportPanel #paymentLastFile { margin:12px 0 0; color:#52627a; }
+#paymentsImportPanel #paymentSelectedFile { margin:12px 0 18px; padding:14px; border:1px solid #cbd5e1; border-radius:6px; background:#f1f5f9; color:#475569; }
+
+.payment-data-tools { grid-template-columns:minmax(0,1fr); }
+</style>
 </head>
 
 <body>
@@ -555,7 +641,63 @@
     <div class="header">
         <h1>Ref Ledger V2.0 Payments</h1>
         <p>Record and track your received payments.</p>
+
     </div>
+
+<div class="payment-data-tools">
+<section id="paymentsExportPanel" aria-labelledby="paymentsExportTitle">
+<div class="card-header"><i class="fa-solid fa-file-export" aria-hidden="true"></i><div><h2 id="paymentsExportTitle">Export Payments</h2><p>Download your payments as a CSV file.</p></div></div>
+<div class="card-body">
+<form id="paymentsExportForm" autocomplete="off">
+<div class="form-group"><label for="paymentsExportPrefix">File name prefix</label><input class="form-control" id="paymentsExportPrefix" value="ref-ledger" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,79}" required aria-describedby="paymentsExportHelp"></div>
+<p id="paymentsExportHelp" style="margin-bottom:16px;line-height:1.5">Exports all payments for your account, regardless of the payment registry filters. Includes payment ID, payment date, tax year, amount, association, and game IDs. Amounts include a dollar sign. Your browser chooses the download directory.</p>
+<p id="paymentsExportFilename" style="margin-bottom:16px"></p>
+<button type="submit" class="btn" id="paymentsExportButton"><i class="fa-solid fa-file-export" aria-hidden="true"></i> Export Payments</button>
+</form>
+<p id="paymentsExportStatus" role="status" aria-live="polite" style="margin-top:16px"></p>
+</div></section>
+<section id="paymentsImportPanel" class="settings-card" aria-labelledby="importRecordsTitle">
+<div class="card-header"><i class="fa-solid fa-file-import" aria-hidden="true"></i><div><h2 id="importRecordsTitle">Import Payments</h2><p>Preview and import records from a CSV file.</p></div></div>
+<div class="card-body">
+<form id="importRecordsForm" autocomplete="off">
+<select id="importCollection" hidden><option value="payments" selected>Payments</option></select>
+<button type="button" class="btn" id="downloadPaymentsTemplate"><i class="fa-solid fa-download" aria-hidden="true"></i> Download Payments Template</button>
+<div class="form-group payment-file-controls">
+<label for="importRecordsFile">Payments CSV File</label>
+<button type="button" class="btn" id="paymentOpenFile"><i class="fa-solid fa-folder-open" aria-hidden="true"></i> Open CSV File</button>
+<input class="form-control" id="importRecordsFile" type="file" accept=".csv,text/csv" aria-describedby="paymentFileHelp">
+<p id="paymentFileHelp"></p>
+<button type="button" class="btn" id="paymentStandardPicker">Use Standard File Picker</button>
+<p id="paymentLastFile" hidden></p>
+<button type="button" class="btn" id="paymentForgetFile" hidden>Forget Last File</button>
+<p id="paymentSelectedFile">No file selected.</p>
+</div>
+<p id="importRecordsHelp" style="margin-bottom:16px;line-height:1.5">CSV columns: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated). Amounts may be 92.00 or $92.00. Quote multiple game IDs, for example "1,2,3". Files must be no larger than 5 MB. All referenced games must be Completed, belong to the selected association, and total the payment amount.</p>
+<button class="btn btn-primary" type="submit" id="previewRecordsImport" disabled><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Preview Payments</button>
+<button class="btn btn-secondary" type="button" id="clearRecordsImport">Clear</button>
+</form>
+<p id="importRecordsStatus" role="status" aria-live="polite" style="margin-top:16px;white-space:pre-line"></p>
+<div id="importRecordsPreview" hidden style="margin-top:18px">
+<h2 id="importRecordsPreviewTitle">Import Preview</h2>
+<div class="summary-grid" id="importRecordsCounts">
+<div class="summary-card total"><span class="summary-number" id="importTotalRows">0</span>Total Rows</div>
+<div class="summary-card valid"><span class="summary-number" id="importValidRows">0</span>Valid Rows</div>
+<div class="summary-card invalid"><span class="summary-number" id="importInvalidRows">0</span>Rows With Errors</div>
+</div>
+<p id="importRecordsSummary" style="margin-bottom:12px"></p>
+<div class="settings-table-wrapper"><table class="settings-table"><thead><tr id="importRecordsHeaders"><th scope="col">CSV Row</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead><tbody id="importRecordsRows"></tbody></table></div>
+<p style="margin:16px 0;line-height:1.5">Review the results before importing. Rows with errors will not be imported. Existing records will not be overwritten.</p>
+<div class="import-options" id="importDuplicateOptions"><h3>Duplicate Records</h3>
+<label><input type="radio" name="recordsDuplicateAction" value="skip" checked> Skip records that already exist.</label>
+<label><input type="radio" name="recordsDuplicateAction" value="stop"> Stop the import when a duplicate is found.</label>
+</div>
+<button class="btn btn-primary" type="button" id="confirmRecordsImport" disabled>Import Valid Records</button>
+<button class="btn btn-secondary" type="button" id="clearRecordsPreview">Clear Preview</button>
+</div>
+</div></section>
+
+
+</div>
 
     <div class="payment-workspace">
 
@@ -3195,5 +3337,523 @@ document.addEventListener(
     </div>
 </div>
 
+<script>
+// Reuse the existing /api/import/{collection}/preview and /commit handlers.
+// Preview uses multipart field file. Commit uses {previewToken, duplicateAction:"skip"}.
+// Preview response: {previewToken,totalRows,validRows,invalidRows,rows}.
+// Commit response: {added,skipped,failed,message,rows}; HTTP 200 can include failed rows.
+(() => {
+    const form = document.getElementById("importRecordsForm");
+    const collection = document.getElementById("importCollection");
+    const file = document.getElementById("importRecordsFile");
+    const previewButton = document.getElementById("previewRecordsImport");
+    const clearButton = document.getElementById("clearRecordsImport");
+    const confirmButton = document.getElementById("confirmRecordsImport");
+    const panel = document.getElementById("importRecordsPreview");
+    const status = document.getElementById("importRecordsStatus");
+    let busy = false;
+    let token = "";
+    let validCount = 0;
+    const csvFile = file;
+    const selectedFile = document.getElementById("paymentSelectedFile");
+    const openFileBtn = document.getElementById("paymentOpenFile");
+    const useStandardPickerBtn = document.getElementById("paymentStandardPicker");
+    const fileHelp = document.getElementById("paymentFileHelp");
+    const lastUsedFile = document.getElementById("paymentLastFile");
+    const forgetSavedFileBtn = document.getElementById("paymentForgetFile");
+    const clearFileBtn = clearButton;
+    const clearPreviewBtn = document.getElementById("clearRecordsPreview");
+    const importGamesForm = form;
+    const maximumFileSize = 5 * 1024 * 1024;
+    const savedFileKey = "refLedger.paymentsImport.lastFile";
+    let handleMode = window.isSecureContext && typeof window.showOpenFilePicker === "function";
+    let fileHandle = null;
+    let rememberedName = "";
+    function setBusy(value) { busy = value; sync(); }
+    function clearPreview() { invalidate(); }
+    function showMessage(message) { status.textContent = message; }
+    function formatFileSize(bytes) { return bytes < 1024 ? `${bytes} bytes` : `${(bytes / 1024).toFixed(1)} KB`; }
+// Only the name and read-only file handle are saved, never CSV contents or
+// preview tokens. The record belongs to this browser and site origin.
+function openImportDatabase() {
+    return new Promise(function (resolve, reject) {
+        if (!window.indexedDB) {
+            reject(new Error("Browser storage is unavailable."));
+            return;
+        }
+        const request = window.indexedDB.open("refLedgerPaymentsImport", 1);
+        let finished = false;
+        const timer = setTimeout(function () {
+            finished = true;
+            reject(new Error("Browser storage did not respond."));
+        }, 3000);
+        request.onupgradeneeded = function () {
+            if (!request.result.objectStoreNames.contains("files")) {
+                request.result.createObjectStore("files");
+            }
+        };
+        request.onsuccess = function () {
+            if (finished) { request.result.close(); return; }
+            finished = true;
+            clearTimeout(timer);
+            request.result.onversionchange = function () { request.result.close(); };
+            resolve(request.result);
+        };
+        request.onerror = function () {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            reject(request.error);
+        };
+        request.onblocked = function () {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            reject(new Error("Browser storage is busy in another tab."));
+        };
+    });
+}
+async function storedFile(action, record) {
+    const database = await openImportDatabase();
+    try {
+        return await new Promise(function (resolve, reject) {
+            const transaction = database.transaction("files", action === "get" ? "readonly" : "readwrite");
+            const store = transaction.objectStore("files");
+            let request;
+            if (action === "get") request = store.get("lastFile");
+            else if (action === "delete") request = store.delete("lastFile");
+            else request = store.put(record, "lastFile");
+            transaction.oncomplete = function () { resolve(request.result); };
+            transaction.onabort = function () { reject(transaction.error || new Error("Browser storage failed.")); };
+            transaction.onerror = function () { reject(transaction.error || new Error("Browser storage failed.")); };
+        });
+    } finally {
+        database.close();
+    }
+}
+function showRememberedName(name) {
+    rememberedName = typeof name === "string" ? name : "";
+    lastUsedFile.textContent = rememberedName ? "Last file used: " + rememberedName : "";
+    lastUsedFile.hidden = !rememberedName;
+    forgetSavedFileBtn.hidden = !rememberedName;
+    openFileBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> ' + (rememberedName ? "Open Different File" : "Open CSV File");
+}
+async function rememberFile(file, handle) {
+    showRememberedName(file.name);
+    // A small name-only fallback is available if IndexedDB is unavailable.
+    try { window.localStorage.setItem(savedFileKey, file.name); } catch (error) { /* Storage can be disabled. */ }
+    try {
+        await storedFile("put", { name: file.name, handle: handle || null });
+    } catch (error) {
+        // Some browsers cannot serialize file handles. Replace any old handle
+        // with a name-only record, so a later visit cannot restore the old CSV.
+        try {
+            await storedFile("put", { name: file.name, handle: null });
+        } catch (storageError) {
+            showMessage("File selected for this visit. Your browser could not remember it for the next visit.", "warning");
+        }
+    }
+}
+async function restoreLastFile() {
+    setBusy(true);
+    let name = "";
+    try { name = window.localStorage.getItem(savedFileKey) || ""; } catch (error) { /* Optional storage. */ }
+    try {
+        const record = await storedFile("get");
+        // When both exist, a newer name fallback must not revive an old handle.
+        if (record && (!name || name === record.name)) {
+            name = record.name || "";
+            if (handleMode && record.handle && typeof record.handle.getFile === "function") {
+                fileHandle = record.handle;
+                showRememberedName(name);
+                const permission = await fileHandle.queryPermission({ mode: "read" });
+                if (permission === "granted") {
+                    const file = await fileHandle.getFile();
+                    validateFile(file);
+                    describeFile(file);
+                    showMessage("Last CSV restored. Save any edits and select Preview Payments to read the latest saved file.", "info");
+                } else {
+                    selectedFile.textContent = "Remembered file: " + name + " (access required).";
+                    showMessage("Select Preview Payments to allow access to the remembered CSV, or open a different file.", "info");
+                }
+            }
+        }
+    } catch (error) {
+        fileHandle = null;
+        if (name) showMessage("Last filename remembered. Select the file again to continue.", "info");
+    } finally {
+        showRememberedName(name);
+        if (name && !fileHandle) {
+            showMessage("Last file used: " + name + ". Select it again to continue.", "info");
+        }
+        setBusy(false);
+    }
+}
+forgetSavedFileBtn.addEventListener("click", async function () {
+    if (busy) return;
+    setBusy(true);
+    forgetFile();
+    let removed = true;
+    try { window.localStorage.removeItem(savedFileKey); } catch (error) { removed = false; }
+    try { await storedFile("delete"); } catch (error) { removed = false; }
+    showRememberedName("");
+    showMessage(removed ? "Remembered file and current preview cleared." : "Current selection cleared. Browser storage could not be cleared completely; try again or clear this site's browser data.", removed ? "info" : "warning");
+    setBusy(false);
+});
+
+function updatePickerMode() {
+    openFileBtn.hidden = !handleMode;
+    csvFile.hidden = handleMode;
+    useStandardPickerBtn.hidden = !handleMode;
+    fileHelp.textContent = handleMode
+        ? "This browser can reread your file. Use Open CSV File once, then save changes to the same CSV and click Preview Payments again. Select the file again if it is moved, replaced, or saved under a new name."
+        : "After editing and saving the CSV, use Choose File to select it again before previewing. This browser cannot automatically reread saved changes in this mode.";
+}
+function describeFile(file) {
+    selectedFile.textContent = file.name + " (" + formatFileSize(file.size) + ")";
+}
+function validateFile(file) {
+    if (!file.name.toLowerCase().endsWith(".csv")) {
+        throw new Error("The selected file must have a .csv extension.");
+    }
+    if (file.size > maximumFileSize) {
+        throw new Error("The selected file is too large. The maximum file size is 5 MB.");
+    }
+}
+function forgetFile() {
+    fileHandle = null;
+    csvFile.value = "";
+    selectedFile.textContent = "No file selected.";
+    clearPreview();
+}
+openFileBtn.addEventListener("click", async function () {
+    if (busy) return;
+    setBusy(true);
+    try {
+        // Called directly from a click so the browser can request file access.
+        const handles = await window.showOpenFilePicker({
+            multiple: false,
+            types: [{ description: "Payments CSV file", accept: { "text/csv": [".csv"] } }]
+        });
+        const handle = handles[0];
+        if (!handle) return;
+        // A new selection always invalidates the old preview.
+        forgetFile();
+        const file = await handle.getFile();
+        validateFile(file);
+        fileHandle = handle;
+        describeFile(file);
+        showMessage("File selected. Select Preview Payments to validate it.", "info");
+        await rememberFile(file, handle);
+    } catch (error) {
+        if (error.name === "AbortError") return; // Keep the previous selection on cancellation.
+        showMessage("Unable to open the CSV. Try Open CSV File again or use the standard file picker. " + (error.message || ""), "error");
+    } finally {
+        setBusy(false);
+    }
+});
+useStandardPickerBtn.addEventListener("click", function () {
+    if (busy) return;
+    forgetFile();
+    handleMode = false;
+    updatePickerMode();
+    showMessage("Use Choose File to select the CSV. Select it again after saving edits.", "info");
+});
+// Reset the input before opening the standard picker, so selecting the same
+// filename again gives the browser a fresh selection and triggers change.
+csvFile.addEventListener("click", function () {
+    if (busy) return;
+    forgetFile();
+    showMessage("Select the saved Payments CSV file.", "info");
+});
+csvFile.addEventListener("change", async function () {
+    clearPreview();
+    fileHandle = null;
+    const file = csvFile.files[0];
+    if (!file) {
+        selectedFile.textContent = "No file selected.";
+        showMessage("Select a Payments CSV file to begin.", "info");
+        return;
+    }
+    try {
+        validateFile(file);
+        describeFile(file);
+        showMessage("File selected. Select Preview Payments to validate it. Select the file again after saving edits.", "info");
+        setBusy(true);
+        await rememberFile(file, null);
+    } catch (error) {
+        forgetFile();
+        showMessage(error.message, "error");
+    } finally {
+        setBusy(false);
+    }
+});
+clearFileBtn.addEventListener("click", function () {
+    if (busy) return;
+    importGamesForm.reset();
+    forgetFile();
+    showMessage("File selection and preview cleared. The last file is still remembered; use Forget Last File to remove it.", "info");
+});
+clearPreviewBtn.addEventListener("click", function () {
+    if (busy) return;
+    clearPreview();
+    showMessage(handleMode
+        ? "Preview cleared. Save any CSV changes and preview again."
+        : "Preview cleared. If you edited the CSV, use Choose File to select it again before previewing.", "info");
+});
+async function getUploadSnapshot() {
+    let file;
+    try {
+        if (fileHandle) {
+            let permission = await fileHandle.queryPermission({ mode: "read" });
+            if (permission !== "granted") {
+                // Invoked from Preview Payments, never automatically on page load.
+                permission = await fileHandle.requestPermission({ mode: "read" });
+            }
+            if (permission !== "granted") {
+                throw new Error("File access was not granted.");
+            }
+        }
+        // Never cache the File returned by getFile(): obtain its current state.
+        file = fileHandle ? await fileHandle.getFile() : csvFile.files[0];
+    } catch (error) {
+        throw new Error("The CSV is no longer accessible. Save and close it if necessary, then select it again with Open CSV File or the standard file picker.");
+    }
+    if (!file) throw new Error("Select a Payments CSV file.");
+    validateFile(file);
+    describeFile(file);
+    try {
+        // Copy bytes into memory before uploading. An external edit during
+        // the later request cannot invalidate this upload's file reference.
+        const bytes = await file.arrayBuffer();
+        return { blob: new Blob([bytes], { type: "text/csv" }), name: file.name };
+    } catch (error) {
+        throw new Error(handleMode
+            ? "The CSV changed while it was being read or could not be read. Finish saving it and click Preview Payments again. If that fails, select the file again."
+            : "The CSV may have changed since it was selected or could not be read. Finish saving it, use Choose File to select it again, and preview again.");
+    }
+}
+
+    const columns = {
+        payments: [["Payment ID", "paymentId"], ["Payment Date", "paymentDate"], ["Tax Year", "taxYear"], ["Payment Amount", "paymentAmt"], ["Association", "association"], ["Game IDs", "gameIds"]],
+        levels: [["Sport", "sport"], ["Level Name", "name"], ["Game Fee", "gameFee"], ["Active", "active"]],
+        expenses: [["Date", "date"], ["Tax Year", "taxYear"], ["Type", "type"], ["Amount / Mileage", "amount"], ["Association", "association"], ["Description", "description"]],
+        associations: [["Association ID", "associationId"], ["Association Name", "associationName"], ["Contact Name", "contactName"], ["Contact Number", "contactNumber"], ["Contact Email", "contactEmail"], ["Assignors", "assignors"]],
+        officials: [["First Name", "firstName"], ["Last Name", "lastName"], ["Phone", "phone"], ["Email", "email"], ["Address", "address"]],
+        sites: [["Site Name", "siteName"], ["Contact Name", "contactName"], ["Contact Number", "contactNumber"], ["Contact Email", "contactEmail"]],
+        games: [["Game Id", "gameId"], ["Date", "date"], ["Tax Year", "taxYear"], ["Time", "time"], ["Sport", "sport"], ["Site", "site"], ["Field", "field"], ["Num of Games", "numOfGames"], ["Level", "level"], ["Home", "home"], ["Visitor", "visitor"], ["Game Fee", "gameFee"], ["Travel Pay", "travelPay"], ["Assignor Fee", "assignorFee"], ["Deductions", "deductions"], ["Association", "association"], ["Status", "status"]]
+    };
+    function rawImportValue(data, key) {
+        return data[key] ?? data[key.charAt(0).toUpperCase() + key.slice(1)] ?? "";
+    }
+    function importRoleKey(official) {
+        return rawImportValue(official, "roleId") || (String(rawImportValue(official, "title")).toLowerCase() + "|" + Number(rawImportValue(official, "displayOrder") || 0));
+    }
+    function importPreviewFields(rows) {
+        const fields = (columns[collection.value] || []).map(([label, key]) => ({label, value: data => previewValue(data, key), key}));
+        if (collection.value !== "games") return fields;
+        const roles = new Map();
+        rows.forEach(row => {
+            const officials = rawImportValue(row.data || {}, "officials");
+            if (!Array.isArray(officials)) return;
+            officials.forEach(official => {
+                const key = importRoleKey(official);
+                if (!roles.has(key)) roles.set(key, {
+                    key, title: rawImportValue(official, "title") || "Official",
+                    order: Number(rawImportValue(official, "displayOrder") || 0)
+                });
+            });
+        });
+        Array.from(roles.values()).sort((a, b) => a.order - b.order || String(a.title).localeCompare(String(b.title))).forEach(role => {
+            fields.push({label: role.title, value: data => {
+                const officials = rawImportValue(data, "officials");
+                const official = Array.isArray(officials) ? officials.find(item => importRoleKey(item) === role.key) : null;
+                return official ? rawImportValue(official, "name") : "";
+            }});
+        });
+        [["Assignor", "assignor"], ["Notes", "notes"]].forEach(([label, key]) => fields.push({label, key, value: data => previewValue(data, key)}));
+        return fields;
+    }
+    function setHeaders(labels) {
+        const header = document.getElementById("importRecordsHeaders");
+        header.replaceChildren();
+        labels.forEach(label => { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; header.appendChild(th); });
+    }
+    function appendImportCell(tr, value, className = "") {
+        const td = document.createElement("td");
+        td.textContent = String(value ?? ""); td.className = className; tr.appendChild(td);
+    }
+    function previewValue(data, key) {
+        const value = data[key] ?? data[key.charAt(0).toUpperCase() + key.slice(1)] ?? "";
+        if (Array.isArray(value)) return value.map(item => {
+            if (typeof item !== "object" || item === null) return String(item);
+            return Object.entries(item).map(([name, field]) => `${name}: ${field ?? ""}`).join(", ");
+        }).join("; ");
+        return value;
+    }
+    function sync() {
+        [collection, file, clearButton, document.getElementById("clearRecordsPreview"), ...document.querySelectorAll('input[name="recordsDuplicateAction"]')].forEach(element => { element.disabled = busy; });
+        previewButton.disabled = busy || !collection.value || (!fileHandle && !file.files.length);
+        confirmButton.disabled = busy || !token || validCount === 0;
+        [openFileBtn, useStandardPickerBtn, forgetSavedFileBtn].forEach(control => { control.disabled = busy; });
+    }
+    function invalidate() {
+        token = "";
+        validCount = 0;
+        panel.hidden = true;
+        document.getElementById("importRecordsRows").replaceChildren();
+        status.textContent = "";
+        sync();
+    }
+
+    collection.addEventListener("change", invalidate);
+
+
+    async function readResult(response, action) {
+        if (response.status === 401 || response.redirected) throw new Error("Your session has expired. Sign in and try again.");
+        if (response.status === 403) throw new Error("Permission denied. You cannot import records.");
+        if (response.status === 404 || response.status === 405) throw new Error("Import Records is not available yet. The selected collection’s import handlers are unavailable.");
+        const result = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(result?.message || result?.error || `${action} failed (HTTP ${response.status}).`);
+        if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error(`Invalid ${action.toLowerCase()} response.`);
+        return result;
+    }
+    form.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (busy || !form.reportValidity()) return;
+        invalidate();
+        busy = true; sync(); status.textContent = "Reading and validating the Payments CSV file…";
+        try {
+            const snapshot = await getUploadSnapshot();
+            const data = new FormData();
+            data.append("collection", "payments");
+            data.append("file", snapshot.blob, snapshot.name);
+            const result = await readResult(await fetch(`/api/import/${collection.value}/preview`, {
+                method: "POST", credentials: "same-origin", redirect: "error",
+                headers: {Accept: "application/json"}, body: data
+            }), "Preview");
+            if (![result.totalRows, result.validRows, result.invalidRows].every(value => Number.isInteger(value) && value >= 0) ||
+                result.validRows + result.invalidRows !== result.totalRows || !Array.isArray(result.rows)) throw new Error("Invalid preview response. No import is enabled.");
+            document.getElementById("importRecordsSummary").textContent = `${result.totalRows} record(s): ${result.validRows} valid, ${result.invalidRows} with errors.`;
+            const body = document.getElementById("importRecordsRows");
+            const fields = importPreviewFields(result.rows);
+            setHeaders(["CSV Row", "Status", ...fields.map(field => field.label), "Errors"]);
+            document.getElementById("importRecordsPreviewTitle").textContent = collection.options[collection.selectedIndex].textContent + " Import Preview";
+            document.getElementById("importRecordsCounts").hidden = false;
+            document.getElementById("importDuplicateOptions").hidden = false;
+            document.getElementById("importTotalRows").textContent = result.totalRows;
+            document.getElementById("importValidRows").textContent = result.validRows;
+            document.getElementById("importInvalidRows").textContent = result.invalidRows;
+            confirmButton.textContent = "Import Valid " + collection.options[collection.selectedIndex].textContent;
+            result.rows.forEach(row => {
+                const tr = document.createElement("tr");
+                appendImportCell(tr, row.rowNumber);
+                appendImportCell(tr, row.valid === true ? "Valid" : "Error", row.valid === true ? "status-valid" : "status-error");
+                fields.forEach(field => appendImportCell(tr, field.value(row.data || {}), field.key === "notes" ? "notes-cell" : ""));
+                appendImportCell(tr, Array.isArray(row.errors) ? row.errors.join("; ") : row.error || "", "error-list");
+                body.appendChild(tr);
+            });
+            panel.hidden = false;
+            if (result.rows.length < result.totalRows) document.getElementById("importRecordsSummary").textContent += ` Showing ${result.rows.length} preview row(s).`;
+            if (!result.totalRows) status.textContent = "The file contains no records to import.";
+            else if (typeof result.previewToken !== "string" || !result.previewToken.trim()) throw new Error("The server did not authorize this preview for import.");
+            else { token = result.previewToken; validCount = result.validRows; status.textContent = result.invalidRows ? "Preview complete. Rows with errors will not be imported. You may import valid rows or correct the file and preview again." : "Preview complete. All rows are valid."; }
+        } catch (error) { token = ""; status.textContent = error.message || "Unable to preview records."; }
+        finally { busy = false; sync(); }
+    });
+    confirmButton.addEventListener("click", async () => {
+        if (busy || !token || !validCount) return;
+        const previewToken = token;
+        const selectedCollection = collection.value;
+        token = ""; busy = true; sync(); status.textContent = "Importing records…";
+        try {
+            const result = await readResult(await fetch(`/api/import/${selectedCollection}/commit`, {
+                method: "POST", credentials: "same-origin", redirect: "error",
+                headers: {"Content-Type": "application/json", Accept: "application/json"},
+                body: JSON.stringify({previewToken, duplicateAction: document.querySelector('input[name="recordsDuplicateAction"]:checked').value})
+            }), "Import");
+            if (![result.added, result.skipped, result.failed].every(value => Number.isInteger(value) && value >= 0)) throw new Error("The server did not return valid import counts. Verify your records before retrying.");
+            status.textContent = `${selectedCollection}: ${result.added} added, ${result.skipped} skipped, ${result.failed} failed.`;
+            const body = document.getElementById("importRecordsRows");
+            body.replaceChildren();
+            setHeaders(["CSV Row", "Status", "Details"]);
+            document.getElementById("importRecordsCounts").hidden = true;
+            document.getElementById("importDuplicateOptions").hidden = true;
+            if (Array.isArray(result.rows)) result.rows.forEach(row => {
+                const tr = document.createElement("tr");
+                [row.rowNumber, row.status, row.message].forEach(value => {
+                    const td = document.createElement("td"); td.textContent = String(value ?? ""); tr.appendChild(td);
+                });
+                body.appendChild(tr);
+            });
+            document.getElementById("importRecordsSummary").textContent = "Import results";
+            panel.hidden = !body.children.length;
+            file.value = "";
+            await loadCompletedGames(false);
+            await loadPaymentsRegistry();
+            if (["games", "payments"].includes(selectedCollection) && typeof window.loadPendingGames === "function") await window.loadPendingGames();
+        } catch (error) { status.textContent = (error.message || "Unable to import records.") + " Verify your records before previewing again."; }
+        finally { busy = false; sync(); }
+    });
+    updatePickerMode();
+    restoreLastFile();
+    sync();
+})();
+
+</script>
+
+<script>
+(() => {
+    const form = document.getElementById("paymentsExportForm");
+    const prefix = document.getElementById("paymentsExportPrefix");
+    const button = document.getElementById("paymentsExportButton");
+    const status = document.getElementById("paymentsExportStatus");
+    let busy = false;
+    function sync() {
+        const value = prefix.value.trim();
+        button.disabled = busy || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/.test(value);
+        prefix.disabled = busy;
+        document.getElementById("paymentsExportFilename").textContent = value ? `File: ${value}-payments.csv` : "";
+    }
+    prefix.addEventListener("input", sync);
+    form.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (busy || button.disabled || !form.reportValidity()) return;
+        const filePrefix = prefix.value.trim();
+        busy = true; sync(); status.textContent = "Preparing payments export…";
+        try {
+            const response = await fetch("/api/settings/export-records", {
+                method: "POST", credentials: "same-origin", redirect: "error",
+                headers: {"Content-Type": "application/json", Accept: "text/csv, application/json"},
+                body: JSON.stringify({collections: ["payments"], prefix: filePrefix})
+            });
+            if (response.status === 401 || response.redirected) throw new Error("Your session has expired. Sign in and try again.");
+            if (!response.ok) {
+                const result = await response.json().catch(() => null);
+                throw new Error(result?.error || result?.message || `Export failed (HTTP ${response.status}).`);
+            }
+            if (!(response.headers.get("Content-Type") || "").toLowerCase().startsWith("text/csv")) throw new Error("The server did not return a payments CSV file.");
+            const url = URL.createObjectURL(await response.blob());
+            const link = document.createElement("a");
+            link.href = url; link.download = `${filePrefix}-payments.csv`;
+            document.body.appendChild(link); link.click(); link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+            status.textContent = "Payments export prepared. Check your browser downloads.";
+        } catch (error) { status.textContent = error.message || "Unable to export payments."; }
+        finally { busy = false; sync(); }
+    });
+    sync();
+})();
+</script>
+<script>
+document.getElementById("downloadPaymentsTemplate").addEventListener("click", () => {
+    const csv = 'paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated)\r\n';
+    const url = URL.createObjectURL(new Blob([csv], {type:"text/csv;charset=utf-8"}));
+    const link = document.createElement("a");
+    link.href = url; link.download = "payments-template.csv";
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+});
+</script>
 </body>
 </html>

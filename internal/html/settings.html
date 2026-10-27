@@ -498,6 +498,63 @@
         #recordsDialog::backdrop { background: rgba(15,23,42,.68); }
         #recordsDialog ul { padding-left: 24px; margin-bottom: 18px; line-height: 1.6; }
         #recordsDeleteStatus { margin-top: 16px; white-space: pre-line; line-height: 1.5; }
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.summary-card {
+    padding: 18px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #e2e8f0;
+}
+
+.summary-card.total {
+    background-color: #eff6ff;
+}
+
+.summary-card.valid {
+    background-color: #f0fdf4;
+}
+
+.summary-card.invalid {
+    background-color: #fef2f2;
+}
+
+.summary-number {
+    display: block;
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.summary-card.total .summary-number {
+    color: #1d4ed8;
+}
+
+.summary-card.valid .summary-number {
+    color: #15803d;
+}
+
+.summary-card.invalid .summary-number {
+    color: #b91c1c;
+}
+
+
+#importRecordsPreview table { min-width: 900px; }
+#importRecordsPreview th { background: #2563eb; color: white; white-space: nowrap; }
+#importRecordsPreview td { vertical-align: top; }
+#importRecordsPreview tbody tr:nth-child(even) { background: #f9fafb; }
+#importRecordsPreview .status-valid { color: #15803d; font-weight: bold; }
+#importRecordsPreview .status-error, #importRecordsPreview .error-list { color: #b91c1c; }
+#importRecordsPreview .import-options { margin: 20px 0; padding: 18px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 7px; }
+#importRecordsPreview .import-options label { display: block; margin-top: 12px; }
+@media (max-width: 550px) { #importRecordsPreview .summary-grid { grid-template-columns: 1fr; } }
+#importRecordsPreview td { padding: 11px; }
+#importRecordsPreview .notes-cell { min-width: 200px; max-width: 320px; white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -737,6 +794,39 @@
 <p style="margin-bottom:16px;line-height:1.5">One selection downloads a CSV. Multiple selections download a ZIP containing one CSV per collection. All includes only these seven collections. Levels, Expenses, and Payments use proposed formats for future imports. Existing import validation and limits still apply.</p>
 <button type="button" class="btn btn-primary" id="exportRecordsButton" disabled>Export Selected</button>
 <p id="exportStatus" role="status" aria-live="polite" style="margin-top:16px"></p>
+</div></section>
+
+<section class="settings-card" style="margin-top:25px" aria-labelledby="importRecordsTitle">
+<div class="card-header"><i class="fa-solid fa-file-import" aria-hidden="true"></i><div><h2 id="importRecordsTitle">Import Records</h2><p>Preview and import records from a CSV file.</p></div></div>
+<div class="card-body">
+<form id="importRecordsForm" autocomplete="off">
+<div class="form-group"><label for="importCollection">Collection</label><select class="form-control" id="importCollection" required>
+<option value="">Select a collection</option>
+<option value="associations">Associations</option><option value="expenses">Expenses</option><option value="games">Games</option><option value="levels">Levels</option><option value="officials">Officials</option><option value="payments">Payments</option><option value="sites">Sites</option>
+</select></div>
+<div class="form-group"><label for="importRecordsFile">CSV file</label><input class="form-control" id="importRecordsFile" type="file" accept=".csv,text/csv" required aria-describedby="importRecordsHelp"></div>
+<p id="importRecordsHelp" style="margin-bottom:16px;line-height:1.5">Available collections: Associations, Expenses, Games, Levels, Officials, Payments, and Sites. Select one collection and its matching CSV file (up to 5 MB). Preview the file before importing. For expenses, use date,taxYear,type,amount,association,description. Enter whole miles (18) for Mileage or a dollar amount with two decimals ($7.25) for other types. Import related records before games, and games before payments. Payments accept 92.00 or $92.00. Quote multiple game IDs ("1,2,3"). Games must be Completed and their total must match the payment. ZIP files must be extracted first.</p>
+<button class="btn btn-primary" type="submit" id="previewRecordsImport" disabled>Preview Import</button>
+<button class="btn btn-secondary" type="button" id="clearRecordsImport">Clear</button>
+</form>
+<p id="importRecordsStatus" role="status" aria-live="polite" style="margin-top:16px;white-space:pre-line"></p>
+<div id="importRecordsPreview" hidden style="margin-top:18px">
+<h2 id="importRecordsPreviewTitle">Import Preview</h2>
+<div class="summary-grid" id="importRecordsCounts">
+<div class="summary-card total"><span class="summary-number" id="importTotalRows">0</span>Total Rows</div>
+<div class="summary-card valid"><span class="summary-number" id="importValidRows">0</span>Valid Rows</div>
+<div class="summary-card invalid"><span class="summary-number" id="importInvalidRows">0</span>Rows With Errors</div>
+</div>
+<p id="importRecordsSummary" style="margin-bottom:12px"></p>
+<div class="settings-table-wrapper"><table class="settings-table"><thead><tr id="importRecordsHeaders"><th scope="col">CSV Row</th><th scope="col">Status</th><th scope="col">Details</th></tr></thead><tbody id="importRecordsRows"></tbody></table></div>
+<p style="margin:16px 0;line-height:1.5">Review the results before importing. Rows with errors will not be imported. Existing records will not be overwritten.</p>
+<div class="import-options" id="importDuplicateOptions"><h3>Duplicate Records</h3>
+<label><input type="radio" name="recordsDuplicateAction" value="skip" checked> Skip records that already exist.</label>
+<label><input type="radio" name="recordsDuplicateAction" value="stop"> Stop the import when a duplicate is found.</label>
+</div>
+<button class="btn btn-primary" type="button" id="confirmRecordsImport" disabled>Import Valid Records</button>
+<button class="btn btn-secondary" type="button" id="clearRecordsPreview">Clear Preview</button>
+</div>
 </div></section>
 
 <section class="settings-card records-card" aria-labelledby="deleteRecordsTitle">
@@ -1586,5 +1676,185 @@ document.addEventListener('keydown', event => {
     sync();
 })();
 
+
+// Reuse the existing /api/import/{collection}/preview and /commit handlers.
+// Preview uses multipart field file. Commit uses {previewToken, duplicateAction:"skip"}.
+// Preview response: {previewToken,totalRows,validRows,invalidRows,rows}.
+// Commit response: {added,skipped,failed,message,rows}; HTTP 200 can include failed rows.
+(() => {
+    const form = document.getElementById("importRecordsForm");
+    const collection = document.getElementById("importCollection");
+    const file = document.getElementById("importRecordsFile");
+    const previewButton = document.getElementById("previewRecordsImport");
+    const clearButton = document.getElementById("clearRecordsImport");
+    const confirmButton = document.getElementById("confirmRecordsImport");
+    const panel = document.getElementById("importRecordsPreview");
+    const status = document.getElementById("importRecordsStatus");
+    let busy = false;
+    let token = "";
+    let validCount = 0;
+    const columns = {
+        payments: [["Payment ID", "paymentId"], ["Payment Date", "paymentDate"], ["Tax Year", "taxYear"], ["Payment Amount", "paymentAmt"], ["Association", "association"], ["Game IDs", "gameIds"]],
+        levels: [["Sport", "sport"], ["Level Name", "name"], ["Game Fee", "gameFee"], ["Active", "active"]],
+        expenses: [["Date", "date"], ["Tax Year", "taxYear"], ["Type", "type"], ["Amount / Mileage", "amount"], ["Association", "association"], ["Description", "description"]],
+        associations: [["Association ID", "associationId"], ["Association Name", "associationName"], ["Contact Name", "contactName"], ["Contact Number", "contactNumber"], ["Contact Email", "contactEmail"], ["Assignors", "assignors"]],
+        officials: [["First Name", "firstName"], ["Last Name", "lastName"], ["Phone", "phone"], ["Email", "email"], ["Address", "address"]],
+        sites: [["Site Name", "siteName"], ["Contact Name", "contactName"], ["Contact Number", "contactNumber"], ["Contact Email", "contactEmail"]],
+        games: [["Game Id", "gameId"], ["Date", "date"], ["Tax Year", "taxYear"], ["Time", "time"], ["Sport", "sport"], ["Site", "site"], ["Field", "field"], ["Num of Games", "numOfGames"], ["Level", "level"], ["Home", "home"], ["Visitor", "visitor"], ["Game Fee", "gameFee"], ["Travel Pay", "travelPay"], ["Assignor Fee", "assignorFee"], ["Deductions", "deductions"], ["Association", "association"], ["Status", "status"]]
+    };
+    function rawImportValue(data, key) {
+        return data[key] ?? data[key.charAt(0).toUpperCase() + key.slice(1)] ?? "";
+    }
+    function importRoleKey(official) {
+        return rawImportValue(official, "roleId") || (String(rawImportValue(official, "title")).toLowerCase() + "|" + Number(rawImportValue(official, "displayOrder") || 0));
+    }
+    function importPreviewFields(rows) {
+        const fields = (columns[collection.value] || []).map(([label, key]) => ({label, value: data => previewValue(data, key), key}));
+        if (collection.value !== "games") return fields;
+        const roles = new Map();
+        rows.forEach(row => {
+            const officials = rawImportValue(row.data || {}, "officials");
+            if (!Array.isArray(officials)) return;
+            officials.forEach(official => {
+                const key = importRoleKey(official);
+                if (!roles.has(key)) roles.set(key, {
+                    key, title: rawImportValue(official, "title") || "Official",
+                    order: Number(rawImportValue(official, "displayOrder") || 0)
+                });
+            });
+        });
+        Array.from(roles.values()).sort((a, b) => a.order - b.order || String(a.title).localeCompare(String(b.title))).forEach(role => {
+            fields.push({label: role.title, value: data => {
+                const officials = rawImportValue(data, "officials");
+                const official = Array.isArray(officials) ? officials.find(item => importRoleKey(item) === role.key) : null;
+                return official ? rawImportValue(official, "name") : "";
+            }});
+        });
+        [["Assignor", "assignor"], ["Notes", "notes"]].forEach(([label, key]) => fields.push({label, key, value: data => previewValue(data, key)}));
+        return fields;
+    }
+    function setHeaders(labels) {
+        const header = document.getElementById("importRecordsHeaders");
+        header.replaceChildren();
+        labels.forEach(label => { const th = document.createElement("th"); th.scope = "col"; th.textContent = label; header.appendChild(th); });
+    }
+    function appendImportCell(tr, value, className = "") {
+        const td = document.createElement("td");
+        td.textContent = String(value ?? ""); td.className = className; tr.appendChild(td);
+    }
+    function previewValue(data, key) {
+        const value = data[key] ?? data[key.charAt(0).toUpperCase() + key.slice(1)] ?? "";
+        if (Array.isArray(value)) return value.map(item => {
+            if (typeof item !== "object" || item === null) return String(item);
+            return Object.entries(item).map(([name, field]) => `${name}: ${field ?? ""}`).join(", ");
+        }).join("; ");
+        return value;
+    }
+    function sync() {
+        [collection, file, clearButton, document.getElementById("clearRecordsPreview"), ...document.querySelectorAll('input[name="recordsDuplicateAction"]')].forEach(element => { element.disabled = busy; });
+        previewButton.disabled = busy || !collection.value || !file.files.length;
+        confirmButton.disabled = busy || !token || validCount === 0;
+    }
+    function invalidate() {
+        token = "";
+        validCount = 0;
+        panel.hidden = true;
+        document.getElementById("importRecordsRows").replaceChildren();
+        status.textContent = "";
+        sync();
+    }
+    document.getElementById("clearRecordsPreview").addEventListener("click", invalidate);
+    collection.addEventListener("change", invalidate);
+    file.addEventListener("change", invalidate);
+    clearButton.addEventListener("click", () => { form.reset(); invalidate(); });
+    async function readResult(response, action) {
+        if (response.status === 401 || response.redirected) throw new Error("Your session has expired. Sign in and try again.");
+        if (response.status === 403) throw new Error("Permission denied. You cannot import records.");
+        if (response.status === 404 || response.status === 405) throw new Error("Import Records is not available yet. The selected collection’s import handlers are unavailable.");
+        const result = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(result?.message || result?.error || `${action} failed (HTTP ${response.status}).`);
+        if (!result || typeof result !== "object" || Array.isArray(result)) throw new Error(`Invalid ${action.toLowerCase()} response.`);
+        return result;
+    }
+    form.addEventListener("submit", async event => {
+        event.preventDefault();
+        if (busy || !form.reportValidity()) return;
+        invalidate();
+        const selectedFile = file.files[0];
+        if (!selectedFile || !/\.csv$/i.test(selectedFile.name)) { status.textContent = "Choose a CSV file."; return; }
+        if (!selectedFile.size || selectedFile.size > 5 * 1024 * 1024) { status.textContent = "Choose a nonempty CSV file no larger than 5 MB."; return; }
+        const data = new FormData();
+        data.append("collection", collection.value);
+        data.append("file", selectedFile);
+        busy = true; sync(); status.textContent = "Validating import…";
+        try {
+            const result = await readResult(await fetch(`/api/import/${collection.value}/preview`, {
+                method: "POST", credentials: "same-origin", redirect: "error",
+                headers: {Accept: "application/json"}, body: data
+            }), "Preview");
+            if (![result.totalRows, result.validRows, result.invalidRows].every(value => Number.isInteger(value) && value >= 0) ||
+                result.validRows + result.invalidRows !== result.totalRows || !Array.isArray(result.rows)) throw new Error("Invalid preview response. No import is enabled.");
+            document.getElementById("importRecordsSummary").textContent = `${result.totalRows} record(s): ${result.validRows} valid, ${result.invalidRows} with errors.`;
+            const body = document.getElementById("importRecordsRows");
+            const fields = importPreviewFields(result.rows);
+            setHeaders(["CSV Row", "Status", ...fields.map(field => field.label), "Errors"]);
+            document.getElementById("importRecordsPreviewTitle").textContent = collection.options[collection.selectedIndex].textContent + " Import Preview";
+            document.getElementById("importRecordsCounts").hidden = false;
+            document.getElementById("importDuplicateOptions").hidden = false;
+            document.getElementById("importTotalRows").textContent = result.totalRows;
+            document.getElementById("importValidRows").textContent = result.validRows;
+            document.getElementById("importInvalidRows").textContent = result.invalidRows;
+            confirmButton.textContent = "Import Valid " + collection.options[collection.selectedIndex].textContent;
+            result.rows.forEach(row => {
+                const tr = document.createElement("tr");
+                appendImportCell(tr, row.rowNumber);
+                appendImportCell(tr, row.valid === true ? "Valid" : "Error", row.valid === true ? "status-valid" : "status-error");
+                fields.forEach(field => appendImportCell(tr, field.value(row.data || {}), field.key === "notes" ? "notes-cell" : ""));
+                appendImportCell(tr, Array.isArray(row.errors) ? row.errors.join("; ") : row.error || "", "error-list");
+                body.appendChild(tr);
+            });
+            panel.hidden = false;
+            if (result.rows.length < result.totalRows) document.getElementById("importRecordsSummary").textContent += ` Showing ${result.rows.length} preview row(s).`;
+            if (!result.totalRows) status.textContent = "The file contains no records to import.";
+            else if (typeof result.previewToken !== "string" || !result.previewToken.trim()) throw new Error("The server did not authorize this preview for import.");
+            else { token = result.previewToken; validCount = result.validRows; status.textContent = result.invalidRows ? "Preview complete. Rows with errors will not be imported. You may import valid rows or correct the file and preview again." : "Preview complete. All rows are valid."; }
+        } catch (error) { token = ""; status.textContent = error.message || "Unable to preview records."; }
+        finally { busy = false; sync(); }
+    });
+    confirmButton.addEventListener("click", async () => {
+        if (busy || !token || !validCount) return;
+        const previewToken = token;
+        const selectedCollection = collection.value;
+        token = ""; busy = true; sync(); status.textContent = "Importing records…";
+        try {
+            const result = await readResult(await fetch(`/api/import/${selectedCollection}/commit`, {
+                method: "POST", credentials: "same-origin", redirect: "error",
+                headers: {"Content-Type": "application/json", Accept: "application/json"},
+                body: JSON.stringify({previewToken, duplicateAction: document.querySelector('input[name="recordsDuplicateAction"]:checked').value})
+            }), "Import");
+            if (![result.added, result.skipped, result.failed].every(value => Number.isInteger(value) && value >= 0)) throw new Error("The server did not return valid import counts. Verify your records before retrying.");
+            status.textContent = `${selectedCollection}: ${result.added} added, ${result.skipped} skipped, ${result.failed} failed.`;
+            const body = document.getElementById("importRecordsRows");
+            body.replaceChildren();
+            setHeaders(["CSV Row", "Status", "Details"]);
+            document.getElementById("importRecordsCounts").hidden = true;
+            document.getElementById("importDuplicateOptions").hidden = true;
+            if (Array.isArray(result.rows)) result.rows.forEach(row => {
+                const tr = document.createElement("tr");
+                [row.rowNumber, row.status, row.message].forEach(value => {
+                    const td = document.createElement("td"); td.textContent = String(value ?? ""); tr.appendChild(td);
+                });
+                body.appendChild(tr);
+            });
+            document.getElementById("importRecordsSummary").textContent = "Import results";
+            panel.hidden = !body.children.length;
+            file.value = "";
+            if (selectedCollection === "levels") await loadLevels();
+            if (["games", "payments"].includes(selectedCollection) && typeof window.loadPendingGames === "function") await window.loadPendingGames();
+        } catch (error) { status.textContent = (error.message || "Unable to import records.") + " Verify your records before previewing again."; }
+        finally { busy = false; sync(); }
+    });
+    sync();
+})();
 </script></body>
 </html>
