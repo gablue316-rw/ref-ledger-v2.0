@@ -648,7 +648,7 @@
 </div>
 </div>
 <div class="card-body">
-<form id="levelForm">
+<form id="levelForm" autocomplete="off">
 <input id="levelOriginalId" type="hidden"/>
 <div class="form-group">
 <label for="levelSport">Sport</label>
@@ -659,7 +659,15 @@
 <label for="levelName">
                                     Level name
                                 </label>
-<input class="form-control" id="levelName" maxlength="50" placeholder="Example: Varsity" required="" type="text"/>
+<input
+    class="form-control"
+    id="levelName"
+    maxlength="50"
+    placeholder="Example: Varsity"
+    required
+    type="text"
+    autocomplete="off"
+/>
 </div>
 <div class="form-group">
 <label for="levelGameFee">Game Fee</label>
@@ -734,7 +742,7 @@
 <section class="settings-card records-card" aria-labelledby="deleteRecordsTitle">
 <div class="card-header"><i class="fa-solid fa-trash-can" aria-hidden="true"></i><div><h2 id="deleteRecordsTitle">Delete Records</h2><p>Permanently remove records for your account.</p></div></div>
 <div class="card-body">
-<p class="records-warning"><strong>Warning: This action cannot be undone.</strong> All records in the selected collections for your tenant will be permanently deleted, including paid games and payment history when selected. Export a backup first. Deleting related records separately can leave games or payments referencing missing records.</p>
+<p class="records-warning"><strong>Warning: This action cannot be undone.</strong> All records in the selected collections for your account will be permanently deleted, including paid games and payment history when selected. Export a backup first. Deleting related records separately can leave games or payments referencing missing records.</p>
 <details class="collection-picker" id="recordsPicker"><summary id="recordsPickerSummary">Select collections</summary><div class="collection-options">
 <label><input type="checkbox" id="deleteAllCollections"> All</label>
 <label><input type="checkbox" name="deleteCollection" value="associations"> Associations</label>
@@ -752,7 +760,7 @@
 <dialog id="recordsDialog" aria-labelledby="recordsDialogTitle" aria-describedby="recordsDialogWarning">
 <div class="delete-modal-body">
 <h2 id="recordsDialogTitle" style="margin-bottom:16px;color:#a32020">Confirm permanent deletion</h2>
-<p class="records-warning" id="recordsDialogWarning">Every record in the collections below for your tenant will be permanently deleted. This cannot be undone.</p>
+<p class="records-warning" id="recordsDialogWarning">Every record in the collections below for your account will be permanently deleted. This cannot be undone.</p>
 <ul id="recordsDeleteList"></ul>
 <label for="recordsConfirmation">Type <strong>DELETE</strong> to confirm:</label>
 <input id="recordsConfirmation" class="form-control" autocomplete="off" spellcheck="false" style="margin-top:8px">
@@ -1282,7 +1290,10 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
             }
         }
         function resetLevelForm() {
+            // Keep the sport selected while preparing the next level.
+            const selectedSport = document.getElementById("levelSport").value;
             document.getElementById("levelForm").reset();
+            document.getElementById("levelSport").value = selectedSport;
             document.getElementById("levelName").readOnly = false;
             document.getElementById("levelOriginalId").value = "";
             document.getElementById("saveLevelButton").innerHTML = `
@@ -1359,6 +1370,7 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
                     }
                     await loadLevels();
                     resetLevelForm();
+                    document.getElementById("levelName").focus();
                     showMessage(
                         responseData.message ||
                         editing ? "Level saved successfully" : "Level added successfully",

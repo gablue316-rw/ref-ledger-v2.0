@@ -9416,7 +9416,44 @@ func DeleteRecordsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer session.EndSession(ctx)
+	levelInUse := errors.New("Cannot delete levels because one or more are used by games. Delete Games along with the Levels.")
+	selected := make(map[string]bool, len(names))
+	for _, name := range names {
+		selected[name] = true
+	}
 	result, err := session.WithTransaction(ctx, func(sc mongo.SessionContext) (any, error) {
+		db := database.Client.Database(database.GetMongoDbName())
+		// Validate before deleting any collection. Games and Levels may be
+		// cleared together because no games will retain those references.
+		if selected["levels"] && !selected["games"] {
+			cursor, findErr := db.Collection("levels").Find(sc, bson.M{"tenantId": tId})
+			if findErr != nil {
+				return nil, findErr
+			}
+			defer cursor.Close(sc)
+			for cursor.Next(sc) {
+				var level database.Level
+				if decodeErr := cursor.Decode(&level); decodeErr != nil {
+					return nil, decodeErr
+				}
+				filter := bson.M{"tenantId": tId, "level": level.Name}
+				// A legacy level without a sport may be used by any sport.
+				if level.Sport != "" {
+					filter["sport"] = level.Sport
+				}
+				lookupErr := db.Collection("games").FindOne(sc, filter,
+					options.FindOne().SetProjection(bson.M{"_id": 1})).Err()
+				if lookupErr == nil {
+					return nil, levelInUse
+				}
+				if !errors.Is(lookupErr, mongo.ErrNoDocuments) {
+					return nil, lookupErr
+				}
+			}
+			if cursorErr := cursor.Err(); cursorErr != nil {
+				return nil, cursorErr
+			}
+		}
 		counts := map[string]int64{}
 		for _, name := range names {
 			deleted, deleteErr := database.Client.Database(database.GetMongoDbName()).Collection(name).DeleteMany(sc, bson.M{"tenantId": tId})
@@ -9428,6 +9465,10 @@ func DeleteRecordsHandler(w http.ResponseWriter, r *http.Request) {
 		return counts, nil
 	})
 	if err != nil {
+		if errors.Is(err, levelInUse) {
+			writeJSONError(w, http.StatusConflict, levelInUse.Error())
+			return
+		}
 		log.Printf("DeleteRecordsHandler: tenant=%s error=%v", tId, err)
 		writeJSONError(w, 500, "Deletion was not confirmed. MongoDB transactions require a replica set or sharded cluster. Check your records before retrying.")
 		return
