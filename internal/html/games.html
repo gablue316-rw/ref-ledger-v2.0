@@ -1,234 +1,1503 @@
-<!DOCTYPE html>
+html
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ref Ledger V2.0 Game Entry</title>
-<link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">   
-<link rel="stylesheet" href="/components/navbar.css?v=12"> 
-<style>
-*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;}
+    <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+        <title>
+            Ref Ledger V2.0 Games
+        </title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
+        <link href="/components/navbar.css?v=12" rel="stylesheet"/>
+        <style>
+            * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
 body {
     background: #f4f6f9;
     color: #333;
 }
+
 .container {
     max-width: 1200px;
     margin: 20px auto;
     padding: 0 20px;
 }
-.header{background:#1e293b;color:#fff;padding:20px;border-radius:10px;margin-bottom:20px;}
-.header h1{margin-bottom:8px;}
-.card{background:#fff;padding:20px;border-radius:10px;margin-bottom:15px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
-.card-title{font-size:18px;font-weight:bold;margin-bottom:15px;padding-bottom:10px;border-bottom:1px solid #ddd;}
-.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;}
-.official-fields{grid-column:1 / -1;}
-.assignor-row{grid-column:1 / -1;display:flex;flex-wrap:wrap;align-items:center;gap:15px;}
-.assignor-row>.form-group{flex:0 0 var(--assignor-width,220px);max-width:100%;min-width:0;}
-.assignor-row>.role-hint{flex:2 1 280px;}
-#assignorHint[hidden]{display:none;}
-.basic-game-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
-.role-hint{grid-column:1 / -1;display:flex;align-items:center;gap:14px;padding:16px 18px;border:1px solid #c7d2fe;border-left:4px solid #6366f1;border-radius:10px;background:linear-gradient(120deg,#eef2ff,#f8fafc);color:#4338ca;}
-.role-hint-icon{width:42px;height:42px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-radius:12px;background:#e0e7ff;color:#4f46e5;font-size:19px;}
-.role-hint-title{display:block;margin-bottom:4px;font-size:14px;font-weight:bold;}
-.role-hint-message{display:block;color:#475569;font-size:14px;line-height:1.5;}
-.role-hint.error{border-color:#fecaca;border-left-color:#dc2626;background:#fef2f2;color:#b91c1c;}
-.role-hint.error .role-hint-icon{background:#fee2e2;color:#b91c1c;}
-.role-hint.error .role-hint-message{color:#b91c1c;}
-.btn:disabled{opacity:.55;cursor:not-allowed;}
-.form-group{display:flex;flex-direction:column;}
-.form-group label{font-weight:bold;margin-bottom:5px;}
-.form-group input,.form-group select,.form-group textarea{padding:10px;border:1px solid #ccc;border-radius:5px;}
-.button-row{background:#fff;padding:15px 20px;border-radius:10px;margin-bottom:20px;display:flex;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,.1);}
-.btn{border:none;color:white;padding:12px 20px;border-radius:5px;cursor:pointer;font-weight:bold;}
-.btn-add{background:#16a34a;}
-.btn-add:hover{background:#15803d;}
-.btn-save{background:#2616a3;}
-.btn-save:hover{background:#251580;}
-.btn-clear{background:#dc2626;}
-.btn-clear:hover{background:#b91c1c;}
-.btn-delete{background:#ffff00;color:black;}
-.btn-delete:hover{background:#ffc000;color: black;}
-.btn-find{
-    background:#2563eb;
+
+.header {
+    background: #1e293b;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
-.btn-find:hover{
-    background:#1d4ed8;
+
+.header h1 {
+    margin-bottom: 10px;
 }
+
+.form-card {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px #0000001a;
+    margin-bottom: 20px;
+}
+
+h2 {
+    color: #0f2747;
+    font-size: 24px;
+    margin-bottom: 6px;
+}
+
+.help {
+    color: #475569;
+    line-height: 1.45;
+    margin-bottom: 20px;
+}
+
+.workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.row {
+    display: flex;
+    gap: 16px;
+}
+
+.field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+label {
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+input[readonly] {
+    background: #e2e8f0;
+}
+
+.buttons,
+.registry-tools {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 15px;
+}
+
+.btn {
+    border: 0;
+    border-radius: 5px;
+    padding: 11px 17px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    background: #1d4f91;
+    color: white;
+}
+
+.btn:hover {
+    filter: brightness(.9);
+}
+
+.green {
+    background: #16a34a;
+}
+
+.red {
+    background: #dc2626;
+}
+
+.teal {
+    background: #0f766e;
+}
+
+.blue {
+    background: #2563eb;
+}
+
+.btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.message {
+    padding: 16px 20px;
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    min-height: 52px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.error {
+    color: #b91c1c;
+}
+
+.success {
+    color: #15803d;
+}
+
+.table-wrap {
+    overflow: auto;
+    margin-top: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14px;
+}
+
+th {
+    background: #2563eb;
+    color: white;
+    text-align: left;
+    padding: 12px;
+}
+
+td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #ddd;
+    overflow-wrap: anywhere;
+}
+
+tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+tbody tr.selected {
+    background: #dbeafe;
+}
+
+.icon {
+    background: transparent;
+    border: 0;
+    padding: 9px;
+    font-size: 17px;
+    cursor: pointer;
+    border-radius: 5px;
+    color: #2563eb;
+}
+
+.icon.danger {
+    color: #dc2626;
+}
+
+.icon:hover {
+    background: #e2e8f0;
+}
+
+.select-btn {
+    background: white;
+    border: 1px solid #2563eb;
+    color: #1d4ed8;
+    border-radius: 5px;
+    padding: 7px 10px;
+    cursor: pointer;
+}
+
+.select-btn[aria-pressed="true"] {
+    background: #2563eb;
+    color: white;
+}
+
+.registry-tools {
+    justify-content: space-between;
+}
+
+.registry-tools .buttons {
+    margin: 0;
+}
+
+dialog {
+    margin: auto;
+    width: min(680px, calc(100% - 32px));
+    max-height: 90vh;
+    overflow: auto;
+    padding: 24px;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px #0f172a55;
+}
+
+dialog::backdrop {
+    background: #0f172aa6;
+}
+
+dialog h2 {
+    margin-bottom: 20px;
+}
+
+dialog p {
+    line-height: 1.5;
+}
+
+#deleteTarget {
+    margin: 16px 0;
+    padding: 12px;
+    background: #fff1f2;
+    color: #991b1b;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow: auto;
+}
+
+.status {
+    margin-top: 12px;
+    white-space: pre-wrap;
+}
+
+.file-name {
+    color: #475569;
+    margin-top: 10px;
+}
+
+.count {
+    color: #475569;
+}
+
+button:focus-visible,
+input:focus-visible {
+    outline: 3px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+@media(max-width:768px) {
+    .workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .buttons .btn {
+        flex: 1;
+    }
+
+    .container {
+        padding: 0 12px;
+    }
+
+    .form-card {
+        padding: 20px;
+    }
+
+    h1 {
+        font-size: 26px;
+    }
+}
+
+/* Payments-style CSV import panel. */
+.import-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.import-header {
+    padding: 22px 25px;
+    background: #0c2d4e;
+    color: white;
+}
+
+.import-header h2 {
+    color: white;
+}
+
+.import-content {
+    padding: 25px;
+}
+
+.purple {
+    background: #7c3aed;
+}
+
+.slate {
+    background: #64748b;
+}
+
+.full-width {
+    width: 100%;
+}
+
+.file-controls {
+    margin-top: 18px;
+}
+
+.file-help {
+    color: #64748b;
+    line-height: 1.5;
+    margin-top: 14px;
+}
+
+.file-summary {
+    padding: 16px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+}
+
+.csv-help {
+    margin-top: 24px;
+    line-height: 1.5;
+}
+
+.preview-title {
+    margin-top: 24px;
+}
+
+.preview-totals {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+}
+
+.total-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 22px;
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+    background: #eff6ff;
+}
+
+.total-card strong {
+    font-size: 30px;
+    color: #1d4ed8;
+}
+
+.total-card.valid {
+    background: #f0fdf4;
+}
+
+.total-card.valid strong {
+    color: #15803d;
+}
+
+.total-card.invalid {
+    background: #fff1f2;
+}
+
+.total-card.invalid strong {
+    color: #dc2626;
+}
+
+.duplicate-options {
+    margin-top: 24px;
+    padding: 18px 20px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+}
+
+.duplicate-options legend {
+    font-weight: bold;
+    padding: 0 4px;
+}
+
+.duplicate-options label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: normal;
+    margin: 10px 0 0;
+}
+
+.duplicate-options input {
+    width: auto;
+    accent-color: #2563eb;
+}
+
+@media (max-width: 600px) {
+    .preview-totals {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Keep import statuses such as Duplicate on one line. */
+#previewWrap table th:nth-child(2),
+#previewWrap table td:nth-child(2) {
+    min-width: 115px;
+    white-space: nowrap;
+    overflow-wrap: normal;
+}
+
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+    background: #f4f6f9;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 0 20px;
+}
+
+.header {
+    background: #1e293b;
+    color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.header h1 {
+    margin-bottom: 8px;
+}
+
+.card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .1);
+}
+
+.card-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+}
+
+.official-fields {
+    grid-column: 1 / -1;
+}
+
+.assignor-row {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 15px;
+}
+
+.assignor-row>.form-group {
+    flex: 0 0 var(--assignor-width, 220px);
+    max-width: 100%;
+    min-width: 0;
+}
+
+.assignor-row>.role-hint {
+    flex: 2 1 280px;
+}
+
+#assignorHint[hidden] {
+    display: none;
+}
+
+.basic-game-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.role-hint {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1px solid #c7d2fe;
+    border-left: 4px solid #6366f1;
+    border-radius: 10px;
+    background: linear-gradient(120deg, #eef2ff, #f8fafc);
+    color: #4338ca;
+}
+
+.role-hint-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: #e0e7ff;
+    color: #4f46e5;
+    font-size: 19px;
+}
+
+.role-hint-title {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.role-hint-message {
+    display: block;
+    color: #475569;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.role-hint.error {
+    border-color: #fecaca;
+    border-left-color: #dc2626;
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.role-hint.error .role-hint-icon {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.role-hint.error .role-hint-message {
+    color: #b91c1c;
+}
+
+.btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.button-row {
+    background: #fff;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .1);
+}
+
+.btn {
+    border: none;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-add {
+    background: #16a34a;
+}
+
+.btn-add:hover {
+    background: #15803d;
+}
+
+.btn-save {
+    background: #2616a3;
+}
+
+.btn-save:hover {
+    background: #251580;
+}
+
+.btn-clear {
+    background: #dc2626;
+}
+
+.btn-clear:hover {
+    background: #b91c1c;
+}
+
+.btn-delete {
+    background: #ffff00;
+    color: black;
+}
+
+.btn-delete:hover {
+    background: #ffc000;
+    color: black;
+}
+
+.btn-find {
+    background: #2563eb;
+}
+
+.btn-find:hover {
+    background: #1d4ed8;
+}
+
 .btn-import {
     background-color: #0f766e;
     color: white;
 }
+
 .btn-import:hover {
     background-color: #115e59;
 }
-        .message-box {
-            background-color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            font-weight: bold;
-            min-height: 60px;
-        }
-#message{margin-top:15px;font-weight:bold;}
-@media(max-width:768px){
-body{padding:10px;}
-.button-row{flex-direction:column;}
-.btn{width:100%;}
+
+.message-box {
+    background-color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    font-weight: bold;
+    min-height: 60px;
 }
-</style>
-</head>
-<body>
-<div id="navbar-container"></div>
-<div class="container">
-<div class="header">
-<h1>Ref Ledger V2.0 Game Entry</h1>
-<p>Create or update game information.</p>
-</div>
-<form id="gameForm">
-<div class="card">
-<div class="card-title">Basic Game Information</div>
-<div class="form-grid basic-game-grid">
-<div class="form-group">
-    <label for="association">Association</label>
-    <select id="association">
-        <option value="">Select Association</option>
-    </select>
-</div>
-<div class="form-group"><label for="gameId">Game ID</label><input type="number" id="gameId" required></div>
-<div class="form-group"><label for="date">Date</label><input type="date" id="date" required></div>
-<div class="form-group"><label for="taxYear">Tax Year</label><input type="text" id="taxYear" inputmode="numeric" placeholder="YYYY"></div>
-<div class="form-group" style="grid-column:1 / -1;">
-    <label for="notes">Notes (150 characters maximum)</label>
-    <textarea id="notes" name="notes" maxlength="150" rows="3" style="resize:vertical;" aria-describedby="notesRemaining"></textarea>
-    <small id="notesRemaining" style="margin-top:5px;color:#64748b;">150 characters left</small>
-</div>
-<div class="form-group"><label for="time">Time</label><input type="time" id="time" required></div>
-<div class="form-group">
-    <label for="status">Status</label>
-    <select id="status">
-        <option value="">Loading statuses...</option>
-    </select>
-</div>
-</div>
-</div>
-<div class="card">
-<div class="card-title">Sport and Location</div>
-<div class="form-grid">
-<div class="form-group">
-    <label for="sport">Sport</label>
-    <select id="sport" disabled>
-        <option value="">Select Sport</option>
-    </select>
-</div>
-<div class="form-group">
-    <label for="level">Level</label>
-    <select id="level">
-        <option value="">Select Level</option>
-    </select>
-</div>
-<div class="form-group">
-    <label for="site">Site</label>
-    <select id="site">
-        <option value="">Select Site</option>
-    </select>
-</div>
-<div class="form-group"><label for="field">Field</label><input type="text" id="field"></div>
-<div class="form-group"><label for="home">Home</label><input type="text" id="home" value="TBD"></div>
-<div class="form-group"><label for="visitor">Visitor</label><input type="text" id="visitor" value="TBD"></div>
-</div>
-</div>
-<div class="card">
-<div class="card-title">Financial Information</div>
-<div class="form-grid">
-<div class="form-group"><label for="numOfGames">Number of Games</label><input type="number" value="1" id="numOfGames"></div>
-<div class="form-group"><label for="gameFee">Game Fee</label><input type="number" step="0.01" value="0.00" id="gameFee"></div>
-<div class="form-group"><label for="travelPay">Travel Pay</label><input type="number" step="0.01" value="0.00" id="travelPay"></div>
-<div class="form-group"><label for="assignorFee">Assignor Fee</label><input type="number" step="0.01" value="0.00" id="assignorFee"></div>
-<div class="form-group"><label for="deductions">Deductions</label><input type="number" step="0.01" value="0.00" id="deductions"></div>
-</div>
-</div>
-<div class="card">
-<div class="card-title">Officials</div>
-<div class="form-grid">
-<div id="officialRolesHint" class="role-hint" role="status" aria-live="polite">
-    <span class="role-hint-icon" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
-    <div>
-        <span class="role-hint-title">Official fields follow your sport</span>
-        <span id="officialRolesMessage" class="role-hint-message">Choose a sport in Sport and Location. Its official fields will appear here automatically.</span>
-    </div>
-</div>
-<div id="officialFields" class="official-fields form-grid" aria-label="Sport official assignments"></div>
-<div class="assignor-row">
-<div class="form-group">
-    <label for="assignor">Assignor</label>
-    <select id="assignor" disabled aria-describedby="assignorHintMessage">
-        <option value="Unassigned">Unassigned</option>
-    </select>
-</div>
-<div id="assignorHint" class="role-hint" role="status" aria-live="polite">
-    <span class="role-hint-icon" aria-hidden="true"><i class="fa-solid fa-building"></i></span>
-    <div>
-        <span class="role-hint-title">Assignors follow your association</span>
-        <span id="assignorHintMessage" class="role-hint-message">Select an Association in Basic Game Information before choosing an Assignor.</span>
-    </div>
-</div>
-</div>
-</div> 
-</div> 
-<div class="button-row">
-   <button
-       type="button"
-       id="getGameBtn"
-       class="btn btn-find">
-       <i class="fa-solid fa-magnifying-glass"></i>                    
-       Find
-   </button>
-   <button
-       type="button"
-       id="addGameBtn"
-       class="btn btn-add">
-       <i class="fa-solid fa-plus"></i>     
-       Add               
-   </button>
-   <button
-       type="button"
-       id="updateGameBtn"
-       class="btn btn-save">
-       <i class="fa-solid fa-pen"></i>                   
-       Save
-   </button>
-   <button
-       type="button"
-       id="deleteBtn"
-       class="btn btn-delete">
-       <i class="fa-solid fa-trash"></i>                   
-       Delete
-   </button>
-   <button
-       type="button"
-       id="clearBtn"
-       class="btn btn-clear"> 
-       <i class="fa-solid fa-eraser"></i>                   
-       Clear
-   </button>
-   <button 
-       type="button" 
-       id="importGamesBtn" 
-       class="btn btn-import"> 
-       <i class="fa-solid fa-file-import"></i>
-       Import
-   </button>   
-</div>
-<div class="message-box" id="message">
-        Ready to enter Games
-</div>
-</form>
-</div>
-<script src="/components/navbar.js?v=12"></script>
-<script>
-// Set this URL to your existing sport-role GET route if its name differs.
+
+#message {
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+@media(max-width:768px) {
+    body {
+        padding: 10px;
+    }
+
+    .button-row {
+        flex-direction: column;
+    }
+
+    .btn {
+        width: 100%;
+    }
+}
+
+[hidden] {
+    display: none !important;
+}
+
+.game-workspace .form-card {
+    margin-bottom: 20px;
+}
+
+#findForm {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 15px;
+}
+
+#findForm .buttons {
+    grid-column: 1 / -1;
+}
+
+#gameEditor {
+    width: min(1160px, calc(100% - 32px));
+}
+
+#gameEditor .button-row {
+    flex-wrap: wrap;
+}
+
+.message-box {
+    margin-bottom: 20px;
+}
+        
+/* Give the directory its natural width instead of squeezing every column. */
+#registrySection .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#gamesTable {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+}
+
+#gamesTable th,
+#gamesTable td {
+    min-width: 110px;
+    padding: 12px 16px;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    vertical-align: top;
+}
+
+#gamesTable th:nth-child(-n+3),
+#gamesTable td:nth-child(-n+3) {
+    min-width: 76px;
+}
+
+#gamesTable th:nth-child(11),
+#gamesTable td:nth-child(11),
+#gamesTable th:nth-child(18),
+#gamesTable td:nth-child(18) {
+    min-width: 200px;
+}
+
+/* Longer notes and assignment lists wrap at words in generous columns. */
+#gamesTable th:nth-child(19),
+#gamesTable td:nth-child(19) {
+    min-width: 280px;
+    max-width: 360px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+#gamesTable th:nth-child(20),
+#gamesTable td:nth-child(20) {
+    min-width: 420px;
+    max-width: 520px;
+    white-space: normal;
+}
+
+        
+/* Let the Games import preview use its natural column widths. */
+#previewWrap .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#previewWrap table {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+}
+
+#previewWrap table th,
+#previewWrap table td {
+    min-width: 120px;
+    padding: 12px 16px;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-break: normal;
+    vertical-align: top;
+}
+
+#previewWrap table th:first-child,
+#previewWrap table td:first-child {
+    min-width: 90px;
+}
+
+/* Notes and validation messages can wrap at words in spacious columns.
+   Counting from the end also supports sport-specific official columns. */
+#previewWrap table th:nth-last-child(2),
+#previewWrap table td:nth-last-child(2) {
+    min-width: 280px;
+    max-width: 360px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+#previewWrap table th:last-child,
+#previewWrap table td:last-child {
+    min-width: 360px;
+    max-width: 520px;
+    white-space: normal;
+}
+
+        </style>
+    </head>
+    <body>
+        <div id="navbar-container">
+        </div>
+        <main class="container">
+            <header class="header">
+                <h1>
+                    Ref Ledger V2.0 Games
+                </h1>
+                <p>
+                    Manage games, assignments, and game financials.
+                </p>
+            </header>
+            <section class="form-card">
+                <h2>
+                    Export Games
+                </h2>
+                <p class="help">
+                    Export all games using the same CSV format and export handler as Settings.
+                </p>
+                <div class="field">
+                    <label for="exportPrefix">
+                        File-name prefix
+                    </label>
+                    <input id="exportPrefix" maxlength="80" value="ref-ledger"/>
+                </div>
+                <button class="btn teal" id="exportBtn">
+                    <i aria-hidden="true" class="fa-solid fa-file-export">
+                    </i>
+                    Export Games
+                </button>
+                <p class="status" id="exportStatus" role="status">
+                </p>
+            </section>
+            <section class="form-card import-card">
+                <div class="import-header">
+                    <h2>
+                        <i aria-hidden="true" class="fa-solid fa-file-import">
+                        </i>
+                        Import Games
+                    </h2>
+                    <p>
+                        Preview and import records from a CSV file.
+                    </p>
+                </div>
+                <div class="import-content">
+                    <button class="btn purple" id="templateBtn">
+                        Download Games Template
+                    </button>
+                    <div class="field file-controls">
+                        <label for="openFileBtn">
+                            Games CSV File
+                        </label>
+                        <button class="btn blue full-width" id="openFileBtn">
+                            Open CSV File
+                        </button>
+                        <p class="file-help" id="fileHelp">
+                        </p>
+                        <button class="btn slate full-width" id="standardFileBtn">
+                            Use Standard File Picker
+                        </button>
+                        <input accept=".csv,text/csv" hidden="" id="importFile" type="file"/>
+                        <p class="file-help" id="lastFile">
+                            Last file used: None
+                        </p>
+                        <button class="btn slate full-width" id="forgetFileBtn">
+                            Forget Last File
+                        </button>
+                    </div>
+                    <p class="file-summary" id="fileName">
+                        No file selected.
+                    </p>
+                    <p class="csv-help">
+                        Use the Games template or a Settings Games export. CSV includes gameid,date,taxyear,time,sport,site,field,numofgames,level,gamefee,travelpay,assignorfee,deductions,association,status,official1 through official10,assignor,home,visitor,notes. Files must be no larger than 5 MB. Notes are limited to 150 characters.
+                    </p>
+                    <div class="buttons">
+                        <button class="btn blue" disabled="" id="previewBtn">
+                            Preview Games
+                        </button>
+                        <button class="btn red" id="clearImportBtn">
+                            Clear
+                        </button>
+                    </div>
+                    <p aria-live="polite" class="status" id="importStatus" role="status">
+                    </p>
+                    <div hidden="" id="previewWrap">
+                        <h2 class="preview-title">
+                            Games Import Preview
+                        </h2>
+                        <div class="preview-totals">
+                            <div class="total-card">
+                                <strong id="totalRows">
+                                    0
+                                </strong>
+                                <span>
+                                    Total Rows
+                                </span>
+                            </div>
+                            <div class="total-card valid">
+                                <strong id="validRows">
+                                    0
+                                </strong>
+                                <span>
+                                    Valid Rows
+                                </span>
+                            </div>
+                            <div class="total-card invalid">
+                                <strong id="errorRows">
+                                    0
+                                </strong>
+                                <span>
+                                    Rows With Errors
+                                </span>
+                            </div>
+                        </div>
+                        <p class="status" id="previewSummary">
+                        </p>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr id="previewHeaders">
+                                        <th>
+                                            CSV Row
+                                        </th>
+                                        <th>
+                                            Status
+                                        </th>
+                                        <th>
+                                            First Name
+                                        </th>
+                                        <th>
+                                            Last Name
+                                        </th>
+                                        <th>
+                                            Phone
+                                        </th>
+                                        <th>
+                                            Email
+                                        </th>
+                                        <th>
+                                            Address
+                                        </th>
+                                        <th>
+                                            Errors
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="previewBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="csv-help">
+                            Review the results before importing. Rows with errors will not be imported. Existing games will not be overwritten. Duplicates are identified by association and Game ID.
+                        </p>
+                        <fieldset class="duplicate-options">
+                            <legend>
+                                Duplicate Records
+                            </legend>
+                            <label>
+                                <input checked="" name="duplicatePolicy" type="radio" value="skip"/>
+                                Skip records that already exist.
+                            </label>
+                            <label>
+                                <input name="duplicatePolicy" type="radio" value="stop"/>
+                                Stop the import when a duplicate is found.
+                            </label>
+                        </fieldset>
+                        <div class="buttons">
+                            <button class="btn green" disabled="" id="importBtn">
+                                Import Valid Games
+                            </button>
+                            <button class="btn red" id="clearPreviewBtn">
+                                Clear Preview
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <div class="game-workspace">
+                <section class="form-card">
+                    <h2>
+                        Enter a Game
+                    </h2>
+                    <p class="help">
+                        Add a game with its sport-specific games and financial information.
+                    </p>
+                    <div id="entryGameFields">
+                        <form id="gameForm">
+                            <div class="card">
+                                <div class="card-title">
+                                    Basic Game Information
+                                </div>
+                                <div class="form-grid basic-game-grid">
+                                    <div class="form-group">
+                                        <label for="association">
+                                            Association
+                                        </label>
+                                        <select id="association">
+                                            <option value="">
+                                                Select Association
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="gameId">
+                                            Game ID
+                                        </label>
+                                        <input id="gameId" required="" type="number"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="date">
+                                            Date
+                                        </label>
+                                        <input id="date" required="" type="date"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="taxYear">
+                                            Tax Year
+                                        </label>
+                                        <input id="taxYear" inputmode="numeric" placeholder="YYYY" type="text"/>
+                                    </div>
+                                    <div class="form-group" style="grid-column:1 / -1;">
+                                        <label for="notes">
+                                            Notes (150 characters maximum)
+                                        </label>
+                                        <textarea aria-describedby="notesRemaining" id="notes" maxlength="150" name="notes" rows="3" style="resize:vertical;"></textarea>
+                                        <small id="notesRemaining" style="margin-top:5px;color:#64748b;">
+                                            150 characters left
+                                        </small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="time">
+                                            Time
+                                        </label>
+                                        <input id="time" required="" type="time"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="status">
+                                            Status
+                                        </label>
+                                        <select id="status">
+                                            <option value="">
+                                                Loading statuses...
+                                            </option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">
+                                    Sport and Location
+                                </div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="sport">
+                                            Sport
+                                        </label>
+                                        <select disabled="" id="sport">
+                                            <option value="">
+                                                Select Sport
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="level">
+                                            Level
+                                        </label>
+                                        <select id="level">
+                                            <option value="">
+                                                Select Level
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="site">
+                                            Site
+                                        </label>
+                                        <select id="site">
+                                            <option value="">
+                                                Select Site
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="field">
+                                            Field
+                                        </label>
+                                        <input id="field" type="text"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="home">
+                                            Home
+                                        </label>
+                                        <input id="home" type="text" value="TBD"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="visitor">
+                                            Visitor
+                                        </label>
+                                        <input id="visitor" type="text" value="TBD"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">
+                                    Financial Information
+                                </div>
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="numOfGames">
+                                            Number of Games
+                                        </label>
+                                        <input id="numOfGames" type="number" value="1"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="gameFee">
+                                            Game Fee
+                                        </label>
+                                        <input id="gameFee" step="0.01" type="number" value="0.00"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="travelPay">
+                                            Travel Pay
+                                        </label>
+                                        <input id="travelPay" step="0.01" type="number" value="0.00"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="assignorFee">
+                                            Assignor Fee
+                                        </label>
+                                        <input id="assignorFee" step="0.01" type="number" value="0.00"/>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="deductions">
+                                            Deductions
+                                        </label>
+                                        <input id="deductions" step="0.01" type="number" value="0.00"/>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">
+                                    Officials
+                                </div>
+                                <div class="form-grid">
+                                    <div aria-live="polite" class="role-hint" id="officialRolesHint" role="status">
+                                        <span aria-hidden="true" class="role-hint-icon">
+                                            <i class="fa-solid fa-wand-magic-sparkles">
+                                            </i>
+                                        </span>
+                                        <div>
+                                            <span class="role-hint-title">
+                                                Official fields follow your sport
+                                            </span>
+                                            <span class="role-hint-message" id="officialRolesMessage">
+                                                Choose a sport in Sport and Location. Its official fields will appear here automatically.
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div aria-label="Sport official assignments" class="official-fields form-grid" id="officialFields">
+                                    </div>
+                                    <div class="assignor-row">
+                                        <div class="form-group">
+                                            <label for="assignor">
+                                                Assignor
+                                            </label>
+                                            <select aria-describedby="assignorHintMessage" disabled="" id="assignor">
+                                                <option value="Unassigned">
+                                                    Unassigned
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <div aria-live="polite" class="role-hint" id="assignorHint" role="status">
+                                            <span aria-hidden="true" class="role-hint-icon">
+                                                <i class="fa-solid fa-building">
+                                                </i>
+                                            </span>
+                                            <div>
+                                                <span class="role-hint-title">
+                                                    Assignors follow your association
+                                                </span>
+                                                <span class="role-hint-message" id="assignorHintMessage">
+                                                    Select an Association in Basic Game Information before choosing an Assignor.
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="button-row">
+                                <button class="btn btn-find" hidden="" id="getGameBtn" type="button">
+                                    <i class="fa-solid fa-magnifying-glass">
+                                    </i>
+                                    Find
+                                </button>
+                                <button class="btn btn-add" id="addGameBtn" type="button">
+                                    <i class="fa-solid fa-plus">
+                                    </i>
+                                    Add
+                                </button>
+                                <button class="btn btn-save" id="updateGameBtn" type="button">
+                                    <i class="fa-solid fa-pen">
+                                    </i>
+                                    Save
+                                </button>
+                                <button class="btn btn-delete" hidden="" id="deleteBtn" type="button">
+                                    <i class="fa-solid fa-trash">
+                                    </i>
+                                    Delete
+                                </button>
+                                <button class="btn btn-clear" id="clearBtn" type="button">
+                                    <i class="fa-solid fa-eraser">
+                                    </i>
+                                    Clear
+                                </button>
+                                <button class="btn btn-import" hidden="" id="importGamesBtn" type="button">
+                                    <i class="fa-solid fa-file-import">
+                                    </i>
+                                    Import
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+                <section class="form-card">
+                    <h2>
+                        Find a Game
+                    </h2>
+                    <p class="help">
+                        Search games with independent filters, or show all games regardless of filters.
+                    </p>
+                    <form id="findForm">
+                        <div class="field">
+                            <label for="find_association">
+                                Association
+                            </label>
+                            <input id="find_association" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_gameId">
+                                Game IDs (single, comma list, or range)
+                            </label>
+                            <input id="find_gameId" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_begindate">
+                                From Date
+                            </label>
+                            <input id="find_begindate" type="date"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_enddate">
+                                Through Date
+                            </label>
+                            <input id="find_enddate" type="date"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_taxYear">
+                                Tax Year
+                            </label>
+                            <input id="find_taxYear" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_sport">
+                                Sport
+                            </label>
+                            <input id="find_sport" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_level">
+                                Level
+                            </label>
+                            <input id="find_level" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_site">
+                                Site
+                            </label>
+                            <input id="find_site" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_status">
+                                Status
+                            </label>
+                            <input id="find_status" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_assignor">
+                                Assignor
+                            </label>
+                            <input id="find_assignor" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_official">
+                                Game
+                            </label>
+                            <input id="find_official" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_home">
+                                Home
+                            </label>
+                            <input id="find_home" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_visitor">
+                                Visitor
+                            </label>
+                            <input id="find_visitor" type="text"/>
+                        </div>
+                        <div class="buttons">
+                            <button class="btn blue" type="submit">
+                                Search Games
+                            </button>
+                            <button class="btn" id="showAllBtn" type="button">
+                                Show All Games (Ignore Filters)
+                            </button>
+                            <button class="btn red" id="clearFiltersBtn" type="button">
+                                Clear Filters
+                            </button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+            <div aria-live="polite" class="message" id="message" role="status">
+                Ready to enter games.
+            </div>
+            <section class="form-card" hidden="" id="registrySection">
+                <h2>
+                    Game Directory
+                </h2>
+                <p class="help">
+                    Edit or delete a game, or select multiple games for deletion.
+                </p>
+                <div class="registry-tools">
+                    <span class="count" id="registryCount">
+                        Loading games…
+                    </span>
+                    <div class="buttons">
+                        <button class="btn blue" id="selectAllBtn">
+                            Select All
+                        </button>
+                        <button class="btn" id="clearSelectionBtn">
+                            Clear Selection
+                        </button>
+                        <button class="btn red" disabled="" id="deleteSelectedBtn">
+                            Delete All Selected Games (0)
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table id="gamesTable">
+                        <thead>
+                            <tr>
+                                <th>
+                                    Select
+                                </th>
+                                <th>
+                                    Delete
+                                </th>
+                                <th>
+                                    Edit
+                                </th>
+                                <th>
+                                    Association
+                                </th>
+                                <th>
+                                    Game ID
+                                </th>
+                                <th>
+                                    Date
+                                </th>
+                                <th>
+                                    Tax Year
+                                </th>
+                                <th>
+                                    Time
+                                </th>
+                                <th>
+                                    Sport
+                                </th>
+                                <th>
+                                    Level
+                                </th>
+                                <th>
+                                    Site
+                                </th>
+                                <th>
+                                    Field
+                                </th>
+                                <th>
+                                    Number of Games
+                                </th>
+                                <th>
+                                    Game Fee
+                                </th>
+                                <th>
+                                    Status
+                                </th>
+                                <th>
+                                    Home
+                                </th>
+                                <th>
+                                    Visitor
+                                </th>
+                                <th>
+                                    Assignor
+                                </th>
+                                <th>
+                                    Notes
+                                </th>
+                                <th>
+                                    Officials
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="registryBody">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <dialog aria-describedby="deleteDescription" aria-labelledby="deleteTitle" id="deleteModal">
+                <h2 id="deleteTitle">
+                    Confirm deletion
+                </h2>
+                <p id="deleteDescription">
+                    Permanently delete these games? This action cannot be undone.
+                </p>
+                <div id="deleteTarget">
+                </div>
+                <div class="buttons">
+                    <button class="btn" id="cancelDeleteBtn">
+                        Cancel
+                    </button>
+                    <button class="btn red" id="confirmDeleteBtn">
+                        Delete
+                    </button>
+                </div>
+            </dialog>
+            <dialog aria-labelledby="gameEditorTitle" id="gameEditor">
+                <h2 id="gameEditorTitle">
+                    Edit Game
+                </h2>
+                <p id="editorMessage" role="status">
+                </p>
+                <div id="editGameFields">
+                </div>
+                <div class="buttons">
+                    <button class="btn slate" id="cancelGameEdit" type="button">
+                        Close Editor
+                    </button>
+                </div>
+            </dialog>
+        </main>
+        <script src="/components/navbar.js?v=12">
+        </script>
+        <script>
+            // Set this URL to your existing sport-role GET route if its name differs.
 const OFFICIAL_ROLES_API = "/api/settings/official-roles";
 let isUpdateMode = false;
 let pageReady = false;
@@ -239,14 +1508,18 @@ let roleFields = [];
 let roleRequest = 0;
 let roleAbortController = null;
 let formRevision = 0;
+
 function updateActionButtons() {
+    document.getElementById("clearBtn").hidden = isUpdateMode;
+    document.getElementById("updateGameBtn").hidden = !isUpdateMode;
+    document.getElementById("addGameBtn").hidden = isUpdateMode;
     const sport = document.getElementById("sport").value;
     const allowedSport = userSportsReady && userSports.includes(sport);
     const preservedSport = isUpdateMode && sport && sport === existingGameSport;
-    document.getElementById("addGameBtn").disabled =
-        !pageReady || !rolesReady || isUpdateMode || !allowedSport;
-    document.getElementById("updateGameBtn").disabled =
-        !pageReady || !rolesReady || !isUpdateMode || !(allowedSport || preservedSport);
+    document.getElementById("addGameBtn").disabled = !pageReady || !rolesReady || isUpdateMode || !
+        allowedSport;
+    document.getElementById("updateGameBtn").disabled = !pageReady || !rolesReady || !isUpdateMode || !(
+        allowedSport || preservedSport);
     document.getElementById("getGameBtn").disabled = !pageReady;
 }
 
@@ -256,11 +1529,13 @@ function setUpdateMode(isUpdate) {
     document.getElementById("association").disabled = isUpdate;
     updateActionButtons();
 }
+
 function roleHint(message, error = false) {
     const hint = document.getElementById("officialRolesHint");
     document.getElementById("officialRolesMessage").textContent = message;
     hint.classList.toggle("error", error);
 }
+
 function resetOfficialFields() {
     roleRequest++;
     if (roleAbortController) roleAbortController.abort();
@@ -271,6 +1546,7 @@ function resetOfficialFields() {
     roleHint("Choose a sport in Sport and Location. Its official fields will appear here automatically.");
     updateActionButtons();
 }
+
 function normalizeRole(role) {
     return {
         roleId: String(role.roleId ?? role.RoleId ?? ""),
@@ -279,6 +1555,7 @@ function normalizeRole(role) {
         active: (role.active ?? role.Active) === true
     };
 }
+
 function normalizeAssignment(assignment) {
     const rawId = assignment.officialId ?? assignment.OfficialId ?? "";
     return {
@@ -289,6 +1566,7 @@ function normalizeAssignment(assignment) {
         name: String(assignment.name ?? assignment.Name ?? "Unassigned")
     };
 }
+
 function savedGameAssignments(game, roles) {
     if (!game) return [];
     const key = value => String(value ?? "").trim().toLowerCase().replace(/[\s_-]+/g, "");
@@ -301,14 +1579,17 @@ function savedGameAssignments(game, roles) {
     for (const raw of assignments) {
         const assignment = normalizeAssignment(raw);
         assignment.title = String(raw.title ?? raw.Title ?? raw.role ?? raw.Role ?? "").trim();
-        const role = byId.get(assignment.roleId) || (!assignment.roleId ? byTitle.get(key(assignment.title)) : null);
+        const role = byId.get(assignment.roleId) || (!assignment.roleId ? byTitle.get(key(assignment.title)) :
+            null);
         if (role) {
             assignment.roleId = role.roleId;
             assignment.title = assignment.title || role.title;
-            if (raw.displayOrder == null && raw.DisplayOrder == null) assignment.displayOrder = role.displayOrder;
+            if (raw.displayOrder == null && raw.DisplayOrder == null) assignment.displayOrder = role
+                .displayOrder;
         }
         if (!assignment.roleId || !assignment.title) {
-            if (assignment.officialId || (assignment.name && assignment.name !== "Unassigned")) withoutRoles.push(assignment);
+            if (assignment.officialId || (assignment.name && assignment.name !== "Unassigned")) withoutRoles
+                .push(assignment);
             continue;
         }
         // The new array is authoritative, including explicitly Unassigned entries.
@@ -326,10 +1607,14 @@ function savedGameAssignments(game, roles) {
         const value = fields.get(field);
         if (value == null || value === "") continue;
         const assignment = typeof value === "object" ? normalizeAssignment(value) : {
-            officialId: "", name: String(value).trim()
+            officialId: "",
+            name: String(value).trim()
         };
         result.set(role.roleId, {
-            ...assignment, roleId: role.roleId, title: role.title, displayOrder: role.displayOrder
+            ...assignment,
+            roleId: role.roleId,
+            title: role.title,
+            displayOrder: role.displayOrder
         });
     }
     // Do not silently drop a legacy assignment whose sport has no corresponding role.
@@ -337,16 +1622,22 @@ function savedGameAssignments(game, roles) {
         const value = fields.get(key(title));
         if (value == null || value === "" || value === "Unassigned") continue;
         const role = byTitle.get(key(title)) || (title === "Referee" ? byTitle.get("plateumpire") : null);
-        if (!role && !assignments.length) throw new Error(`The saved ${title} assignment has no matching role for this sport. Review it before saving.`);
+        if (!role && !assignments.length) throw new Error(
+            `The saved ${title} assignment has no matching role for this sport. Review it before saving.`
+            );
     }
     // A list of names without role metadata cannot safely be matched by array position.
     const matched = Array.from(result.values());
     const unresolved = withoutRoles.filter(assignment => !matched.some(saved =>
-        assignment.officialId ? saved.officialId === assignment.officialId || saved.name === assignment.name : saved.name === assignment.name
+        assignment.officialId ? saved.officialId === assignment.officialId || saved.name ===
+        assignment.name : saved.name === assignment.name
     ));
-    if (unresolved.length) throw new Error("The game API returned officials without roleId/title. Update the Find handler to return each assignment's role metadata.");
+    if (unresolved.length) throw new Error(
+        "The game API returned officials without roleId/title. Update the Find handler to return each assignment's role metadata."
+        );
     return matched;
 }
+
 function appendOfficialOption(select, official, value) {
     const option = new Option(official.name, value);
     option.dataset.officialId = official.officialId;
@@ -354,6 +1645,7 @@ function appendOfficialOption(select, official, value) {
     select.add(option);
     return option;
 }
+
 function matchAssignorWidth() {
     const officialSelect = document.querySelector("#officialFields select");
     const row = document.querySelector(".assignor-row");
@@ -363,24 +1655,39 @@ function matchAssignorWidth() {
 }
 const officialWidthObserver = new ResizeObserver(matchAssignorWidth);
 officialWidthObserver.observe(document.getElementById("officialFields"));
+
 function renderOfficialFields(roles, savedAssignments) {
     const container = document.getElementById("officialFields");
     container.replaceChildren();
     roleFields = [];
     const definitions = new Map(roles.map(role => [role.roleId, role]));
     const saved = new Map(savedAssignments.map(assignment => [assignment.roleId, assignment]));
-    const fields = roles.filter(role => role.active).map(role => ({ role, assignment: saved.get(role.roleId) }));
+    const fields = roles.filter(role => role.active).map(role => ({
+        role,
+        assignment: saved.get(role.roleId)
+    }));
     // Keep inactive or deleted saved assignments visible and unchanged during edits.
     savedAssignments.forEach(assignment => {
         if (!definitions.get(assignment.roleId)?.active) {
             fields.push({
-                role: { roleId: assignment.roleId, title: assignment.title, displayOrder: assignment.displayOrder, active: false },
-                assignment, preserved: true
+                role: {
+                    roleId: assignment.roleId,
+                    title: assignment.title,
+                    displayOrder: assignment.displayOrder,
+                    active: false
+                },
+                assignment,
+                preserved: true
             });
         }
     });
-    fields.sort((a, b) => (a.assignment?.displayOrder ?? a.role.displayOrder) - (b.assignment?.displayOrder ?? b.role.displayOrder));
-    fields.forEach(({ role, assignment, preserved }, index) => {
+    fields.sort((a, b) => (a.assignment?.displayOrder ?? a.role.displayOrder) - (b.assignment?.displayOrder ??
+        b.role.displayOrder));
+    fields.forEach(({
+        role,
+        assignment,
+        preserved
+    }, index) => {
         const group = document.createElement("div");
         group.className = "form-group";
         const label = document.createElement("label");
@@ -388,18 +1695,25 @@ function renderOfficialFields(roles, savedAssignments) {
         select.id = `official-role-${index}`;
         label.htmlFor = select.id;
         label.textContent = (assignment?.title || role.title) + (preserved ? " (saved role)" : "");
-        appendOfficialOption(select, { officialId: "", name: "Unassigned" }, "");
+        appendOfficialOption(select, {
+            officialId: "",
+            name: "Unassigned"
+        }, "");
         officialsDirectory.forEach((official, officialIndex) => {
-            appendOfficialOption(select, official, official.officialId ? `id:${official.officialId}` : `name:${officialIndex}`);
+            appendOfficialOption(select, official, official.officialId ?
+                `id:${official.officialId}` : `name:${officialIndex}`);
         });
-        if (assignment && (assignment.officialId || (assignment.name && assignment.name !== "Unassigned"))) {
+        if (assignment && (assignment.officialId || (assignment.name && assignment.name !==
+                "Unassigned"))) {
             const match = Array.from(select.options).find(option =>
-                assignment.officialId ? option.dataset.officialId === assignment.officialId : option.dataset.name.trim().toLowerCase() === assignment.name.trim().toLowerCase()
+                assignment.officialId ? option.dataset.officialId === assignment.officialId :
+                option.dataset.name.trim().toLowerCase() === assignment.name.trim().toLowerCase()
             );
             if (match) select.value = match.value;
             else {
                 const option = appendOfficialOption(select, {
-                    officialId: assignment.officialId, name: assignment.name || `Official ${assignment.officialId}`
+                    officialId: assignment.officialId,
+                    name: assignment.name || `Official ${assignment.officialId}`
                 }, `saved:${index}`);
                 select.value = option.value;
             }
@@ -407,7 +1721,12 @@ function renderOfficialFields(roles, savedAssignments) {
         select.disabled = Boolean(preserved);
         group.append(label, select);
         container.appendChild(group);
-        roleFields.push({ role, assignment, select, preserved: Boolean(preserved) });
+        roleFields.push({
+            role,
+            assignment,
+            select,
+            preserved: Boolean(preserved)
+        });
     });
     matchAssignorWidth();
 }
@@ -420,22 +1739,32 @@ async function loadSportOfficialRoles(sport, game = null) {
     roleFields = [];
     document.getElementById("officialFields").replaceChildren();
     updateActionButtons();
-    if (!sport) { roleHint("Choose a sport in Sport and Location. Its official fields will appear here automatically."); return false; }
+    if (!sport) {
+        roleHint(
+            "Choose a sport in Sport and Location. Its official fields will appear here automatically."
+            );
+        return false;
+    }
     roleHint(`Loading official roles for ${sport}...`);
     try {
         if (officialsLoadError) throw new Error(officialsLoadError);
         const url = new URL(OFFICIAL_ROLES_API, window.location.origin);
         url.searchParams.set("sport", sport);
-        const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) throw new Error(`Unable to load official roles for ${sport} (${response.status}).`);
+        const response = await fetch(url, {
+            signal: controller.signal
+        });
+        if (!response.ok) throw new Error(
+            `Unable to load official roles for ${sport} (${response.status}).`);
         const data = await response.json();
         if (request !== roleRequest) return false;
         const rawRoles = Array.isArray(data) ? data : data.roles ?? data.Roles;
-        if (!Array.isArray(rawRoles)) throw new Error("The official roles response must contain a roles array.");
+        if (!Array.isArray(rawRoles)) throw new Error(
+            "The official roles response must contain a roles array.");
         const roles = rawRoles.map(normalizeRole).sort((a, b) => a.displayOrder - b.displayOrder);
         const ids = new Set();
         roles.forEach(role => {
-            if (!role.roleId || !role.title || ids.has(role.roleId)) throw new Error("Official role definitions contain missing or duplicate identifiers.");
+            if (!role.roleId || !role.title || ids.has(role.roleId)) throw new Error(
+                "Official role definitions contain missing or duplicate identifiers.");
             ids.add(role.roleId);
         });
         const assignments = savedGameAssignments(game, roles);
@@ -445,7 +1774,8 @@ async function loadSportOfficialRoles(sport, game = null) {
         }
         renderOfficialFields(roles, assignments);
         if (!roleFields.length) {
-            roleHint(`No active official roles are configured for ${sport}. Add roles in Settings first.`, true);
+            roleHint(`No active official roles are configured for ${sport}. Add roles in Settings first.`,
+                true);
             return false;
         }
         rolesReady = true;
@@ -458,11 +1788,20 @@ async function loadSportOfficialRoles(sport, game = null) {
         return false;
     }
 }
+
 function collectOfficialAssignments() {
     validateGameSport();
-    if (!rolesReady || !document.getElementById("sport").value) throw new Error("Select a sport and wait for its official roles to load.");
-    return roleFields.map(({ role, assignment, select, preserved }) => {
-        if (preserved) return { ...assignment };
+    if (!rolesReady || !document.getElementById("sport").value) throw new Error(
+        "Select a sport and wait for its official roles to load.");
+    return roleFields.map(({
+        role,
+        assignment,
+        select,
+        preserved
+    }) => {
+        if (preserved) return {
+            ...assignment
+        };
         const option = select.selectedOptions[0];
         return {
             roleId: role.roleId,
@@ -473,23 +1812,20 @@ function collectOfficialAssignments() {
         };
     });
 }
+
 function ensureSelectedValue(id, value) {
     const select = document.getElementById(id);
     const text = String(value ?? "");
-    if (text && !Array.from(select.options).some(option => option.value === text)) select.add(new Option(text, text));
+    if (text && !Array.from(select.options).some(option => option.value === text)) select.add(new Option(text,
+        text));
     select.value = text;
 }
-document.getElementById("sport").addEventListener("change", async function () {
+document.getElementById("sport").addEventListener("change", async function() {
     formRevision++;
     populateSportLevels();
     document.getElementById("gameFee").value = "0.00";
     await loadSportOfficialRoles(this.value);
 });
-document
-    .getElementById("importGamesBtn")
-    .addEventListener("click", function () {
-        window.location.href = "/importGames";
-    });
 let assignorsReady = false;
 let assignorsVersion = 0;
 async function loadAssignors(savedAssignor = "Unassigned") {
@@ -505,9 +1841,12 @@ async function loadAssignors(savedAssignor = "Unassigned") {
         return true;
     }
     try {
-        const params = new URLSearchParams({ association });
+        const params = new URLSearchParams({
+            association
+        });
         const response = await fetch(`/api/loadAssignors?${params.toString()}`);
-        if (!response.ok) throw new Error(`Unable to load assignors for ${association} (HTTP ${response.status}).`);
+        if (!response.ok) throw new Error(
+            `Unable to load assignors for ${association} (HTTP ${response.status}).`);
         const records = await response.json();
         if (version !== assignorsVersion) return false;
         if (!Array.isArray(records)) throw new Error("The assignor response must be an array.");
@@ -520,7 +1859,8 @@ async function loadAssignors(savedAssignor = "Unassigned") {
                 if (!associations.some(value => String(value).trim() === association)) return;
             }
             // Records without membership fields must be filtered by the API.
-            const name = String(typeof record === "string" ? record : record?.name ?? record?.Name ?? "").trim();
+            const name = String(typeof record === "string" ? record : record?.name ?? record
+                ?.Name ?? "").trim();
             if (!name || names.has(name)) return;
             names.add(name);
             const option = document.createElement("option");
@@ -566,10 +1906,10 @@ async function loadAssociations() {
             select.innerHTML =
                 '<option value="">Select Association</option>';
             associations.forEach(assoc => {
-               const option = document.createElement("option");
-               option.value = assoc.id;
-               option.textContent = assoc.id;
-               select.appendChild(option);
+                const option = document.createElement("option");
+                option.value = assoc.id;
+                option.textContent = assoc.id;
+                select.appendChild(option);
             });
         });
     } catch (err) {
@@ -581,12 +1921,13 @@ function formatLevelGameFee(value) {
     const amount = Number(value ?? 0);
     return Number.isFinite(amount) && amount >= 0 ? amount.toFixed(2) : "0.00";
 }
-document.getElementById("level").addEventListener("change", function () {
+document.getElementById("level").addEventListener("change", function() {
     const option = this.selectedOptions[0];
     document.getElementById("gameFee").value =
         formatLevelGameFee(option?.dataset.gameFee);
 });
 let gameLevelCatalog = [];
+
 function populateSportLevels(savedLevel = "", preserveSaved = false) {
     const sport = document.getElementById("sport").value;
     const select = document.getElementById("level");
@@ -596,14 +1937,17 @@ function populateSportLevels(savedLevel = "", preserveSaved = false) {
         option.dataset.gameFee = formatLevelGameFee(level.gameFee ?? level.GameFee);
         select.add(option);
     });
-    if (preserveSaved && savedLevel && !Array.from(select.options).some(option => option.value === savedLevel)) {
+    if (preserveSaved && savedLevel && !Array.from(select.options).some(option => option.value ===
+        savedLevel)) {
         select.add(new Option(savedLevel + " (saved level)", savedLevel));
     }
     select.value = savedLevel;
 }
 async function loadLevels() {
     try {
-        const response = await fetch("/api/levels?active=true", { cache: "no-store" });
+        const response = await fetch("/api/levels?active=true", {
+            cache: "no-store"
+        });
         if (!response.ok) throw new Error("Failed to load levels");
         const levels = await response.json();
         if (!Array.isArray(levels)) throw new Error("Invalid levels response");
@@ -613,7 +1957,8 @@ async function loadLevels() {
         return true;
     } catch (err) {
         console.error("Error loading levels:", err);
-        document.getElementById("message").innerText = "Unable to load levels. Reload the page to try again.";
+        document.getElementById("message").innerText =
+            "Unable to load levels. Reload the page to try again.";
         return false;
     }
 }
@@ -634,10 +1979,10 @@ async function loadSites() {
             select.innerHTML =
                 '<option value="">Select Site</option>';
             sites.forEach(site => {
-               const option = document.createElement("option");
-               option.value = site.name;
-               option.textContent = site.name;
-               select.appendChild(option);
+                const option = document.createElement("option");
+                option.value = site.name;
+                option.textContent = site.name;
+                select.appendChild(option);
             });
         });
     } catch (err) {
@@ -689,7 +2034,8 @@ async function loadSports() {
 function validateGameSport() {
     const sport = document.getElementById("sport").value;
     if (isUpdateMode && sport && sport === existingGameSport) return;
-    if (!userSportsReady) throw new Error("Your sports could not be loaded. Reload the page before choosing a new sport.");
+    if (!userSportsReady) throw new Error(
+        "Your sports could not be loaded. Reload the page before choosing a new sport.");
     if (!sport || !userSports.includes(sport)) {
         throw new Error("Choose one of your sports from Settings.");
     }
@@ -698,15 +2044,22 @@ function validateGameSport() {
 async function loadOfficials() {
     try {
         const response = await fetch("/api/loadOfficials");
-        if (!response.ok) throw new Error("Unable to load the officials directory. Reload the page to retry.");
+        if (!response.ok) throw new Error(
+            "Unable to load the officials directory. Reload the page to retry.");
         const data = await response.json();
-        const officials = Array.isArray(data) ? data : data.officials ?? data.Officials;
-        if (!Array.isArray(officials)) throw new Error("The officials directory response must contain an array.");
+        const officials = data == null ? [] : Array.isArray(data) ? data : data.officials ?? data
+            .Officials;
+        if (!Array.isArray(officials)) throw new Error(
+            "The officials directory response must contain an array.");
         officialsDirectory = officials.map(official => {
-            const rawId = official.officialId ?? official.OfficialId ?? official.id ?? official.Id ?? "";
+            const rawId = official.officialId ?? official.OfficialId ?? official.id ?? official
+                .Id ?? "";
             return {
                 officialId: rawId === 0 || rawId === "0" ? "" : String(rawId),
-                name: typeof official === "string" ? official : String(official.name ?? official.Name ?? `${official.firstName ?? official.FirstName ?? ""} ${official.lastName ?? official.LastName ?? ""}`).trim()
+                name: typeof official === "string" ? official : String(official.name ?? official
+                    .Name ??
+                    `${official.firstName ?? official.FirstName ?? ""} ${official.lastName ?? official.LastName ?? ""}`
+                    ).trim()
             };
         }).filter(official => official.name && official.name !== "Unassigned");
         officialsLoadError = "";
@@ -715,6 +2068,7 @@ async function loadOfficials() {
         console.error("Error loading officials:", err);
     }
 }
+
 function getStatusTypeName(statusType) {
     if (typeof statusType === "string") {
         return statusType.trim();
@@ -740,9 +2094,9 @@ async function loadStatusTypes() {
             );
         }
         const responseData = await response.json();
-        const statusTypes = Array.isArray(responseData)
-            ? responseData
-            : responseData.statusTypes ?? responseData.statuses ?? [];
+        const statusTypes = Array.isArray(responseData) ?
+            responseData :
+            responseData.statusTypes ?? responseData.statuses ?? [];
         const statuses = statusTypes
             .map(getStatusTypeName)
             .filter((status, index, values) =>
@@ -782,7 +2136,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     setUpdateMode(false);
     await loadSportOfficialRoles(document.getElementById("sport").value);
 });
-document.getElementById("clearBtn").addEventListener("click", function () {
+document.getElementById("clearBtn").addEventListener("click", function() {
     formRevision++;
     document.getElementById("gameForm").reset();
     existingGameSport = "";
@@ -795,27 +2149,34 @@ document.getElementById("clearBtn").addEventListener("click", function () {
     setUpdateMode(false);
     document.getElementById("message").innerText = "Ready to enter Games";
 });
+
 function updateNotesRemaining() {
     const remaining = Math.max(0, 150 - document.getElementById("notes").value.length);
     document.getElementById("notesRemaining").textContent =
         `${remaining} character${remaining === 1 ? "" : "s"} left`;
 }
 document.getElementById("notes").addEventListener("input", updateNotesRemaining);
-document.getElementById("gameForm").addEventListener("reset", function () {
+document.getElementById("gameForm").addEventListener("reset", function() {
     // Reset fires before the browser restores the form values.
     setTimeout(updateNotesRemaining, 0);
 });
 updateNotesRemaining();
+
 function gameDateTaxYear() {
     return document.getElementById("date").value.split("-")[0] || "";
 }
-document.getElementById("date").addEventListener("input", function () {
+document.getElementById("date").addEventListener("input", function() {
     document.getElementById("taxYear").value = gameDateTaxYear();
 });
-function toInputDate(dateStr) {
-    const d = new Date(dateStr);
-    return d.toISOString().split("T")[0];
+
+function toInputDate(value) {
+    const text = String(value || '').replace(/\s*\([^)]*\)$/, '');
+    const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+    const us = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    return us ? us[3] + '-' + us[1].padStart(2, '0') + '-' + us[2].padStart(2, '0') : '';
 }
+
 function toInputTime(timeStr) {
     if (!timeStr) return "";
     const [time, modifier] = timeStr.split(" ");
@@ -829,52 +2190,11 @@ function toInputTime(timeStr) {
     }
     return `${String(hours).padStart(2, "0")}:${minutes}`;
 }
-document.getElementById("deleteBtn").addEventListener("click", async function () {
-    const gameId = document.getElementById("gameId").value;
-    const association = document.getElementById("association").value;
-    if (!gameId) {
-        document.getElementById("message").innerText =
-            "Enter a Game ID first.";
-        return;
-    }
-    if (!association) {
-        document.getElementById("message").innerText =
-            "Enter an Association first.";
-        return;
-    }
-    try {
-        const response = await fetch(`/api/deleteGame/${association}/${gameId}`, {
-            method: "DELETE"
-        });
-        const message = await response.text();
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Game deleted successfully."
-                : message || "Error deleting game.";
-        // Reload the navbar count after a successful delete.
-        if (response.ok && typeof loadPendingGames === "function") {
-            await loadPendingGames();
-}
-    } catch(err) {
-        document.getElementById("message").innerText = "Server unavailable.";
-    }
-});
-document.getElementById("getGameBtn").addEventListener("click", async function () {
-    const gameId = document.getElementById("gameId").value;
-    const association = document.getElementById("association").value;
-    if (!gameId) {
-        document.getElementById("message").innerText =
-            "Enter a Game ID first.";
-        return;
-    }
-    if (!association) {
-        document.getElementById("message").innerText =
-            "Enter an Association first.";
-        return;
-    }
+async function loadGameForEdit(association, gameId) {
     const revision = ++formRevision;
     try {
-        const response = await fetch(`/api/game/${association}/${gameId}`);
+        const response = await fetch(
+            `/api/game/${encodeURIComponent(association)}/${encodeURIComponent(gameId)}`);
         if (revision !== formRevision) return;
         if (!response.ok) {
             document.getElementById("message").innerText =
@@ -888,7 +2208,7 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         console.log(
             "Find officials:",
             JSON.stringify(game.Officials ?? game.officials, null, 2)
-        );        
+        );
         if (revision !== formRevision) return;
         console.log("Returned game:", game);
         document.getElementById("association").value = game.Association;
@@ -920,21 +2240,27 @@ document.getElementById("getGameBtn").addEventListener("click", async function (
         const loaded = await loadSportOfficialRoles(game.Sport, game);
         if (revision !== formRevision) return;
         if (!loaded) {
-            document.getElementById("message").innerText = "Game loaded, but its official roles could not be loaded. Saving is disabled.";
+            document.getElementById("message").innerText =
+                "Game loaded, but its official roles could not be loaded. Saving is disabled.";
             return;
-        }     
+        }
         document.getElementById("message").innerText =
-            "Game loaded successfully.";  
+            "Game loaded successfully.";
+        return true;
     } catch (err) {
         if (revision !== formRevision) return;
         document.getElementById("message").innerText =
             "Server unavailable.";
     }
-});
+
+}
+
 document.getElementById("updateGameBtn").addEventListener("click", async function(e) {
     e.preventDefault();
+    if (!document.getElementById("gameForm").reportValidity()) return;
     if (!assignorsReady) {
-        document.getElementById("message").innerText = "Wait for the association assignors to load successfully before saving.";
+        document.getElementById("message").innerText =
+            "Wait for the association assignors to load successfully before saving.";
         return;
     }
     if (document.getElementById("notes").value.length > 150) {
@@ -943,8 +2269,12 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         return;
     }
     let assignments;
-    try { assignments = collectOfficialAssignments(); }
-    catch (err) { document.getElementById("message").innerText = err.message; return; }
+    try {
+        assignments = collectOfficialAssignments();
+    } catch (err) {
+        document.getElementById("message").innerText = err.message;
+        return;
+    }
     const game = {
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value),
@@ -967,6 +2297,10 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         officials: assignments,
         assignor: document.getElementById("assignor").value
     };
+    if (editingGameIdentity) {
+        game.association = editingGameIdentity.association;
+        game.gameId = Number(editingGameIdentity.gameId);
+    }
     if (game.status === "Cancelled") {
         game.gameFee = 0;
         game.travelPay = 0;
@@ -991,6 +2325,10 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         }
         document.getElementById("message").innerText =
             message || "Game updated successfully.";
+        if (document.getElementById("gameEditor").open) document.getElementById("gameEditor")
+            .close();
+        if (!document.getElementById("registrySection").hidden) await loadGameDirectory();
+        document.getElementById("message").textContent = message || "Game updated successfully.";
         // Reload the navbar count after a successful save.
         if (typeof loadPendingGames === "function") {
             await loadPendingGames();
@@ -1003,8 +2341,10 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
 });
 document.getElementById("addGameBtn").addEventListener("click", async function(e) {
     e.preventDefault();
+    if (!document.getElementById("gameForm").reportValidity()) return;
     if (!assignorsReady) {
-        document.getElementById("message").innerText = "Wait for the association assignors to load successfully before saving.";
+        document.getElementById("message").innerText =
+            "Wait for the association assignors to load successfully before saving.";
         return;
     }
     if (document.getElementById("notes").value.length > 150) {
@@ -1013,8 +2353,12 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         return;
     }
     let assignments;
-    try { assignments = collectOfficialAssignments(); }
-    catch (err) { document.getElementById("message").innerText = err.message; return; }
+    try {
+        assignments = collectOfficialAssignments();
+    } catch (err) {
+        document.getElementById("message").innerText = err.message;
+        return;
+    }
     const game = {
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value),
@@ -1027,7 +2371,7 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         sport: document.getElementById("sport").value,
         level: document.getElementById("level").value,
         home: document.getElementById("home").value.trim(),
-        visitor: document.getElementById("visitor").value.trim(),        
+        visitor: document.getElementById("visitor").value.trim(),
         numOfGames: parseInt(document.getElementById("numOfGames").value),
         gameFee: parseFloat(document.getElementById("gameFee").value),
         travelPay: parseFloat(document.getElementById("travelPay").value),
@@ -1061,6 +2405,8 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         }
         document.getElementById("message").innerText =
             message || "Game saved successfully.";
+        if (!document.getElementById("registrySection").hidden) await loadGameDirectory();
+        document.getElementById("message").textContent = message || "Game saved successfully.";
         // Reload the navbar count after a successful save.
         if (typeof loadPendingGames === "function") {
             await loadPendingGames();
@@ -1071,6 +2417,626 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
             "Server unavailable.";
     }
 });
-</script>
-</body>
+
+// Games directory and Settings-compatible data tools.
+const $ = id => document.getElementById(id);
+let directoryGames = [];
+let selectedGames = new Set();
+let directoryVersion = 0;
+let directoryBusy = false;
+let pendingGamesDelete = [];
+let editingGameIdentity = null;
+let gamePreviewToken = '';
+let preview = [];
+let fileRevision = 0;
+let busy = false;
+
+function gameValue(game, key) {
+    return game[key] ?? game[key[0].toUpperCase() + key.slice(1)] ?? '';
+}
+
+function gameKey(game) {
+    return JSON.stringify([String(gameValue(game, 'association')), String(gameValue(game, 'gameId'))]);
+}
+
+function gameLabel(game) {
+    return String(gameValue(game, 'association')) + ' / Game ' + gameValue(game, 'gameId');
+}
+
+function message(text, error = false) {
+    $('message').textContent = text;
+    $('message').classList.toggle('error', error);
+}
+
+function cell(row, text) {
+    const td = document.createElement('td');
+    td.textContent = String(text ?? '');
+    row.append(td);
+    return td;
+}
+async function gameResponse(response, action) {
+    if (response.status === 401 || response.redirected) {
+        throw new Error('Your session has expired. Sign in again.');
+    }
+    const text = await response.text();
+    let result;
+    try {
+        result = JSON.parse(text);
+    } catch {
+        result = null;
+    }
+    if (!response.ok) throw new Error(result?.message || result?.error || text || action + ' failed.');
+    return result;
+}
+
+function directoryParameters() {
+    const params = new URLSearchParams({
+        t: Date.now()
+    });
+    const keys = ['association', 'gameId', 'begindate', 'enddate', 'taxYear', 'sport', 'level', 'site',
+        'status', 'assignor', 'official', 'home', 'visitor'
+    ];
+    keys.forEach(key => {
+        const value = $('find_' + key).value.trim();
+        if (value) params.set(key, value);
+    });
+    return params;
+}
+async function loadGameDirectory() {
+    const version = ++directoryVersion;
+    message('Loading game directory…');
+    try {
+        const response = await fetch('/api/dashboard?' + directoryParameters(), {
+            cache: 'no-store'
+        });
+        const text = await response.text();
+        if (version !== directoryVersion) return;
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch {
+            data = null;
+        }
+        if (response.status === 404 && data?.message?.includes('No games were found')) {
+            data = [];
+        } else if (!response.ok || response.redirected) {
+            throw new Error(data?.message || text || 'Unable to load games.');
+        }
+        const games = Array.isArray(data) ? data : data?.games ?? data?.Games;
+        if (!Array.isArray(games)) throw new Error('The server did not return a game list.');
+        directoryGames = games;
+        selectedGames.clear();
+        renderGameDirectory();
+        $('registrySection').hidden = false;
+        message(games.length + ' game(s) loaded.');
+    } catch (error) {
+        if (version === directoryVersion) message(error.message, true);
+    }
+}
+
+function renderGameDirectory() {
+    $('registryBody').replaceChildren();
+    for (const game of directoryGames) {
+        const key = gameKey(game);
+        const row = document.createElement('tr');
+        row.classList.toggle('selected', selectedGames.has(key));
+        const select = document.createElement('button');
+        select.type = 'button';
+        select.className = 'select-btn';
+        select.disabled = directoryBusy;
+        select.textContent = selectedGames.has(key) ? 'Selected' : 'Select';
+        select.setAttribute('aria-pressed', String(selectedGames.has(key)));
+        select.setAttribute('aria-label', 'Select ' + gameLabel(game));
+        select.onclick = () => {
+            if (directoryBusy) return;
+            selectedGames.has(key) ? selectedGames.delete(key) : selectedGames.add(key);
+            renderGameDirectory();
+        };
+        cell(row, '').append(select);
+        for (const action of ['delete', 'edit']) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'icon ' + (action === 'delete' ? 'danger' : '');
+            button.disabled = directoryBusy || !pageReady;
+            button.title = (action === 'delete' ? 'Delete ' : 'Edit ') + gameLabel(game);
+            button.setAttribute('aria-label', button.title);
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid ' + (action === 'delete' ? 'fa-trash' : 'fa-pen');
+            icon.setAttribute('aria-hidden', 'true');
+            button.append(icon);
+            button.onclick = () => action === 'delete' ? confirmGameDeletion([game]) : openGameEditor(game);
+            cell(row, '').append(button);
+        }
+        const columns = ['association', 'gameId', 'date', 'taxYear', 'time', 'sport', 'level', 'site',
+            'field', 'numOfGames', 'gameFee', 'status', 'home', 'visitor', 'assignor', 'notes'
+        ];
+        columns.forEach(key => cell(row, gameValue(game, key)));
+        const assignments = gameValue(game, 'officials');
+        cell(row, Array.isArray(assignments) ? assignments.map(item => {
+            return String(gameValue(item, 'title')) + ': ' + String(gameValue(item, 'name'));
+        }).join('; ') : '');
+        $('registryBody').append(row);
+    }
+    if (!directoryGames.length) {
+        const row = document.createElement('tr');
+        cell(row, 'No games found.').colSpan = 20;
+        $('registryBody').append(row);
+    }
+    $('registryCount').textContent = directoryGames.length + ' games · ' + selectedGames.size + ' selected';
+    $('deleteSelectedBtn').textContent = 'Delete All Selected Games (' + selectedGames.size + ')';
+    $('deleteSelectedBtn').disabled = directoryBusy || !selectedGames.size;
+}
+$('findForm').onsubmit = event => {
+    event.preventDefault();
+    if (!directoryBusy) loadGameDirectory();
+};
+$('showAllBtn').onclick = () => {
+    if (directoryBusy) return;
+    $('findForm').reset();
+    loadGameDirectory();
+};
+$('clearFiltersBtn').onclick = () => $('findForm').reset();
+$('selectAllBtn').onclick = () => {
+    if (directoryBusy) return;
+    directoryGames.forEach(game => selectedGames.add(gameKey(game)));
+    renderGameDirectory();
+};
+$('clearSelectionBtn').onclick = () => {
+    if (directoryBusy) return;
+    selectedGames.clear();
+    renderGameDirectory();
+};
+
+async function openGameEditor(game) {
+    if (directoryBusy || !pageReady) return;
+    $('clearBtn').click();
+    $('editGameFields').append($('gameForm'));
+    $('gameEditor').showModal();
+    editingGameIdentity = {
+        association: String(gameValue(game, 'association')),
+        gameId: String(gameValue(game, 'gameId'))
+    };
+    $('editorMessage').textContent = 'Loading complete game details…';
+    $('gameForm').hidden = true;
+    const loaded = await loadGameForEdit(editingGameIdentity.association, editingGameIdentity.gameId);
+    if (!$('gameEditor').open) return;
+    $('editorMessage').textContent = loaded ? '' : 'Unable to fully load the game. ' + $('message')
+        .textContent;
+    $('gameForm').hidden = !loaded;
+}
+$('cancelGameEdit').onclick = () => $('gameEditor').close();
+$('gameEditor').addEventListener('close', () => {
+    formRevision++;
+    editingGameIdentity = null;
+    $('entryGameFields').append($('gameForm'));
+    $('gameForm').hidden = false;
+    $('clearBtn').click();
+});
+
+function confirmGameDeletion(games) {
+    if (directoryBusy || $('deleteModal').open) return;
+    pendingGamesDelete = games;
+    $('deleteTarget').textContent = games.map(gameLabel).join('\n');
+    $('deleteModal').showModal();
+    $('cancelDeleteBtn').focus();
+}
+$('cancelDeleteBtn').onclick = () => $('deleteModal').close();
+$('deleteModal').addEventListener('cancel', event => {
+    if (directoryBusy) event.preventDefault();
+});
+$('deleteSelectedBtn').onclick = () => confirmGameDeletion(directoryGames.filter(game => selectedGames.has(
+    gameKey(game))));
+$('confirmDeleteBtn').onclick = async () => {
+    if (directoryBusy) return;
+    directoryBusy = true;
+    $('confirmDeleteBtn').disabled = true;
+    $('cancelDeleteBtn').disabled = true;
+    let deleted = 0;
+    const errors = [];
+    for (const game of pendingGamesDelete) {
+        try {
+            const response = await fetch('/api/deleteGame/' + encodeURIComponent(gameValue(game,
+                'association')) + '/' + encodeURIComponent(gameValue(game, 'gameId')), {
+                method: 'DELETE'
+            });
+            if (!response.ok || response.redirected) throw new Error(await response.text() ||
+                'Unable to delete game.');
+            directoryGames = directoryGames.filter(item => gameKey(item) !== gameKey(game));
+            selectedGames.delete(gameKey(game));
+            deleted++;
+        } catch (error) {
+            errors.push(gameLabel(game) + ': ' + error.message);
+        }
+    }
+    directoryBusy = false;
+    $('confirmDeleteBtn').disabled = false;
+    $('cancelDeleteBtn').disabled = false;
+    $('deleteModal').close();
+    renderGameDirectory();
+    message(deleted + ' game(s) deleted.' + (errors.length ? '\n' + errors.join('\n') : ''), errors
+        .length > 0);
+    if (typeof loadPendingGames === 'function') await loadPendingGames();
+};
+
+function downloadBlob(name, blob) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$('exportBtn').onclick = async () => {
+    $('exportBtn').disabled = true;
+    try {
+        const prefix = $('exportPrefix').value.trim() || 'ref-ledger';
+        const response = await fetch('/api/settings/export-records', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'text/csv'
+            },
+            body: JSON.stringify({
+                collections: ['games'],
+                prefix
+            })
+        });
+        if (!response.ok || response.redirected) throw new Error(await response.text() ||
+            'Export failed.');
+        if (!(response.headers.get('Content-Type') || '').startsWith('text/csv')) throw new Error(
+            'The server did not return a CSV file.');
+        downloadBlob(prefix.replace(/[^a-zA-Z0-9_-]/g, '_') + '-games.csv', await response.blob());
+        $('exportStatus').textContent = 'Export prepared. Check your browser downloads.';
+    } catch (error) {
+        $('exportStatus').textContent = error.message;
+    } finally {
+        $('exportBtn').disabled = false;
+    }
+};
+$('templateBtn').onclick = async () => {
+    try {
+        const response = await fetch('/api/import/games/template');
+        if (!response.ok || response.redirected) throw new Error(await response.text() ||
+            'Template download failed.');
+        downloadBlob('games_template.csv', await response.blob());
+    } catch (error) {
+        $('importStatus').textContent = error.message;
+    }
+};
+
+let currentFile = null;
+let rememberedHandle = null;
+let rememberedName = '';
+let previewing = false;
+const maximumCSVSize = 5 * 1024 * 1024;
+
+function fileStore(mode, operation) {
+    return new Promise((resolve, reject) => {
+        const open = indexedDB.open('ref-ledger-game-import', 1);
+        open.onupgradeneeded = () => open.result.createObjectStore('files');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+            const database = open.result;
+            const transaction = database.transaction('files', mode);
+            const request = operation(transaction.objectStore('files'));
+            transaction.oncomplete = () => {
+                database.close();
+                resolve(request.result);
+            };
+            transaction.onabort = () => {
+                database.close();
+                reject(transaction.error || new Error('File memory is unavailable.'));
+            };
+        };
+    });
+}
+
+function updateFileControls() {
+    const canRemember = typeof window.showOpenFilePicker === 'function';
+    $('openFileBtn').textContent = currentFile || rememberedHandle ? 'Open Different File' : 'Open CSV File';
+    $('fileHelp').textContent = canRemember ?
+        'This browser can reread your file. Use Open CSV File once, then save changes to the same CSV and click Preview Games again. Select the file again if it is moved, replaced, or saved under a new name.' :
+        'Choose a CSV file. To preview saved changes, select the file again using the standard file picker.';
+    $('lastFile').textContent = 'Last file used: ' + (rememberedName || 'None');
+    $('fileName').textContent = currentFile ?
+        currentFile.name + ' (' + currentFile.size + ' bytes)' :
+        rememberedHandle ? rememberedName + ' — select Preview Games to reread.' : 'No file selected.';
+    $('previewBtn').disabled = busy || previewing || !(currentFile || rememberedHandle);
+}
+
+function clearPreview() {
+    gamePreviewToken = "";
+    fileRevision++;
+    preview = [];
+    $('previewBody').replaceChildren();
+    $('previewWrap').hidden = true;
+    $('importBtn').disabled = true;
+    $('importStatus').textContent = '';
+}
+
+async function rememberFile(handle, file) {
+    rememberedHandle = handle;
+    rememberedName = file.name;
+    try {
+        await fileStore('readwrite', store => store.put({
+            handle,
+            name: file.name
+        }, 'last'));
+    } catch {
+        // File selection remains usable when persistent browser storage is unavailable.
+    }
+}
+
+async function chooseFile() {
+    if (busy || previewing) return;
+    if (typeof window.showOpenFilePicker !== 'function') {
+        $('importFile').click();
+        return;
+    }
+    try {
+        const [handle] = await window.showOpenFilePicker({
+            multiple: false,
+            types: [{
+                description: 'CSV files',
+                accept: {
+                    'text/csv': ['.csv']
+                }
+            }]
+        });
+        const file = await handle.getFile();
+        clearPreview();
+        currentFile = file;
+        await rememberFile(handle, file);
+        updateFileControls();
+        $('importStatus').textContent = 'File selected. Select Preview Games to validate it.';
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            $('importStatus').textContent = 'Unable to open file: ' + error.message +
+                ' Use Standard File Picker instead.';
+        }
+    }
+}
+
+$('openFileBtn').onclick = chooseFile;
+$('standardFileBtn').onclick = () => $('importFile').click();
+$('clearPreviewBtn').onclick = clearPreview;
+$('clearImportBtn').onclick = () => {
+    clearPreview();
+    currentFile = null;
+    $('importFile').value = '';
+    updateFileControls();
+};
+$('forgetFileBtn').onclick = async () => {
+    clearPreview();
+    currentFile = null;
+    rememberedHandle = null;
+    rememberedName = '';
+    $('importFile').value = '';
+    try {
+        await fileStore('readwrite', store => store.delete('last'));
+        $('importStatus').textContent = 'Last file forgotten.';
+    } catch {
+        $('importStatus').textContent =
+            'File cleared for this session. Browser storage could not be updated.';
+    }
+    updateFileControls();
+};
+$('importFile').onchange = async () => {
+    const file = $('importFile').files[0];
+    if (!file) return;
+    clearPreview();
+    currentFile = file;
+    await rememberFile(null, file);
+    updateFileControls();
+    $('importStatus').textContent = 'File selected. Select Preview Games to validate it.';
+};
+
+
+async function restoreLastFile() {
+    try {
+        const remembered = await fileStore('readonly', store => store.get('last'));
+        // Do not overwrite a new file chosen while storage was loading.
+        if (remembered && !currentFile) {
+            rememberedHandle = remembered.handle || null;
+            rememberedName = remembered.name || '';
+        }
+    } catch {
+        // Standard file selection works without IndexedDB.
+    }
+    updateFileControls();
+}
+
+function renderGameImport(result, committed = false) {
+    const headers = $('previewHeaders');
+    headers.replaceChildren();
+    $('previewBody').replaceChildren();
+    const baseColumns = [
+        ['Game ID', 'gameId'],
+        ['Date', 'date'],
+        ['Tax Year', 'taxYear'],
+        ['Time', 'time'],
+        ['Sport', 'sport'],
+        ['Site', 'site'],
+        ['Field', 'field'],
+        ['Number of Games', 'numOfGames'],
+        ['Level', 'level'],
+        ['Home', 'home'],
+        ['Visitor', 'visitor'],
+        ['Game Fee', 'gameFee'],
+        ['Travel Pay', 'travelPay'],
+        ['Assignor Fee', 'assignorFee'],
+        ['Deductions', 'deductions'],
+        ['Association', 'association'],
+        ['Status', 'status']
+    ];
+    const columns = baseColumns.map(([label, key]) => ({
+        label,
+        value: data => gameValue(data, key)
+    }));
+    const roles = new Map();
+    for (const row of result.rows || []) {
+        const assignments = gameValue(row.data || {}, 'officials');
+        if (!Array.isArray(assignments)) continue;
+        for (const assignment of assignments) {
+            const id = String(gameValue(assignment, 'roleId') || gameValue(assignment, 'title'));
+            if (!roles.has(id)) roles.set(id, assignment);
+        }
+    }
+    [...roles.entries()].sort((a, b) => Number(gameValue(a[1], 'displayOrder')) - Number(gameValue(b[1],
+        'displayOrder'))).forEach(([id, role]) => {
+        columns.push({
+            label: String(gameValue(role, 'title')),
+            value: data => {
+                const assignments = gameValue(data, 'officials');
+                const item = Array.isArray(assignments) ? assignments.find(assignment =>
+                    String(gameValue(assignment, 'roleId') || gameValue(assignment,
+                        'title')) === id) : null;
+                return item ? gameValue(item, 'name') : '';
+            }
+        });
+    });
+    columns.push({
+        label: 'Assignor',
+        value: data => gameValue(data, 'assignor')
+    });
+    columns.push({
+        label: 'Notes',
+        value: data => gameValue(data, 'notes')
+    });
+    const labels = committed ? ['CSV Row', 'Status', 'Details'] : ['CSV Row', 'Status', ...columns.map(
+        column => column.label), 'Errors'];
+    labels.forEach(label => {
+        const th = document.createElement('th');
+        th.textContent = label;
+        headers.append(th);
+    });
+    for (const row of result.rows || []) {
+        const tr = document.createElement('tr');
+        cell(tr, row.rowNumber);
+        cell(tr, committed ? row.status : row.valid === true ? 'Valid' : 'Error');
+        if (committed) cell(tr, row.message);
+        else {
+            columns.forEach(column => cell(tr, column.value(row.data || {})));
+            cell(tr, Array.isArray(row.errors) ? row.errors.join('; ') : row.error || '');
+        }
+        $('previewBody').append(tr);
+    }
+    $('totalRows').textContent = committed ? result.added + result.skipped + result.failed : result.totalRows;
+    $('validRows').textContent = committed ? result.added : result.validRows;
+    $('errorRows').textContent = committed ? result.failed : result.invalidRows;
+    $('previewSummary').textContent = committed ? 'Import results' : result.totalRows + ' record(s): ' +
+        result.validRows + ' valid, ' + result.invalidRows + ' with errors.';
+    $('previewWrap').hidden = false;
+}
+
+function importControls(disabled) {
+    ['previewBtn', 'importBtn', 'clearPreviewBtn', 'clearImportBtn', 'openFileBtn', 'standardFileBtn',
+        'forgetFileBtn', 'importFile'
+    ].forEach(id => $(id).disabled = disabled);
+    document.querySelectorAll('input[name="duplicatePolicy"]').forEach(input => input.disabled = disabled);
+}
+$('previewBtn').onclick = async () => {
+    if (busy || previewing) return;
+    clearPreview();
+    const revision = fileRevision;
+    busy = true;
+    previewing = true;
+    importControls(true);
+    try {
+        if (rememberedHandle) {
+            const permission = {
+                mode: 'read'
+            };
+            if (await rememberedHandle.queryPermission(permission) !== 'granted' &&
+                await rememberedHandle.requestPermission(permission) !== 'granted') throw new Error(
+                'Open the CSV file again to grant access.');
+            currentFile = await rememberedHandle.getFile();
+        }
+        if (!currentFile || !currentFile.size || currentFile.size > maximumCSVSize) throw new Error(
+            'Choose a nonempty CSV file no larger than 5 MB.');
+        const data = new FormData();
+        data.append('file', currentFile);
+        const result = await gameResponse(await fetch('/api/import/games/preview', {
+            method: 'POST',
+            body: data,
+            headers: {
+                Accept: 'application/json'
+            }
+        }), 'Preview');
+        if (revision !== fileRevision) return;
+        if (!result || !Array.isArray(result.rows) || ![result.totalRows, result.validRows, result
+                .invalidRows
+            ].every(value => Number.isInteger(value) && value >= 0) || result.validRows + result
+            .invalidRows !== result.totalRows) throw new Error('Invalid preview response.');
+        renderGameImport(result);
+        if (typeof result.previewToken !== 'string' || !result.previewToken.trim()) throw new Error(
+            'The server did not authorize this preview for import.');
+        gamePreviewToken = result.previewToken;
+        $('importStatus').textContent =
+            'Preview complete. Rows with errors will not be imported. Choose how to handle duplicate records below.';
+        $('importBtn').disabled = !result.validRows;
+    } catch (error) {
+        gamePreviewToken = '';
+        $('importStatus').textContent = error.message;
+    } finally {
+        busy = false;
+        previewing = false;
+        importControls(false);
+        updateFileControls();
+        $('importBtn').disabled = !gamePreviewToken || Number($('validRows').textContent) === 0;
+    }
+};
+$('importBtn').onclick = async () => {
+    if (busy || !gamePreviewToken) return;
+    const token = gamePreviewToken;
+    gamePreviewToken = '';
+    busy = true;
+    importControls(true);
+    try {
+        const response = await fetch('/api/import/games/commit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json'
+            },
+            body: JSON.stringify({
+                previewToken: token,
+                duplicateAction: document.querySelector(
+                    'input[name="duplicatePolicy"]:checked').value
+            })
+        });
+        // A stop-on-duplicate response can include successful earlier imports and row results.
+        const text = await response.text();
+        let result;
+        try {
+            result = JSON.parse(text);
+        } catch {
+            throw new Error(text || 'Import failed.');
+        }
+        if (![result.added, result.skipped, result.failed].every(value => Number.isInteger(value) &&
+                value >= 0)) throw new Error(result.message || result.error ||
+            'Invalid import result.');
+        renderGameImport(result, true);
+        $('importStatus').textContent = result.added + ' added, ' + result.skipped + ' skipped, ' +
+            result.failed + ' failed. ' + (result.message || '');
+        if (!response.ok) $('importStatus').textContent +=
+            ' Import stopped. Earlier successful imports were kept.';
+        if (!$('registrySection').hidden) await loadGameDirectory();
+        if (typeof loadPendingGames === 'function') await loadPendingGames();
+    } catch (error) {
+        $('importStatus').textContent = error.message +
+            ' Verify your records before previewing again.';
+    } finally {
+        busy = false;
+        importControls(false);
+        updateFileControls();
+        $('importBtn').disabled = true;
+    }
+};
+updateFileControls();
+restoreLastFile();
+        </script>
+    </body>
 </html>

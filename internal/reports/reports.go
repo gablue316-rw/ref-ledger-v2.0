@@ -360,7 +360,7 @@ func GenerateReconciliationReport(records []model.PaymentDescriptor, tid string)
 			continue
 		}
 
-		calcPayment, err = database.GetGameFee(gameIds, tid, "")
+		calcPayment, err = database.GetGameFee(gameIds, tid, "", record.Association)
 		if err != nil {
 			utils.AuditLog.Printf("Failed to get game fee for PaymentId %s.  Reason: %v", record.PaymentId, err)
 			continue

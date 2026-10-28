@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"context"
 	"encoding/csv"
 	"errors"
@@ -3834,25 +3835,35 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	/* Limit the complete request body. The additional 1 MB allows room for the multipart boundary and HTTP form metadata. */
-
-	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+(oneMB))
+	// Allow additional space for multipart boundaries and form metadata.
+	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+oneMB)
 
 	if err := r.ParseMultipartForm(maxCSVSize); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "The CSV upload is invalid or exceeds the 5 MB limit.")
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The CSV upload is invalid or exceeds the 5 MB limit.",
+		)
 		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
 	}
 
 	file, fileHeader, err := r.FormFile("file")
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "An Officials CSV file is required.")
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"A Sites CSV file is required.",
+		)
 		return
 	}
-
 	defer file.Close()
 
 	if err := validateCSVFile(fileHeader); err != nil {
@@ -3861,21 +3872,24 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csvReader := csv.NewReader(file)
-
-	/* Allow variable-length records so we can report a useful row-level error instead of stopping immediately. */
 	csvReader.FieldsPerRecord = -1
-
-	/* This trims spaces that appear outside quoted CSV values. For example: John, Smith is treated similarly to: John,Smith */
 	csvReader.TrimLeadingSpace = true
 
 	header, err := csvReader.Read()
 	if err == io.EOF {
-		writeJSONError(w, http.StatusBadRequest, "The CSV file is empty.")
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"The CSV file is empty.",
+		)
 		return
 	}
-
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "Unable to read the CSV header: "+err.Error())
+		writeJSONError(
+			w,
+			http.StatusBadRequest,
+			"Unable to read the CSV header: "+err.Error(),
+		)
 		return
 	}
 
@@ -3885,52 +3899,54 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows := make([]SitePreviewRow, 0)
-
-	/* Used to detect duplicates inside the uploaded CSV file. */
 	namesInFile := make(map[string]int)
 	csvRowNumber := 1
 
 	for {
 		record, readErr := csvReader.Read()
-
 		if readErr == io.EOF {
 			break
 		}
 
 		csvRowNumber++
+
+		if readErr == nil && isBlankCSVRecord(record) {
+			continue
+		}
+
 		if len(rows) >= maxCSVRows {
-			writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("The CSV file contains more than %d data rows.", maxCSVRows))
+			writeJSONError(
+				w,
+				http.StatusBadRequest,
+				fmt.Sprintf(
+					"The CSV file contains more than %d data rows.",
+					maxCSVRows,
+				),
+			)
 			return
 		}
 
 		if readErr != nil {
-			rows = append(
-				rows,
-				SitePreviewRow{
-					RowNumber: csvRowNumber,
-					Valid:     false,
-					Data:      SiteImportData{},
-					Errors: []string{
-						"Unable to parse CSV row: " + readErr.Error(),
-					},
+			rows = append(rows, SitePreviewRow{
+				RowNumber: csvRowNumber,
+				Valid:     false,
+				Data:      SiteImportData{},
+				Errors: []string{
+					"Unable to parse CSV row: " + readErr.Error(),
 				},
-			)
-			/* Some CSV syntax errors leave the reader unable to continue reliably. Stop after recording the error. */
+			})
 			break
 		}
 
-		if isBlankCSVRecord(record) {
-			continue
-		}
-
-		previewRow := buildSitePreviewRow(
-			csvRowNumber,
-			record,
+		previewRow := buildSitePreviewRow(csvRowNumber, record)
+		previewRow.Data.SiteName = strings.TrimSpace(
+			previewRow.Data.SiteName,
 		)
 
-		nameKey := normalizeSiteId(previewRow.Data.SiteId)
+		// Compare names without regard to case or surrounding spaces.
+		nameKey := strings.ToLower(previewRow.Data.SiteName)
 
-		if nameKey != "|" {
+		if nameKey != "" {
 			if previousRow, found := namesInFile[nameKey]; found {
 				previewRow.Errors = append(
 					previewRow.Errors,
@@ -3945,7 +3961,6 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		previewRow.Valid = len(previewRow.Errors) == 0
-
 		rows = append(rows, previewRow)
 	}
 
@@ -3957,22 +3972,20 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	/* Check MongoDB for sites that already exist. This only runs for rows that passed the basic CSV validation. */
 
+	// Check existing sites only for rows that passed CSV validation.
 	for i := range rows {
 		if !rows[i].Valid {
 			continue
 		}
 
-		siteId := rows[i].Data.SiteId
-
-		exists, err := sc.Exists(siteId, tId)
-
+		name := rows[i].Data.SiteName
+		exists, err := sc.Exists(name, tId)
 		if err != nil {
 			log.Printf(
 				"PreviewSitesImportHandler: duplicate lookup failed for tenant %s, site %s: %v",
 				tId,
-				rows[i].Data.SiteId,
+				name,
 				err,
 			)
 			writeJSONError(
@@ -4029,16 +4042,13 @@ func PreviewSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 	saveSitesPreview(preview)
 	removeExpiredSitesPreviews()
 
-	response := SitesPreviewResponse{
+	writeJSON(w, http.StatusOK, SitesPreviewResponse{
 		PreviewToken: previewToken,
 		TotalRows:    len(rows),
 		ValidRows:    validRows,
 		InvalidRows:  invalidRows,
 		Rows:         rows,
-	}
-
-	writeJSON(w, http.StatusOK, response)
-
+	})
 }
 
 func PreviewGamesImportHandler(w http.ResponseWriter, r *http.Request) {
@@ -8796,6 +8806,8 @@ func main() {
 	mux.HandleFunc("/api/environment", GetEnvironmentHandler)
 	mux.HandleFunc("/api/about", AboutHandler)
 	mux.HandleFunc("/settings", authRequired(SettingsPage))
+	mux.HandleFunc("/api/settings/export-records", authRequired(ExportRecordsHandler))
+	mux.HandleFunc("/api/settings/delete-records", authRequired(readOnlyForbidden(DeleteRecordsHandler)))
 	mux.HandleFunc("/administration", authRequired(adminRequired(AdministrationPage)))
 
 	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
@@ -8850,6 +8862,13 @@ func main() {
 
 	mux.HandleFunc("/api/session", getCurrentSession)
 	mux.HandleFunc("/api/pod", PodInfoHandler)
+
+	mux.HandleFunc("/api/import/payments/preview", authRequired(readOnlyForbidden(PreviewPaymentsImportHandler)))
+	mux.HandleFunc("/api/import/payments/commit", authRequired(readOnlyForbidden(CommitPaymentsImportHandler)))
+	mux.HandleFunc("/api/import/levels/preview", authRequired(readOnlyForbidden(PreviewLevelsImportHandler)))
+	mux.HandleFunc("/api/import/levels/commit", authRequired(readOnlyForbidden(CommitLevelsImportHandler)))
+	mux.HandleFunc("/api/import/expenses/preview", authRequired(readOnlyForbidden(PreviewExpensesImportHandler)))
+	mux.HandleFunc("/api/import/expenses/commit", authRequired(readOnlyForbidden(CommitExpensesImportHandler)))
 
 	mux.HandleFunc("/api/import/officials/preview", authRequired(readOnlyForbidden(PreviewOfficialsImportHandler)))
 	mux.HandleFunc("/api/import/officials/commit", authRequired(readOnlyForbidden(CommitOfficialsImportHandler)))
@@ -9026,4 +9045,1460 @@ func main() {
 		log.Fatal(err)
 	}
 
+}
+
+// Data exports use the current session's tenant and an explicit collection allowlist.
+var dataCollectionNames = []string{"associations", "expenses", "games", "levels", "officials", "payments", "sites"}
+
+func selectedDataCollections(names []string) ([]string, error) {
+	if len(names) == 0 {
+		return nil, fmt.Errorf("Select at least one collection.")
+	}
+	seen := map[string]bool{}
+	for _, name := range names {
+		valid := false
+		for _, allowed := range dataCollectionNames {
+			if name == allowed {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return nil, fmt.Errorf("Unsupported collection: %s", name)
+		}
+		seen[name] = true
+	}
+	out := []string{}
+	for _, name := range dataCollectionNames {
+		if seen[name] {
+			out = append(out, name)
+		}
+	}
+	return out, nil
+}
+
+// Match existing BSON spellings (including fields without explicit BSON tags).
+func exportValue(doc bson.M, names ...string) any {
+	for _, name := range names {
+		if value, ok := doc[name]; ok {
+			return value
+		}
+		for key, value := range doc {
+			if strings.EqualFold(strings.ReplaceAll(key, "_", ""), strings.ReplaceAll(name, "_", "")) {
+				return value
+			}
+		}
+	}
+	return nil
+}
+func exportText(value any) string {
+	if value == nil {
+		return ""
+	}
+	switch v := value.(type) {
+	case string:
+		return v
+	case primitive.A:
+		parts := make([]string, len(v))
+		for i, x := range v {
+			parts[i] = exportText(x)
+		}
+		return strings.Join(parts, ",")
+	case []string:
+		return strings.Join(v, ",")
+	default:
+		return fmt.Sprint(value)
+	}
+}
+func exportCents(value any) (string, error) {
+	if value == nil || strings.TrimSpace(exportText(value)) == "" {
+		return "0.00", nil
+	}
+	cents, err := strconv.ParseInt(exportText(value), 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("invalid stored cents value %q", exportText(value))
+	}
+	// Avoid floating point rounding, including for large stored amounts.
+	negative := cents < 0
+	var magnitude uint64
+	if negative {
+		magnitude = uint64(-(cents + 1)) + 1
+	} else {
+		magnitude = uint64(cents)
+	}
+	text := fmt.Sprintf("%d.%02d", magnitude/100, magnitude%100)
+	if negative {
+		text = "-" + text
+	}
+	return text, nil
+}
+func dataExportHeader(name string) []string {
+	switch name {
+	case "associations":
+		return []string{"associationId", "associationName", "contactName", "contactNumber", "contactEmail", "assignors(comma-separated)"}
+	case "officials":
+		return []string{"firstname", "lastname", "phone", "email", "address"}
+	case "sites":
+		return []string{"sitename", "contactname", "contactnumber", "contactemail"}
+	case "games":
+		return []string{"gameid", "date", "taxyear", "time", "sport", "site", "field", "numofgames", "level", "gamefee", "travelpay", "assignorfee", "deductions", "association", "status", "official1", "official2", "official3", "official4", "official5", "official6", "official7", "official8", "official9", "official10", "assignor", "home", "visitor", "notes"}
+	case "levels":
+		return []string{"sport", "name", "gameFee", "active"}
+	case "expenses":
+		return []string{"date", "taxYear", "type", "amount", "association", "description"}
+	case "payments":
+		return []string{"paymentId", "paymentDate", "taxYear", "paymentAmt", "association", "gameIds(comma-separated)"}
+	}
+	return nil
+}
+func dataExportRow(name string, doc bson.M) ([]string, error) {
+	get := func(names ...string) string { return exportText(exportValue(doc, names...)) }
+	var row []string
+	switch name {
+	case "associations":
+		row = []string{get("id", "associationId"), get("name", "associationName"), get("contact", "contactName"), get("phone", "contactNumber"), get("email", "contactEmail"), get("assignors")}
+	case "officials":
+		row = []string{get("firstName"), get("lastName"), get("phone"), get("email"), get("address")}
+	case "sites":
+		row = []string{get("name", "siteName"), get("contact", "contactName"), get("phone", "contactNumber"), get("email", "contactEmail")}
+	case "levels":
+		row = []string{get("sport"), get("name"), get("gameFee"), get("active")}
+	case "expenses":
+		// The CSV uses one amount column for money or mileage, selected by type.
+		value := get("amount")
+		if strings.EqualFold(strings.TrimSpace(get("type")), "Mileage") {
+			value = get("mileage")
+		}
+		row = []string{get("date"), get("taxYear"), get("type"), value, get("association"), get("description")}
+	case "payments":
+		row = []string{get("paymentId"), get("paymentDate"), get("taxYear"), get("paymentAmt"), get("association"), get("gameIds")}
+	case "games":
+		row = make([]string, 29)
+		for i, field := range dataExportHeader(name) {
+			if i < 15 || i > 24 {
+				row[i] = get(field)
+			}
+		}
+		// Use the same active-role order as buildGamePreviewRow; sorting only
+		// stored officials would shift columns when a role is absent.
+		roles, err := database.GetOfficialRoles(get("sport"))
+		if err != nil {
+			return nil, err
+		}
+		sort.SliceStable(roles.Roles, func(i, j int) bool { return roles.Roles[i].DisplayOrder < roles.Roles[j].DisplayOrder })
+		var stored struct {
+			Officials []model.GameOfficialDoc `bson:"officials"`
+		}
+		encoded, err := bson.Marshal(bson.M{"officials": exportValue(doc, "officials")})
+		if err != nil {
+			return nil, err
+		}
+		if err = bson.Unmarshal(encoded, &stored); err != nil {
+			return nil, err
+		}
+		matched := map[int]bool{}
+		position := 0
+		for _, role := range roles.Roles {
+			if !role.Active {
+				continue
+			}
+			if position == 10 {
+				return nil, fmt.Errorf("sport %s has more than ten active roles", get("sport"))
+			}
+			row[15+position] = "Unassigned"
+			found := false
+			for i, official := range stored.Officials {
+				if official.RoleId == role.RoleId {
+					if found {
+						return nil, fmt.Errorf("duplicate stored assignment for %s", role.Title)
+					}
+					found = true
+					row[15+position] = official.Name
+					matched[i] = true
+				}
+			}
+			// Support older games with the original role fields.
+			if len(stored.Officials) == 0 {
+				legacy := get(strings.ToLower(role.Title))
+				if legacy != "" {
+					row[15+position] = legacy
+				}
+			}
+			position++
+		}
+		for i, official := range stored.Officials {
+			if !matched[i] && official.Name != "" && !strings.EqualFold(official.Name, "Unassigned") {
+				return nil, fmt.Errorf("game %s has an assigned inactive or unknown role %s; cannot export without losing its assignment", get("gameId"), official.Title)
+			}
+		}
+	}
+	// Amounts and legacy expense mileage are stored in hundredths; export both divided by 100.
+	money := map[string][]int{"games": {9, 10, 11, 12}, "levels": {2}, "expenses": {3}, "payments": {3}}
+	for _, index := range money[name] {
+		value, err := exportCents(row[index])
+		if err != nil {
+			return nil, err
+		}
+		row[index] = value
+	}
+	if name == "payments" {
+		row[3] = "$" + row[3]
+	}
+	if name == "expenses" {
+		if strings.EqualFold(strings.TrimSpace(get("type")), "Mileage") {
+			// Remove unnecessary decimal zeros without losing fractional miles.
+			row[3] = strings.TrimRight(strings.TrimRight(row[3], "0"), ".")
+		} else {
+			row[3] = "$" + row[3]
+		}
+	}
+	return row, nil
+}
+
+func ExportRecordsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil || strings.TrimSpace(tId) == "" {
+		writeJSONError(w, 401, "Invalid tenant.")
+		return
+	}
+	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		writeJSONError(w, 415, "JSON is required.")
+		return
+	}
+	var request struct {
+		Collections []string `json:"collections"`
+		Prefix      string   `json:"prefix"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8192)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(&request); err != nil {
+		writeJSONError(w, 400, "Invalid export request.")
+		return
+	}
+	names, err := selectedDataCollections(request.Collections)
+	if err != nil {
+		writeJSONError(w, 400, err.Error())
+		return
+	}
+	prefix := strings.TrimSpace(request.Prefix)
+	if prefix == "" {
+		prefix = "ref-ledger"
+	}
+	if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$`).MatchString(prefix) {
+		writeJSONError(w, 400, "Use a prefix of 1–80 letters, numbers, hyphens or underscores.")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	// Stage output on disk: errors never result in a successful partial download.
+	file, err := os.CreateTemp("", "ref-ledger-export-*")
+	if err != nil {
+		writeJSONError(w, 500, "Unable to create export.")
+		return
+	}
+	defer os.Remove(file.Name())
+	defer file.Close()
+	var archive *zip.Writer
+	if len(names) > 1 {
+		archive = zip.NewWriter(file)
+	}
+	db := database.Client.Database(database.GetMongoDbName())
+	for _, name := range names {
+		var destination io.Writer = file
+		if archive != nil {
+			destination, err = archive.Create(prefix + "-" + name + ".csv")
+			if err != nil {
+				break
+			}
+		}
+		writer := csv.NewWriter(destination)
+		writer.UseCRLF = true
+		err = writer.Write(dataExportHeader(name))
+		if err != nil {
+			break
+		}
+		cursor, findErr := db.Collection(name).Find(ctx, bson.M{"tenantId": tId}, options.Find().SetSort(bson.D{{Key: "_id", Value: 1}}))
+		if findErr != nil {
+			err = findErr
+			break
+		}
+		for cursor.Next(ctx) {
+			var doc bson.M
+			if err = cursor.Decode(&doc); err != nil {
+				break
+			}
+			var row []string
+			row, err = dataExportRow(name, doc)
+			if err != nil {
+				break
+			}
+			if err = writer.Write(row); err != nil {
+				break
+			}
+		}
+		if err == nil {
+			err = cursor.Err()
+		}
+		cursor.Close(ctx)
+		writer.Flush()
+		if err == nil {
+			err = writer.Error()
+		}
+		if err != nil {
+			break
+		}
+	}
+	if archive != nil {
+		closeErr := archive.Close()
+		if err == nil {
+			err = closeErr
+		}
+	}
+	if err != nil {
+		log.Printf("ExportRecordsHandler: tenant=%s error=%v", tId, err)
+		writeJSONError(w, 500, "Export could not be completed. Check the server log for details.")
+		return
+	}
+	filename := prefix + "-" + names[0] + ".csv"
+	contentType := "text/csv; charset=utf-8"
+	if archive != nil {
+		filename = prefix + "-export.zip"
+		contentType = "application/zip"
+	}
+	if _, err = file.Seek(0, io.SeekStart); err != nil {
+		writeJSONError(w, 500, "Unable to read export.")
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, filename, time.Time{}, file)
+}
+
+func DeleteRecordsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil || strings.TrimSpace(tId) == "" {
+		writeJSONError(w, 401, "Invalid tenant.")
+		return
+	}
+	// Requiring JSON prevents cross-site HTML forms from submitting deletions.
+	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+		writeJSONError(w, 415, "JSON is required.")
+		return
+	}
+	if site := r.Header.Get("Sec-Fetch-Site"); site != "" && site != "same-origin" && site != "none" {
+		writeJSONError(w, 403, "Cross-site deletion is forbidden.")
+		return
+	}
+	var request struct {
+		Collections  []string `json:"collections"`
+		Confirmation string   `json:"confirmation"`
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8192)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(&request); err != nil || request.Confirmation != "DELETE" {
+		writeJSONError(w, 400, "Select collections and confirm with DELETE.")
+		return
+	}
+	names, err := selectedDataCollections(request.Collections)
+	if err != nil {
+		writeJSONError(w, 400, err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	session, err := database.Client.StartSession()
+	if err != nil {
+		writeJSONError(w, 500, "Unable to start deletion.")
+		return
+	}
+	defer session.EndSession(ctx)
+	levelInUse := errors.New("Cannot delete levels because one or more are used by games. Delete Games along with the Levels.")
+	selected := make(map[string]bool, len(names))
+	for _, name := range names {
+		selected[name] = true
+	}
+	result, err := session.WithTransaction(ctx, func(sc mongo.SessionContext) (any, error) {
+		db := database.Client.Database(database.GetMongoDbName())
+		// Validate before deleting any collection. Games and Levels may be
+		// cleared together because no games will retain those references.
+		if selected["levels"] && !selected["games"] {
+			cursor, findErr := db.Collection("levels").Find(sc, bson.M{"tenantId": tId})
+			if findErr != nil {
+				return nil, findErr
+			}
+			defer cursor.Close(sc)
+			for cursor.Next(sc) {
+				var level database.Level
+				if decodeErr := cursor.Decode(&level); decodeErr != nil {
+					return nil, decodeErr
+				}
+				filter := bson.M{"tenantId": tId, "level": level.Name}
+				// A legacy level without a sport may be used by any sport.
+				if level.Sport != "" {
+					filter["sport"] = level.Sport
+				}
+				lookupErr := db.Collection("games").FindOne(sc, filter,
+					options.FindOne().SetProjection(bson.M{"_id": 1})).Err()
+				if lookupErr == nil {
+					return nil, levelInUse
+				}
+				if !errors.Is(lookupErr, mongo.ErrNoDocuments) {
+					return nil, lookupErr
+				}
+			}
+			if cursorErr := cursor.Err(); cursorErr != nil {
+				return nil, cursorErr
+			}
+		}
+		counts := map[string]int64{}
+		for _, name := range names {
+			deleted, deleteErr := database.Client.Database(database.GetMongoDbName()).Collection(name).DeleteMany(sc, bson.M{"tenantId": tId})
+			if deleteErr != nil {
+				return nil, deleteErr
+			}
+			counts[name] = deleted.DeletedCount
+		}
+		return counts, nil
+	})
+	if err != nil {
+		if errors.Is(err, levelInUse) {
+			writeJSONError(w, http.StatusConflict, levelInUse.Error())
+			return
+		}
+		log.Printf("DeleteRecordsHandler: tenant=%s error=%v", tId, err)
+		writeJSONError(w, 500, "Deletion was not confirmed. MongoDB transactions require a replica set or sharded cluster. Check your records before retrying.")
+		return
+	}
+	writeJSON(w, 200, map[string]any{"success": true, "deletedCounts": result})
+}
+
+// Expense CSV previews use the same temporary, single-pod lifecycle as other imports.
+type ExpenseImportData struct {
+	Date        string `json:"date"`
+	TaxYear     string `json:"taxYear"`
+	Type        string `json:"type"`
+	Amount      string `json:"amount"`
+	Association string `json:"association"`
+	Description string `json:"description"`
+}
+type ExpensePreviewRow struct {
+	RowNumber int               `json:"rowNumber"`
+	Valid     bool              `json:"valid"`
+	Data      ExpenseImportData `json:"data"`
+	Errors    []string          `json:"errors"`
+}
+type expensesImportPreview struct {
+	TenantID  string
+	SessionID string
+	ExpiresAt time.Time
+	Rows      []ExpensePreviewRow
+}
+
+var expensesImportStore = struct {
+	sync.Mutex
+	Items map[string]expensesImportPreview
+}{Items: make(map[string]expensesImportPreview)}
+
+// Serialize expense import commits so duplicate checks cover concurrent imports.
+var expensesImportCommitMu sync.Mutex
+
+func expenseImportValue(value string) (string, error) {
+	value = strings.TrimPrefix(strings.TrimSpace(value), "$")
+	if !regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`).MatchString(value) {
+		return "", fmt.Errorf("must be a nonnegative number with at most two decimal places")
+	}
+	parts := strings.SplitN(value, ".", 2)
+	whole := strings.TrimLeft(parts[0], "0")
+	if whole == "" {
+		whole = "0"
+	}
+	fraction := "00"
+	if len(parts) == 2 {
+		fraction = (parts[1] + "00")[:2]
+	}
+	if _, err := strconv.ParseInt(whole+fraction, 10, 64); err != nil {
+		return "", fmt.Errorf("value is too large")
+	}
+	return whole + "." + fraction, nil
+}
+func expenseImportExpense(data ExpenseImportData) (database.Expense, error) {
+	dt, err := time.Parse("1/2/2006", data.Date)
+	if err != nil {
+		return database.Expense{}, err
+	}
+	// Existing storage conversion routes Amount by Type and multiplies by 100.
+	value := strings.TrimPrefix(data.Amount, "$")
+	return database.Expense{Date: dt.Format("2006-01-02"), Type: data.Type, Amount: value, Mileage: "0", Association: data.Association, Description: data.Description, TaxYear: data.TaxYear, GameId: "0"}, nil
+}
+func expenseImportID(data ExpenseImportData) string {
+	expense, _ := expenseImportExpense(data)
+	expense.Date = data.Date // GenerateExpenseId expects m/d/yyyy, as called by Add.
+	var collection database.ExpensesCollection
+	return collection.GenerateExpenseId(expense)
+}
+func validateExpenseImportRow(rowNumber int, record []string) ExpensePreviewRow {
+	row := ExpensePreviewRow{RowNumber: rowNumber, Errors: []string{}}
+	if len(record) != 6 {
+		row.Errors = append(row.Errors, "Expected 6 columns: date,taxYear,type,amount,association,description.")
+		return row
+	}
+	d := ExpenseImportData{Date: strings.TrimSpace(record[0]), TaxYear: strings.TrimSpace(record[1]), Type: strings.TrimSpace(record[2]), Amount: strings.TrimSpace(record[3]), Association: strings.TrimSpace(record[4]), Description: strings.TrimSpace(record[5])}
+	dt, err := time.Parse("1/2/2006", d.Date)
+	if err != nil {
+		row.Errors = append(row.Errors, "A valid date in m/d/yyyy format is required.")
+	} else {
+		d.Date = dt.Format("1/2/2006")
+		if d.TaxYear == "" {
+			d.TaxYear = strconv.Itoa(dt.Year())
+		}
+	}
+	year, err := strconv.Atoi(d.TaxYear)
+	if err != nil || len(d.TaxYear) != 4 || year < utils.MinTaxYear || year > utils.MaxTaxYear {
+		row.Errors = append(row.Errors, fmt.Sprintf("Tax year must be between %d and %d.", utils.MinTaxYear, utils.MaxTaxYear))
+	}
+	validType := false
+	for _, t := range database.GetExpenseTypes() {
+		if strings.EqualFold(d.Type, t.ExpenseType) {
+			d.Type = t.ExpenseType
+			validType = true
+			break
+		}
+	}
+	if !validType {
+		row.Errors = append(row.Errors, "Select a supported expense type.")
+	}
+	if d.Type == "Mileage" {
+		if !regexp.MustCompile(`^[0-9]+$`).MatchString(d.Amount) {
+			row.Errors = append(row.Errors, "Mileage must be whole miles without a dollar sign or decimal places.")
+		} else if normalized, err := expenseImportValue(d.Amount); err != nil {
+			row.Errors = append(row.Errors, "Mileage "+err.Error()+".")
+		} else {
+			d.Amount = strings.SplitN(normalized, ".", 2)[0]
+		}
+	} else {
+		if !regexp.MustCompile(`^\$[0-9]+\.[0-9]{2}$`).MatchString(d.Amount) {
+			row.Errors = append(row.Errors, "Amount must include a dollar sign and two decimal places, for example $7.25.")
+		} else if normalized, err := expenseImportValue(d.Amount); err != nil {
+			row.Errors = append(row.Errors, "Amount "+err.Error()+".")
+		} else {
+			d.Amount = "$" + normalized
+		}
+	}
+	if d.Association == "" {
+		row.Errors = append(row.Errors, "Association is required.")
+	}
+	row.Data = d
+	row.Valid = len(row.Errors) == 0
+	return row
+}
+func expenseImportReference(ctx context.Context, tId, association string) error {
+	err := database.Client.Database(database.GetMongoDbName()).Collection("associations").FindOne(ctx, bson.M{"tenantId": tId, "id": association}).Err()
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf("Association %s does not exist in your account.", association)
+	}
+	if err != nil {
+		return fmt.Errorf("Unable to verify association.")
+	}
+	return nil
+}
+func PreviewExpensesImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import expenses.")
+		return
+	}
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import expenses.")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+oneMB)
+	if err = r.ParseMultipartForm(maxCSVSize); err != nil {
+		writeJSONError(w, 400, "Invalid upload or file exceeds 5 MB.")
+		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSONError(w, 400, "Choose a CSV file.")
+		return
+	}
+	defer file.Close()
+	if err = validateCSVFile(header); err != nil {
+		writeJSONError(w, 400, err.Error())
+		return
+	}
+
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1
+	columns, err := reader.Read()
+	if err != nil || len(columns) != 6 {
+		writeJSONError(w, 400, "Expected header: date,taxYear,type,amount,association,description.")
+		return
+	}
+	expected := []string{"date", "taxYear", "type", "amount", "association", "description"}
+	for i, name := range expected {
+		if normalizeHeaderName(columns[i]) != normalizeHeaderName(name) {
+			writeJSONError(w, 400, "Expected header: date,taxYear,type,amount,association,description.")
+			return
+		}
+	}
+	rows := []ExpensePreviewRow{}
+	valid := 0
+	seen := map[string]bool{}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	for {
+		record, e := reader.Read()
+		if e == io.EOF {
+			break
+		}
+		if e != nil {
+			writeJSONError(w, 400, "Unable to read CSV. Check quotes and delimiters.")
+			return
+		}
+		if isBlankCSVRecord(record) {
+			continue
+		}
+		if len(rows) >= 10000 {
+			writeJSONError(w, 400, "Import at most 10,000 expense records at a time.")
+			return
+		}
+		line, _ := reader.FieldPos(0)
+		row := validateExpenseImportRow(line, record)
+		if row.Valid {
+			if e = expenseImportReference(ctx, tId, row.Data.Association); e != nil {
+				row.Errors = append(row.Errors, e.Error())
+				row.Valid = false
+			}
+		}
+		if row.Valid {
+			id := expenseImportID(row.Data)
+			if seen[id] {
+				row.Errors = append(row.Errors, "Duplicate expense in this CSV file.")
+				row.Valid = false
+			} else {
+				seen[id] = true
+			}
+		}
+		if row.Valid {
+			valid++
+		}
+		rows = append(rows, row)
+	}
+	token, err := generatePreviewToken()
+	if err != nil {
+		writeJSONError(w, 500, "Unable to create preview.")
+		return
+	}
+	expensesImportStore.Lock()
+	for key, p := range expensesImportStore.Items {
+		if time.Now().After(p.ExpiresAt) {
+			delete(expensesImportStore.Items, key)
+		}
+	}
+	expensesImportStore.Items[token] = expensesImportPreview{TenantID: tId, SessionID: cookie.Value, ExpiresAt: time.Now().Add(previewExpiration), Rows: rows}
+	expensesImportStore.Unlock()
+	writeJSON(w, 200, map[string]any{"previewToken": token, "totalRows": len(rows), "validRows": valid, "invalidRows": len(rows) - valid, "rows": rows})
+}
+func CommitExpensesImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import expenses.")
+		return
+	}
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import expenses.")
+		return
+	}
+	var request struct {
+		PreviewToken    string `json:"previewToken"`
+		DuplicateAction string `json:"duplicateAction"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&request) != nil {
+		writeJSONError(w, 400, "Invalid request.")
+		return
+	}
+	if request.DuplicateAction == "" {
+		request.DuplicateAction = "skip"
+	}
+	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+		writeJSONError(w, 400, "Duplicate action must be skip or stop.")
+		return
+	}
+	expensesImportStore.Lock()
+	preview, ok := expensesImportStore.Items[request.PreviewToken]
+	if !ok || preview.TenantID != tId || preview.SessionID != cookie.Value || time.Now().After(preview.ExpiresAt) {
+		expensesImportStore.Unlock()
+		writeJSONError(w, 400, "Preview expired or unavailable. Preview the file again.")
+		return
+	}
+	delete(expensesImportStore.Items, request.PreviewToken)
+	expensesImportStore.Unlock()
+	expensesImportCommitMu.Lock()
+	defer expensesImportCommitMu.Unlock()
+	var collection database.ExpensesCollection
+	if err = collection.Init(database.Client); err != nil {
+		writeJSONError(w, 500, "Unable to initialize expenses.")
+		return
+	}
+	added, skipped, failed := 0, 0, 0
+	results := []map[string]any{}
+	for _, row := range preview.Rows {
+		state, message := "skipped", "Row contains validation errors."
+		if !row.Valid {
+			skipped++
+		} else {
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			err = expenseImportReference(ctx, tId, row.Data.Association)
+			if err == nil {
+				lookup := collection.Coll.FindOne(ctx, bson.M{"tenantId": tId, "association": row.Data.Association, "expenseId": expenseImportID(row.Data)}).Err()
+				if lookup == nil {
+					skipped++
+					message = "Expense already exists."
+					if request.DuplicateAction == "stop" {
+						results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
+						cancel()
+						writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Import stopped at a duplicate. Earlier rows may have been added.", "rows": results})
+						return
+					}
+				} else if !errors.Is(lookup, mongo.ErrNoDocuments) {
+					err = fmt.Errorf("Unable to check existing expenses.")
+				} else {
+					var expense database.Expense
+					expense, err = expenseImportExpense(row.Data)
+					if err == nil {
+						err = collection.Add(expense, tId)
+					}
+					if err == nil {
+						added++
+						state = "added"
+						message = "Expense added."
+					}
+				}
+			}
+			cancel()
+			if err != nil {
+				failed++
+				state = "failed"
+				message = "Unable to import expense."
+				log.Printf("expense import row %d: %v", row.RowNumber, err)
+			}
+		}
+		results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
+	}
+	writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Expenses import completed.", "rows": results})
+}
+
+type LevelImportData struct {
+	Sport   string `json:"sport"`
+	Name    string `json:"name"`
+	GameFee string `json:"gameFee"`
+	Active  bool   `json:"active"`
+}
+type LevelPreviewRow struct {
+	RowNumber int             `json:"rowNumber"`
+	Valid     bool            `json:"valid"`
+	Data      LevelImportData `json:"data"`
+	Errors    []string        `json:"errors"`
+}
+type levelsImportPreview struct {
+	TenantID  string
+	SessionID string
+	ExpiresAt time.Time
+	Rows      []LevelPreviewRow
+}
+
+var levelsImportStore = struct {
+	sync.Mutex
+	Items map[string]levelsImportPreview
+}{Items: make(map[string]levelsImportPreview)}
+
+// Serialize level import commits so duplicate checks cover concurrent imports.
+var levelsImportCommitMu sync.Mutex
+
+func levelImportValue(value string) (string, error) {
+	value = strings.TrimPrefix(strings.TrimSpace(value), "$")
+	if !regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`).MatchString(value) {
+		return "", fmt.Errorf("must be a nonnegative number with at most two decimal places")
+	}
+	parts := strings.SplitN(value, ".", 2)
+	whole := strings.TrimLeft(parts[0], "0")
+	if whole == "" {
+		whole = "0"
+	}
+	fraction := "00"
+	if len(parts) == 2 {
+		fraction = (parts[1] + "00")[:2]
+	}
+	if _, err := strconv.ParseInt(whole+fraction, 10, 64); err != nil {
+		return "", fmt.Errorf("value is too large")
+	}
+	return whole + "." + fraction, nil
+}
+func levelImportLevel(data LevelImportData, tenantID string) (database.Level, error) {
+	normalized, err := levelImportValue(data.GameFee)
+	if err != nil {
+		return database.Level{}, err
+	}
+	cents, err := strconv.ParseInt(strings.ReplaceAll(normalized, ".", ""), 10, 64)
+	if err != nil {
+		return database.Level{}, err
+	}
+	return database.Level{ID: primitive.NewObjectID().Hex(), Sport: data.Sport, Name: data.Name, GameFee: cents, Active: data.Active, TenantID: tenantID}, nil
+}
+func levelImportID(data LevelImportData) string {
+	encoded, _ := json.Marshal([]string{data.Sport, data.Name})
+	return string(encoded)
+}
+func validateLevelImportRow(rowNumber int, record []string) LevelPreviewRow {
+	row := LevelPreviewRow{RowNumber: rowNumber, Errors: []string{}}
+	if len(record) != 4 {
+		row.Errors = append(row.Errors, "Expected 4 columns: sport,name,gameFee,active.")
+		return row
+	}
+	d := LevelImportData{Sport: strings.TrimSpace(record[0]), Name: strings.TrimSpace(record[1]), GameFee: strings.TrimSpace(record[2])}
+	if d.Sport == "" {
+		row.Errors = append(row.Errors, "Sport is required.")
+	}
+	if d.Name == "" || utf8.RuneCountInString(d.Name) > 50 {
+		row.Errors = append(row.Errors, "Level name is required and must not exceed 50 characters.")
+	}
+	if !regexp.MustCompile(`^[0-9]+\.[0-9]{2}$`).MatchString(d.GameFee) {
+		row.Errors = append(row.Errors, "Game fee must be a nonnegative amount with two decimal places, for example 75.00.")
+	} else if normalized, err := levelImportValue(d.GameFee); err != nil {
+		row.Errors = append(row.Errors, "Game fee "+err.Error()+".")
+	} else {
+		d.GameFee = normalized
+	}
+	switch strings.ToLower(strings.TrimSpace(record[3])) {
+	case "true":
+		d.Active = true
+	case "false":
+		d.Active = false
+	default:
+		row.Errors = append(row.Errors, "Active must be true or false.")
+	}
+	row.Data = d
+	row.Valid = len(row.Errors) == 0
+	return row
+}
+func levelImportReference(ctx context.Context, tId, sport string) error {
+	// Sports catalog is shared, matching LevelsCollection.validateLevelSport.
+	err := database.Client.Database(database.GetMongoDbName()).Collection("sports").FindOne(ctx, bson.M{"name": sport}).Err()
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return fmt.Errorf("Sport %s does not exist.", sport)
+	}
+	if err != nil {
+		return fmt.Errorf("Unable to verify sport.")
+	}
+	return nil
+}
+func PreviewLevelsImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import levels.")
+		return
+	}
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import levels.")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+oneMB)
+	if err = r.ParseMultipartForm(maxCSVSize); err != nil {
+		writeJSONError(w, 400, "Invalid upload or file exceeds 5 MB.")
+		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSONError(w, 400, "Choose a CSV file.")
+		return
+	}
+	defer file.Close()
+	if err = validateCSVFile(header); err != nil {
+		writeJSONError(w, 400, err.Error())
+		return
+	}
+
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1
+	columns, err := reader.Read()
+	if err != nil || len(columns) != 4 {
+		writeJSONError(w, 400, "Expected header: sport,name,gameFee,active.")
+		return
+	}
+	expected := []string{"sport", "name", "gameFee", "active"}
+	for i, name := range expected {
+		if normalizeHeaderName(columns[i]) != normalizeHeaderName(name) {
+			writeJSONError(w, 400, "Expected header: sport,name,gameFee,active.")
+			return
+		}
+	}
+	rows := []LevelPreviewRow{}
+	valid := 0
+	seen := map[string]bool{}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	for {
+		record, e := reader.Read()
+		if e == io.EOF {
+			break
+		}
+		if e != nil {
+			writeJSONError(w, 400, "Unable to read CSV. Check quotes and delimiters.")
+			return
+		}
+		if isBlankCSVRecord(record) {
+			continue
+		}
+		if len(rows) >= 10000 {
+			writeJSONError(w, 400, "Import at most 10,000 level records at a time.")
+			return
+		}
+		line, _ := reader.FieldPos(0)
+		row := validateLevelImportRow(line, record)
+		if row.Valid {
+			if e = levelImportReference(ctx, tId, row.Data.Sport); e != nil {
+				row.Errors = append(row.Errors, e.Error())
+				row.Valid = false
+			}
+		}
+		if row.Valid {
+			id := levelImportID(row.Data)
+			if seen[id] {
+				row.Errors = append(row.Errors, "Duplicate level in this CSV file.")
+				row.Valid = false
+			} else {
+				seen[id] = true
+			}
+		}
+		if row.Valid {
+			valid++
+		}
+		rows = append(rows, row)
+	}
+	token, err := generatePreviewToken()
+	if err != nil {
+		writeJSONError(w, 500, "Unable to create preview.")
+		return
+	}
+	levelsImportStore.Lock()
+	for key, p := range levelsImportStore.Items {
+		if time.Now().After(p.ExpiresAt) {
+			delete(levelsImportStore.Items, key)
+		}
+	}
+	levelsImportStore.Items[token] = levelsImportPreview{TenantID: tId, SessionID: cookie.Value, ExpiresAt: time.Now().Add(previewExpiration), Rows: rows}
+	levelsImportStore.Unlock()
+	writeJSON(w, 200, map[string]any{"previewToken": token, "totalRows": len(rows), "validRows": valid, "invalidRows": len(rows) - valid, "rows": rows})
+}
+func CommitLevelsImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import levels.")
+		return
+	}
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import levels.")
+		return
+	}
+	var request struct {
+		PreviewToken    string `json:"previewToken"`
+		DuplicateAction string `json:"duplicateAction"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&request) != nil {
+		writeJSONError(w, 400, "Invalid request.")
+		return
+	}
+	if request.DuplicateAction == "" {
+		request.DuplicateAction = "skip"
+	}
+	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+		writeJSONError(w, 400, "Duplicate action must be skip or stop.")
+		return
+	}
+	levelsImportStore.Lock()
+	preview, ok := levelsImportStore.Items[request.PreviewToken]
+	if !ok || preview.TenantID != tId || preview.SessionID != cookie.Value || time.Now().After(preview.ExpiresAt) {
+		levelsImportStore.Unlock()
+		writeJSONError(w, 400, "Preview expired or unavailable. Preview the file again.")
+		return
+	}
+	delete(levelsImportStore.Items, request.PreviewToken)
+	levelsImportStore.Unlock()
+	levelsImportCommitMu.Lock()
+	defer levelsImportCommitMu.Unlock()
+	var collection database.LevelsCollection
+	if err = collection.Init(database.Client); err != nil {
+		writeJSONError(w, 500, "Unable to initialize levels.")
+		return
+	}
+	added, skipped, failed := 0, 0, 0
+	results := []map[string]any{}
+	for _, row := range preview.Rows {
+		state, message := "skipped", "Row contains validation errors."
+		if !row.Valid {
+			skipped++
+		} else {
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			err = levelImportReference(ctx, tId, row.Data.Sport)
+			if err == nil {
+				lookup := collection.Coll.FindOne(ctx, bson.M{"tenantId": tId, "sport": row.Data.Sport, "name": row.Data.Name}).Err()
+				if lookup == nil {
+					skipped++
+					message = "Level already exists."
+					if request.DuplicateAction == "stop" {
+						results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
+						cancel()
+						writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Import stopped at a duplicate. Earlier rows may have been added.", "rows": results})
+						return
+					}
+				} else if !errors.Is(lookup, mongo.ErrNoDocuments) {
+					err = fmt.Errorf("Unable to check existing levels.")
+				} else {
+					var level database.Level
+					level, err = levelImportLevel(row.Data, tId)
+					if err == nil {
+						_, err = collection.Coll.InsertOne(ctx, level) // Preserve exported active=false; Add forces active=true.
+					}
+					if err == nil {
+						added++
+						state = "added"
+						message = "Level added."
+					}
+				}
+			}
+			cancel()
+			if err != nil {
+				failed++
+				state = "failed"
+				message = "Unable to import level."
+				log.Printf("level import row %d: %v", row.RowNumber, err)
+			}
+		}
+		results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
+	}
+	writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Levels import completed.", "rows": results})
+}
+
+type PaymentImportData struct {
+	PaymentID   string `json:"paymentId"`
+	PaymentDate string `json:"paymentDate"`
+	TaxYear     string `json:"taxYear"`
+	PaymentAmt  string `json:"paymentAmt"`
+	Association string `json:"association"`
+	GameIDs     string `json:"gameIds"`
+}
+type PaymentPreviewRow struct {
+	RowNumber int               `json:"rowNumber"`
+	Valid     bool              `json:"valid"`
+	Data      PaymentImportData `json:"data"`
+	Errors    []string          `json:"errors"`
+}
+type paymentsImportPreview struct {
+	TenantID  string
+	SessionID string
+	ExpiresAt time.Time
+	Rows      []PaymentPreviewRow
+}
+
+var paymentsImportStore = struct {
+	sync.Mutex
+	Items map[string]paymentsImportPreview
+}{Items: make(map[string]paymentsImportPreview)}
+
+// Serialize payment import commits so duplicate checks cover concurrent imports.
+var paymentsImportCommitMu sync.Mutex
+
+func paymentImportValue(value string) (string, error) {
+	value = strings.TrimPrefix(strings.TrimSpace(value), "$")
+	if !regexp.MustCompile(`^[0-9]+(\.[0-9]{1,2})?$`).MatchString(value) {
+		return "", fmt.Errorf("must be a nonnegative number with at most two decimal places")
+	}
+	parts := strings.SplitN(value, ".", 2)
+	whole := strings.TrimLeft(parts[0], "0")
+	if whole == "" {
+		whole = "0"
+	}
+	fraction := "00"
+	if len(parts) == 2 {
+		fraction = (parts[1] + "00")[:2]
+	}
+	if _, err := strconv.ParseInt(whole+fraction, 10, 64); err != nil {
+		return "", fmt.Errorf("value is too large")
+	}
+	return whole + "." + fraction, nil
+}
+func paymentImportDescriptor(data PaymentImportData) model.PaymentDescriptor {
+	return model.PaymentDescriptor{PaymentId: data.PaymentID, PaymentDate: data.PaymentDate, TaxYear: data.TaxYear,
+		PaymentAmt: strings.TrimPrefix(data.PaymentAmt, "$"), Association: data.Association, GameIds: strings.ReplaceAll(data.GameIDs, ",", ";")}
+}
+func paymentImportID(data PaymentImportData) string {
+	encoded, _ := json.Marshal([]string{data.Association, data.PaymentID})
+	return string(encoded)
+}
+func paymentImportGameIDs(value string) ([]int64, error) {
+	result := []int64{}
+	seen := map[int64]bool{}
+	for _, part := range strings.Split(value, ",") {
+		id, err := strconv.ParseInt(strings.TrimSpace(part), 10, 64)
+		if err != nil || id <= 0 || seen[id] {
+			return nil, fmt.Errorf("Game IDs must be distinct positive integers separated by commas.")
+		}
+		seen[id] = true
+		result = append(result, id)
+	}
+	return result, nil
+}
+func validatePaymentImportRow(rowNumber int, record []string) PaymentPreviewRow {
+	row := PaymentPreviewRow{RowNumber: rowNumber, Errors: []string{}}
+	if len(record) != 6 {
+		row.Errors = append(row.Errors, "Expected 6 columns: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated). Quote multiple game IDs, for example \"1,2,3\".")
+		return row
+	}
+	d := PaymentImportData{PaymentID: strings.TrimSpace(record[0]), PaymentDate: strings.TrimSpace(record[1]), TaxYear: strings.TrimSpace(record[2]), PaymentAmt: strings.TrimSpace(record[3]), Association: strings.TrimSpace(record[4]), GameIDs: strings.TrimSpace(record[5])}
+	if d.PaymentID == "" {
+		row.Errors = append(row.Errors, "Payment ID is required.")
+	}
+	dt, err := time.Parse("1/2/2006", d.PaymentDate)
+	if err != nil {
+		row.Errors = append(row.Errors, "A valid payment date in m/d/yyyy format is required.")
+	} else {
+		d.PaymentDate = dt.Format("1/2/2006")
+		if d.TaxYear == "" {
+			d.TaxYear = strconv.Itoa(dt.Year())
+		}
+	}
+	year, err := strconv.Atoi(d.TaxYear)
+	if err != nil || len(d.TaxYear) != 4 || year < utils.MinTaxYear || year > utils.MaxTaxYear {
+		row.Errors = append(row.Errors, fmt.Sprintf("Tax year must be between %d and %d.", utils.MinTaxYear, utils.MaxTaxYear))
+	}
+	if !regexp.MustCompile(`^\$?[0-9]+\.[0-9]{2}$`).MatchString(d.PaymentAmt) {
+		row.Errors = append(row.Errors, "Payment amount must have two decimal places, for example 92.00 or $92.00.")
+	} else if amount, e := paymentImportValue(d.PaymentAmt); e != nil {
+		row.Errors = append(row.Errors, "Payment amount "+e.Error()+".")
+	} else {
+		d.PaymentAmt = "$" + amount
+	}
+	if d.Association == "" {
+		row.Errors = append(row.Errors, "Association is required.")
+	}
+	ids, err := paymentImportGameIDs(d.GameIDs)
+	if err != nil {
+		row.Errors = append(row.Errors, err.Error())
+	} else {
+		parts := []string{}
+		for _, id := range ids {
+			parts = append(parts, strconv.FormatInt(id, 10))
+		}
+		d.GameIDs = strings.Join(parts, ",")
+	}
+	row.Data = d
+	row.Valid = len(row.Errors) == 0
+	return row
+}
+func paymentImportReference(ctx context.Context, tId string, data PaymentImportData) error {
+	if err := expenseImportReference(ctx, tId, data.Association); err != nil {
+		return err
+	}
+	ids, err := paymentImportGameIDs(data.GameIDs)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		var game struct {
+			Status string `bson:"status"`
+		}
+		err = database.Client.Database(database.GetMongoDbName()).Collection("games").FindOne(ctx, bson.M{"tenantId": tId, "association": data.Association, "gameId": id}).Decode(&game)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("Game %d was not found for association %s.", id, data.Association)
+		}
+		if err != nil {
+			return fmt.Errorf("Unable to verify game %d.", id)
+		}
+		if game.Status != "Completed" {
+			return fmt.Errorf("Game %d must be Completed before importing a payment.", id)
+		}
+		n, e := database.Client.Database(database.GetMongoDbName()).Collection("payments").CountDocuments(ctx, bson.M{"tenantId": tId, "association": data.Association, "gameIds": id})
+		if e != nil {
+			return fmt.Errorf("Unable to check existing payments.")
+		}
+		if n > 0 {
+			return fmt.Errorf("Game %d already belongs to a payment.", id)
+		}
+	}
+	total, err := database.GetGameFee(ids, tId, "", data.Association)
+	if err != nil {
+		return fmt.Errorf("Unable to calculate game fees.")
+	}
+	amount, err := paymentImportValue(data.PaymentAmt)
+	if err != nil {
+		return err
+	}
+	cents, err := strconv.ParseInt(strings.ReplaceAll(amount, ".", ""), 10, 64)
+	if err != nil {
+		return err
+	}
+	if total != cents {
+		return fmt.Errorf("Payment amount does not match game total: expected %s.", utils.ConvertInt64ToAmtStr(total))
+	}
+	return nil
+}
+func PreviewPaymentsImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import payments.")
+		return
+	}
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import payments.")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxCSVSize+oneMB)
+	if err = r.ParseMultipartForm(maxCSVSize); err != nil {
+		writeJSONError(w, 400, "Invalid upload or file exceeds 5 MB.")
+		return
+	}
+	if r.MultipartForm != nil {
+		defer r.MultipartForm.RemoveAll()
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSONError(w, 400, "Choose a CSV file.")
+		return
+	}
+	defer file.Close()
+	if err = validateCSVFile(header); err != nil {
+		writeJSONError(w, 400, err.Error())
+		return
+	}
+
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1
+	columns, err := reader.Read()
+	if err != nil || len(columns) != 6 {
+		writeJSONError(w, 400, "Expected header: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated).")
+		return
+	}
+	expected := []string{"paymentId", "paymentDate", "taxYear", "paymentAmt", "association", "gameIds(comma-separated)"}
+	for i, name := range expected {
+		if normalizeHeaderName(columns[i]) != normalizeHeaderName(name) {
+			writeJSONError(w, 400, "Expected header: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated).")
+			return
+		}
+	}
+	rows := []PaymentPreviewRow{}
+	valid := 0
+	seen := map[string]bool{}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	for {
+		record, e := reader.Read()
+		if e == io.EOF {
+			break
+		}
+		if e != nil {
+			writeJSONError(w, 400, "Unable to read CSV. Check quotes and delimiters.")
+			return
+		}
+		if isBlankCSVRecord(record) {
+			continue
+		}
+		if len(rows) >= 10000 {
+			writeJSONError(w, 400, "Import at most 10,000 payment records at a time.")
+			return
+		}
+		line, _ := reader.FieldPos(0)
+		row := validatePaymentImportRow(line, record)
+		if row.Valid {
+			if e = paymentImportReference(ctx, tId, row.Data); e != nil {
+				row.Errors = append(row.Errors, e.Error())
+				row.Valid = false
+			}
+		}
+		if row.Valid {
+			id := paymentImportID(row.Data)
+			if seen[id] {
+				row.Errors = append(row.Errors, "Duplicate payment in this CSV file.")
+				row.Valid = false
+			} else {
+				seen[id] = true
+			}
+		}
+		if row.Valid {
+			valid++
+		}
+		rows = append(rows, row)
+	}
+	token, err := generatePreviewToken()
+	if err != nil {
+		writeJSONError(w, 500, "Unable to create preview.")
+		return
+	}
+	paymentsImportStore.Lock()
+	for key, p := range paymentsImportStore.Items {
+		if time.Now().After(p.ExpiresAt) {
+			delete(paymentsImportStore.Items, key)
+		}
+	}
+	paymentsImportStore.Items[token] = paymentsImportPreview{TenantID: tId, SessionID: cookie.Value, ExpiresAt: time.Now().Add(previewExpiration), Rows: rows}
+	paymentsImportStore.Unlock()
+	writeJSON(w, 200, map[string]any{"previewToken": token, "totalRows": len(rows), "validRows": valid, "invalidRows": len(rows) - valid, "rows": rows})
+}
+func CommitPaymentsImportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		writeJSONError(w, 405, "Method not allowed.")
+		return
+	}
+	tId, err := getTenantId(r)
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import payments.")
+		return
+	}
+	cookie, err := r.Cookie("rl_session")
+	if err != nil {
+		writeJSONError(w, 401, "Sign in to import payments.")
+		return
+	}
+	var request struct {
+		PreviewToken    string `json:"previewToken"`
+		DuplicateAction string `json:"duplicateAction"`
+	}
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&request) != nil {
+		writeJSONError(w, 400, "Invalid request.")
+		return
+	}
+	if request.DuplicateAction == "" {
+		request.DuplicateAction = "skip"
+	}
+	if request.DuplicateAction != "skip" && request.DuplicateAction != "stop" {
+		writeJSONError(w, 400, "Duplicate action must be skip or stop.")
+		return
+	}
+	paymentsImportStore.Lock()
+	preview, ok := paymentsImportStore.Items[request.PreviewToken]
+	if !ok || preview.TenantID != tId || preview.SessionID != cookie.Value || time.Now().After(preview.ExpiresAt) {
+		paymentsImportStore.Unlock()
+		writeJSONError(w, 400, "Preview expired or unavailable. Preview the file again.")
+		return
+	}
+	delete(paymentsImportStore.Items, request.PreviewToken)
+	paymentsImportStore.Unlock()
+	paymentsImportCommitMu.Lock()
+	defer paymentsImportCommitMu.Unlock()
+	collection := database.Client.Database(database.GetMongoDbName()).Collection("payments")
+	added, skipped, failed := 0, 0, 0
+	results := []map[string]any{}
+	for _, row := range preview.Rows {
+		state, message := "skipped", "Row contains validation errors."
+		if !row.Valid {
+			skipped++
+		} else {
+			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+			err = nil
+			if err == nil {
+				lookup := collection.FindOne(ctx, bson.M{"tenantId": tId, "association": row.Data.Association, "paymentId": row.Data.PaymentID}).Err()
+				if lookup == nil {
+					skipped++
+					message = "Payment already exists."
+					if request.DuplicateAction == "stop" {
+						results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
+						cancel()
+						writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Import stopped at a duplicate. Earlier rows may have been added.", "rows": results})
+						return
+					}
+				} else if !errors.Is(lookup, mongo.ErrNoDocuments) {
+					err = fmt.Errorf("Unable to check existing payments.")
+				} else {
+					err = paymentImportReference(ctx, tId, row.Data)
+					if err != nil {
+						cancel()
+						failed++
+						results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": "failed", "message": err.Error()})
+						continue
+					}
+					descriptor := paymentImportDescriptor(row.Data)
+					saved, errorsCount, _, saveErrors := database.InsertPaymentDocs(ctx, []model.PaymentDescriptor{descriptor}, database.GetMongoDbName(), "payments", tId)
+					added += saved
+					if errorsCount > 0 || saved != 1 {
+						err = fmt.Errorf("Payment could not be fully imported: %v", saveErrors)
+						if saved > 0 {
+							state = "failed"
+							message = "Payment saved, but some game status updates failed. Check the payment and games before retrying."
+						}
+					} else {
+						state = "added"
+						message = "Payment added and games marked Paid."
+					}
+
+				}
+			}
+			cancel()
+			if err != nil {
+				failed++
+				state = "failed"
+				if message == "Row contains validation errors." {
+					message = "Unable to import payment. Check the payment and games before retrying."
+				}
+				log.Printf("payment import row %d: %v", row.RowNumber, err)
+			}
+		}
+		results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
+	}
+	writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Payments import completed.", "rows": results})
 }

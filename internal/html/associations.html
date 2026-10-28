@@ -1,932 +1,1468 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ref Ledger V2.0 Associations</title>
-    <link rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">    
-    <link rel="stylesheet" href="/components/navbar.css?v=12">
-
-    <style>
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: Arial, Helvetica, sans-serif;
-        }
-
-        body {
-           background-color: #f4f6f9;
-           color: #333;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 20px auto;
-            padding: 0 20px;
-        }
-
-        .header {
-            background-color: #1e293b;
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        .header h1 {
-            margin-bottom: 10px;
-        }
-
-        .form-card {
-            background-color: white;
-            padding: 25px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-
-        .row {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 15px;
-        }
-
-        .col {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-
-        input,
-        select,
-        textarea {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            width: 100%;
-        }
-
-        textarea {
-            resize: vertical;
-        }
-
-        .button-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
-
-        .btn {
-            border: none;
-            color: white;
-            padding: 11px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-        }
-
-        .btn-add {
-            background-color: #16a34a;
-        }
-
-        .btn-add:hover {
-            background-color: #15803d;
-        }
-
-        .btn-clear {
-            background-color: #dc2626;
-            color: white;
-        }
-
-        .btn-clear:hover {
-            background-color: #b91c1c;
-        }
-
-        .btn-find{
-            background:#2563eb;
-        }
-
-        .btn-find:hover{
-            background:#1d4ed8;
-        }        
-
-        .btn-edit{
-            background:#2616a3;
-        }
-        
-        .btn-edit:hover{
-            background:#251580;
-        }
-        
-        .btn-delete {
-            background-color: #ffff00;
-            color: black;
-        }
-
-        .btn-delete:hover {
-            background-color: #ffc000;
-        }
-
-        .btn-directory {
-            background-color: #7c3aed;
-        }
-
-        .btn-directory:hover {
-            background-color: #6d28d9;
-        }
-
-        .btn-import {
-            background-color: #0f766e;
-            color: white;
-        }
-
-        .btn-import:hover {
-            background-color: #115e59;
-        }
-
-        .directory-actions {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-
-        .select-all-label { display:flex; align-items:center; gap:8px; margin:0; cursor:pointer; }
-        .select-all-label input, .association-check { width:auto; cursor:pointer; }
-        .btn:disabled { cursor:not-allowed; opacity:.55; }
-        .btn-delete-selected { background:#dc2626; }
-        .btn-delete-selected:hover:not(:disabled) { background:#b91c1c; }
-
-        .row-delete-btn {
-            border: none;
-            background: transparent;
-            color: #dc2626;
-            cursor: pointer;
-            font-size: 17px;
-            padding: 6px 9px;
-            border-radius: 5px;
-        }
-
-        .row-delete-btn:hover {
-            color: white;
-            background: #dc2626;
-        }
-
-        .select-column,
-        .delete-column, .edit-column {
-            width: 70px;
-            text-align: center !important;
-        }
-
-        .association-check {
-            width: 17px;
-            height: 17px;
-            cursor: pointer;
-        }
-
-        .delete-modal { width:min(460px,calc(100% - 32px)); padding:0; border:none; border-radius:16px; box-shadow:0 24px 60px rgba(15,23,42,.3); overflow:hidden; }
-        .delete-modal::backdrop { background:rgba(15,23,42,.65); backdrop-filter:blur(3px); }
-        .delete-modal-content { background:white; }
-        .delete-modal-header { display:flex; align-items:center; gap:14px; padding:22px 24px 16px; }
-        .delete-modal-icon { display:grid; place-items:center; flex:0 0 48px; height:48px; border-radius:50%; background:#fee2e2; color:#dc2626; font-size:21px; }
-        .delete-modal-header h2 { color:#1e293b; font-size:21px; margin-bottom:3px; }
-        .delete-modal-header p { color:#64748b; font-size:14px; }
-        .delete-modal-body { padding:4px 24px 22px; color:#475569; line-height:1.55; }
-        .delete-modal-target { margin-top:14px; padding:12px 14px; border:1px solid #fecaca; border-radius:9px; background:#fff7f7; color:#991b1b; font-weight:bold; }
-        .delete-modal-actions { display:flex; justify-content:flex-end; gap:10px; padding:16px 24px; border-top:1px solid #e2e8f0; background:#f8fafc; }
-        .btn-modal-cancel { background:white; color:#334155; border:1px solid #cbd5e1; }
-        .btn-modal-delete { background:#dc2626; }
- 
-        .message-box {
-            background-color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            font-weight: bold;
-            min-height: 60px;
-            margin-bottom: 20px;
-        }
-
-.directory-note { margin-bottom:15px; color:#475569; font-size:14px; }
-
-.directory-table {
-    width: 100%;
-    border-collapse: collapse;
+    <head>
+        <meta charset="UTF-8"/>
+        <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+        <title>
+            Ref Ledger V2.0 Associations
+        </title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
+        <link href="/components/navbar.css?v=12" rel="stylesheet"/>
+        <style>
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
-.directory-table th {
+body {
+    background: #f4f6f9;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 0 20px;
+}
+
+.header {
+    background: #1e293b;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.header h1 {
+    margin-bottom: 10px;
+}
+
+.form-card {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px #0000001a;
+    margin-bottom: 20px;
+}
+
+h2 {
+    color: #0f2747;
+    font-size: 24px;
+    margin-bottom: 6px;
+}
+
+.help {
+    color: #475569;
+    line-height: 1.45;
+    margin-bottom: 20px;
+}
+
+.workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.row {
+    display: flex;
+    gap: 16px;
+}
+
+.field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+label {
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+input[readonly] {
+    background: #e2e8f0;
+}
+
+.buttons,
+.registry-tools {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 15px;
+}
+
+.btn {
+    border: 0;
+    border-radius: 5px;
+    padding: 11px 17px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    background: #1d4f91;
+    color: white;
+}
+
+.btn:hover {
+    filter: brightness(.9);
+}
+
+.green {
+    background: #16a34a;
+}
+
+.red {
+    background: #dc2626;
+}
+
+.teal {
+    background: #0f766e;
+}
+
+.blue {
+    background: #2563eb;
+}
+
+.btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.message {
+    padding: 16px 20px;
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    min-height: 52px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.error {
+    color: #b91c1c;
+}
+
+.success {
+    color: #15803d;
+}
+
+.table-wrap {
+    overflow: auto;
+    margin-top: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14px;
+}
+
+th {
     background: #2563eb;
     color: white;
-    padding: 12px;
     text-align: left;
+    padding: 12px;
 }
 
-.directory-table td {
+td {
     padding: 10px 12px;
     border-bottom: 1px solid #ddd;
+    overflow-wrap: anywhere;
 }
 
-.directory-table tr:nth-child(even) {
+tbody tr:nth-child(even) {
     background: #f8fafc;
 }
 
-.directory-table tr:hover {
-    background: #eef4ff;
+tbody tr.selected {
+    background: #dbeafe;
 }
 
-.directory-table tbody tr {
+.icon {
+    background: transparent;
+    border: 0;
+    padding: 9px;
+    font-size: 17px;
+    cursor: pointer;
+    border-radius: 5px;
+    color: #2563eb;
+}
+
+.icon.danger {
+    color: #dc2626;
+}
+
+.icon:hover {
+    background: #e2e8f0;
+}
+
+.select-btn {
+    background: white;
+    border: 1px solid #2563eb;
+    color: #1d4ed8;
+    border-radius: 5px;
+    padding: 7px 10px;
     cursor: pointer;
 }
 
-        @media (max-width: 768px) {
+.select-btn[aria-pressed="true"] {
+    background: #2563eb;
+    color: white;
+}
 
-            .row, .button-row, .directory-actions {
-                flex-direction: column;
-            }
+.registry-tools {
+    justify-content: space-between;
+}
 
-            .btn {
-                width: 100%;
-            }
-            .delete-modal-actions .btn { width:auto; }
+.registry-tools .buttons {
+    margin: 0;
+}
+
+dialog {
+    margin: auto;
+    width: min(680px, calc(100% - 32px));
+    max-height: 90vh;
+    overflow: auto;
+    padding: 24px;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px #0f172a55;
+}
+
+dialog::backdrop {
+    background: #0f172aa6;
+}
+
+dialog h2 {
+    margin-bottom: 20px;
+}
+
+dialog p {
+    line-height: 1.5;
+}
+
+#deleteTarget {
+    margin: 16px 0;
+    padding: 12px;
+    background: #fff1f2;
+    color: #991b1b;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow: auto;
+}
+
+.status {
+    margin-top: 12px;
+    white-space: pre-wrap;
+}
+
+.file-name {
+    color: #475569;
+    margin-top: 10px;
+}
+
+.count {
+    color: #475569;
+}
+
+button:focus-visible,
+input:focus-visible {
+    outline: 3px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+@media(max-width:768px) {
+    .workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .buttons .btn {
+        flex: 1;
+    }
+
+    .container {
+        padding: 0 12px;
+    }
+
+    .form-card {
+        padding: 20px;
+    }
+
+    h1 {
+        font-size: 26px;
+    }
+}
+
+/* Payments-style CSV import panel. */
+.import-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.import-header {
+    padding: 22px 25px;
+    background: #0c2d4e;
+    color: white;
+}
+
+.import-header h2 {
+    color: white;
+}
+
+.import-content {
+    padding: 25px;
+}
+
+.purple {
+    background: #7c3aed;
+}
+
+.slate {
+    background: #64748b;
+}
+
+.full-width {
+    width: 100%;
+}
+
+.file-controls {
+    margin-top: 18px;
+}
+
+.file-help {
+    color: #64748b;
+    line-height: 1.5;
+    margin-top: 14px;
+}
+
+.file-summary {
+    padding: 16px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+}
+
+.csv-help {
+    margin-top: 24px;
+    line-height: 1.5;
+}
+
+.preview-title {
+    margin-top: 24px;
+}
+
+.preview-totals {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+}
+
+.total-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 22px;
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+    background: #eff6ff;
+}
+
+.total-card strong {
+    font-size: 30px;
+    color: #1d4ed8;
+}
+
+.total-card.valid {
+    background: #f0fdf4;
+}
+
+.total-card.valid strong {
+    color: #15803d;
+}
+
+.total-card.invalid {
+    background: #fff1f2;
+}
+
+.total-card.invalid strong {
+    color: #dc2626;
+}
+
+.duplicate-options {
+    margin-top: 24px;
+    padding: 18px 20px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+}
+
+.duplicate-options legend {
+    font-weight: bold;
+    padding: 0 4px;
+}
+
+.duplicate-options label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: normal;
+    margin: 10px 0 0;
+}
+
+.duplicate-options input {
+    width: auto;
+    accent-color: #2563eb;
+}
+
+@media (max-width: 600px) {
+    .preview-totals {
+        grid-template-columns: 1fr;
+    }
+}
+        /* Keep import statuses such as Duplicate on one line. */
+        #previewWrap table th:nth-child(2),
+        #previewWrap table td:nth-child(2) {
+            min-width: 115px;
+            white-space: nowrap;
+            overflow-wrap: normal;
         }
+        </style>
 
-        .row-edit-btn { border:none; background:transparent; color:#2563eb; cursor:pointer; font-size:17px; padding:6px 9px; border-radius:5px; }
-        .row-edit-btn:hover { background:#2563eb; color:white; }
-        .edit-modal { margin:auto; width:min(680px,calc(100% - 32px)); max-height:90vh; overflow:auto; padding:24px; border:0; border-radius:12px; }
-        .edit-modal::backdrop { background:rgba(15,23,42,.65); }
-        .edit-modal h2 { margin-bottom:20px; }
-        .edit-modal input[readonly] { background:#e2e8f0; cursor:not-allowed; }
-        .edit-error { color:#b91c1c; margin-top:12px; }
-    </style>
-</head>
+    </head>
 
-<body>
+    <body>
+        <div id="navbar-container">
+        </div>
+        <main class="container">
+            <header class="header">
+                <h1>
+                    Ref Ledger V2.0 Associations
+                </h1>
+                <p>
+                    Manage your associations and contact information.
+                </p>
+            </header>
 
-<div id="navbar-container"></div>   
-
-<div class="container">
-
-    <div class="header">
-        <h1>Ref Ledger V2.0 Associations</h1>
-        <p>Manage your Associations</p>
-    </div>
-
-
-    <div class="form-card">
-
-        <form id="associationForm">
-
-            <div class="row">
-
-                <div class="col">
-                    <label for="assocId">Association ID</label>
-                    <input
-                        type="text" 
-                        id="assocId" 
-                        placeholder="Enter Association ID" required
-                    >
+            <section class="form-card">
+                <h2>
+                    Export Associations
+                </h2>
+                <p class="help">
+                    Export all associations to a CSV file, including contact details and assignors.
+                </p>
+                <div class="field">
+                    <label for="exportPrefix">
+                        File-name prefix
+                    </label>
+                    <input id="exportPrefix" maxlength="80" value="associations"/>
                 </div>
+                <button class="btn teal" id="exportBtn">
+                    <i aria-hidden="true" class="fa-solid fa-file-export">
+                    </i>
+                    Export Associations
+                </button>
+                <p class="status" id="exportStatus" role="status">
+                </p>
+            </section>
 
-                <div class="col">
-                    <label for="assocName">Association Name</label>
-                    <input type="text" id="assocName" placeholder="Enter Association Name">
+            <section class="form-card import-card">
+                <div class="import-header">
+                    <h2><i class="fa-solid fa-file-import" aria-hidden="true"></i> Import Associations</h2>
+                    <p>Preview and import records from a CSV file.</p>
                 </div>
+                <div class="import-content">
+                    <button class="btn purple" id="templateBtn">Download Associations Template</button>
+                    <div class="field file-controls">
+                        <label for="openFileBtn">Associations CSV File</label>
+                        <button class="btn blue full-width" id="openFileBtn">Open CSV File</button>
+                        <p class="file-help" id="fileHelp"></p>
+                        <button class="btn slate full-width" id="standardFileBtn">Use Standard File Picker</button>
+                        <input accept=".csv,text/csv" id="importFile" type="file" hidden>
+                        <p class="file-help" id="lastFile">Last file used: None</p>
+                        <button class="btn slate full-width" id="forgetFileBtn">Forget Last File</button>
+                    </div>
+                    <p class="file-summary" id="fileName">No file selected.</p>
+                    <p class="csv-help">CSV columns: associationId,associationName,contactName,contactNumber,contactEmail,assignors(comma-separated). Quote multiple assignors,
+                        for example "Ann, Bob". Files must be no larger than 5 MB.</p>
+                    <div class="buttons">
+                        <button class="btn blue" id="previewBtn" disabled>Preview Associations</button>
+                        <button class="btn red" id="clearImportBtn">Clear</button>
+                    </div>
+                    <p class="status" id="importStatus" role="status" aria-live="polite"></p>
+                    <div id="previewWrap" hidden>
+                        <h2 class="preview-title">Associations Import Preview</h2>
+                        <div class="preview-totals">
+                            <div class="total-card"><strong id="totalRows">0</strong><span>Total Rows</span></div>
+                            <div class="total-card valid"><strong id="validRows">0</strong><span>Valid Rows</span></div>
+                            <div class="total-card invalid"><strong id="errorRows">0</strong><span>Rows With Errors</span></div>
+                        </div>
+                        <p id="previewSummary" class="status"></p>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>CSV Row</th><th>Status</th><th>Association ID</th>
+                                        <th>Association Name</th><th>Contact</th><th>Phone</th>
+                                        <th>Email</th><th>Assignors</th><th>Errors</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="previewBody"></tbody>
+                            </table>
+                        </div>
+                        <p class="csv-help">Review the results before importing. Rows with errors will not be imported.
+                            Existing records will not be overwritten.</p>
+                        <fieldset class="duplicate-options">
+                            <legend>Duplicate Records</legend>
+                            <label><input type="radio" name="duplicatePolicy" value="skip" checked>
+                                Skip records that already exist.</label>
+                            <label><input type="radio" name="duplicatePolicy" value="stop">
+                                Stop the import when a duplicate is found.</label>
+                        </fieldset>
+                        <div class="buttons">
+                            <button class="btn green" id="importBtn" disabled>Import Valid Associations</button>
+                            <button class="btn red" id="clearPreviewBtn">Clear Preview</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-                <div class="col">
-                    <label for="contactName">Contact Name</label>
-                    <input type="text" id="contactName" placeholder="Enter Contact Name">
-                </div>
+            <div class="workspace">
+                <section class="form-card">
+                    <h2>
+                        Enter an Association
+                    </h2>
+                    <p class="help">
+                        Add a new association. Use the registry edit icon to update an existing association.
+                    </p>
+                    <form id="associationForm">
+                        <div id="entryFields">
+                        </div>
+                        <div class="buttons">
+                            <button class="btn green" id="addBtn" type="submit">
+                                <i aria-hidden="true" class="fa-solid fa-plus">
+                                </i>
+                                Add Association
+                            </button>
+                            <button class="btn red" type="reset">
+                                Clear
+                            </button>
+                        </div>
+                    </form>
+
+                </section>
+
+                <section class="form-card">
+                    <h2>
+                        Find an Association
+                    </h2>
+                    <p class="help">
+                        Search by exact Association ID or part of an association name, contact name, or assignor name.
+                    </p>
+                    <form id="findForm">
+                        <div class="field">
+                            <label for="findId">
+                                Association ID
+                            </label>
+                            <input id="findId" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="findName">
+                                Association Name
+                            </label>
+                            <input id="findName" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="findContact">
+                                Contact Name
+                            </label>
+                            <input id="findContact" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="findAssignor">
+                                Assignor
+                            </label>
+                            <input id="findAssignor" type="text" placeholder="Enter all or part of an assignor name"/>
+                        </div>
+                        <div class="buttons">
+                            <button class="btn blue" type="submit">
+                                Search Associations
+                            </button>
+                            <button class="btn" id="showAllBtn" type="button">
+                                Show All Associations (Ignore Filters)
+                            </button>
+                            <button class="btn red" id="clearFiltersBtn" type="button">
+                                Clear Filters
+                            </button>
+                        </div>
+                    </form>
+
+                </section>
 
             </div>
-
-            <div class="row">
-
-                <div class="col">
-                    <label for="contactNumber">Contact Number</label>
-                    <input type="text" id="contactNumber" placeholder="Enter Contact Number">
-                </div>
- 
-                <div class="col">
-                    <label for="contactEmail">Contact Email</label>
-                    <input type="email" id="contactEmail" placeholder="Enter Contact Email">
-                </div>
-
-                <div class="col">
-                    <label for="assignors">Assignors</label>
-                    <input type="text" id="assignors" placeholder="Enter Assignors (comma-separated)">
-                </div>
-
+            <div aria-live="polite" class="message" id="message" role="status">
+                Ready to enter associations.
             </div>
-
-            <div class="button-row">
-
-                <button
-                    type="button"
-                    id="getAssocBtn"
-                    class="btn btn-find">
-                    <i class="fa-solid fa-magnifying-glass"></i>                    
-                    Find
-                </button>
-                 
-                <button
-                    type="submit"
-                    class="btn btn-add">
-                    <i class="fa-solid fa-plus"></i>     
-                    Add               
-                </button>          
-                
-                <button
-                   type="button"
-                   id="editBtn"
-                   class="btn btn-edit">
-                   <i class="fa-solid fa-pen"></i>                   
-                   Save
-                </button>                
-                
-                <button
-                   type="button"
-                   id="deleteBtn"
-                   class="btn btn-delete">
-                   <i class="fa-solid fa-trash"></i>                   
-                   Delete
-                </button>
-
-                <button
-                    type="button"
-                    id="clearAssocBtn"
-                    class="btn btn-clear">
-                    <i class="fa-solid fa-eraser"></i>                    
-                    Clear 
-                </button>      
-
-                <button
-                   type="button"
-                   id="directoryBtn"
-                   class="btn btn-directory">
-                   <i class="fa-solid fa-folder"></i>
-                   Directory
-                </button>
-
-                <button 
-                   type="button" 
-                   id="importAssociationsBtn" 
-                   class="btn btn-import"> 
-                   <i class="fa-solid fa-file-import"></i>
-                   Import
-                </button>
-
-
-            </div>
-
-        </form>
-
-    </div>
-
-    <div class="message-box" id="message">
-        Ready to enter Associations
-    </div>
-
-<div class="form-card" id="directorySection" style="display:none;">
-    <h2>Association Directory</h2>
-    <p class="directory-note">Manage associations individually or select multiple associations for deletion.</p>
-
-    <div class="directory-actions">
-        <label class="select-all-label" for="selectAllAssociations">
-            <input type="checkbox" id="selectAllAssociations">
-            Select All
-        </label>
-
-        <button type="button" id="deleteSelectedBtn" class="btn btn-delete-selected" disabled>
-            <i class="fa-solid fa-trash"></i>
-            Delete Selected
-        </button>
-    </div>
-
-    <table id="associationsTable" class="directory-table">
-        <thead>
-            <tr>
-                <th class="select-column">Select</th>
-                <th class="delete-column">Delete</th>
-                <th class="edit-column">Edit</th>
-                <th>ID</th>
-                <th>Association</th>
-                <th>Contact</th>
-                <th>Phone</th>
-                <th>Email</th>
-                <th>Assignors</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-</div>
-
-<dialog id="editAssociationModal" class="edit-modal" aria-labelledby="editAssociationTitle">
-    <h2 id="editAssociationTitle">Edit Association</h2>
-    <form id="editAssociationForm">
-        <div class="form-group"><label for="editAssociationId">Association ID</label><input type="text" id="editAssociationId" readonly aria-readonly="true"></div>
-        <div class="form-group"><label for="editAssociationName">Association Name</label><input type="text" id="editAssociationName"></div>
-        <div class="form-group"><label for="editAssociationContact">Contact Name</label><input type="text" id="editAssociationContact"></div>
-        <div class="form-group"><label for="editAssociationPhone">Contact Number</label><input type="text" id="editAssociationPhone"></div>
-        <div class="form-group"><label for="editAssociationEmail">Contact Email</label><input type="email" id="editAssociationEmail"></div>
-        <div class="form-group"><label for="editAssociationAssignors">Assignors (comma-separated)</label><input type="text" id="editAssociationAssignors"></div>
-        <p id="editAssociationError" class="edit-error" role="alert"></p>
-        <div class="button-row">
-            <button type="submit" id="saveAssociationChanges" class="btn btn-edit">Save Changes</button>
-            <button type="button" id="cancelAssociationEdit" class="btn btn-modal-cancel">Cancel</button>
-        </div>
-    </form>
-</dialog>
-
-<dialog id="deleteConfirmationModal" class="delete-modal" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalMessage">
-    <div class="delete-modal-content">
-        <div class="delete-modal-header">
-            <div class="delete-modal-icon" aria-hidden="true"><i class="fa-solid fa-trash-can"></i></div>
-            <div><h2 id="deleteModalTitle">Confirm deletion</h2><p>This action cannot be undone.</p></div>
-        </div>
-        <div class="delete-modal-body">
-            <p id="deleteModalMessage"></p>
-            <div id="deleteModalTarget" class="delete-modal-target"></div>
-        </div>
-        <div class="delete-modal-actions">
-            <button type="button" id="cancelDeleteBtn" class="btn btn-modal-cancel">
-                Cancel
-            </button>
-            <button type="button" id="confirmDeleteBtn" class="btn btn-modal-delete">
-                <i class="fa-solid fa-trash-can"></i>
-                Delete
-            </button>
-        </div>
-    </div>
-</dialog>
-    
-</div>
-
-<script src="/components/navbar.js?v=12"></script>
-
-<script>
-
-
-function escapeAssociationHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[character]));
-}
-const editAssociationModal = document.getElementById("editAssociationModal");
-let associationBeingEdited = null;
-let associationEditSaving = false;
-function openAssociationEditor(association, row) {
-    associationBeingEdited = { association, row, id: association.Id };
-    for (const field of ["Id", "Name", "Contact", "Phone", "Email", "Assignors"]) {
-        document.getElementById("editAssociation" + field).value = association[field] ?? "";
-    }
-    document.getElementById("editAssociationError").textContent = "";
-    editAssociationModal.showModal();
-    document.getElementById("editAssociationName").focus();
-}
-document.getElementById("cancelAssociationEdit").addEventListener("click", () => editAssociationModal.close());
-editAssociationModal.addEventListener("cancel", event => {
-    if (associationEditSaving) event.preventDefault();
-});
-editAssociationModal.addEventListener("close", () => { associationBeingEdited = null; });
-document.getElementById("editAssociationForm").addEventListener("submit", async function (event) {
-    event.preventDefault();
-    if (!associationBeingEdited || associationEditSaving) return;
-    const editing = associationBeingEdited;
-    // Always submit the original ID, regardless of the displayed input value.
-    const payload = { id: editing.id };
-    for (const field of ["Name", "Contact", "Phone", "Email", "Assignors"]) {
-        payload[field.toLowerCase()] = document.getElementById("editAssociation" + field).value;
-    }
-    associationEditSaving = true;
-    document.getElementById("saveAssociationChanges").disabled = true;
-    document.getElementById("cancelAssociationEdit").disabled = true;
-    document.getElementById("editAssociationError").textContent = "";
-    try {
-        const response = await fetch("/api/associations-update", {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-        });
-        const message = await response.text();
-        if (!response.ok) throw new Error(message || "Unable to update association.");
-        const fields = ["Id", "Name", "Contact", "Phone", "Email", "Assignors"];
-        fields.forEach((field, index) => {
-            editing.association[field] = payload[field.toLowerCase()];
-            editing.row.cells[index + 3].textContent = editing.association[field];
-        });
-        if (document.getElementById("assocId").value === String(editing.id)) {
-            ["assocName", "contactName", "contactNumber", "contactEmail", "assignors"].forEach((id, index) => {
-                document.getElementById(id).value = payload[fields[index + 1].toLowerCase()];
-            });
-        }
-        document.getElementById("message").textContent = message || "Association updated successfully.";
-        editAssociationModal.close();
-    } catch (error) {
-        document.getElementById("editAssociationError").textContent = error.message || "Server unavailable.";
-    } finally {
-        associationEditSaving = false;
-        document.getElementById("saveAssociationChanges").disabled = false;
-        document.getElementById("cancelAssociationEdit").disabled = false;
-    }
-});
-
-// Clear the registry immediately when using the main association actions.
-function clearAssociationRegistry() {
-    document.querySelector("#associationsTable tbody").replaceChildren();
-    document.getElementById("directorySection").style.display = "none";
-    selectAllAssociations.checked = false;
-    selectAllAssociations.indeterminate = false;
-    deleteSelectedBtn.disabled = true;
-}
-
-for (const buttonId of ["getAssocBtn", "editBtn", "deleteBtn", "clearAssocBtn"]) {
-    document.getElementById(buttonId).addEventListener("click", clearAssociationRegistry);
-}
-document.querySelector('#associationForm button[type="submit"]').addEventListener("click", clearAssociationRegistry);
-// Also handle Add when the form is submitted using Enter.
-document.getElementById("associationForm").addEventListener("submit", clearAssociationRegistry);
-
-function clearAssociationsForm() {
-    document.getElementById("associationForm").reset();
-}
-
-const selectAllAssociations = document.getElementById("selectAllAssociations");
-const deleteSelectedBtn = document.getElementById("deleteSelectedBtn");
-const deleteConfirmationModal = document.getElementById("deleteConfirmationModal");
-
-function confirmAssociationDeletion(message, target) {
-    document.getElementById("deleteModalMessage").textContent = message;
-    document.getElementById("deleteModalTarget").textContent = target;
-    deleteConfirmationModal.showModal();
-    return new Promise(function (resolve) {
-        function finish(confirmed) {
-            document.getElementById("confirmDeleteBtn").removeEventListener("click", confirmDeletion);
-            document.getElementById("cancelDeleteBtn").removeEventListener("click", cancelDeletion);
-            deleteConfirmationModal.removeEventListener("cancel", cancelWithEscape);
-            deleteConfirmationModal.removeEventListener("click", cancelFromBackdrop);
-            deleteConfirmationModal.close();
-            resolve(confirmed);
-        }
-        function confirmDeletion() { finish(true); }
-        function cancelDeletion() { finish(false); }
-        function cancelWithEscape(event) { event.preventDefault(); finish(false); }
-        function cancelFromBackdrop(event) { if (event.target === deleteConfirmationModal) finish(false); }
-        document.getElementById("confirmDeleteBtn").addEventListener("click", confirmDeletion);
-        document.getElementById("cancelDeleteBtn").addEventListener("click", cancelDeletion);
-        deleteConfirmationModal.addEventListener("cancel", cancelWithEscape);
-        deleteConfirmationModal.addEventListener("click", cancelFromBackdrop);
-        document.getElementById("cancelDeleteBtn").focus();
-    });
-}
-
-function updateAssociationSelection() {
-    const checkboxes = Array.from(document.querySelectorAll(".association-check"));
-    const selectedCount = checkboxes.filter(checkbox => checkbox.checked).length;
-    selectAllAssociations.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
-    selectAllAssociations.indeterminate = selectedCount > 0 && selectedCount < checkboxes.length;
-    deleteSelectedBtn.disabled = selectedCount === 0;
-}
-
-async function deleteAssociation(assocId) {
-    const response = await fetch(
-        `/api/deleteAssociation/${encodeURIComponent(assocId)}`,
-        { method: "DELETE" }
-    );
-
-    const message = await response.text();
-
-    if (!response.ok) {
-        throw new Error(message || `Unable to delete association ${assocId}.`);
-    }
-
-    return message;
-}
-
-document
-    .getElementById("importAssociationsBtn")
-    .addEventListener("click", function () {
-        window.location.href = "/importAssociations";
-    });
-
-
-document.getElementById("clearAssocBtn").addEventListener("click", function () {
-    document.getElementById("associationForm").reset();
-    document.getElementById("message").innerText = "";
-});
-
-
-document.getElementById("getAssocBtn").addEventListener("click", async function () {
-
-    const assocId = document.getElementById("assocId").value;
-    
-    if (!assocId) {
-        document.getElementById("message").innerText =
-            "Enter an Association ID first.";
-        return;
-    }
-
-    try {
-
-        const response = await fetch(`/api/association/${assocId}`);
-
-        if (!response.ok) {
-            document.getElementById("message").innerText =
-                "Association not found.";
-            return;
-        }
-
-        const association = await response.json();
-
-        console.log("Returned association:", association);
-
-        document.getElementById("assocId").value = association.Id || "";
-        document.getElementById("assocName").value = association.Name || "";
-        document.getElementById("contactName").value = association.Contact || "";
-        document.getElementById("contactNumber").value = association.Phone || "";
-        document.getElementById("contactEmail").value = association.Email || "";
-        document.getElementById("assignors").value = association.Assignors || "";
-
-        document.getElementById("message").innerText =
-            "Association loaded successfully.";
-
-    } catch (err) {
-        document.getElementById("message").innerText =
-            "Server unavailable.";
-    }
-});
-
-
-document.getElementById("deleteBtn").addEventListener("click", async () => {
-
-    const assocId = document.getElementById("assocId").value.trim();
-    const assocName = document.getElementById("assocName").value.trim();
-
-    if (!assocId) {
-        document.getElementById("message").innerText =
-            "Enter or load an Association ID before deleting.";
-        return;
-    }
-
-    const description = assocName
-        ? `\"${assocName}\" (${assocId})`
-        : `association ${assocId}`;
-
-    const confirmed = await confirmAssociationDeletion(
-        "You are about to permanently delete this association.", description
-    );
-    if (!confirmed) return;
-    try {
-        const message = await deleteAssociation(assocId);
-        document.getElementById("message").innerText = message || "Association deleted successfully.";
-        clearAssociationsForm();
-    } catch (err) { document.getElementById("message").innerText = err.message; }
-});
-
-document.getElementById("associationForm").addEventListener("submit", async function(e) {
-    e.preventDefault();
-
-    const association = {
-       id: document.getElementById("assocId").value,
-       name: document.getElementById("assocName").value,
-       contact: document.getElementById("contactName").value,
-       phone: document.getElementById("contactNumber").value,
-       email: document.getElementById("contactEmail").value,
-       assignors: document.getElementById("assignors").value
-    };
-
-    try {
-        const response = await fetch("/api/associations", {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify(association)
-        });
-
-        // const message = await response.text();
-        const message = (await response.text()).trim();
-        const messageElement = document.getElementById("message");
-
-        messageElement.textContent =
-            message || (response.ok
-                ? "Association saved successfully."
-                : "Error saving association.");
-        messageElement.style.color = response.ok ? "green" : "red";
-
-        if (response.ok) {
-           clearAssociationsForm();
-        }
-
-    } catch(err) {
-        document.getElementById("message").innerText = "Server unavailable.";
-    }
-});
-
-document
-    .getElementById("editBtn")
-    .addEventListener("click", async function (e) {
-        e.preventDefault();
-
-    const association = {
-       id: document.getElementById("assocId").value,
-       name: document.getElementById("assocName").value,
-       contact: document.getElementById("contactName").value,
-       phone: document.getElementById("contactNumber").value,
-       email: document.getElementById("contactEmail").value,
-       assignors: document.getElementById("assignors").value
-    };
-
-    try {
-        const response = await fetch("/api/associations-update", {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify(association)
-        });
-
-        const message = await response.text();
-
-        document.getElementById("message").innerText =
-            response.ok
-                ? message || "Association updated successfully."
-                : message || "Error updating association.";
-
-    } catch(err) {
-        document.getElementById("message").innerText = "Server unavailable.";
-    }
-});
-
-
-document.getElementById("directoryBtn").addEventListener("click", async function () {
-    clearAssociationsForm();
-    try {
-        const response = await fetch(`/api/associationsDirectory?t=${Date.now()}`);
-
-        if (!response.ok) {
-            document.getElementById("message").innerText =
-                "Unable to load association directory.";
-            return;
-        }
-
-        const associations = await response.json();
-
-        const tbody = document.querySelector("#associationsTable tbody");
-        tbody.innerHTML = "";
-        selectAllAssociations.checked = false;
-        selectAllAssociations.indeterminate = false;
-        deleteSelectedBtn.disabled = true;
-
-        if (!associations || associations.length === 0) {
-            document.getElementById("directorySection").style.display = "block";
-            document.getElementById("message").innerText =
-                "No associations found.";
-            return;
-        }
-
-        associations.forEach(function (association) {
-            const row = document.createElement("tr");
-
-            row.innerHTML = `
-                <td class="select-column">
-                    <input
-                        type="checkbox"
-                        class="association-check"
-                        value="${escapeAssociationHtml(association.Id || "")}"
-                        aria-label="Select ${escapeAssociationHtml(association.Name || association.Id || "association")}"
-                    >
-                </td>
-                <td class="delete-column">
-                    <button
-                        type="button"
-                        class="row-delete-btn"
-                        title="Delete association"
-                        aria-label="Delete ${escapeAssociationHtml(association.Name || association.Id || "association")}"
-                    >
-                        <i class="fa-solid fa-trash"></i>
+            <section class="form-card" id="registrySection" hidden>
+                <h2>
+                    Association Registry
+                </h2>
+                <p class="help">
+                    Edit or delete an association, or select multiple associations for deletion.
+                </p>
+                <div class="registry-tools">
+                    <span class="count" id="registryCount">
+                        Loading associations…
+                    </span>
+                    <div class="buttons">
+                        <button class="btn blue" id="selectAllBtn">
+                            Select All
+                        </button>
+                        <button class="btn" id="clearSelectionBtn">
+                            Clear Selection
+                        </button>
+                        <button class="btn red" disabled="" id="deleteSelectedBtn">
+                            Delete All Selected Associations (0)
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table id="associationsTable">
+                        <thead>
+                            <tr>
+                                <th>
+                                    Select
+                                </th>
+                                <th>
+                                    Delete
+                                </th>
+                                <th>
+                                    Edit
+                                </th>
+                                <th>
+                                    ID
+                                </th>
+                                <th>
+                                    Association
+                                </th>
+                                <th>
+                                    Contact
+                                </th>
+                                <th>
+                                    Phone
+                                </th>
+                                <th>
+                                    Email
+                                </th>
+                                <th>
+                                    Assignors
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="registryBody">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <dialog aria-labelledby="editTitle" id="editModal">
+                <h2 id="editTitle">
+                    Edit Association
+                </h2>
+                <form id="editForm">
+                    <div id="editFields">
+                    </div>
+                    <p class="error" id="editError" role="alert">
+                    </p>
+                    <div class="buttons">
+                        <button class="btn blue" id="saveEditBtn" type="submit">
+                            Save Changes
+                        </button>
+                        <button class="btn" id="cancelEditBtn" type="button">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+
+            </dialog>
+
+            <dialog aria-describedby="deleteDescription" aria-labelledby="deleteTitle" id="deleteModal">
+                <h2 id="deleteTitle">
+                    Confirm deletion
+                </h2>
+                <p id="deleteDescription">
+                    Permanently delete these associations? This action cannot be undone.
+                </p>
+                <div id="deleteTarget">
+                </div>
+                <div class="buttons">
+                    <button class="btn" id="cancelDeleteBtn">
+                        Cancel
                     </button>
-                </td>
-                <td class="edit-column"><button type="button" class="row-edit-btn" title="Edit association" aria-label="Edit association"><i class="fa-solid fa-pencil"></i></button></td>
-                <td>${escapeAssociationHtml(association.Id || "")}</td>
-                <td>${escapeAssociationHtml(association.Name || "")}</td>
-                <td>${escapeAssociationHtml(association.Contact || "")}</td>
-                <td>${escapeAssociationHtml(association.Phone || "")}</td>
-                <td>${escapeAssociationHtml(association.Email || "")}</td>
-                <td>${escapeAssociationHtml(association.Assignors || "")}</td>
+                    <button class="btn red" id="confirmDeleteBtn">
+                        Delete
+                    </button>
+                </div>
+            </dialog>
 
-            `;
+        </main>
+        <script src="/components/navbar.js?v=12">
+        </script>
+        <script>
+'use strict';
+const $ = id => document.getElementById(id);
+const fields = ['id', 'name', 'contact', 'phone', 'email', 'assignors'];
 
-            row.querySelector(".row-edit-btn").addEventListener("click", function () {
-                openAssociationEditor(association, row);
-            });
-            row.querySelector(".association-check").addEventListener("change", updateAssociationSelection);
+// Shared CSV contract: matches the Settings association export exactly.
+const associationCSVHeaders = [
+    'associationId',
+    'associationName',
+    'contactName',
+    'contactNumber',
+    'contactEmail',
+    'assignors(comma-separated)'
+];
 
-            row.addEventListener("click", function (event) {
-                if (event.target.closest(".association-check, .row-delete-btn, .row-edit-btn")) {
-                    return;
-                }
+function associationCSVField(header) {
+    const name = header.trim().toLowerCase();
+    const index = associationCSVHeaders.findIndex(value => value.toLowerCase() === name);
+    return index >= 0 ? fields[index] : name;
+}
 
-                document.getElementById("assocId").value = association.Id || "";
-                document.getElementById("assocName").value = association.Name || "";
-                document.getElementById("contactName").value = association.Contact || "";
-                document.getElementById("contactNumber").value = association.Phone || "";
-                document.getElementById("contactEmail").value = association.Email || "";
-                document.getElementById("assignors").value = association.Assignors || "";
-
-                document.getElementById("message").innerText =
-                    "Association loaded.";
-            });
-
-            row.querySelector(".row-delete-btn").addEventListener("click", async function () {
-                const description = association.Name
-                    ? `\"${association.Name}\" (${association.Id})`
-                    : `association ${association.Id}`;
-
-                const confirmed = await confirmAssociationDeletion(
-                    "You are about to permanently delete this association.", description
-                );
-                if (!confirmed) return;
-                try {
-                    const message = await deleteAssociation(association.Id);
-                    row.remove();
-                    updateAssociationSelection();
-                    document.getElementById("message").innerText = message || "Association deleted successfully.";
-                    if (!tbody.children.length) document.getElementById("message").innerText = "Association deleted successfully. No associations remain.";
-                } catch (err) { document.getElementById("message").innerText = err.message; }
-            });
-
-            tbody.appendChild(row);
-        });
-
-        document.getElementById("directorySection").style.display = "block";
-
-        document.getElementById("message").innerText =
-            `${associations.length} associations loaded.`;
-
-    } catch (err) {
-        document.getElementById("message").innerText = "Server unavailable.";
+function associationCSVColumnMap(headers) {
+    // Legacy short headers remain readable, but all new exports use the shared contract.
+    const mapped = headers.map(associationCSVField);
+    if (new Set(mapped).size !== mapped.length || fields.some(key => !mapped.includes(key))) {
+        throw new Error('CSV headers must include: ' + associationCSVHeaders.join(', '));
     }
-});
+    return mapped;
+}
 
-selectAllAssociations.addEventListener("change", function () {
-    document.querySelectorAll(".association-check").forEach(function (checkbox) {
-        checkbox.checked = selectAllAssociations.checked;
+const labels = ['Association ID', 'Association Name', 'Contact Name', 'Contact Number',
+    'Contact Email', 'Assignors (comma-separated)'
+];
+let associations = [],
+    visible = [],
+    selected = new Set(),
+    editingId = null,
+    busy = false,
+    preview = [],
+    fileRevision = 0;
+
+function fieldControls(container, prefix) {
+    fields.forEach((key, i) => {
+        const div = document.createElement('div');
+        div.className = 'field';
+        const label = document.createElement('label');
+        label.htmlFor = prefix + key;
+        label.textContent = labels[i];
+        const input = document.createElement('input');
+        input.id = prefix + key;
+        input.type = key === 'email' ? 'email' : 'text';
+        input.required = key === 'id';
+        if (prefix === 'edit_' && key === 'id') input.readOnly = true;
+        div.append(label, input);
+        $(container).append(div);
     });
-    updateAssociationSelection();
-});
+}
+fieldControls('entryFields', 'entry_');
+fieldControls('editFields', 'edit_');
 
-deleteSelectedBtn.addEventListener("click", async function () {
-    const selected = Array.from(
-        document.querySelectorAll(".association-check:checked")
-    );
+function message(text, error = false) {
+    $('message').textContent = text;
+    $('message').className = 'message ' + (error ? 'error' : 'success');
+}
 
-    if (!selected.length) {
-        document.getElementById("message").innerText =
-            "Select at least one association to delete.";
+function normalize(a) {
+    return Object.fromEntries(fields.map(k => [k, String(a[k] ?? a[k[0].toUpperCase() + k.slice(
+        1)] ?? '')]));
+}
+
+function values(prefix) {
+    return Object.fromEntries(fields.map(k => [k, $(prefix + k).value.trim()]));
+}
+async function request(url, options) {
+    const r = await fetch(url, options);
+    if (r.redirected) throw new Error('Your session may have expired. Sign in again.');
+    const text = await r.text();
+    if (!r.ok) throw new Error(text || 'Request failed (' + r.status + ').');
+    return text;
+}
+// An empty Go slice can be serialized as null instead of an empty array.
+// Accept that empty result without disabling duplicate checks for real records.
+function associationListFromResponse(data) {
+    if (data === null) {
+        return [];
+    }
+
+    if (Array.isArray(data)) {
+        return data;
+    }
+
+    // Also accept an explicitly named association-list response envelope.
+    if (data && typeof data === 'object') {
+        for (const key of ['associations', 'Associations']) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                if (data[key] === null) {
+                    return [];
+                }
+                if (Array.isArray(data[key])) {
+                    return data[key];
+                }
+            }
+        }
+    }
+
+    throw new Error('Unable to check existing associations: the directory API returned an unexpected response. Expected an array or null.');
+}
+
+async function getAssociations() {
+    const text = await request('/api/associationsDirectory?t=' + Date.now(), {
+        cache: 'no-store'
+    });
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch {
+        throw new Error('The server did not return an association list.');
+    }
+
+    return associationListFromResponse(data).map(normalize);
+}
+
+async function save(a, update = false) {
+    return request(update ? '/api/associations-update' : '/api/associations', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(a)
+    });
+}
+
+function filtered() {
+    const id = $('findId').value.trim().toLowerCase();
+    const name = $('findName').value.trim().toLowerCase();
+    const contact = $('findContact').value.trim().toLowerCase();
+    const assignor = $('findAssignor').value.trim().toLowerCase();
+
+    return associations.filter(association => {
+        return (!id || association.id.toLowerCase() === id) &&
+            (!name || association.name.toLowerCase().includes(name)) &&
+            (!contact || association.contact.toLowerCase().includes(contact)) &&
+            (!assignor || association.assignors.toLowerCase().includes(assignor));
+    });
+}
+
+function cell(row, text) {
+    const td = document.createElement('td');
+    td.textContent = text;
+    row.append(td);
+    return td;
+}
+
+function render() {
+    visible = filtered();
+    const ids = new Set(visible.map(a => a.id));
+    selected = new Set([...selected].filter(id => ids.has(id)));
+    $('registryBody').replaceChildren();
+    for (const a of visible) {
+        const row = document.createElement('tr');
+        row.classList.toggle('selected', selected.has(a.id));
+        const select = document.createElement('button');
+        select.type = 'button';
+        select.className = 'select-btn';
+        select.textContent = selected.has(a.id) ? 'Selected' : 'Select';
+        select.setAttribute('aria-pressed', String(selected.has(a.id)));
+        select.setAttribute('aria-label', 'Select association ' + a.id);
+        select.onclick = () => {
+            selected.has(a.id) ? selected.delete(a.id) : selected.add(a.id);
+            render();
+        };
+        cell(row, '').append(select);
+        for (const action of ['delete', 'edit']) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'icon ' + (action === 'delete' ? 'danger' : '');
+            b.title = action === 'delete' ? 'Delete association' : 'Edit association';
+            b.setAttribute('aria-label', b.title + ' ' + a.id);
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid ' + (action === 'delete' ? 'fa-trash' : 'fa-pen');
+            icon.setAttribute('aria-hidden', 'true');
+            b.append(icon);
+            b.onclick = () => action === 'delete' ? confirmDelete([a]) : openEditor(a);
+            cell(row, '').append(b);
+        }
+        fields.forEach(k => cell(row, a[k]));
+        $('registryBody').append(row);
+    }
+    if (!visible.length) {
+        const row = document.createElement('tr');
+        const td = cell(row, 'No associations found.');
+        td.colSpan = 9;
+        $('registryBody').append(row);
+    }
+    $('registryCount').textContent = visible.length + ' of ' + associations.length +
+        ' associations · ' + selected.size + ' selected';
+    $('deleteSelectedBtn').textContent = 'Delete All Selected Associations (' + selected.size + ')';
+    $('deleteSelectedBtn').disabled = busy || !selected.size;
+    $('selectAllBtn').disabled = busy || !visible.length;
+}
+async function refresh(showRegistry = false) {
+    associations = await getAssociations();
+    render();
+
+    // Only an explicit search or Show All request opens the registry.
+    if (showRegistry) {
+        $('registrySection').hidden = false;
+    }
+}
+$('associationForm').onsubmit = async e => {
+    e.preventDefault();
+    if (busy) return;
+    const a = values('entry_');
+    if (!a.id) {
+        message('Enter an Association ID.', true);
         return;
     }
+    $('addBtn').disabled = true;
+    try {
+        const result = await save(a);
+        $('associationForm').reset();
+        message(result || 'Association added successfully.');
+        await refresh();
+    } catch (e) {
+        message(e.message, true);
+    } finally {
+        $('addBtn').disabled = false;
+    }
+};
+$('findForm').onsubmit = async e => {
+    e.preventDefault();
+    try {
+        selected.clear();
+        await refresh(true);
+        message(visible.length + ' matching association(s) found.');
+    } catch (e) {
+        message(e.message, true);
+    }
+};
+$('showAllBtn').onclick = async () => {
+    $('findForm').reset();
+    selected.clear();
+    try {
+        await refresh(true);
+        message(associations.length + ' associations loaded.');
+    } catch (e) {
+        message(e.message, true);
+    }
+};
+$('clearFiltersBtn').onclick = () => {
+    $('findForm').reset();
+    selected.clear();
+    render();
+};
+$('selectAllBtn').onclick = () => {
+    visible.forEach(a => selected.add(a.id));
+    render();
+};
+$('clearSelectionBtn').onclick = () => {
+    selected.clear();
+    render();
+};
 
-    const count = selected.length;
-    const confirmed = await confirmAssociationDeletion(
-        "You are about to permanently delete the selected associations.",
-        `${count} selected association(s)`
-    );
-    if (!confirmed) return;
-            const deletedIds = [];
-            const errors = [];
+function openEditor(a) {
+    if (busy) return;
+    editingId = a.id;
+    fields.forEach(k => $('edit_' + k).value = a[k]);
+    $('editError').textContent = '';
+    $('editModal').showModal();
+    $('edit_name').focus();
+}
+$('cancelEditBtn').onclick = () => $('editModal').close();
+$('editModal').addEventListener('cancel', e => {
+    if (busy) e.preventDefault();
+});
+$('editForm').onsubmit = async e => {
+    e.preventDefault();
+    if (busy) return;
+    const a = values('edit_');
+    a.id = editingId;
+    busy = true;
+    $('saveEditBtn').disabled = true;
+    $('cancelEditBtn').disabled = true;
+    try {
+        const result = await save(a, true);
+        const index = associations.findIndex(x => x.id === editingId);
+        if (index >= 0) associations[index] = a;
+        render();
+        $('editModal').close();
+        message(result || 'Association updated successfully.');
+    } catch (e) {
+        $('editError').textContent = e.message;
+    } finally {
+        busy = false;
+        $('saveEditBtn').disabled = false;
+        $('cancelEditBtn').disabled = false;
+        render();
+    }
+};
+let pendingDelete = [];
 
-            for (const checkbox of selected) {
-                try {
-                    await deleteAssociation(checkbox.value);
-                    deletedIds.push(checkbox.value);
-                    checkbox.closest("tr").remove();
-                } catch (err) {
-                    errors.push(`${checkbox.value}: ${err.message}`);
+function confirmDelete(items) {
+    if (busy || $('deleteModal').open) return;
+    pendingDelete = items.map(a => ({
+        ...a
+    }));
+    $('deleteTarget').textContent = items.map(a => a.id + (a.name ? ' — ' + a.name : '')).join(
+        '\n');
+    $('confirmDeleteBtn').textContent = 'Delete ' + items.length + ' Association' + (items
+        .length === 1 ? '' : 's');
+    $('deleteModal').showModal();
+    $('cancelDeleteBtn').focus();
+}
+$('cancelDeleteBtn').onclick = () => $('deleteModal').close();
+$('deleteModal').addEventListener('cancel', e => {
+    if (busy) e.preventDefault();
+});
+$('deleteSelectedBtn').onclick = () => confirmDelete(visible.filter(a => selected.has(a.id)));
+$('confirmDeleteBtn').onclick = async () => {
+    if (busy) return;
+    busy = true;
+    $('confirmDeleteBtn').disabled = true;
+    $('cancelDeleteBtn').disabled = true;
+    let deleted = 0;
+    const errors = [];
+    for (const a of pendingDelete) {
+        try {
+            await request('/api/deleteAssociation/' + encodeURIComponent(a.id), {
+                method: 'DELETE'
+            });
+            associations = associations.filter(x => x.id !== a.id);
+            selected.delete(a.id);
+            deleted++;
+        } catch (e) {
+            errors.push(a.id + ': ' + e.message);
+        }
+    }
+    busy = false;
+    $('confirmDeleteBtn').disabled = false;
+    $('cancelDeleteBtn').disabled = false;
+    $('deleteModal').close();
+    render();
+    message(deleted + ' association(s) deleted.' + (errors.length ?
+        '\nCould not delete:\n' + errors.join('\n') : ''), errors.length > 0);
+};
+
+function download(name, text) {
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + text], {
+        type: 'text/csv;charset=utf-8'
+    }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function csvValue(value) {
+    let s = String(value ?? '');
+    if (/^[=+@\-\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+}
+$('exportBtn').onclick = async () => {
+    $('exportBtn').disabled = true;
+    try {
+        const all = await getAssociations();
+        const prefix = ($('exportPrefix').value.trim() || 'associations').replace(
+            /[^a-zA-Z0-9_-]/g, '_');
+        download(prefix + '_' + new Date().toISOString().slice(0, 10) + '.csv', [associationCSVHeaders.join(','), ...all.map(a => fields.map(k => csvValue(a[k])).join(','))
+        ].join('\r\n'));
+        $('exportStatus').textContent = all.length + ' associations exported.';
+    } catch (e) {
+        $('exportStatus').textContent = e.message;
+    } finally {
+        $('exportBtn').disabled = false;
+    }
+};
+$('templateBtn').onclick = () => download('associations_template.csv', associationCSVHeaders.join(',') + '\r\n');
+// RFC 4180 style CSV parser: quoted commas, escaped quotes, CRLF and multiline fields.
+function parseCSV(text) {
+    text = text.replace(/^\uFEFF/, '');
+    const rows = [];
+    let row = [],
+        value = '',
+        quoted = false,
+        closed = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (quoted) {
+            if (c === '"') {
+                if (text[i + 1] === '"') {
+                    value += '"';
+                    i++;
+                } else {
+                    quoted = false;
+                    closed = true;
+                }
+            } else value += c;
+            continue;
+        }
+        if (c === '"') {
+            if (value || closed) throw new Error('Unexpected quote in CSV.');
+            quoted = true;
+        } else if (c === ',' || c === '\n' || c === '\r') {
+            row.push(value);
+            value = '';
+            closed = false;
+            if (c !== ',') {
+                if (c === '\r' && text[i + 1] === '\n') i++;
+                if (row.some(v => v.trim())) rows.push(row);
+                row = [];
+            }
+        } else {
+            if (closed) throw new Error('Unexpected text after a closing CSV quote.');
+            value += c;
+        }
+    }
+    if (quoted) throw new Error('Unclosed quote in CSV.');
+    row.push(value);
+    if (row.some(v => v.trim())) rows.push(row);
+    return rows;
+}
+
+// File handles are stored separately from the preview so the same CSV can be reread.
+let currentFile = null;
+let rememberedHandle = null;
+let rememberedName = '';
+let previewing = false;
+const maximumCSVSize = 5 * 1024 * 1024;
+
+function fileStore(mode, operation) {
+    return new Promise((resolve, reject) => {
+        const open = indexedDB.open('ref-ledger-association-import', 1);
+        open.onupgradeneeded = () => open.result.createObjectStore('files');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+            const database = open.result;
+            const transaction = database.transaction('files', mode);
+            const request = operation(transaction.objectStore('files'));
+            transaction.oncomplete = () => {
+                database.close();
+                resolve(request.result);
+            };
+            transaction.onabort = () => {
+                database.close();
+                reject(transaction.error || new Error('File memory is unavailable.'));
+            };
+        };
+    });
+}
+
+function updateFileControls() {
+    const canRemember = typeof window.showOpenFilePicker === 'function';
+    $('openFileBtn').textContent = currentFile || rememberedHandle ? 'Open Different File' : 'Open CSV File';
+    $('fileHelp').textContent = canRemember ?
+        'This browser can reread your file. Use Open CSV File once, then save changes to the same CSV and click Preview Associations again. Select the file again if it is moved, replaced, or saved under a new name.' :
+        'Choose a CSV file. To preview saved changes, select the file again using the standard file picker.';
+    $('lastFile').textContent = 'Last file used: ' + (rememberedName || 'None');
+    $('fileName').textContent = currentFile ?
+        currentFile.name + ' (' + currentFile.size + ' bytes)' :
+        rememberedHandle ? rememberedName + ' — select Preview Associations to reread.' : 'No file selected.';
+    $('previewBtn').disabled = busy || previewing || !(currentFile || rememberedHandle);
+}
+
+function clearPreview() {
+    fileRevision++;
+    preview = [];
+    $('previewBody').replaceChildren();
+    $('previewWrap').hidden = true;
+    $('importBtn').disabled = true;
+    $('importStatus').textContent = '';
+}
+
+async function rememberFile(handle, file) {
+    rememberedHandle = handle;
+    rememberedName = file.name;
+    try {
+        await fileStore('readwrite', store => store.put({
+            handle,
+            name: file.name
+        }, 'last'));
+    } catch {
+        // File selection remains usable when persistent browser storage is unavailable.
+    }
+}
+
+async function chooseFile() {
+    if (busy || previewing) return;
+    if (typeof window.showOpenFilePicker !== 'function') {
+        $('importFile').click();
+        return;
+    }
+    try {
+        const [handle] = await window.showOpenFilePicker({
+            multiple: false,
+            types: [{
+                description: 'CSV files',
+                accept: {
+                    'text/csv': ['.csv']
+                }
+            }]
+        });
+        const file = await handle.getFile();
+        clearPreview();
+        currentFile = file;
+        await rememberFile(handle, file);
+        updateFileControls();
+        $('importStatus').textContent = 'File selected. Select Preview Associations to validate it.';
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            $('importStatus').textContent = 'Unable to open file: ' + error.message +
+                ' Use Standard File Picker instead.';
+        }
+    }
+}
+
+$('openFileBtn').onclick = chooseFile;
+$('standardFileBtn').onclick = () => $('importFile').click();
+$('clearPreviewBtn').onclick = clearPreview;
+$('clearImportBtn').onclick = () => {
+    clearPreview();
+    currentFile = null;
+    $('importFile').value = '';
+    updateFileControls();
+};
+$('forgetFileBtn').onclick = async () => {
+    clearPreview();
+    currentFile = null;
+    rememberedHandle = null;
+    rememberedName = '';
+    $('importFile').value = '';
+    try {
+        await fileStore('readwrite', store => store.delete('last'));
+        $('importStatus').textContent = 'Last file forgotten.';
+    } catch {
+        $('importStatus').textContent =
+            'File cleared for this session. Browser storage could not be updated.';
+    }
+    updateFileControls();
+};
+$('importFile').onchange = async () => {
+    const file = $('importFile').files[0];
+    if (!file) return;
+    clearPreview();
+    currentFile = file;
+    await rememberFile(null, file);
+    updateFileControls();
+    $('importStatus').textContent = 'File selected. Select Preview Associations to validate it.';
+};
+
+function duplicatePolicy() {
+    return document.querySelector('input[name="duplicatePolicy"]:checked').value;
+}
+
+function renderPreview() {
+    const body = $('previewBody');
+    body.replaceChildren();
+    preview.forEach(record => {
+        const row = document.createElement('tr');
+        const status = record.outcome || (record.error ? 'Error' : record.duplicate ? 'Duplicate' :
+            'Valid');
+        cell(row, record.line);
+        cell(row, status).className = record.error ? 'error' : '';
+        fields.forEach(key => cell(row, record.a[key]));
+        cell(row, record.error || (record.duplicate ?
+            'Association ID already exists or is repeated in this file.' : ''));
+        body.append(row);
+    });
+    const errors = preview.filter(record => record.error).length;
+    const valid = preview.filter(record => !record.error && !record.duplicate && !record.outcome).length;
+    const duplicates = preview.filter(record => record.duplicate).length;
+    $('totalRows').textContent = preview.length;
+    $('validRows').textContent = valid;
+    $('errorRows').textContent = errors;
+    $('previewSummary').textContent = preview.length + ' record(s): ' + valid + ' valid, ' + errors +
+        ' with errors, ' + duplicates + ' duplicate(s).';
+    $('previewWrap').hidden = false;
+    $('importBtn').disabled = busy || !preview.some(record => !record.error && !record.outcome);
+}
+
+$('previewBtn').onclick = async () => {
+    if (busy || previewing) return;
+    clearPreview();
+    const revision = fileRevision;
+    previewing = true;
+    updateFileControls();
+    try {
+        if (rememberedHandle) {
+            const options = {
+                mode: 'read'
+            };
+            if (await rememberedHandle.queryPermission(options) !== 'granted' &&
+                await rememberedHandle.requestPermission(options) !== 'granted') {
+                throw new Error('File access was not granted. Open the CSV file again.');
+            }
+            currentFile = await rememberedHandle.getFile();
+        }
+        if (!currentFile) throw new Error('Choose a CSV file first.');
+        if (currentFile.size > maximumCSVSize) throw new Error(
+            'CSV files must be no larger than 5 MB.');
+        const [text, existing] = await Promise.all([currentFile.text(), getAssociations()]);
+        if (revision !== fileRevision) return;
+        const rows = parseCSV(text);
+        if (!rows.length) throw new Error('The CSV file is empty.');
+        const header = associationCSVColumnMap(rows.shift());
+        const seen = new Set(existing.map(association => association.id));
+        preview = rows.map((columns, index) => {
+            const association = Object.fromEntries(fields.map(key => [key, (columns[header
+                .indexOf(key)] ?? '').trim()]));
+            let error = '';
+            if (columns.length !== header.length) error =
+                'Column count does not match header.';
+            else if (!association.id) error = 'Association ID is required.';
+            else if (association.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(association
+                    .email)) error = 'Invalid email.';
+            const duplicate = !!association.id && seen.has(association.id);
+            if (!error) seen.add(association.id);
+            return {
+                a: association,
+                error,
+                duplicate,
+                outcome: '',
+                line: index + 2
+            };
+        });
+        renderPreview();
+        $('importStatus').textContent =
+            'Preview complete. Rows with errors will not be imported. Review duplicate handling below.';
+    } catch (error) {
+        if (revision === fileRevision) $('importStatus').textContent = error.message;
+    } finally {
+        previewing = false;
+        updateFileControls();
+    }
+};
+
+$('importBtn').onclick = async () => {
+    if (busy || previewing) return;
+    busy = true;
+    const policy = duplicatePolicy();
+    const controls = ['importBtn', 'previewBtn', 'clearPreviewBtn', 'clearImportBtn', 'openFileBtn',
+        'standardFileBtn', 'forgetFileBtn', 'importFile'
+    ];
+    controls.forEach(id => $(id).disabled = true);
+    document.querySelectorAll('input[name="duplicatePolicy"]').forEach(input => input.disabled =
+    true);
+    let imported = 0;
+    let skipped = 0;
+    let stopped = false;
+    try {
+        // Refresh IDs immediately before writing: the registry may have changed since preview.
+        const existing = new Set((await getAssociations()).map(association => association.id));
+        for (const record of preview) {
+            if (record.outcome) continue;
+            const duplicate = existing.has(record.a.id);
+            record.duplicate = duplicate;
+            if (duplicate) {
+                if (policy === 'stop') {
+                    // Keep the duplicate pending so another import cannot silently pass it.
+                    stopped = true;
+                    break;
+                }
+                record.outcome = 'Skipped — duplicate';
+                skipped++;
+                continue;
+            }
+            if (record.error) continue;
+            try {
+                await save(record.a);
+                existing.add(record.a.id);
+                record.outcome = 'Imported';
+                imported++;
+            } catch (error) {
+                // Recheck IDs to detect another client inserting this ID after preflight.
+                const latest = new Set((await getAssociations()).map(association => association.id));
+                if (latest.has(record.a.id)) {
+                    existing.add(record.a.id);
+                    record.duplicate = true;
+                    if (policy === 'stop') {
+                        // Keep the duplicate pending so another import cannot silently pass it.
+                        stopped = true;
+                        break;
+                    }
+                    record.outcome = 'Skipped — duplicate';
+                    skipped++;
+                } else {
+                    record.error = error.message;
+                    record.outcome = 'Failed';
                 }
             }
+        }
+        $('importStatus').textContent = imported + ' association(s) imported; ' + skipped +
+            ' duplicate(s) skipped.' +
+            (stopped ?
+                ' Import stopped at the first duplicate. Earlier successful imports were kept; later rows were not imported.' :
+                ' Review row statuses for errors.');
+        await refresh();
+    } catch (error) {
+        $('importStatus').textContent = imported + ' association(s) imported. Import stopped: ' +
+            error.message;
+    } finally {
+        busy = false;
+        controls.forEach(id => $(id).disabled = false);
+        document.querySelectorAll('input[name="duplicatePolicy"]').forEach(input => input.disabled =
+            false);
+        renderPreview();
+        updateFileControls();
+        render();
+    }
+};
 
-            const messageElement = document.getElementById("message");
+async function restoreLastFile() {
+    try {
+        const remembered = await fileStore('readonly', store => store.get('last'));
+        // Do not overwrite a new file chosen while storage was loading.
+        if (remembered && !currentFile) {
+            rememberedHandle = remembered.handle || null;
+            rememberedName = remembered.name || '';
+        }
+    } catch {
+        // Standard file selection works without IndexedDB.
+    }
+    updateFileControls();
+}
+updateFileControls();
+restoreLastFile();
 
-            if (!errors.length) {
-                messageElement.innerText =
-                    `${deletedIds.length} association${deletedIds.length === 1 ? "" : "s"} deleted successfully.`;
-            } else {
-                messageElement.innerText =
-                    `${deletedIds.length} deleted. ${errors.length} could not be deleted: ${errors.join(" | ")}`;
-            }
-
-            updateAssociationSelection();
-});
-
-</script>
-
-</body>
+// The registry is loaded when Search Associations or Show All Associations is requested.
+        </script>
+    </body>
 </html>
