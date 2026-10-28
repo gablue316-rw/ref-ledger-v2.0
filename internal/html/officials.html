@@ -1,482 +1,1553 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ref Ledger V2.0 Officials Entry</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-<link rel="stylesheet" href="/components/navbar.css?v=12">
-<style>
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; }
-body { background: #f4f6f9; color: #333; }
-.container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
-.header { background: #1e293b; color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-.header h1 { margin-bottom: 10px; }
-.form-card { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 8px #0000001a; margin-bottom: 20px; }
-.row { display: flex; gap: 20px; margin-bottom: 15px; }
-.col, .form-group { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-label { font-weight: bold; margin-bottom: 5px; }
-input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
-input[readonly] { background: #f1f5f9; color: #64748b; cursor: default; }
-.button-row { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
-.btn { border: none; color: white; padding: 11px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 14px; }
-.btn:disabled { cursor: not-allowed; opacity: .55; }
-.btn-find { background: #2563eb; } .btn-find:hover { background: #1d4ed8; }
-.btn-add { background: #16a34a; } .btn-add:hover { background: #15803d; }
-.btn-save { background: #5f16a3; } .btn-save:hover { background: #291580; }
-.btn-clear, .btn-delete-selected, .btn-modal-delete { background: #dc2626; }
-.btn-clear:hover, .btn-delete-selected:hover:not(:disabled), .btn-modal-delete:hover { background: #b91c1c; }
-.btn-delete { background: #ffff00; color: black; } .btn-delete:hover { background: #ffc000; }
-.btn-directory { background: #7c3aed; } .btn-directory:hover { background: #6d28d9; }
-.btn-import { background: #0f766e; } .btn-import:hover { background: #115e59; }
-.message-box { background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 8px #0000001a; font-weight: bold; white-space: pre-line; min-height: 60px; margin-bottom: 20px; }
-.directory-note { margin: 10px 0 15px; color: #475569; font-size: 14px; }
-.directory-actions { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 15px; }
-.select-all-label { display: flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
-.select-all-label input, .official-select { width: auto; cursor: pointer; }
-.table-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; }
-th { background: #2563eb; color: white; padding: 10px; text-align: left; }
-td { padding: 10px; border-bottom: 1px solid #ddd; }
-tr:nth-child(even) { background: #f9fafb; }
-.select-column, .action-column { width: 65px; text-align: center; }
-.btn-row-edit, .btn-row-delete { border: none; background: transparent; padding: 6px 9px; border-radius: 4px; cursor: pointer; font-size: 16px; }
-.btn-row-edit { color: #5f16a3; } .btn-row-edit:hover { color: white; background: #5f16a3; }
-.btn-row-delete { color: #dc2626; } .btn-row-delete:hover { color: white; background: #dc2626; }
-dialog { margin: auto; padding: 0; border: none; border-radius: 16px; box-shadow: 0 24px 60px #0f172a4d; max-height: calc(100vh - 32px); overflow: auto; }
-dialog::backdrop { background: #0f172aa6; backdrop-filter: blur(3px); }
-.delete-modal { width: min(460px, calc(100% - 32px)); }
-.edit-modal { width: min(700px, calc(100% - 32px)); }
-.modal-header { display: flex; align-items: center; gap: 14px; padding: 22px 24px 16px; }
-.modal-header h2 { color: #1e293b; font-size: 21px; margin-bottom: 3px; }
-.modal-header p { color: #64748b; font-size: 14px; }
-.delete-modal-icon { display: grid; place-items: center; flex: 0 0 48px; height: 48px; border-radius: 50%; background: #fee2e2; color: #dc2626; font-size: 21px; }
-.modal-body { padding: 4px 24px 22px; color: #475569; line-height: 1.55; }
-.delete-modal-target { margin-top: 14px; padding: 12px 14px; border: 1px solid #fecaca; border-radius: 9px; background: #fff7f7; color: #991b1b; font-weight: bold; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
-.btn-modal-cancel { background: white; color: #334155; border: 1px solid #cbd5e1; } .btn-modal-cancel:hover { background: #f1f5f9; }
-#editMessage { color: #b91c1c; min-height: 22px; }
-@media (max-width: 768px) { .row, .button-row, .directory-actions { flex-direction: column; } .btn { width: 100%; } .modal-actions .btn { width: auto; } }
-</style>
-</head>
-<body>
-<div id="navbar-container"></div>
-<div class="container">
-    <div class="header"><h1>Ref Ledger V2.0 Officials Entry</h1><p>Manage and track Officials information.</p></div>
-    <div class="form-card">
-        <form id="officialsForm">
-            <div class="row">
-                <div class="form-group"><label for="firstname">First Name</label><input type="text" id="firstname" required></div>
-                <div class="form-group"><label for="lastname">Last Name</label><input type="text" id="lastname" required></div>
-                <div class="form-group"><label for="phone">Phone</label><input type="text" id="phone"></div>
-            </div>
-            <div class="row">
-                <div class="col"><label for="email">Email</label><input type="email" id="email"></div>
-                <div class="col"><label for="address">Address</label><input type="text" id="address"></div>
-            </div>
-            <div class="button-row">
-                <button type="button" id="getOfficialBtn" class="btn btn-find"><i class="fa-solid fa-magnifying-glass"></i> Find</button>
-                <button type="submit" class="btn btn-add"><i class="fa-solid fa-plus"></i> Add</button>
-                <button type="button" id="updateOfficialBtn" class="btn btn-save"><i class="fa-solid fa-pen"></i> Save</button>
-                <button type="button" id="deleteOfficialBtn" class="btn btn-delete"><i class="fa-solid fa-trash"></i> Delete</button>
-                <button type="button" id="clearBtn" class="btn btn-clear"><i class="fa-solid fa-eraser"></i> Clear</button>
-                <button type="button" id="directoryBtn" class="btn btn-directory"><i class="fa-solid fa-address-book"></i> Directory</button>
-                <button type="button" id="importOfficialsBtn" class="btn btn-import"><i class="fa-solid fa-file-import"></i> Import</button>
-            </div>
-        </form>
-    </div>
-    <div class="message-box" id="message" role="status">Ready to enter officials.</div>
-    <div class="form-card" id="directorySection" style="display: none;">
-        <h2>Officials Directory</h2>
-        <p class="directory-note">Directory is filtered by First Name and/or Last Name when those fields are filled in. Leave both blank to show all officials.</p>
-        <div class="directory-actions">
-            <label class="select-all-label" for="selectAllOfficials"><input type="checkbox" id="selectAllOfficials"> Select All</label>
-            <button type="button" id="deleteSelectedOfficialsBtn" class="btn btn-delete-selected" disabled><i class="fa-solid fa-trash"></i> Delete Selected</button>
+    <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+        <title>
+            Ref Ledger V2.0 Officials
+        </title>
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
+        <link href="/components/navbar.css?v=12" rel="stylesheet"/>
+        <style>
+            * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+    background: #f4f6f9;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 0 20px;
+}
+
+.header {
+    background: #1e293b;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.header h1 {
+    margin-bottom: 10px;
+}
+
+.form-card {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px #0000001a;
+    margin-bottom: 20px;
+}
+
+h2 {
+    color: #0f2747;
+    font-size: 24px;
+    margin-bottom: 6px;
+}
+
+.help {
+    color: #475569;
+    line-height: 1.45;
+    margin-bottom: 20px;
+}
+
+.workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.row {
+    display: flex;
+    gap: 16px;
+}
+
+.field {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+label {
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+input[readonly] {
+    background: #e2e8f0;
+}
+
+.buttons,
+.registry-tools {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 15px;
+}
+
+.btn {
+    border: 0;
+    border-radius: 5px;
+    padding: 11px 17px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    background: #1d4f91;
+    color: white;
+}
+
+.btn:hover {
+    filter: brightness(.9);
+}
+
+.green {
+    background: #16a34a;
+}
+
+.red {
+    background: #dc2626;
+}
+
+.teal {
+    background: #0f766e;
+}
+
+.blue {
+    background: #2563eb;
+}
+
+.btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.message {
+    padding: 16px 20px;
+    background: white;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    min-height: 52px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.error {
+    color: #b91c1c;
+}
+
+.success {
+    color: #15803d;
+}
+
+.table-wrap {
+    overflow: auto;
+    margin-top: 16px;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 14px;
+}
+
+th {
+    background: #2563eb;
+    color: white;
+    text-align: left;
+    padding: 12px;
+}
+
+td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #ddd;
+    overflow-wrap: anywhere;
+}
+
+tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+tbody tr.selected {
+    background: #dbeafe;
+}
+
+.icon {
+    background: transparent;
+    border: 0;
+    padding: 9px;
+    font-size: 17px;
+    cursor: pointer;
+    border-radius: 5px;
+    color: #2563eb;
+}
+
+.icon.danger {
+    color: #dc2626;
+}
+
+.icon:hover {
+    background: #e2e8f0;
+}
+
+.select-btn {
+    background: white;
+    border: 1px solid #2563eb;
+    color: #1d4ed8;
+    border-radius: 5px;
+    padding: 7px 10px;
+    cursor: pointer;
+}
+
+.select-btn[aria-pressed="true"] {
+    background: #2563eb;
+    color: white;
+}
+
+.registry-tools {
+    justify-content: space-between;
+}
+
+.registry-tools .buttons {
+    margin: 0;
+}
+
+dialog {
+    margin: auto;
+    width: min(680px, calc(100% - 32px));
+    max-height: 90vh;
+    overflow: auto;
+    padding: 24px;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 24px 60px #0f172a55;
+}
+
+dialog::backdrop {
+    background: #0f172aa6;
+}
+
+dialog h2 {
+    margin-bottom: 20px;
+}
+
+dialog p {
+    line-height: 1.5;
+}
+
+#deleteTarget {
+    margin: 16px 0;
+    padding: 12px;
+    background: #fff1f2;
+    color: #991b1b;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow: auto;
+}
+
+.status {
+    margin-top: 12px;
+    white-space: pre-wrap;
+}
+
+.file-name {
+    color: #475569;
+    margin-top: 10px;
+}
+
+.count {
+    color: #475569;
+}
+
+button:focus-visible,
+input:focus-visible {
+    outline: 3px solid #93c5fd;
+    outline-offset: 2px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+@media(max-width:768px) {
+    .workspace {
+        grid-template-columns: 1fr;
+    }
+
+    .row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .buttons .btn {
+        flex: 1;
+    }
+
+    .container {
+        padding: 0 12px;
+    }
+
+    .form-card {
+        padding: 20px;
+    }
+
+    h1 {
+        font-size: 26px;
+    }
+}
+
+/* Payments-style CSV import panel. */
+.import-card {
+    padding: 0;
+    overflow: hidden;
+}
+
+.import-header {
+    padding: 22px 25px;
+    background: #0c2d4e;
+    color: white;
+}
+
+.import-header h2 {
+    color: white;
+}
+
+.import-content {
+    padding: 25px;
+}
+
+.purple {
+    background: #7c3aed;
+}
+
+.slate {
+    background: #64748b;
+}
+
+.full-width {
+    width: 100%;
+}
+
+.file-controls {
+    margin-top: 18px;
+}
+
+.file-help {
+    color: #64748b;
+    line-height: 1.5;
+    margin-top: 14px;
+}
+
+.file-summary {
+    padding: 16px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+}
+
+.csv-help {
+    margin-top: 24px;
+    line-height: 1.5;
+}
+
+.preview-title {
+    margin-top: 24px;
+}
+
+.preview-totals {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 24px 0;
+}
+
+.total-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 22px;
+    border: 1px solid #dbe3ef;
+    border-radius: 8px;
+    background: #eff6ff;
+}
+
+.total-card strong {
+    font-size: 30px;
+    color: #1d4ed8;
+}
+
+.total-card.valid {
+    background: #f0fdf4;
+}
+
+.total-card.valid strong {
+    color: #15803d;
+}
+
+.total-card.invalid {
+    background: #fff1f2;
+}
+
+.total-card.invalid strong {
+    color: #dc2626;
+}
+
+.duplicate-options {
+    margin-top: 24px;
+    padding: 18px 20px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+}
+
+.duplicate-options legend {
+    font-weight: bold;
+    padding: 0 4px;
+}
+
+.duplicate-options label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: normal;
+    margin: 10px 0 0;
+}
+
+.duplicate-options input {
+    width: auto;
+    accent-color: #2563eb;
+}
+
+@media (max-width: 600px) {
+    .preview-totals {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Keep import statuses such as Duplicate on one line. */
+#previewWrap table th:nth-child(2),
+#previewWrap table td:nth-child(2) {
+    min-width: 115px;
+    white-space: nowrap;
+    overflow-wrap: normal;
+}
+        </style>
+    </head>
+    <body>
+        <div id="navbar-container">
         </div>
-        <div class="table-scroll">
-            <table id="officialsTable">
-                <thead><tr><th class="select-column">Select</th><th class="action-column">Edit</th><th class="action-column">Delete</th><th>First Name</th><th>Last Name</th><th>Phone</th><th>Email</th><th>Address</th></tr></thead>
-                <tbody></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-<dialog id="editOfficialModal" class="edit-modal" aria-labelledby="editModalTitle" aria-describedby="editModalNote">
-    <form id="editOfficialForm">
-        <div class="modal-header"><div><h2 id="editModalTitle"><i class="fa-solid fa-pencil" aria-hidden="true"></i> Edit Official</h2><p id="editModalNote">First and last name cannot be changed.</p></div></div>
-        <div class="modal-body">
-            <div class="row">
-                <div class="form-group"><label for="editFirstName">First Name</label><input id="editFirstName" readonly></div>
-                <div class="form-group"><label for="editLastName">Last Name</label><input id="editLastName" readonly></div>
+        <main class="container">
+            <header class="header">
+                <h1>
+                    Ref Ledger V2.0 Officials
+                </h1>
+                <p>
+                    Manage and track officials information.
+                </p>
+            </header>
+            <section class="form-card">
+                <h2>
+                    Export Officials
+                </h2>
+                <p class="help">
+                    Export all officials to a CSV file, including first name, last name, phone, email, and address.
+                </p>
+                <div class="field">
+                    <label for="exportPrefix">
+                        File-name prefix
+                    </label>
+                    <input id="exportPrefix" maxlength="80" value="officials"/>
+                </div>
+                <button class="btn teal" id="exportBtn">
+                    <i aria-hidden="true" class="fa-solid fa-file-export">
+                    </i>
+                    Export Officials
+                </button>
+                <p class="status" id="exportStatus" role="status">
+                </p>
+            </section>
+            <section class="form-card import-card">
+                <div class="import-header">
+                    <h2>
+                        <i aria-hidden="true" class="fa-solid fa-file-import">
+                        </i>
+                        Import Officials
+                    </h2>
+                    <p>
+                        Preview and import records from a CSV file.
+                    </p>
+                </div>
+                <div class="import-content">
+                    <button class="btn purple" id="templateBtn">
+                        Download Officials Template
+                    </button>
+                    <div class="field file-controls">
+                        <label for="openFileBtn">
+                            Officials CSV File
+                        </label>
+                        <button class="btn blue full-width" id="openFileBtn">
+                            Open CSV File
+                        </button>
+                        <p class="file-help" id="fileHelp">
+                        </p>
+                        <button class="btn slate full-width" id="standardFileBtn">
+                            Use Standard File Picker
+                        </button>
+                        <input accept=".csv,text/csv" hidden="" id="importFile" type="file"/>
+                        <p class="file-help" id="lastFile">
+                            Last file used: None
+                        </p>
+                        <button class="btn slate full-width" id="forgetFileBtn">
+                            Forget Last File
+                        </button>
+                    </div>
+                    <p class="file-summary" id="fileName">
+                        No file selected.
+                    </p>
+                    <p class="csv-help">
+                        CSV columns: firstname,lastname,phone,email,address. First and last names are required. Files must be no larger than 5 MB.
+                    </p>
+                    <div class="buttons">
+                        <button class="btn blue" disabled="" id="previewBtn">
+                            Preview Officials
+                        </button>
+                        <button class="btn red" id="clearImportBtn">
+                            Clear
+                        </button>
+                    </div>
+                    <p aria-live="polite" class="status" id="importStatus" role="status">
+                    </p>
+                    <div hidden="" id="previewWrap">
+                        <h2 class="preview-title">
+                            Officials Import Preview
+                        </h2>
+                        <div class="preview-totals">
+                            <div class="total-card">
+                                <strong id="totalRows">
+                                    0
+                                </strong>
+                                <span>
+                                    Total Rows
+                                </span>
+                            </div>
+                            <div class="total-card valid">
+                                <strong id="validRows">
+                                    0
+                                </strong>
+                                <span>
+                                    Valid Rows
+                                </span>
+                            </div>
+                            <div class="total-card invalid">
+                                <strong id="errorRows">
+                                    0
+                                </strong>
+                                <span>
+                                    Rows With Errors
+                                </span>
+                            </div>
+                        </div>
+                        <p class="status" id="previewSummary">
+                        </p>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            CSV Row
+                                        </th>
+                                        <th>
+                                            Status
+                                        </th>
+                                        <th>
+                                            First Name
+                                        </th>
+                                        <th>
+                                            Last Name
+                                        </th>
+                                        <th>
+                                            Phone
+                                        </th>
+                                        <th>
+                                            Email
+                                        </th>
+                                        <th>
+                                            Address
+                                        </th>
+                                        <th>
+                                            Errors
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="previewBody">
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="csv-help">
+                            Review the results before importing. Rows with errors will not be imported. Existing records will not be overwritten. Duplicates are identified by first and last name together.
+                        </p>
+                        <fieldset class="duplicate-options">
+                            <legend>
+                                Duplicate Records
+                            </legend>
+                            <label>
+                                <input checked="" name="duplicatePolicy" type="radio" value="skip"/>
+                                Skip records that already exist.
+                            </label>
+                            <label>
+                                <input name="duplicatePolicy" type="radio" value="stop"/>
+                                Stop the import when a duplicate is found.
+                            </label>
+                        </fieldset>
+                        <div class="buttons">
+                            <button class="btn green" disabled="" id="importBtn">
+                                Import Valid Officials
+                            </button>
+                            <button class="btn red" id="clearPreviewBtn">
+                                Clear Preview
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <div class="workspace">
+                <section class="form-card">
+                    <h2>
+                        Enter an Official
+                    </h2>
+                    <p class="help">
+                        Add a new official. Use the directory edit icon to update an existing official.
+                    </p>
+                    <form id="officialForm">
+                        <div id="entryFields">
+                        </div>
+                        <div class="buttons">
+                            <button class="btn green" id="addBtn" type="submit">
+                                <i aria-hidden="true" class="fa-solid fa-plus">
+                                </i>
+                                Add Official
+                            </button>
+                            <button class="btn red" type="reset">
+                                Clear
+                            </button>
+                        </div>
+                    </form>
+                </section>
+                <section class="form-card">
+                    <h2>
+                        Find an Official
+                    </h2>
+                    <p class="help">
+                        Search by all or part of a first name, last name, phone, email, or address.
+                    </p>
+                    <form id="findForm">
+                        <div class="field">
+                            <label for="find_firstName">
+                                First Name
+                            </label>
+                            <input id="find_firstName" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_lastName">
+                                Last Name
+                            </label>
+                            <input id="find_lastName" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_phone">
+                                Phone
+                            </label>
+                            <input id="find_phone" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_email">
+                                Email
+                            </label>
+                            <input id="find_email" type="text"/>
+                        </div>
+                        <div class="field">
+                            <label for="find_address">
+                                Address
+                            </label>
+                            <input id="find_address" type="text"/>
+                        </div>
+                        <div class="buttons">
+                            <button class="btn blue" type="submit">
+                                Search Officials
+                            </button>
+                            <button class="btn" id="showAllBtn" type="button">
+                                Show All Officials (Ignore Filters)
+                            </button>
+                            <button class="btn red" id="clearFiltersBtn" type="button">
+                                Clear Filters
+                            </button>
+                        </div>
+                    </form>
+                </section>
             </div>
-            <div class="row">
-                <div class="form-group"><label for="editPhone">Phone</label><input id="editPhone" type="text"></div>
-                <div class="form-group"><label for="editEmail">Email</label><input id="editEmail" type="email"></div>
+            <div aria-live="polite" class="message" id="message" role="status">
+                Ready to enter officials.
             </div>
-            <div class="row"><div class="form-group"><label for="editAddress">Address</label><input id="editAddress" type="text"></div></div>
-            <p id="editMessage" role="status"></p>
-        </div>
-        <div class="modal-actions">
-            <button type="button" id="cancelEditBtn" class="btn btn-modal-cancel">Cancel</button>
-            <button type="submit" id="saveEditBtn" class="btn btn-save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
-        </div>
-    </form>
-</dialog>
-<dialog id="deleteConfirmationModal" class="delete-modal" aria-labelledby="deleteModalTitle" aria-describedby="deleteModalMessage">
-    <div class="modal-header">
-        <div class="delete-modal-icon" aria-hidden="true"><i class="fa-solid fa-trash-can"></i></div>
-        <div><h2 id="deleteModalTitle">Confirm deletion</h2><p>This action cannot be undone.</p></div>
-    </div>
-    <div class="modal-body"><p id="deleteModalMessage"></p><div id="deleteModalTarget" class="delete-modal-target"></div></div>
-    <div class="modal-actions">
-        <button type="button" id="cancelDeleteBtn" class="btn btn-modal-cancel">Cancel</button>
-        <button type="button" id="confirmDeleteBtn" class="btn btn-modal-delete"><i class="fa-solid fa-trash-can"></i> Delete</button>
-    </div>
-</dialog>
-<script src="/components/navbar.js?v=12"></script>
-<script>
-const byId = id => document.getElementById(id);
-const selectAllOfficials = byId("selectAllOfficials");
-const deleteSelectedOfficialsBtn = byId("deleteSelectedOfficialsBtn");
-const deleteConfirmationModal = byId("deleteConfirmationModal");
-const editOfficialModal = byId("editOfficialModal");
-let directoryRequestVersion = 0;
+            <section class="form-card" hidden="" id="registrySection">
+                <h2>
+                    Official Directory
+                </h2>
+                <p class="help">
+                    Edit or delete an official, or select multiple officials for deletion.
+                </p>
+                <div class="registry-tools">
+                    <span class="count" id="registryCount">
+                        Loading officials…
+                    </span>
+                    <div class="buttons">
+                        <button class="btn blue" id="selectAllBtn">
+                            Select All
+                        </button>
+                        <button class="btn" id="clearSelectionBtn">
+                            Clear Selection
+                        </button>
+                        <button class="btn red" disabled="" id="deleteSelectedBtn">
+                            Delete All Selected Officials (0)
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table id="officialsTable">
+                        <thead>
+                            <tr>
+                                <th>
+                                    Select
+                                </th>
+                                <th>
+                                    Delete
+                                </th>
+                                <th>
+                                    Edit
+                                </th>
+                                <th>
+                                    First Name
+                                </th>
+                                <th>
+                                    Last Name
+                                </th>
+                                <th>
+                                    Phone
+                                </th>
+                                <th>
+                                    Email
+                                </th>
+                                <th>
+                                    Address
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="registryBody">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <dialog aria-labelledby="editTitle" id="editModal">
+                <h2 id="editTitle">
+                    Edit Official
+                </h2>
+                <p class="help">
+                    First and last name cannot be changed.
+                </p>
+                <form id="editForm">
+                    <div id="editFields">
+                    </div>
+                    <p class="error" id="editError" role="alert">
+                    </p>
+                    <div class="buttons">
+                        <button class="btn blue" id="saveEditBtn" type="submit">
+                            Save Changes
+                        </button>
+                        <button class="btn" id="cancelEditBtn" type="button">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </dialog>
+            <dialog aria-describedby="deleteDescription" aria-labelledby="deleteTitle" id="deleteModal">
+                <h2 id="deleteTitle">
+                    Confirm deletion
+                </h2>
+                <p id="deleteDescription">
+                    Permanently delete these officials? This action cannot be undone.
+                </p>
+                <div id="deleteTarget">
+                </div>
+                <div class="buttons">
+                    <button class="btn" id="cancelDeleteBtn">
+                        Cancel
+                    </button>
+                    <button class="btn red" id="confirmDeleteBtn">
+                        Delete
+                    </button>
+                </div>
+            </dialog>
+        </main>
+        <script src="/components/navbar.js?v=12">
+        </script>
+        <script>
+            'use strict';
+const $ = id => document.getElementById(id);
+const fields = ['firstName', 'lastName', 'phone', 'email', 'address'];
+const labels = ['First Name', 'Last Name', 'Phone', 'Email', 'Address'];
+// Shared Settings CSV format and column order.
+const officialCSVHeaders = ['firstname', 'lastname', 'phone', 'email', 'address'];
+let officials = [];
+let visible = [];
+let selected = new Set();
 let editingOfficial = null;
-let editSaving = false;
-let loadedOfficial = null;
-const showMessage = text => { byId("message").textContent = text; };
-function requiresLogin(response) {
-    if (response.status === 401 || response.redirected) {
-        window.location.href = "/login";
-        return true;
+let busy = false;
+let preview = [];
+let fileRevision = 0;
+
+function officialKey(official) {
+    return JSON.stringify([official.firstName, official.lastName]);
+}
+
+function officialName(official) {
+    return (official.firstName + ' ' + official.lastName).trim();
+}
+
+function officialCSVColumnMap(headers) {
+    const mapped = headers.map(header => {
+        const index = officialCSVHeaders.indexOf(header.trim().toLowerCase());
+        return index >= 0 ? fields[index] : header.trim().toLowerCase();
+    });
+    if (new Set(mapped).size !== mapped.length || fields.some(key => !mapped.includes(key))) {
+        throw new Error('CSV headers must include: ' + officialCSVHeaders.join(', '));
     }
-    return false;
+    return mapped;
 }
-function normalizeOfficial(value) {
-    return {
-        ...value,
-        FirstName: value.FirstName ?? value.firstName ?? "",
-        LastName: value.LastName ?? value.lastName ?? "",
-        Phone: value.Phone ?? value.phone ?? "",
-        Email: value.Email ?? value.email ?? "",
-        Address: value.Address ?? value.address ?? ""
-    };
-}
-function officialPayload(official, phone, email, address) {
-    const payload = { firstName: official.FirstName, lastName: official.LastName, phone, email, address };
-    // Retain an existing ID when the API supplies it; never generate one here.
-    const id = official.Id ?? official.id ?? official.ID;
-    if (id !== undefined && id !== null) payload.id = id;
-    return payload;
-}
-function readMainForm() {
-    return officialPayload({
-        ...(loadedOfficial || {}),
-        FirstName: byId("firstname").value.trim(),
-        LastName: byId("lastname").value.trim()
-    }, byId("phone").value.trim(), byId("email").value.trim(), byId("address").value.trim());
-}
-function clearOfficialsDirectory() {
-    directoryRequestVersion++;
-    document.querySelector("#officialsTable tbody").replaceChildren();
-    byId("directorySection").style.display = "none";
-    updateDirectorySelection();
-}
-function clearOfficialForm() {
-    byId("officialsForm").reset();
-    loadedOfficial = null;
-    byId("firstname").readOnly = false;
-    byId("lastname").readOnly = false;
-    document.querySelector("#officialsForm .btn-add").disabled = false;
-    byId("firstname").focus();
-}
-function fillMainForm(official) {
-    loadedOfficial = official;
-    for (const [input, field] of [["firstname", "FirstName"], ["lastname", "LastName"], ["phone", "Phone"], ["email", "Email"], ["address", "Address"]]) {
-        byId(input).value = official[field];
-    }
-    byId("firstname").readOnly = true;
-    byId("lastname").readOnly = true;
-    document.querySelector("#officialsForm .btn-add").disabled = true;
-}
-function updateDirectorySelection() {
-    const checkboxes = [...document.querySelectorAll(".official-select")];
-    const count = checkboxes.filter(box => box.checked).length;
-    selectAllOfficials.checked = checkboxes.length > 0 && count === checkboxes.length;
-    selectAllOfficials.indeterminate = count > 0 && count < checkboxes.length;
-    deleteSelectedOfficialsBtn.disabled = count === 0;
-}
-function confirmOfficialDeletion(message, target) {
-    byId("deleteModalMessage").textContent = message;
-    byId("deleteModalTarget").textContent = target;
-    deleteConfirmationModal.returnValue = "cancel";
-    deleteConfirmationModal.showModal();
-    byId("cancelDeleteBtn").focus();
-    return new Promise(resolve => {
-        deleteConfirmationModal.addEventListener("close", () => resolve(deleteConfirmationModal.returnValue === "delete"), { once: true });
+
+function fieldControls(container, prefix) {
+    fields.forEach((key, index) => {
+        const group = document.createElement('div');
+        group.className = 'field';
+        const label = document.createElement('label');
+        label.htmlFor = prefix + key;
+        label.textContent = labels[index];
+        const input = document.createElement('input');
+        input.id = prefix + key;
+        input.type = key === 'email' ? 'email' : 'text';
+        input.required = key === 'firstName' || key === 'lastName';
+        input.readOnly = prefix === 'edit_' && input.required;
+        group.append(label, input);
+        $(container).append(group);
     });
 }
-byId("confirmDeleteBtn").addEventListener("click", () => deleteConfirmationModal.close("delete"));
-byId("cancelDeleteBtn").addEventListener("click", () => deleteConfirmationModal.close("cancel"));
-deleteConfirmationModal.addEventListener("click", event => {
-    if (event.target === deleteConfirmationModal) {
-        const rect = deleteConfirmationModal.getBoundingClientRect();
-        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) deleteConfirmationModal.close("cancel");
-    }
-});
-function deleteDirectoryOfficial(firstName, lastName) {
-    return fetch(`/api/deleteOfficial/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}`, { method: "DELETE" });
+fieldControls('entryFields', 'entry_');
+fieldControls('editFields', 'edit_');
+
+function message(text, error = false) {
+    $('message').textContent = text;
+    $('message').className = 'message ' + (error ? 'error' : 'success');
 }
-selectAllOfficials.addEventListener("change", () => {
-    document.querySelectorAll(".official-select").forEach(box => { box.checked = selectAllOfficials.checked; });
-    updateDirectorySelection();
-});
-deleteSelectedOfficialsBtn.addEventListener("click", async () => {
-    const selected = [...document.querySelectorAll(".official-select:checked")];
-    if (!selected.length) return showMessage("Select at least one official to delete.");
-    if (!await confirmOfficialDeletion("You are about to permanently delete the selected officials.", `${selected.length} selected official(s)`)) return;
-    deleteSelectedOfficialsBtn.disabled = true;
-    showMessage(`Deleting ${selected.length} selected official(s)...`);
-    let deleted = 0;
-    const failures = [];
-    for (const box of selected) {
-        try {
-            const response = await deleteDirectoryOfficial(box.dataset.firstName, box.dataset.lastName);
-            if (requiresLogin(response)) return;
-            if (response.status === 403) {
-                updateDirectorySelection();
-                return showMessage("Permission denied. Read-only users cannot delete officials.");
+
+function normalize(value) {
+    const official = {};
+    for (const key of fields) {
+        const upper = key[0].toUpperCase() + key.slice(1);
+        official[key] = String(value[key] ?? value[upper] ?? value[key.toLowerCase()] ?? '');
+    }
+    // Preserve an existing API ID for updates without adding it to CSV files.
+    const id = value.Id ?? value.id ?? value.ID;
+    if (id !== undefined && id !== null) official.id = id;
+    return official;
+}
+
+function values(prefix) {
+    return Object.fromEntries(fields.map(key => [key, $(prefix + key).value.trim()]));
+}
+
+async function request(url, options) {
+    const response = await fetch(url, options);
+    if (response.status === 401 || response.redirected) {
+        window.location.href = '/login';
+        throw new Error('Your session has expired. Sign in again.');
+    }
+    const text = await response.text();
+    if (response.status === 403) {
+        throw new Error(text || 'Permission denied. Read-only users cannot modify officials.');
+    }
+    if (!response.ok) throw new Error(text || 'Request failed (' + response.status + ').');
+    return text;
+}
+
+function officialListFromResponse(data) {
+    if (data === null) return [];
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object') {
+        for (const key of ['officials', 'Officials']) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                if (data[key] === null) return [];
+                if (Array.isArray(data[key])) return data[key];
             }
-            if (response.ok) {
-                box.closest("tr").remove();
-                deleted++;
-            } else {
-                const reason = (await response.text()).trim() || "Unable to delete official.";
-                const name = `${box.dataset.firstName} ${box.dataset.lastName}`.trim();
-                failures.push(/^delete failed:/i.test(reason)
-                    ? reason
-                    : `Delete failed: cannot delete ${name}: ${reason}`);
-            }
-        } catch {
-            const name = `${box.dataset.firstName} ${box.dataset.lastName}`.trim();
-            failures.push(`Delete failed: cannot delete ${name}: Server unavailable.`);
         }
     }
-    updateDirectorySelection();
-    showMessage(failures.length
-        ? (deleted > 0 ? `${deleted} official(s) deleted successfully.\n` : "") + failures.join("\n")
-        : `${deleted} official(s) deleted successfully.`);
-});
-byId("importOfficialsBtn").addEventListener("click", () => { window.location.href = "/importOfficials"; });
-byId("clearBtn").addEventListener("click", () => { clearOfficialsDirectory(); clearOfficialForm(); showMessage("Form cleared."); });
-async function saveMainOfficial(update) {
-    if (!byId("officialsForm").reportValidity()) return;
+    throw new Error('Unable to check existing officials: expected an official list or null.');
+}
 
-    const messageElement = byId("message");
-    const official = readMainForm();
+async function getOfficials() {
+    const text = await request('/api/officialsDirectory?t=' + Date.now(), {
+        cache: 'no-store'
+    });
+    let data;
+    try {
+        data = JSON.parse(text);
+    } catch {
+        throw new Error('The server did not return an official list.');
+    }
+    return officialListFromResponse(data).map(normalize);
+}
 
+async function save(official, update = false) {
+    return request(update ? '/api/officials-update' : '/api/officials', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(official)
+    });
+}
+
+function filtered() {
+    const filters = fields.map(key => [key, $('find_' + key).value.trim().toLowerCase()]);
+    return officials.filter(official => filters.every(([key, query]) => {
+        return !query || official[key].toLowerCase().includes(query);
+    }));
+}
+
+function cell(row, text) {
+    const td = document.createElement('td');
+    td.textContent = text;
+    row.append(td);
+    return td;
+}
+
+function render() {
+    visible = filtered();
+    const keys = new Set(visible.map(officialKey));
+    selected = new Set([...selected].filter(key => keys.has(key)));
+    $('registryBody').replaceChildren();
+    for (const official of visible) {
+        const row = document.createElement('tr');
+        const key = officialKey(official);
+        row.classList.toggle('selected', selected.has(key));
+        const select = document.createElement('button');
+        select.type = 'button';
+        select.className = 'select-btn';
+        select.textContent = selected.has(key) ? 'Selected' : 'Select';
+        select.disabled = busy;
+        select.setAttribute('aria-pressed', String(selected.has(key)));
+        select.setAttribute('aria-label', 'Select official ' + officialName(official));
+        select.onclick = () => {
+            if (busy) return;
+            selected.has(key) ? selected.delete(key) : selected.add(key);
+            render();
+        };
+        cell(row, '').append(select);
+        for (const action of ['delete', 'edit']) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'icon ' + (action === 'delete' ? 'danger' : '');
+            button.title = (action === 'delete' ? 'Delete ' : 'Edit ') + officialName(official);
+            button.disabled = busy;
+            button.setAttribute('aria-label', button.title);
+            const icon = document.createElement('i');
+            icon.className = 'fa-solid ' + (action === 'delete' ? 'fa-trash' : 'fa-pen');
+            icon.setAttribute('aria-hidden', 'true');
+            button.append(icon);
+            button.onclick = () => action === 'delete' ? confirmDelete([official]) : openEditor(official);
+            cell(row, '').append(button);
+        }
+        fields.forEach(key => cell(row, official[key]));
+        $('registryBody').append(row);
+    }
+    if (!visible.length) {
+        const row = document.createElement('tr');
+        cell(row, 'No officials found.').colSpan = 8;
+        $('registryBody').append(row);
+    }
+    $('registryCount').textContent = visible.length + ' of ' + officials.length + ' officials · ' + selected
+        .size + ' selected';
+    $('deleteSelectedBtn').textContent = 'Delete All Selected Officials (' + selected.size + ')';
+    $('deleteSelectedBtn').disabled = busy || !selected.size;
+    $('selectAllBtn').disabled = busy || !visible.length;
+    $('clearSelectionBtn').disabled = busy;
+}
+
+async function refresh(showDirectory = false) {
+    officials = await getOfficials();
+    render();
+    if (showDirectory) $('registrySection').hidden = false;
+}
+
+$('officialForm').onsubmit = async event => {
+    event.preventDefault();
+    if (busy) return;
+    const official = values('entry_');
     if (!official.firstName || !official.lastName) {
-        messageElement.style.color = "red";
-        showMessage("Enter both First Name and Last Name first.");
+        message('Enter both First Name and Last Name.', true);
         return;
     }
-
-    messageElement.style.color = "";
-    showMessage(update ? "Updating Official..." : "Saving Official...");
-
+    busy = true;
+    $('addBtn').disabled = true;
     try {
-        const response = await fetch(
-            update ? "/api/officials-update" : "/api/officials",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(official)
-            }
-        );
+        const result = await save(official);
+        $('officialForm').reset();
+        message(result || 'Official added successfully.');
+        if (!$('registrySection').hidden) await refresh();
+    } catch (error) {
+        message(error.message, true);
+    } finally {
+        busy = false;
+        $('addBtn').disabled = false;
+        render();
+    }
+};
+$('findForm').onsubmit = async event => {
+    event.preventDefault();
+    if (busy) return;
+    try {
+        selected.clear();
+        await refresh(true);
+        message(visible.length + ' matching official(s) found.');
+    } catch (error) {
+        message(error.message, true);
+    }
+};
+$('showAllBtn').onclick = async () => {
+    if (busy) return;
+    $('findForm').reset();
+    selected.clear();
+    try {
+        await refresh(true);
+        message(officials.length + ' officials loaded.');
+    } catch (error) {
+        message(error.message, true);
+    }
+};
+$('clearFiltersBtn').onclick = () => {
+    if (busy) return;
+    $('findForm').reset();
+    selected.clear();
+    render();
+};
+$('selectAllBtn').onclick = () => {
+    if (busy) return;
+    visible.forEach(official => selected.add(officialKey(official)));
+    render();
+};
+$('clearSelectionBtn').onclick = () => {
+    if (busy) return;
+    selected.clear();
+    render();
+};
 
-        if (requiresLogin(response)) return;
+function openEditor(official) {
+    if (busy) return;
+    editingOfficial = {
+        ...official
+    };
+    fields.forEach(key => $('edit_' + key).value = official[key]);
+    $('editError').textContent = '';
+    $('editModal').showModal();
+    $('edit_phone').focus();
+}
+$('cancelEditBtn').onclick = () => $('editModal').close();
+$('editModal').addEventListener('cancel', event => {
+    if (busy) event.preventDefault();
+});
+$('editForm').onsubmit = async event => {
+    event.preventDefault();
+    if (busy || !editingOfficial) return;
+    const official = values('edit_');
+    // Always submit the original identity, even if a readonly input is modified externally.
+    official.firstName = editingOfficial.firstName;
+    official.lastName = editingOfficial.lastName;
+    if (editingOfficial.id !== undefined) official.id = editingOfficial.id;
+    busy = true;
+    $('saveEditBtn').disabled = true;
+    $('cancelEditBtn').disabled = true;
+    try {
+        const result = await save(official, true);
+        const index = officials.findIndex(value => officialKey(value) === officialKey(
+            editingOfficial));
+        if (index >= 0) officials[index] = official;
+        $('editModal').close();
+        message(result || 'Official updated successfully.');
+    } catch (error) {
+        $('editError').textContent = error.message;
+    } finally {
+        busy = false;
+        $('saveEditBtn').disabled = false;
+        $('cancelEditBtn').disabled = false;
+        render();
+    }
+};
 
-        const message = (await response.text()).trim();
-        messageElement.style.color = response.ok ? "green" : "red";
+let pendingDelete = [];
 
-        if (response.status === 403) {
-            showMessage(
-                `Permission denied. Read-only users cannot ${update ? "update" : "add"} officials.`
-            );
-            return;
+function confirmDelete(items) {
+    if (busy || $('deleteModal').open) return;
+    pendingDelete = items.map(official => ({
+        ...official
+    }));
+    $('deleteTarget').textContent = items.map(officialName).join('\n');
+    $('confirmDeleteBtn').textContent = 'Delete ' + items.length + ' Official' + (items.length === 1 ? '' :
+        's');
+    $('deleteModal').showModal();
+    $('cancelDeleteBtn').focus();
+}
+$('cancelDeleteBtn').onclick = () => $('deleteModal').close();
+$('deleteModal').addEventListener('cancel', event => {
+    if (busy) event.preventDefault();
+});
+$('deleteSelectedBtn').onclick = () => confirmDelete(visible.filter(official => selected.has(officialKey(
+    official))));
+$('confirmDeleteBtn').onclick = async () => {
+    if (busy) return;
+    busy = true;
+    $('confirmDeleteBtn').disabled = true;
+    $('cancelDeleteBtn').disabled = true;
+    let deleted = 0;
+    const errors = [];
+    for (const official of pendingDelete) {
+        try {
+            await request('/api/deleteOfficial/' + encodeURIComponent(official.firstName) + '/' +
+                encodeURIComponent(official.lastName), {
+                    method: 'DELETE'
+                });
+            officials = officials.filter(value => officialKey(value) !== officialKey(official));
+            selected.delete(officialKey(official));
+            deleted++;
+        } catch (error) {
+            errors.push(officialName(official) + ': ' + error.message);
         }
+    }
+    busy = false;
+    $('confirmDeleteBtn').disabled = false;
+    $('cancelDeleteBtn').disabled = false;
+    $('deleteModal').close();
+    render();
+    message(deleted + ' official(s) deleted.' + (errors.length ? '\nCould not delete:\n' + errors
+        .join('\n') : ''), errors.length > 0);
+};
 
-        showMessage(
-            message || (
-                response.ok
-                    ? `Official ${update ? "updated" : "saved"} successfully.`
-                    : `Error ${update ? "updating" : "saving"} official.`
-            )
-        );
+function download(name, text) {
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + text], {
+        type: 'text/csv;charset=utf-8'
+    }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-        if (response.ok) {
-            clearOfficialsDirectory();
-            if (!update) clearOfficialForm();
+function csvValue(value) {
+    let s = String(value ?? '');
+    if (/^[=+@\-\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+}
+$('exportBtn').onclick = async () => {
+    $('exportBtn').disabled = true;
+    try {
+        const all = await getOfficials();
+        const prefix = ($('exportPrefix').value.trim() || 'officials').replace(
+            /[^a-zA-Z0-9_-]/g, '_');
+        download(prefix + '_' + new Date().toISOString().slice(0, 10) + '.csv', [officialCSVHeaders
+            .join(
+                ','), ...all.map(a => fields.map(k => csvValue(a[k])).join(','))
+        ].join('\r\n'));
+        $('exportStatus').textContent = all.length + ' officials exported.';
+    } catch (e) {
+        $('exportStatus').textContent = e.message;
+    } finally {
+        $('exportBtn').disabled = false;
+    }
+};
+$('templateBtn').onclick = () => download('officials_template.csv', officialCSVHeaders.join(',') + '\r\n');
+// RFC 4180 style CSV parser: quoted commas, escaped quotes, CRLF and multiline fields.
+function parseCSV(text) {
+    text = text.replace(/^\uFEFF/, '');
+    const rows = [];
+    let row = [],
+        value = '',
+        quoted = false,
+        closed = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (quoted) {
+            if (c === '"') {
+                if (text[i + 1] === '"') {
+                    value += '"';
+                    i++;
+                } else {
+                    quoted = false;
+                    closed = true;
+                }
+            } else value += c;
+            continue;
+        }
+        if (c === '"') {
+            if (value || closed) throw new Error('Unexpected quote in CSV.');
+            quoted = true;
+        } else if (c === ',' || c === '\n' || c === '\r') {
+            row.push(value);
+            value = '';
+            closed = false;
+            if (c !== ',') {
+                if (c === '\r' && text[i + 1] === '\n') i++;
+                if (row.some(v => v.trim())) rows.push(row);
+                row = [];
+            }
+        } else {
+            if (closed) throw new Error('Unexpected text after a closing CSV quote.');
+            value += c;
+        }
+    }
+    if (quoted) throw new Error('Unclosed quote in CSV.');
+    row.push(value);
+    if (row.some(v => v.trim())) rows.push(row);
+    return rows;
+}
+
+// File handles are stored separately from the preview so the same CSV can be reread.
+let currentFile = null;
+let rememberedHandle = null;
+let rememberedName = '';
+let previewing = false;
+const maximumCSVSize = 5 * 1024 * 1024;
+
+function fileStore(mode, operation) {
+    return new Promise((resolve, reject) => {
+        const open = indexedDB.open('ref-ledger-official-import', 1);
+        open.onupgradeneeded = () => open.result.createObjectStore('files');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+            const database = open.result;
+            const transaction = database.transaction('files', mode);
+            const request = operation(transaction.objectStore('files'));
+            transaction.oncomplete = () => {
+                database.close();
+                resolve(request.result);
+            };
+            transaction.onabort = () => {
+                database.close();
+                reject(transaction.error || new Error('File memory is unavailable.'));
+            };
+        };
+    });
+}
+
+function updateFileControls() {
+    const canRemember = typeof window.showOpenFilePicker === 'function';
+    $('openFileBtn').textContent = currentFile || rememberedHandle ? 'Open Different File' : 'Open CSV File';
+    $('fileHelp').textContent = canRemember ?
+        'This browser can reread your file. Use Open CSV File once, then save changes to the same CSV and click Preview Officials again. Select the file again if it is moved, replaced, or saved under a new name.' :
+        'Choose a CSV file. To preview saved changes, select the file again using the standard file picker.';
+    $('lastFile').textContent = 'Last file used: ' + (rememberedName || 'None');
+    $('fileName').textContent = currentFile ?
+        currentFile.name + ' (' + currentFile.size + ' bytes)' :
+        rememberedHandle ? rememberedName + ' — select Preview Officials to reread.' : 'No file selected.';
+    $('previewBtn').disabled = busy || previewing || !(currentFile || rememberedHandle);
+}
+
+function clearPreview() {
+    fileRevision++;
+    preview = [];
+    $('previewBody').replaceChildren();
+    $('previewWrap').hidden = true;
+    $('importBtn').disabled = true;
+    $('importStatus').textContent = '';
+}
+
+async function rememberFile(handle, file) {
+    rememberedHandle = handle;
+    rememberedName = file.name;
+    try {
+        await fileStore('readwrite', store => store.put({
+            handle,
+            name: file.name
+        }, 'last'));
+    } catch {
+        // File selection remains usable when persistent browser storage is unavailable.
+    }
+}
+
+async function chooseFile() {
+    if (busy || previewing) return;
+    if (typeof window.showOpenFilePicker !== 'function') {
+        $('importFile').click();
+        return;
+    }
+    try {
+        const [handle] = await window.showOpenFilePicker({
+            multiple: false,
+            types: [{
+                description: 'CSV files',
+                accept: {
+                    'text/csv': ['.csv']
+                }
+            }]
+        });
+        const file = await handle.getFile();
+        clearPreview();
+        currentFile = file;
+        await rememberFile(handle, file);
+        updateFileControls();
+        $('importStatus').textContent = 'File selected. Select Preview Officials to validate it.';
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            $('importStatus').textContent = 'Unable to open file: ' + error.message +
+                ' Use Standard File Picker instead.';
+        }
+    }
+}
+
+$('openFileBtn').onclick = chooseFile;
+$('standardFileBtn').onclick = () => $('importFile').click();
+$('clearPreviewBtn').onclick = clearPreview;
+$('clearImportBtn').onclick = () => {
+    clearPreview();
+    currentFile = null;
+    $('importFile').value = '';
+    updateFileControls();
+};
+$('forgetFileBtn').onclick = async () => {
+    clearPreview();
+    currentFile = null;
+    rememberedHandle = null;
+    rememberedName = '';
+    $('importFile').value = '';
+    try {
+        await fileStore('readwrite', store => store.delete('last'));
+        $('importStatus').textContent = 'Last file forgotten.';
+    } catch {
+        $('importStatus').textContent =
+            'File cleared for this session. Browser storage could not be updated.';
+    }
+    updateFileControls();
+};
+$('importFile').onchange = async () => {
+    const file = $('importFile').files[0];
+    if (!file) return;
+    clearPreview();
+    currentFile = file;
+    await rememberFile(null, file);
+    updateFileControls();
+    $('importStatus').textContent = 'File selected. Select Preview Officials to validate it.';
+};
+
+function duplicatePolicy() {
+    return document.querySelector('input[name="duplicatePolicy"]:checked').value;
+}
+
+function renderPreview() {
+    const body = $('previewBody');
+    body.replaceChildren();
+    preview.forEach(record => {
+        const row = document.createElement('tr');
+        const status = record.outcome || (record.error ? 'Error' : record.duplicate ? 'Duplicate' :
+            'Valid');
+        cell(row, record.line);
+        cell(row, status).className = record.error ? 'error' : '';
+        fields.forEach(key => cell(row, record.a[key]));
+        cell(row, record.error || (record.duplicate ?
+            'First and last name already exist or are repeated in this file.' : ''));
+        body.append(row);
+    });
+    const errors = preview.filter(record => record.error).length;
+    const valid = preview.filter(record => !record.error && !record.duplicate && !record.outcome).length;
+    const duplicates = preview.filter(record => record.duplicate).length;
+    $('totalRows').textContent = preview.length;
+    $('validRows').textContent = valid;
+    $('errorRows').textContent = errors;
+    $('previewSummary').textContent = preview.length + ' record(s): ' + valid + ' valid, ' + errors +
+        ' with errors, ' + duplicates + ' duplicate(s).';
+    $('previewWrap').hidden = false;
+    $('importBtn').disabled = busy || !preview.some(record => !record.error && !record.outcome);
+}
+
+$('previewBtn').onclick = async () => {
+    if (busy || previewing) return;
+    clearPreview();
+    const revision = fileRevision;
+    previewing = true;
+    updateFileControls();
+    try {
+        if (rememberedHandle) {
+            const options = {
+                mode: 'read'
+            };
+            if (await rememberedHandle.queryPermission(options) !== 'granted' &&
+                await rememberedHandle.requestPermission(options) !== 'granted') {
+                throw new Error('File access was not granted. Open the CSV file again.');
+            }
+            currentFile = await rememberedHandle.getFile();
+        }
+        if (!currentFile) throw new Error('Choose a CSV file first.');
+        if (currentFile.size > maximumCSVSize) throw new Error(
+            'CSV files must be no larger than 5 MB.');
+        const [text, existing] = await Promise.all([currentFile.text(), getOfficials()]);
+        if (revision !== fileRevision) return;
+        const rows = parseCSV(text);
+        if (!rows.length) throw new Error('The CSV file is empty.');
+        const header = officialCSVColumnMap(rows.shift());
+        const seen = new Set(existing.map(officialKey));
+        preview = rows.map((columns, index) => {
+            const official = Object.fromEntries(fields.map(key => [key, (columns[header
+                .indexOf(key)] ?? '').trim()]));
+            let error = '';
+            if (columns.length !== header.length) error =
+                'Column count does not match header.';
+            else if (!official.firstName || !official.lastName) error =
+                'First Name and Last Name are required.';
+            else if (official.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(official
+                    .email)) error = 'Invalid email.';
+            const duplicate = !!official.firstName && !!official.lastName && seen.has(
+                officialKey(official));
+            if (!error) seen.add(officialKey(official));
+            return {
+                a: official,
+                error,
+                duplicate,
+                outcome: '',
+                line: index + 2
+            };
+        });
+        renderPreview();
+        $('importStatus').textContent =
+            'Preview complete. Rows with errors will not be imported. Review duplicate handling below.';
+    } catch (error) {
+        if (revision === fileRevision) $('importStatus').textContent = error.message;
+    } finally {
+        previewing = false;
+        updateFileControls();
+    }
+};
+
+$('importBtn').onclick = async () => {
+    if (busy || previewing) return;
+    busy = true;
+    const policy = duplicatePolicy();
+    const controls = ['importBtn', 'previewBtn', 'clearPreviewBtn', 'clearImportBtn', 'openFileBtn',
+        'standardFileBtn', 'forgetFileBtn', 'importFile'
+    ];
+    controls.forEach(id => $(id).disabled = true);
+    document.querySelectorAll('input[name="duplicatePolicy"]').forEach(input => input.disabled =
+        true);
+    let imported = 0;
+    let skipped = 0;
+    let stopped = false;
+    try {
+        // Refresh names immediately before writing: the registry may have changed since preview.
+        const existing = new Set((await getOfficials()).map(officialKey));
+        for (const record of preview) {
+            if (record.outcome) continue;
+            const duplicate = existing.has(officialKey(record.a));
+            record.duplicate = duplicate;
+            if (duplicate) {
+                if (policy === 'stop') {
+                    // Keep the duplicate pending so another import cannot silently pass it.
+                    stopped = true;
+                    break;
+                }
+                record.outcome = 'Skipped — duplicate';
+                skipped++;
+                continue;
+            }
+            if (record.error) continue;
+            try {
+                await save(record.a);
+                existing.add(officialKey(record.a));
+                record.outcome = 'Imported';
+                imported++;
+            } catch (error) {
+                // Recheck names to detect another client inserting this name after preflight.
+                const latest = new Set((await getOfficials()).map(officialKey));
+                if (latest.has(officialKey(record.a))) {
+                    existing.add(officialKey(record.a));
+                    record.duplicate = true;
+                    if (policy === 'stop') {
+                        // Keep the duplicate pending so another import cannot silently pass it.
+                        stopped = true;
+                        break;
+                    }
+                    record.outcome = 'Skipped — duplicate';
+                    skipped++;
+                } else {
+                    record.error = error.message;
+                    record.outcome = 'Failed';
+                }
+            }
+        }
+        $('importStatus').textContent = imported + ' official(s) imported; ' + skipped +
+            ' duplicate(s) skipped.' +
+            (stopped ?
+                ' Import stopped at the first duplicate. Earlier successful imports were kept; later rows were not imported.' :
+                ' Review row statuses for errors.');
+        await refresh();
+    } catch (error) {
+        $('importStatus').textContent = imported + ' official(s) imported. Import stopped: ' +
+            error.message;
+    } finally {
+        busy = false;
+        controls.forEach(id => $(id).disabled = false);
+        document.querySelectorAll('input[name="duplicatePolicy"]').forEach(input => input.disabled =
+            false);
+        renderPreview();
+        updateFileControls();
+        render();
+    }
+};
+
+async function restoreLastFile() {
+    try {
+        const remembered = await fileStore('readonly', store => store.get('last'));
+        // Do not overwrite a new file chosen while storage was loading.
+        if (remembered && !currentFile) {
+            rememberedHandle = remembered.handle || null;
+            rememberedName = remembered.name || '';
         }
     } catch {
-        messageElement.style.color = "red";
-        showMessage("Server unavailable.");
+        // Standard file selection works without IndexedDB.
     }
+    updateFileControls();
 }
-byId("officialsForm").addEventListener("submit", event => { event.preventDefault(); saveMainOfficial(false); });
-byId("updateOfficialBtn").addEventListener("click", () => saveMainOfficial(true));
-byId("getOfficialBtn").addEventListener("click", async () => {
-    clearOfficialsDirectory();
-    const firstName = byId("firstname").value.trim(), lastName = byId("lastname").value.trim();
-    if (!firstName || !lastName) return showMessage("Enter both First Name and Last Name first.");
-    showMessage("Loading Official");
-    try {
-        const response = await fetch(`/api/officials/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}?t=${Date.now()}`);
-        if (requiresLogin(response)) return;
-        if (!response.ok) return showMessage("Official not found.");
-        fillMainForm(normalizeOfficial(await response.json()));
-        showMessage("Official loaded successfully.");
-    } catch { showMessage("Server unavailable."); }
-});
-byId("deleteOfficialBtn").addEventListener("click", async () => {
-    const firstName = byId("firstname").value.trim(), lastName = byId("lastname").value.trim();
-    if (!firstName || !lastName) return showMessage("Enter both First Name and Last Name first.");
-    if (!await confirmOfficialDeletion("You are about to permanently delete this official.", `${firstName} ${lastName}`)) return;
-    showMessage("Deleting Official");
-    try {
-        const response = await deleteDirectoryOfficial(firstName, lastName);
-        if (requiresLogin(response)) return;
-        if (response.status === 403) return showMessage("Permission denied. Read-only users cannot delete officials.");
-        const message = await response.text();
-        showMessage(message || (response.ok ? "Official deleted successfully." : "Error deleting official."));
-        if (response.ok) { clearOfficialForm(); clearOfficialsDirectory(); }
-    } catch { showMessage("Server unavailable."); }
-});
-function openOfficialEditor(official, row) {
-    editingOfficial = { official, row };
-    byId("editFirstName").value = official.FirstName;
-    byId("editLastName").value = official.LastName;
-    byId("editPhone").value = official.Phone;
-    byId("editEmail").value = official.Email;
-    byId("editAddress").value = official.Address;
-    byId("editMessage").textContent = "";
-    editOfficialModal.showModal();
-    byId("editPhone").focus();
-}
-byId("cancelEditBtn").addEventListener("click", () => { if (!editSaving) editOfficialModal.close(); });
-editOfficialModal.addEventListener("cancel", event => { if (editSaving) event.preventDefault(); });
-editOfficialModal.addEventListener("close", () => { editingOfficial = null; });
-byId("editOfficialForm").addEventListener("submit", async event => {
-    event.preventDefault();
-    if (!editingOfficial || editSaving) return;
-    const { official, row } = editingOfficial;
-    // Names come from the original record, never from the edit inputs.
-    const payload = officialPayload(official, byId("editPhone").value.trim(), byId("editEmail").value.trim(), byId("editAddress").value.trim());
-    editSaving = true;
-    byId("saveEditBtn").disabled = true;
-    byId("cancelEditBtn").disabled = true;
-    byId("editMessage").textContent = "Saving changes...";
-    try {
-        const response = await fetch("/api/officials-update", {
-            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
-        });
-        if (requiresLogin(response)) return;
-        const message = await response.text();
-        if (!response.ok) {
-            byId("editMessage").textContent = response.status === 403
-                ? "Permission denied. Read-only users cannot update officials."
-                : message || "Error updating official.";
-            return;
-        }
-        Object.assign(official, { Phone: payload.phone, Email: payload.email, Address: payload.address });
-        [official.FirstName, official.LastName, official.Phone, official.Email, official.Address].forEach((value, index) => {
-            row.cells[index + 3].textContent = value;
-        });
-        if (loadedOfficial && loadedOfficial.FirstName === official.FirstName && loadedOfficial.LastName === official.LastName) fillMainForm(official);
-        showMessage(message || "Official updated successfully.");
-        editOfficialModal.close();
-    } catch { byId("editMessage").textContent = "Server unavailable. Please try again."; }
-    finally {
-        editSaving = false;
-        byId("saveEditBtn").disabled = false;
-        byId("cancelEditBtn").disabled = false;
-    }
-});
-function actionCell(className, icon, label, handler) {
-    const cell = document.createElement("td");
-    cell.className = "action-column";
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = className;
-    button.title = label;
-    button.setAttribute("aria-label", label);
-    const glyph = document.createElement("i");
-    glyph.className = `fa-solid ${icon}`;
-    glyph.setAttribute("aria-hidden", "true");
-    button.appendChild(glyph);
-    button.addEventListener("click", handler);
-    cell.appendChild(button);
-    return cell;
-}
-byId("directoryBtn").addEventListener("click", async () => {
-    const requestVersion = ++directoryRequestVersion;
-    const params = new URLSearchParams();
-    const firstName = byId("firstname").value.trim(), lastName = byId("lastname").value.trim();
-    if (firstName) params.set("firstname", firstName);
-    if (lastName) params.set("lastname", lastName);
-    params.set("t", Date.now());
-    showMessage("Loading Directory");
-    try {
-        const response = await fetch(`/api/officialsDirectory?${params}`);
-        if (requestVersion !== directoryRequestVersion) return;
-        if (requiresLogin(response)) return;
-        if (!response.ok) return showMessage("Unable to load directory.");
-        const officials = await response.json();
-        if (requestVersion !== directoryRequestVersion) return;
-        const tbody = document.querySelector("#officialsTable tbody");
-        tbody.replaceChildren();
-        byId("directorySection").style.display = "block";
-        (officials || []).forEach(value => {
-            const official = normalizeOfficial(value);
-            const row = document.createElement("tr");
-            const name = `${official.FirstName} ${official.LastName}`.trim();
-            const selectCell = document.createElement("td");
-            selectCell.className = "select-column";
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.className = "official-select";
-            checkbox.dataset.firstName = official.FirstName;
-            checkbox.dataset.lastName = official.LastName;
-            checkbox.setAttribute("aria-label", `Select ${name}`);
-            checkbox.addEventListener("change", updateDirectorySelection);
-            selectCell.appendChild(checkbox);
-            row.appendChild(selectCell);
-            row.appendChild(actionCell("btn-row-edit", "fa-pencil", `Edit ${name}`, () => openOfficialEditor(official, row)));
-            row.appendChild(actionCell("btn-row-delete", "fa-trash", `Delete ${name}`, async () => {
-                if (!await confirmOfficialDeletion("You are about to permanently delete this official.", name)) return;
-                showMessage(`Deleting ${name}...`);
-                try {
-                    const response = await deleteDirectoryOfficial(official.FirstName, official.LastName);
-                    if (requiresLogin(response)) return;
-                    if (response.status === 403) return showMessage("Permission denied. Read-only users cannot delete officials.");
-                    const message = await response.text();
-                    if (!response.ok) return showMessage(message || "Error deleting official.");
-                    row.remove();
-                    updateDirectorySelection();
-                    showMessage(message || "Official deleted successfully.");
-                } catch { showMessage("Server unavailable."); }
-            }));
-            [official.FirstName, official.LastName, official.Phone, official.Email, official.Address].forEach(value => {
-                const cell = document.createElement("td");
-                cell.textContent = value;
-                row.appendChild(cell);
-            });
-            tbody.appendChild(row);
-        });
-        updateDirectorySelection();
-        showMessage(officials?.length ? `${officials.length} officials loaded.` : "No officials found for the selected filter.");
-    } catch { if (requestVersion === directoryRequestVersion) showMessage("Server unavailable."); }
-});
-</script>
-</body>
+updateFileControls();
+restoreLastFile();
+
+// The registry is loaded when Search Officials or Show All Officials is requested.
+        </script>
+    </body>
 </html>
