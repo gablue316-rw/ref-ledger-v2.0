@@ -12,7 +12,9 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/mail"
+	"net/url"
 
 	"crypto/rand"
 	"encoding/hex"
@@ -33,6 +35,7 @@ import (
 	"ref-ledger-v2/internal/api"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/handlers"
+	"ref-ledger-v2/internal/metrics"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/reports"
 	"ref-ledger-v2/internal/utils"
@@ -8730,6 +8733,9 @@ func main() {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	database.CreateSettingsIndexes()
 
 	result, err, numOfIndices := sc.IsIndexed()
@@ -8789,6 +8795,13 @@ func main() {
 		utils.AuditLog.Println("Failed to initialize users collection.")
 		return
 	}
+
+	err = metrics.EnsureIndexes(ctx, database.Client.Database(database.Database).Collection("metrics"))
+
+	if err != nil {
+		log.Fatalf("Failed to initialize metrics: %v", err)
+	}
+
 	utils.AuditLog.Println("All collections initialized successfully.")
 
 	fmt.Println("Registering routes...")
@@ -8987,6 +9000,40 @@ func main() {
 
 	})
 
+	monitorURL, err := url.Parse(
+		"https://refledgermonitor-yn2l3v49.back4.app",
+	)
+	if err != nil {
+		log.Fatalf("Invalid monitor URL: %v", err)
+	}
+
+	monitorProxy := &httputil.ReverseProxy{
+		Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(monitorURL)
+
+			// Ref Ledger's session cookies are not needed by the monitor.
+			r.Out.Header.Del("Cookie")
+		},
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
+			log.Printf("Monitor proxy error: %v", err)
+			http.Error(
+				w,
+				"Metrics monitor is temporarily unavailable.",
+				http.StatusBadGateway,
+			)
+		},
+	}
+
+	// Redirect to the trailing slash so relative API URLs resolve correctly.
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/metrics/", http.StatusTemporaryRedirect)
+	})
+
+	// /metrics/api/... becomes /api/... on the monitor.
+	mux.Handle(
+		"/metrics/",
+		http.StripPrefix("/metrics", monitorProxy),
+	)
 	mux.Handle(
 		"/components/",
 		http.StripPrefix(
