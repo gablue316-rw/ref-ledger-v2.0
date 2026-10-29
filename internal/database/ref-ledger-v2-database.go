@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"ref-ledger-v2/internal/metrics"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
 
@@ -2004,6 +2005,16 @@ func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection st
 		return
 	}
 
+	if err := metrics.UpdateCollection(
+		ctx,
+		db.Collection("metrics"),
+		filter["tenantId"].(string),
+		"games",
+		0, 0, result.DeletedCount, 0,
+	); err != nil {
+		log.Printf("Failed to record game metrics: %v", err)
+	}
+
 	fmt.Println("Deleted Record with GameId of", filter["gameId"], " Records Deleted:", result.DeletedCount)
 }
 
@@ -2675,6 +2686,17 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	if result.MatchedCount == 0 {
 		return fmt.Errorf("game not found")
 	}
+
+	if err := metrics.UpdateCollection(
+		ctx,
+		db.Collection("metrics"),
+		tId,
+		"games",
+		0, result.ModifiedCount, 0, 0,
+	); err != nil {
+		log.Printf("Failed to record game metrics: %v", err)
+	}
+
 	fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
 	return nil
 }
@@ -2702,6 +2724,15 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 		if err != nil {
 			totalErrors++
 			fmt.Println(err)
+			if err := metrics.UpdateCollection(
+				ctx,
+				db.Collection("metrics"),
+				tId,
+				"games",
+				0, 0, 0, 1,
+			); err != nil {
+				log.Printf("Failed to record game metrics: %v", err)
+			}
 			continue
 		}
 
@@ -2715,6 +2746,17 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 				utils.MinTaxYear,
 				utils.MaxTaxYear,
 			)
+
+			if err := metrics.UpdateCollection(
+				ctx,
+				db.Collection("metrics"),
+				tId,
+				"games",
+				0, 0, 0, 1,
+			); err != nil {
+				log.Printf("Failed to record game metrics: %v", err)
+			}
+
 			continue
 		}
 
@@ -2732,6 +2774,16 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 
 			totalErrors++
 			fmt.Printf("Game %s: %v\n", v.GameId, utils.ErrInvalidTaxYear)
+
+			if err := metrics.UpdateCollection(
+				ctx,
+				db.Collection("metrics"),
+				tId,
+				"games",
+				0, 0, 0, 1,
+			); err != nil {
+				log.Printf("Failed to record game metrics: %v", err)
+			}
 			continue
 		}
 
@@ -2753,6 +2805,15 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 
 				totalErrors++
 				fmt.Printf("Game %s: %v\n", v.GameId, utils.ErrInvalidTaxYear)
+				if err := metrics.UpdateCollection(
+					ctx,
+					db.Collection("metrics"),
+					tId,
+					"games",
+					0, 0, 0, 1,
+				); err != nil {
+					log.Printf("Failed to record game metrics: %v", err)
+				}
 				continue
 			}
 
@@ -2767,12 +2828,40 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 			if err != nil {
 				fmt.Println(err)
 			}
+			if err := metrics.UpdateCollection(
+				ctx,
+				db.Collection("metrics"),
+				tId,
+				"games",
+				0, 0, 0, 1,
+			); err != nil {
+				log.Printf("Failed to record game metrics: %v", err)
+			}
 			continue
 		}
 		_, err = coll.InsertOne(ctx, doc)
 		if err != nil {
 			fmt.Println("Insert failed.  Reason:", err)
+			if err := metrics.UpdateCollection(
+				ctx,
+				db.Collection("metrics"),
+				tId,
+				"games",
+				0, 0, 0, 1,
+			); err != nil {
+				log.Printf("Failed to record game metrics: %v", err)
+			}
 			return
+		}
+
+		if err := metrics.UpdateCollection(
+			ctx,
+			db.Collection("metrics"),
+			tId,
+			"games",
+			1, 0, 0, 0,
+		); err != nil {
+			log.Printf("Failed to record game metrics: %v", err)
 		}
 		recordsInserted++
 
@@ -3866,6 +3955,8 @@ func (gc *GameCollection) Delete(association, gameId, tid string) error {
 	var filter bson.M
 	var result *mongo.DeleteResult
 
+	db := Client.Database(Database)
+
 	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
 	if err != nil {
 		return fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
@@ -3884,6 +3975,16 @@ func (gc *GameCollection) Delete(association, gameId, tid string) error {
 
 	if result.DeletedCount == 0 {
 		return fmt.Errorf("game not found")
+	}
+
+	if err := metrics.UpdateCollection(
+		context.TODO(),
+		db.Collection("metrics"),
+		filter["tenantId"].(string),
+		"games",
+		0, 0, result.DeletedCount, 0,
+	); err != nil {
+		log.Printf("Failed to record game metrics: %v", err)
 	}
 
 	fmt.Println("Deleted Record with Game Id of", filter["gameId"], " in", gc.Coll.Name(), "Records Deleted:", result.DeletedCount)
@@ -3931,6 +4032,7 @@ func (gc *GameCollection) Add(
 	)
 	defer cancel()
 
+	db := Client.Database(Database)
 	doc := convertGameDescrWithOfficials(game)
 	doc.TenantId = tenantId
 
@@ -3957,6 +4059,16 @@ func (gc *GameCollection) Add(
 	if err != nil {
 		gc.LastError = err
 		return fmt.Errorf("insert failed: %w", err)
+	}
+
+	if err := metrics.UpdateCollection(
+		ctx,
+		db.Collection("metrics"),
+		tenantId,
+		"games",
+		1, 0, 0, 0,
+	); err != nil {
+		log.Printf("Failed to record game metrics: %v", err)
 	}
 
 	gc.LastError = nil
