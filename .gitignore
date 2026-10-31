@@ -55,3 +55,7 @@ resend
 
 # test-files
 test-files
+
+# *.exe
+*.exe
+ref-ledger-v2.exe

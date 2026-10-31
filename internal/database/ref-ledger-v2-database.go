@@ -16,7 +16,6 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"ref-ledger-v2/internal/metrics"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
 
@@ -73,6 +72,89 @@ func ValidStatus(status string) bool {
 		}
 	}
 	return false
+}
+
+func MetricsAdded(tenantId, collection string, count int64) {
+	err := incrementMetric(tenantId, collection, "added", count)
+	if err != nil {
+		log.Printf("Metrics failed: %v", err)
+	}
+}
+
+func MetricsUpdated(tenantId, collection string, count int64) {
+	err := incrementMetric(tenantId, collection, "updated", count)
+	if err != nil {
+		log.Printf("Metrics failed: %v", err)
+	}
+}
+
+func MetricsDeleted(tenantId, collection string, count int64) {
+	err := incrementMetric(tenantId, collection, "deleted", count)
+	if err != nil {
+		log.Printf("Metrics failed: %v", err)
+	}
+}
+
+func MetricsErrors(tenantId, collection string, count int64) {
+	err := incrementMetric(tenantId, collection, "errors", count)
+	if err != nil {
+		log.Printf("Metrics failed: %v", err)
+	}
+}
+
+func incrementMetric(
+	tenantId, collection, field string,
+	count int64,
+) error {
+	if Client == nil || Database == "" {
+		return fmt.Errorf("metrics database is not initialized")
+	}
+	if tenantId == "" || collection == "" {
+		return fmt.Errorf("tenantId and collection are required")
+	}
+	if count < 0 {
+		return fmt.Errorf("metric count must not be negative")
+	}
+	if count == 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
+	defer cancel()
+
+	filter := bson.M{
+		"category":    "collection",
+		"bucketStart": time.Now().UTC().Truncate(time.Minute),
+		"collection":  collection,
+		"tenantId":    tenantId,
+	}
+
+	// Initialize the other counters only when inserting a new bucket.
+	initial := bson.M{}
+	for _, counter := range []string{"added", "updated", "deleted", "errors"} {
+		if counter != field {
+			initial[counter] = int64(0)
+		}
+	}
+
+	update := bson.M{
+		"$inc":         bson.M{field: count},
+		"$setOnInsert": initial,
+	}
+
+	_, err := Client.Database(Database).
+		Collection("metrics").
+		UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+
+	if err != nil {
+		return fmt.Errorf("increment %s metric for %s: %w",
+			field, collection, err)
+	}
+
+	return nil
 }
 
 func convertDateStringToTime(date, gameTime string) (time.Time, error) {
@@ -2005,15 +2087,7 @@ func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection st
 		return
 	}
 
-	if err := metrics.UpdateCollection(
-		ctx,
-		db.Collection("metrics"),
-		filter["tenantId"].(string),
-		"games",
-		0, 0, result.DeletedCount, 0,
-	); err != nil {
-		log.Printf("Failed to record game metrics: %v", err)
-	}
+	MetricsDeleted(filter["tenantId"].(string), collection, result.DeletedCount)
 
 	fmt.Println("Deleted Record with GameId of", filter["gameId"], " Records Deleted:", result.DeletedCount)
 }
@@ -2210,10 +2284,24 @@ func VerifyGameMatchesAssociation(gameIds []int64, association, tenantId string)
 	return gameErrors
 }
 
+//
+// Example Calls
+//
+
+/*
+MetricsAdded(tenantId, "games", 1)
+
+MetricsUpdated(tenantId, "games", 3)
+
+MetricsDeleted(tenantId, "sites", 2)
+
+MetricsErrors(tenantId, "officials", 1)
+*/
+
 func InsertPaymentDocs(
 	parentCtx context.Context,
 	payment []model.PaymentDescriptor,
-	dbase, collection, tId string,
+	dbase, collection, tenantId string,
 ) (int, int, int, []error) {
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -2272,10 +2360,10 @@ func InsertPaymentDocs(
 
 		v.TaxYear = strconv.Itoa(taxYear)
 		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-		doc.TenantId = tId
+		doc.TenantId = tenantId
 		doc.TaxYear = taxYear
 
-		paymentExists, err := PaymentExists(doc, tId)
+		paymentExists, err := PaymentExists(doc, tenantId)
 		if err != nil {
 			totalErrors++
 			fmt.Println(err)
@@ -2306,7 +2394,7 @@ func InsertPaymentDocs(
 		}
 
 		gameErrors := VerifyGameMatchesAssociation(
-			gameIds, v.Association, tId,
+			gameIds, v.Association, tenantId,
 		)
 		if len(gameErrors) > 0 {
 			totalErrors++
@@ -2314,14 +2402,14 @@ func InsertPaymentDocs(
 			continue
 		}
 
-		statusErrors := VerifyGameStatus(gameIds, v.Association, tId)
+		statusErrors := VerifyGameStatus(gameIds, v.Association, tenantId)
 		if len(statusErrors) > 0 {
 			totalErrors++
 			importErrors = append(importErrors, statusErrors...)
 			continue
 		}
 
-		totalGameFee, err := GetGameFee(gameIds, tId, "", v.Association)
+		totalGameFee, err := GetGameFee(gameIds, tenantId, "", v.Association)
 		if err != nil {
 			utils.AuditLog.Printf(
 				"Failed to get game fee for Game Ids %v. Reason: %v",
@@ -2356,15 +2444,18 @@ func InsertPaymentDocs(
 			fmt.Println("Insert failed. Reason:", err)
 			totalErrors++
 			importErrors = append(importErrors, err)
+			MetricsErrors(tenantId, "payments", 1)
 			continue
 		}
+
+		MetricsAdded(tenantId, "payments", 1)
 
 		recordsInserted++
 		paidCount, paidErr := UpdateGameStatusToPaid(
 			ctx,
 			gameIds,
 			v.Association,
-			tId,
+			tenantId,
 		)
 		gamesUpdatedToPaid += paidCount
 
@@ -2390,7 +2481,7 @@ func InsertPaymentDocs(
 func UpdatePaymentDocs(
 	parentCtx context.Context,
 	payment []model.PaymentDescriptor,
-	dbase, collection, tId string,
+	dbase, collection, tenantId string,
 ) (int, int, int, []error) {
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -2449,10 +2540,10 @@ func UpdatePaymentDocs(
 
 		v.TaxYear = strconv.Itoa(taxYear)
 		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-		doc.TenantId = tId
+		doc.TenantId = tenantId
 		doc.TaxYear = taxYear
 
-		paymentExists, err := PaymentExists(doc, tId)
+		paymentExists, err := PaymentExists(doc, tenantId)
 		if err != nil {
 			totalErrors++
 			fmt.Println(err)
@@ -2485,7 +2576,7 @@ func UpdatePaymentDocs(
 		fmt.Println("Game Ids:", gameIds)
 
 		gameErrors := VerifyGameMatchesAssociation(
-			gameIds, v.Association, tId,
+			gameIds, v.Association, tenantId,
 		)
 		if len(gameErrors) > 0 {
 			totalErrors++
@@ -2508,7 +2599,7 @@ func UpdatePaymentDocs(
 		// and added games need to become Paid. That reconciliation still
 		// needs to be implemented separately.
 
-		totalGameFee, err := GetGameFee(gameIds, tId, "", v.Association)
+		totalGameFee, err := GetGameFee(gameIds, tenantId, "", v.Association)
 		if err != nil {
 			utils.AuditLog.Printf(
 				"Failed to get game fee for Game Ids %v. Reason: %v",
@@ -2536,7 +2627,7 @@ func UpdatePaymentDocs(
 
 		filter := bson.M{
 			"paymentId": doc.PaymentId,
-			"tenantId":  tId,
+			"tenantId":  tenantId,
 		}
 
 		update := bson.M{
@@ -2547,6 +2638,7 @@ func UpdatePaymentDocs(
 
 		result, err := coll.UpdateOne(ctx, filter, update)
 		if err != nil {
+			MetricsErrors(tenantId, "payments", 1)
 			updateErr := fmt.Errorf(
 				"payment update failed for PaymentId %s: %w",
 				doc.PaymentId, err,
@@ -2586,7 +2678,7 @@ func UpdatePaymentDocs(
 			ctx,
 			gameIds,
 			v.Association,
-			tId,
+			tenantId,
 		)
 		gamesUpdatedToPaid += paidCount
 
@@ -2687,15 +2779,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		return fmt.Errorf("game not found")
 	}
 
-	if err := metrics.UpdateCollection(
-		ctx,
-		db.Collection("metrics"),
-		tId,
-		"games",
-		0, result.ModifiedCount, 0, 0,
-	); err != nil {
-		log.Printf("Failed to record game metrics: %v", err)
-	}
+	MetricsUpdated(tId, "games", result.ModifiedCount)
 
 	fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
 	return nil
@@ -2724,15 +2808,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 		if err != nil {
 			totalErrors++
 			fmt.Println(err)
-			if err := metrics.UpdateCollection(
-				ctx,
-				db.Collection("metrics"),
-				tId,
-				"games",
-				0, 0, 0, 1,
-			); err != nil {
-				log.Printf("Failed to record game metrics: %v", err)
-			}
+			MetricsErrors(tId, "games", 1)
 			continue
 		}
 
@@ -2747,15 +2823,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 				utils.MaxTaxYear,
 			)
 
-			if err := metrics.UpdateCollection(
-				ctx,
-				db.Collection("metrics"),
-				tId,
-				"games",
-				0, 0, 0, 1,
-			); err != nil {
-				log.Printf("Failed to record game metrics: %v", err)
-			}
+			MetricsErrors(tId, "games", 1)
 
 			continue
 		}
@@ -2775,15 +2843,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 			totalErrors++
 			fmt.Printf("Game %s: %v\n", v.GameId, utils.ErrInvalidTaxYear)
 
-			if err := metrics.UpdateCollection(
-				ctx,
-				db.Collection("metrics"),
-				tId,
-				"games",
-				0, 0, 0, 1,
-			); err != nil {
-				log.Printf("Failed to record game metrics: %v", err)
-			}
+			MetricsErrors(tId, "games", 1)
 			continue
 		}
 
@@ -2805,15 +2865,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 
 				totalErrors++
 				fmt.Printf("Game %s: %v\n", v.GameId, utils.ErrInvalidTaxYear)
-				if err := metrics.UpdateCollection(
-					ctx,
-					db.Collection("metrics"),
-					tId,
-					"games",
-					0, 0, 0, 1,
-				); err != nil {
-					log.Printf("Failed to record game metrics: %v", err)
-				}
+				MetricsErrors(tId, "games", 1)
 				continue
 			}
 
@@ -2828,41 +2880,17 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 			if err != nil {
 				fmt.Println(err)
 			}
-			if err := metrics.UpdateCollection(
-				ctx,
-				db.Collection("metrics"),
-				tId,
-				"games",
-				0, 0, 0, 1,
-			); err != nil {
-				log.Printf("Failed to record game metrics: %v", err)
-			}
+			MetricsErrors(tId, "games", 1)
 			continue
 		}
 		_, err = coll.InsertOne(ctx, doc)
 		if err != nil {
 			fmt.Println("Insert failed.  Reason:", err)
-			if err := metrics.UpdateCollection(
-				ctx,
-				db.Collection("metrics"),
-				tId,
-				"games",
-				0, 0, 0, 1,
-			); err != nil {
-				log.Printf("Failed to record game metrics: %v", err)
-			}
+			MetricsErrors(tId, "games", 1)
 			return
 		}
 
-		if err := metrics.UpdateCollection(
-			ctx,
-			db.Collection("metrics"),
-			tId,
-			"games",
-			1, 0, 0, 0,
-		); err != nil {
-			log.Printf("Failed to record game metrics: %v", err)
-		}
+		MetricsAdded(tId, "games", 1)
 		recordsInserted++
 
 		//fmt.Println("Inserted ID:", result.InsertedID)
@@ -2931,7 +2959,6 @@ func (ac *AssociationCollection) Init(client *mongo.Client) error {
 	ac.DB = client.Database(Database)
 	ac.Coll = ac.DB.Collection("associations")
 
-	fmt.Println("Successfully initialized Associations Collection")
 	return nil
 }
 
@@ -2948,16 +2975,20 @@ func (ac *AssociationCollection) ConvAssocJsonToAssoc(
 	}
 }
 
-func (ac *AssociationCollection) DeleteAll(tenantid string) error {
+func (ac *AssociationCollection) DeleteAll(tenantId string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
-	results, err := ac.Coll.DeleteMany(ctx, bson.M{"tenantId": tenantid})
+	results, err := ac.Coll.DeleteMany(ctx, bson.M{"tenantId": tenantId})
 	if err != nil {
+		MetricsErrors(tenantId, "associations", 1)
 		ac.LastError = err
 		return fmt.Errorf("Delete failed.  Reason: %v", err)
 	}
-	fmt.Println("Total Records deleted from associations collection for tenantId", tenantid, ":", results.DeletedCount)
+
+	MetricsDeleted(tenantId, "associations", results.DeletedCount)
+
+	fmt.Println("Total Records deleted from associations collection for tenantId", tenantId, ":", results.DeletedCount)
 	return nil
 }
 
@@ -3015,10 +3046,12 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 
 	assocExists, err := ac.Exists(association.Id, tenantId)
 	if err != nil {
+		MetricsErrors(tenantId, "associations", 1)
 		return fmt.Errorf("error occurred while checking association existence: %v", err)
 	}
 
 	if assocExists {
+		MetricsErrors(tenantId, "associations", 1)
 		return fmt.Errorf("association with ID %q already exists", association.Id)
 	}
 
@@ -3028,8 +3061,11 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 	result, ac.LastError = ac.Coll.InsertOne(ctx, doc)
 
 	if ac.LastError != nil {
+		MetricsErrors(tenantId, "associations", 1)
 		return fmt.Errorf("Insert failed.  Reason: %v", ac.LastError)
 	}
+
+	MetricsAdded(tenantId, "associations", 1)
 
 	fmt.Println("Inserted ID:", result.InsertedID)
 
@@ -3237,13 +3273,16 @@ func (ac *AssociationCollection) Update(association Association, tenantId string
 
 	result, ac.LastError = ac.Coll.ReplaceOne(context.TODO(), filter, doc)
 	if ac.LastError != nil {
+		MetricsErrors(tenantId, "associations", 1)
 		return fmt.Errorf("Failed to update association.  Reason: %v", ac.LastError)
 	}
 
 	if result.MatchedCount == 0 {
+		MetricsErrors(tenantId, "associations", 1)
 		return fmt.Errorf("association not found")
 	}
 
+	MetricsUpdated(tenantId, "associations", result.ModifiedCount)
 	fmt.Println("Record updated in", ac.Coll.Name())
 	return nil
 }
@@ -3260,13 +3299,15 @@ func (ac *AssociationCollection) Delete(id string, tenantId string) error {
 
 	result, ac.LastError = ac.Coll.DeleteOne(context.TODO(), filter)
 	if ac.LastError != nil {
+		MetricsErrors(tenantId, "associations", 1)
 		return fmt.Errorf("Failed to delete association.  Reason: %v", ac.LastError)
 	}
 
 	if result.DeletedCount == 0 {
+		MetricsErrors(tenantId, "associations", 1)
 		return fmt.Errorf("association not found")
 	}
-
+	MetricsDeleted(tenantId, "associations", result.DeletedCount)
 	fmt.Println("Deleted Record with Association Id of", filter["id"], " in", ac.Coll.Name(), "Records Deleted:", result.DeletedCount)
 
 	return nil
@@ -3574,7 +3615,6 @@ func (sc *SiteCollection) Init(client *mongo.Client) error {
 	sc.DB = client.Database(Database)
 	sc.Coll = sc.DB.Collection("sites")
 
-	fmt.Println("Successfully initialized Site Collection")
 	return nil
 }
 
@@ -3589,12 +3629,15 @@ func (sc *SiteCollection) Add(site Site, tenantId string) error {
 
 	result, err := sc.Coll.InsertOne(ctx, doc)
 	if err != nil {
+		MetricsErrors(tenantId, "sites", 1)
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("site %q already exists", doc.Name)
 		}
 
 		return fmt.Errorf("failed to insert site: %w", err)
 	}
+
+	MetricsAdded(tenantId, "sites", 1)
 
 	fmt.Println("Inserted ID:", result.InsertedID)
 	return nil
@@ -3827,12 +3870,16 @@ func (sc *SiteCollection) Update(site Site, tenantId string) error {
 
 	result, sc.LastError = sc.Coll.ReplaceOne(context.TODO(), filter, doc)
 	if sc.LastError != nil {
+		MetricsErrors(tenantId, "sites", 1)
 		return fmt.Errorf("Failed to update site.  Reason: %v", sc.LastError)
 	}
 
 	if result.MatchedCount == 0 {
+		MetricsErrors(tenantId, "sites", 1)
 		return fmt.Errorf("site not found")
 	}
+
+	MetricsUpdated(tenantId, "sites", result.ModifiedCount)
 
 	fmt.Println("Record updated in", sc.Coll.Name())
 	return nil
@@ -3848,8 +3895,11 @@ func (sc *SiteCollection) DeleteAll(tenantId string) error {
 
 	result, sc.LastError = sc.Coll.DeleteMany(context.TODO(), filter)
 	if sc.LastError != nil {
+		MetricsErrors(tenantId, "sites", 1)
 		return fmt.Errorf("Failed to delete all sites.  Reason: %v", sc.LastError)
 	}
+
+	MetricsDeleted(tenantId, "sites", result.DeletedCount)
 
 	fmt.Println("Deleted ", result.DeletedCount, " records from ", sc.Coll.Name())
 	return nil
@@ -3867,12 +3917,16 @@ func (sc *SiteCollection) Delete(name, tenantId string) error {
 
 	result, sc.LastError = sc.Coll.DeleteOne(context.TODO(), filter)
 	if sc.LastError != nil {
+		MetricsErrors(tenantId, "sites", 1)
 		return fmt.Errorf("Failed to delete site.  Reason: %v", sc.LastError)
 	}
 
 	if result.DeletedCount == 0 {
+		MetricsErrors(tenantId, "sites", 1)
 		return fmt.Errorf("site not found")
 	}
+
+	MetricsDeleted(tenantId, "sites", result.DeletedCount)
 
 	fmt.Println("Deleted Record with Site Name of", filter["name"], " in", sc.Coll.Name(), "Records Deleted:", result.DeletedCount)
 
@@ -3910,7 +3964,6 @@ func (gc *GameCollection) Init(client *mongo.Client) error {
 	gc.DB = client.Database(Database)
 	gc.Coll = gc.DB.Collection("games")
 
-	fmt.Println("Successfully initialized Game Collection")
 	return nil
 }
 
@@ -3955,8 +4008,6 @@ func (gc *GameCollection) Delete(association, gameId, tid string) error {
 	var filter bson.M
 	var result *mongo.DeleteResult
 
-	db := Client.Database(Database)
-
 	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
 	if err != nil {
 		return fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
@@ -3977,15 +4028,7 @@ func (gc *GameCollection) Delete(association, gameId, tid string) error {
 		return fmt.Errorf("game not found")
 	}
 
-	if err := metrics.UpdateCollection(
-		context.TODO(),
-		db.Collection("metrics"),
-		filter["tenantId"].(string),
-		"games",
-		0, 0, result.DeletedCount, 0,
-	); err != nil {
-		log.Printf("Failed to record game metrics: %v", err)
-	}
+	MetricsDeleted(tid, "games", result.DeletedCount)
 
 	fmt.Println("Deleted Record with Game Id of", filter["gameId"], " in", gc.Coll.Name(), "Records Deleted:", result.DeletedCount)
 
@@ -4032,7 +4075,6 @@ func (gc *GameCollection) Add(
 	)
 	defer cancel()
 
-	db := Client.Database(Database)
 	doc := convertGameDescrWithOfficials(game)
 	doc.TenantId = tenantId
 
@@ -4061,15 +4103,7 @@ func (gc *GameCollection) Add(
 		return fmt.Errorf("insert failed: %w", err)
 	}
 
-	if err := metrics.UpdateCollection(
-		ctx,
-		db.Collection("metrics"),
-		tenantId,
-		"games",
-		1, 0, 0, 0,
-	); err != nil {
-		log.Printf("Failed to record game metrics: %v", err)
-	}
+	MetricsAdded(tenantId, "games", 1)
 
 	gc.LastError = nil
 	fmt.Println("Inserted ID:", result.InsertedID)
@@ -4646,7 +4680,6 @@ func (oc *OfficialCollection) Init(client *mongo.Client) error {
 	oc.Coll = oc.DB.Collection("officials")
 	oc.Initialized = true
 
-	fmt.Println("Successfully initialized Official Collection")
 	return nil
 }
 
@@ -4681,6 +4714,7 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 
 	doc, err := oc.convOfficialToDoc(official, tenantId, true)
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("failed to convert official to document: %w", err)
 	}
 
@@ -4688,12 +4722,15 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 
 	result, err := oc.Coll.InsertOne(ctx, doc)
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("Official already exists.")
 		}
 
 		return fmt.Errorf("failed to insert official: %w", err)
 	}
+
+	MetricsAdded(tenantId, "officials", 1)
 
 	fmt.Println("Inserted ID:", result.InsertedID)
 	return nil
@@ -4714,6 +4751,7 @@ func getOfficialsId(fname, lname, tenantId string) (int64, error) {
 
 	err := coll.FindOne(context.TODO(), filter).Decode(&doc)
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			fmt.Println("Official is not found!")
 			return 0, fmt.Errorf(
@@ -4757,6 +4795,7 @@ func (oc *OfficialCollection) GetById(officialId int64, tenantId string) (Offici
 
 	err := oc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			fmt.Println("Official is not found!")
 			return Official{}, fmt.Errorf(
@@ -4791,6 +4830,7 @@ func (oc *OfficialCollection) Get(firstName, lastName, tenantId string) (Officia
 
 	err := oc.Coll.FindOne(context.TODO(), filter, opts).Decode(&doc)
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		fmt.Println("Error:", err)
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return Official{}, fmt.Errorf("official not found")
@@ -4829,6 +4869,7 @@ func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantI
 
 	cursor, err := oc.Coll.Find(context.TODO(), filter, opts)
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		fmt.Println("Error:", err)
 		return []Official{}, fmt.Errorf("failed to query officials. Reason: %v", err)
 	}
@@ -4839,6 +4880,7 @@ func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantI
 
 		if err := cursor.Decode(&doc); err != nil {
 			fmt.Println("Error:", err)
+			MetricsErrors(tenantId, "officials", 1)
 			return []Official{}, fmt.Errorf("failed to decode official document. Reason: %v", err)
 		}
 
@@ -4847,6 +4889,7 @@ func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantI
 
 	if err := cursor.Err(); err != nil {
 		fmt.Println("Error:", err)
+		MetricsErrors(tenantId, "officials", 1)
 		return []Official{}, fmt.Errorf("cursor error while reading officials. Reason: %v", err)
 	}
 
@@ -4868,6 +4911,7 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 	doc, err := oc.convOfficialToDoc(official, tenantId, false)
 
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("Failed to convert official to document.  Reason: %v", err)
 	}
 
@@ -4875,12 +4919,16 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 
 	result, oc.LastError = oc.Coll.ReplaceOne(context.TODO(), filter, doc)
 	if oc.LastError != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("Failed to update official.  Reason: %v", oc.LastError)
 	}
 
 	if result.MatchedCount == 0 {
+		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("official not found")
 	}
+
+	MetricsUpdated(tenantId, "officials", result.ModifiedCount)
 
 	fmt.Println("Record updated in", oc.Coll.Name())
 	return nil
@@ -4895,9 +4943,11 @@ func (oc *OfficialCollection) DeleteAll(tenantId string) error {
 	}
 	result, oc.LastError = oc.Coll.DeleteMany(context.TODO(), filter)
 	if oc.LastError != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("Failed to delete all officials.  Reason: %v", oc.LastError)
 	}
 
+	MetricsDeleted(tenantId, "officials", result.DeletedCount)
 	fmt.Println("Deleted ", result.DeletedCount, " records from ", oc.Coll.Name())
 	return nil
 }
@@ -4915,6 +4965,7 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error
 	var official OfficialDoc
 	err := oc.Coll.FindOne(ctx, filter).Decode(&official)
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		oc.LastError = err
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return fmt.Errorf("official not found")
@@ -4931,6 +4982,7 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error
 	gamesCollection := oc.Coll.Database().Collection("games")
 	err = gamesCollection.FindOne(ctx, gameFilter).Err()
 	if err == nil {
+
 		oc.LastError = fmt.Errorf(
 			"cannot delete %s %s: official is assigned to a game",
 			firstName, lastName,
@@ -4939,6 +4991,7 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error
 	}
 	if !errors.Is(err, mongo.ErrNoDocuments) {
 		oc.LastError = err
+		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("failed to check game assignments: %w", err)
 	}
 
@@ -4953,12 +5006,15 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error
 	result, err := oc.Coll.DeleteOne(ctx, deleteFilter)
 	oc.LastError = err
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("failed to delete official: %w", err)
 	}
 	if result.DeletedCount == 0 {
+		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("official not found")
 	}
 
+	MetricsDeleted(tenantId, "officials", result.DeletedCount)
 	fmt.Println("Deleted official:", firstName, lastName)
 	return nil
 }
@@ -5001,6 +5057,7 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 
 	cursor, err := oc.Coll.Find(context.TODO(), filter, opts)
 	if err != nil {
+		MetricsErrors(tenantId, "officials", 1)
 		fmt.Println("Error:", err)
 		return []OfficialName{}, fmt.Errorf("failed to query officials. Reason: %v", err)
 	}
@@ -5020,6 +5077,7 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 
 		if err := cursor.Decode(&doc); err != nil {
 			fmt.Println("Error:", err)
+			MetricsErrors(tenantId, "officials", 1)
 			return []OfficialName{}, fmt.Errorf("failed to decode official document. Reason: %v", err)
 		}
 
@@ -5029,6 +5087,7 @@ func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName
 
 	if err := cursor.Err(); err != nil {
 		fmt.Println("Error:", err)
+		MetricsErrors(tenantId, "officials", 1)
 		return []OfficialName{}, fmt.Errorf("cursor error while reading officials. Reason: %v", err)
 	}
 
@@ -5109,12 +5168,25 @@ type ExpensesCollection struct {
 	LastError error
 }
 
+//
+// Example Calls
+//
+
+/*
+MetricsAdded(tenantId, "games", 1)
+
+MetricsUpdated(tenantId, "games", 3)
+
+MetricsDeleted(tenantId, "sites", 2)
+
+MetricsErrors(tenantId, "officials", 1)
+*/
+
 func (ec *ExpensesCollection) Init(client *mongo.Client) error {
 
 	ec.DB = client.Database(Database)
 	ec.Coll = ec.DB.Collection("expenses")
 
-	fmt.Println("Successfully initialized Expense Collection")
 	return nil
 }
 
@@ -5203,6 +5275,7 @@ func (ec *ExpensesCollection) GetExpense(assoc, tenantId, expenseType, taxYear s
 	// Query to find all documents
 	cursor, err := ec.Coll.Find(ctx, filter)
 	if err != nil {
+		MetricsErrors(tenantId, "expenses", 1)
 		return totalExpense, fmt.Errorf("GetExpense failure.  Reason: %s", err)
 	}
 
@@ -5210,6 +5283,7 @@ func (ec *ExpensesCollection) GetExpense(assoc, tenantId, expenseType, taxYear s
 	err = cursor.All(ctx, &results)
 	if err != nil {
 		fmt.Println("Error", err)
+		MetricsErrors(tenantId, "expenses", 1)
 		return totalExpense, fmt.Errorf("GetExpense failure.  Reason: %s", err)
 	}
 
@@ -5267,14 +5341,14 @@ func (ec *ExpensesCollection) GenerateExpenseId(expense Expense) string {
 
 }
 
-func (ec *ExpensesCollection) Delete(expenseId, association, tId string) error {
+func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string) error {
 
 	//fmt.Println("Deleting expense")
-	fmt.Println("===== Attempting to delete Expense Id", expenseId, "for Association", association, "and tenant id", tId, "=====")
+	fmt.Println("===== Attempting to delete Expense Id", expenseId, "for Association", association, "and tenant id", tenantId, "=====")
 
 	expenseId = strings.TrimSpace(expenseId)
 	association = strings.TrimSpace(association)
-	tId = strings.TrimSpace(tId)
+	tenantId = strings.TrimSpace(tenantId)
 
 	if expenseId == "" {
 		return fmt.Errorf("expense ID is required")
@@ -5284,14 +5358,14 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tId string) error {
 		return fmt.Errorf("association is required")
 	}
 
-	if tId == "" {
+	if tenantId == "" {
 		return fmt.Errorf("tenant ID is required")
 	}
 
 	filter := bson.M{
 		"expenseId":   expenseId,
 		"association": association,
-		"tenantId":    tId,
+		"tenantId":    tenantId,
 	}
 
 	result, err := ec.Coll.DeleteOne(
@@ -5300,6 +5374,7 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tId string) error {
 	)
 
 	if err != nil {
+		MetricsErrors(tenantId, "expenses", 1)
 		return fmt.Errorf(
 			"failed to delete expense %q for association %q: %w",
 			expenseId,
@@ -5309,13 +5384,14 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tId string) error {
 	}
 
 	if result.DeletedCount == 0 {
+		MetricsErrors(tenantId, "expenses", 1)
 		return fmt.Errorf(
 			"expense %q for association %q was not found",
 			expenseId,
 			association,
 		)
 	}
-
+	MetricsDeleted(tenantId, "expenses", result.DeletedCount)
 	return nil
 }
 
@@ -5403,6 +5479,7 @@ func (ec *ExpensesCollection) Update(
 		update,
 	)
 	if err != nil {
+		MetricsErrors(tenantId, "expenses", 1)
 		ec.LastError = err
 
 		return fmt.Errorf(
@@ -5414,12 +5491,15 @@ func (ec *ExpensesCollection) Update(
 	}
 
 	if result.MatchedCount == 0 {
+		MetricsErrors(tenantId, "expenses", 1)
 		return fmt.Errorf(
 			"expense %q for association %q was not found",
 			expenseId,
 			association,
 		)
 	}
+
+	MetricsUpdated(tenantId, "expenses", result.ModifiedCount)
 
 	fmt.Printf(
 		"Expense %s updated. Matched: %d, Modified: %d\n",
@@ -5454,10 +5534,12 @@ func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
 
 	result, ec.LastError = ec.Coll.InsertOne(ctx, doc)
 	if ec.LastError != nil {
+		MetricsErrors(tenantId, "expenses", 1)
 		return fmt.Errorf("Insert failed.  Reason: %v", ec.LastError)
 	}
 	fmt.Println("Inserted ID:", result.InsertedID)
 
+	MetricsAdded(tenantId, "expenses", 1)
 	return nil
 }
 
@@ -5481,7 +5563,6 @@ func (sc *SessionsCollection) Init(client *mongo.Client) error {
 	sc.DB = client.Database(Database)
 	sc.Coll = sc.DB.Collection("sessions")
 
-	fmt.Println("Successfully initialized Sessions Collection")
 	return nil
 }
 
@@ -5515,7 +5596,6 @@ func (uc *UsersCollection) Init(client *mongo.Client) error {
 	uc.DB = client.Database(Database)
 	uc.Coll = uc.DB.Collection("users")
 
-	fmt.Println("Successfully initialized Users Collection")
 	return nil
 }
 
@@ -5800,7 +5880,6 @@ func (lc *LevelsCollection) Init(client *mongo.Client) error {
 	lc.DB = client.Database(Database)
 	lc.Coll = lc.DB.Collection("levels")
 
-	fmt.Println("Successfully initialized Levels Collection")
 	return nil
 }
 
@@ -6190,7 +6269,6 @@ func (sc *SportsCollection) Init(client *mongo.Client) error {
 	sc.DB = client.Database(Database)
 	sc.Coll = sc.DB.Collection("sports")
 
-	fmt.Println("Successfully initialized Sports Collection")
 	return nil
 }
 
