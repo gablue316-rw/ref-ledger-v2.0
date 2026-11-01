@@ -2,7 +2,7 @@
 
 document.addEventListener("DOMContentLoaded", initializeNavbar);
 
-// Load and initialize the shared navbar
+// Load and initialize the shared navbar.
 async function initializeNavbar() {
     const container = document.getElementById("navbar-container");
 
@@ -16,9 +16,7 @@ async function initializeNavbar() {
         });
 
         if (!response.ok) {
-            throw new Error(
-                `Unable to load navbar: HTTP ${response.status}`
-            );
+            throw new Error(`Unable to load navbar: HTTP ${response.status}`);
         }
 
         container.innerHTML = await response.text();
@@ -36,10 +34,9 @@ async function initializeNavbar() {
     }
 }
 
-// Highlight the current navigation link
+// Highlight the current navigation link.
 function highlightCurrentPage() {
     const pathname = window.location.pathname;
-
     let page;
 
     if (pathname === "/" || pathname === "/dashboard") {
@@ -58,15 +55,11 @@ function highlightCurrentPage() {
 
     navigationLinks.forEach(function (link) {
         const linkPage = link.getAttribute("data-page");
-
-        link.classList.toggle(
-            "active",
-            linkPage === page
-        );
+        link.classList.toggle("active", linkPage === page);
     });
 }
 
-// Load the logged-in user
+// Load the logged-in user.
 async function loadCurrentUser() {
     const userName = document.getElementById("userName");
     const userRole = document.getElementById("userRole");
@@ -86,9 +79,7 @@ async function loadCurrentUser() {
         }
 
         if (!response.ok) {
-            throw new Error(
-                `Unable to load session: HTTP ${response.status}`
-            );
+            throw new Error(`Unable to load session: HTTP ${response.status}`);
         }
 
         const session = await response.json();
@@ -100,15 +91,6 @@ async function loadCurrentUser() {
             "Unknown User";
 
         userRole.textContent = formatRole(session.role);
-
-        const adminLink = document.getElementById("administrationNavLink");
-
-        if (adminLink) {
-            const isAdmin = session.role === "admin";
-            adminLink.hidden = !isAdmin;
-            adminLink.style.display = isAdmin ? "" : "none";
-        }
-
     } catch (error) {
         console.error("Unable to load user information:", error);
         userName.textContent = "Unknown User";
@@ -116,7 +98,7 @@ async function loadCurrentUser() {
     }
 }
 
-// Load environment information
+// Load environment information.
 async function loadEnvironment() {
     const navbar = document.getElementById("main-navbar");
     const environmentLabel = document.getElementById("environment-label");
@@ -131,9 +113,7 @@ async function loadEnvironment() {
         });
 
         if (!response.ok) {
-            throw new Error(
-                `Unable to load environment: HTTP ${response.status}`
-            );
+            throw new Error(`Unable to load environment: HTTP ${response.status}`);
         }
 
         const environmentInfo = await response.json();
@@ -169,9 +149,9 @@ async function loadEnvironment() {
     }
 }
 
-// Load pending-game counts
-// Display format: today / tomorrow / next 7 days
-// Example: 2/3/8
+// Load pending-game counts.
+// Display format: today / tomorrow / next 7 days.
+// Example: 2/3/8.
 async function loadPendingGames() {
     const badge = document.getElementById("pendingGames");
 
@@ -180,12 +160,9 @@ async function loadPendingGames() {
     }
 
     try {
-        const response = await fetch(
-            "/api/games/pending-games/count",
-            {
-                cache: "no-cache"
-            }
-        );
+        const response = await fetch("/api/games/pending-games/count", {
+            cache: "no-cache"
+        });
 
         if (!response.ok) {
             throw new Error(
@@ -245,7 +222,7 @@ function formatRole(role) {
         });
 }
 
-// Initialize logout
+// Initialize logout.
 function initializeLogout() {
     const logoutButton = document.getElementById("logoutBtn");
 
@@ -256,7 +233,7 @@ function initializeLogout() {
     logoutButton.addEventListener("click", logoutUser);
 }
 
-// Log out the current user
+// Log out the current user.
 async function logoutUser(event) {
     event.preventDefault();
 
@@ -266,9 +243,7 @@ async function logoutUser(event) {
         });
 
         if (!response.ok) {
-            throw new Error(
-                `Logout failed: HTTP ${response.status}`
-            );
+            throw new Error(`Logout failed: HTTP ${response.status}`);
         }
 
         window.location.href = "/login";

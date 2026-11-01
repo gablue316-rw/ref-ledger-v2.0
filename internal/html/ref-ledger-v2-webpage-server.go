@@ -174,53 +174,16 @@ func LogRequest(next http.Handler) http.Handler {
 	})
 }
 
-// adminRequired uses the signed-in session, never a client-supplied role.
-// Keep authRequired outside this wrapper to preserve login redirects for pages.
-func adminRequired(next http.HandlerFunc) http.HandlerFunc {
+// Catalog reads remain available to authenticated users of other pages.
+// The enclosing route must use authRequired.
+func catalogReadOnly(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		session, err := database.GetSession(r)
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		if session.Role != "admin" {
-			http.Error(w, "Administrator access required", http.StatusForbidden)
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		next(w, r)
-	}
-}
-
-// Catalog reads remain available to authenticated users of other pages.
-// The enclosing route must use authRequired.
-func sportsAccess(next http.HandlerFunc) http.HandlerFunc {
-	restricted := adminRequired(next)
-	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			next(w, r)
-		case http.MethodPost, http.MethodDelete:
-			restricted(w, r)
-		default:
-			w.Header().Set("Allow", "GET, POST, DELETE")
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	}
-}
-
-func officialRolesAccess(next http.HandlerFunc) http.HandlerFunc {
-	restricted := adminRequired(next)
-	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			next(w, r)
-		case http.MethodPut, http.MethodDelete:
-			restricted(w, r)
-		default:
-			w.Header().Set("Allow", "GET, PUT, DELETE")
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
 	}
 }
 
@@ -393,20 +356,6 @@ func AboutHandler(w http.ResponseWriter, r *http.Request) {
 			http.StatusInternalServerError,
 		)
 	}
-}
-
-// Serve this file only through the protected /administration route.
-func AdministrationPage(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/administration" {
-		http.NotFound(w, r)
-		return
-	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	http.ServeFile(w, r, "./internal/html/administration.html")
 }
 
 func SettingsPage(w http.ResponseWriter, r *http.Request) {
@@ -7580,74 +7529,24 @@ func EmailReport(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// OfficialRolesHandler supplies the shared role catalog to customer pages.
+// Role administration is implemented only by the separate monitor service.
 func OfficialRolesHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	switch r.Method {
-	case http.MethodGet:
-		sport := r.URL.Query().Get("sport")
-
-		// tid comes from the authenticated session.
-		response, err := database.GetOfficialRoles(sport)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			fmt.Printf("Unable to return official roles: %v\n", err)
-		}
-
-	case http.MethodPut:
-		var request model.OfficialRolesRequest
-
-		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
-			return
-		}
-
-		fmt.Printf("PUT official roles: sport=%q\n", request.Sport)
-
-		for _, role := range request.Roles {
-			fmt.Printf(
-				"RoleId=%s Title=%q DisplayOrder=%d Active=%t\n",
-				role.RoleId,
-				role.Title,
-				role.DisplayOrder,
-				role.Active,
-			)
-		}
-
-		// Save this sport's roles using the session's tenantId.
-		// Return success only after the database update succeeds.
-		// tid comes from your authenticated session.
-		if err := database.AddOfficialRoles(request); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "Official roles saved successfully.",
-		})
-
-	case http.MethodDelete:
-		sport := r.URL.Query().Get("sport")
-
-		// tid comes from the authenticated session.
-		if err := database.DeleteOfficialRoles(sport); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": "Official roles deleted successfully.",
-		})
-
-	default:
-		w.Header().Set("Allow", "GET, PUT, DELETE")
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
+	response, err := database.GetOfficialRoles(r.URL.Query().Get("sport"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		fmt.Printf("Unable to return official roles: %v\n", err)
 	}
 }
 
@@ -7751,128 +7650,6 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		"message":  "account created",
 		"tenantId": tenantID,
 	})
-}
-
-func AddSport(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodPost {
-		http.Error(
-			w,
-			"Method not allowed",
-			http.StatusMethodNotAllowed,
-		)
-		return
-	}
-
-	var sport database.Sport
-
-	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
-		http.Error(
-			w,
-			"Invalid sport data",
-			http.StatusBadRequest,
-		)
-		return
-	}
-
-	if err := spc.Add(sport); err != nil {
-		http.Error(
-			w,
-			err.Error(),
-			http.StatusBadRequest,
-		)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Sport added successfully",
-	})
-}
-
-func DelSport(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodDelete {
-		w.Header().Set("Allow", http.MethodDelete)
-
-		http.Error(
-			w,
-			"Method not allowed",
-			http.StatusMethodNotAllowed,
-		)
-		return
-	}
-
-	sportID := strings.TrimSpace(
-		r.URL.Query().Get("id"),
-	)
-
-	if sportID == "" {
-		http.Error(
-			w,
-			"Sport ID is required",
-			http.StatusBadRequest,
-		)
-		return
-	}
-
-	if err := spc.Delete(sportID); err != nil {
-		http.Error(
-			w,
-			err.Error(),
-			http.StatusBadRequest,
-		)
-		return
-	}
-
-	w.Header().Set(
-		"Content-Type",
-		"application/json",
-	)
-
-	w.WriteHeader(http.StatusOK)
-
-	if err := json.NewEncoder(w).Encode(
-		map[string]string{
-			"message": fmt.Sprintf(
-				"Sport %q deleted successfully",
-				sportID,
-			),
-		},
-	); err != nil {
-		fmt.Printf(
-			"Unable to encode delete sport response: %v\n",
-			err,
-		)
-	}
-}
-
-func SportsHandler(w http.ResponseWriter, r *http.Request) {
-
-	switch r.Method {
-	case http.MethodGet:
-		GetSportsHandler(w, r)
-
-	case http.MethodPost:
-		AddSport(w, r)
-
-	case http.MethodDelete:
-		DelSport(w, r)
-
-	default:
-		w.Header().Set(
-			"Allow",
-			"GET, POST, DELETE",
-		)
-
-		http.Error(
-			w,
-			"Method not allowed",
-			http.StatusMethodNotAllowed,
-		)
-	}
 }
 
 func DelLevel(w http.ResponseWriter, r *http.Request) {
@@ -7992,86 +7769,6 @@ func AddLevel(w http.ResponseWriter, r *http.Request) {
 		"message": "Level added successfully",
 	})
 
-}
-
-func ActivateSport(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodPost {
-		http.Error(
-			w,
-			"Method not allowed",
-			http.StatusMethodNotAllowed,
-		)
-		return
-	}
-
-	var sport database.Sport
-
-	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
-		http.Error(
-			w,
-			"Invalid level data",
-			http.StatusBadRequest,
-		)
-		return
-	}
-
-	if err := spc.Activate(sport); err != nil {
-		http.Error(
-			w,
-			err.Error(),
-			http.StatusBadRequest,
-		)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Sport activated successfully.",
-	})
-}
-
-func DeactivateSport(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodPost {
-		http.Error(
-			w,
-			"Method not allowed",
-			http.StatusMethodNotAllowed,
-		)
-		return
-	}
-
-	var sport database.Sport
-
-	if err := json.NewDecoder(r.Body).Decode(&sport); err != nil {
-		http.Error(
-			w,
-			"Invalid level data",
-			http.StatusBadRequest,
-		)
-		return
-	}
-
-	if err := spc.Deactivate(sport); err != nil {
-		http.Error(
-			w,
-			err.Error(),
-			http.StatusBadRequest,
-		)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": "Sport deactivated successfully.",
-	})
 }
 
 func ActivateLevel(w http.ResponseWriter, r *http.Request) {
@@ -8233,432 +7930,6 @@ func LevelsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func GetAdminRolesHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", "GET")
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
-	defer cancel()
-
-	collection := database.Client.
-		Database(database.GetMongoDbName()).
-		Collection("userroles")
-
-	cursor, err := collection.Find(
-		ctx,
-		bson.M{"active": true},
-		options.Find().SetSort(
-			bson.D{{Key: "name", Value: 1}},
-		),
-	)
-	if err != nil {
-		http.Error(w, "Unable to load roles", http.StatusInternalServerError)
-		return
-	}
-	defer cursor.Close(ctx)
-
-	roles := make([]string, 0)
-	seen := make(map[string]bool)
-
-	for cursor.Next(ctx) {
-		var record struct {
-			Name string `bson:"name"`
-		}
-
-		if err := cursor.Decode(&record); err != nil {
-			http.Error(w, "Unable to read role", http.StatusInternalServerError)
-			return
-		}
-
-		if record.Name == "" ||
-			record.Name != strings.TrimSpace(record.Name) ||
-			seen[record.Name] {
-			continue
-		}
-
-		seen[record.Name] = true
-		roles = append(roles, record.Name)
-	}
-
-	if err := cursor.Err(); err != nil {
-		http.Error(w, "Unable to read roles", http.StatusInternalServerError)
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"roles": roles,
-	})
-}
-
-func UpdateAdminUserRoleHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-
-	writeError := func(status int, message string) {
-		w.WriteHeader(status)
-		json.NewEncoder(w).Encode(map[string]string{
-			"message": message,
-		})
-	}
-
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", "POST")
-		writeError(http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	if r.Header.Get("X-Ref-Ledger-Admin") != "1" {
-		writeError(http.StatusForbidden, "Invalid administration request")
-		return
-	}
-
-	session, err := database.GetSession(r)
-	if err != nil {
-		writeError(http.StatusUnauthorized, "Sign in again")
-		return
-	}
-
-	var request struct {
-		UserID string `json:"userId"`
-		Role   string `json:"role"`
-	}
-
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
-
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&request); err != nil {
-		writeError(http.StatusBadRequest, "Invalid role request")
-		return
-	}
-
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		writeError(http.StatusBadRequest, "Provide one JSON object")
-		return
-	}
-
-	userID, err := primitive.ObjectIDFromHex(request.UserID)
-	if err != nil {
-		writeError(http.StatusBadRequest, "Invalid user ID")
-		return
-	}
-
-	if request.Role == "" ||
-		request.Role != strings.TrimSpace(request.Role) {
-		writeError(http.StatusBadRequest, "Select a valid role")
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	defer cancel()
-
-	db := database.Client.Database(database.GetMongoDbName())
-
-	transaction, err := database.Client.StartSession()
-	if err != nil {
-		writeError(http.StatusInternalServerError, "Unable to start role update")
-		return
-	}
-	defer transaction.EndSession(ctx)
-
-	invalidRole := errors.New("invalid role")
-	userNotFound := errors.New("user not found")
-	adminRequiredError := errors.New("administrator access required")
-	selfDemotion := errors.New("self demotion")
-
-	currentSessionCancelled := false
-
-	_, err = transaction.WithTransaction(
-		ctx,
-		func(tx mongo.SessionContext) (interface{}, error) {
-			// Check the administrator's current database role.
-			var administrator struct {
-				Role string `bson:"role"`
-			}
-
-			err := db.Collection("users").FindOne(
-				tx,
-				bson.M{
-					"username": session.Username,
-					"tenantId": session.TenantID,
-				},
-			).Decode(&administrator)
-
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				return nil, adminRequiredError
-			}
-			if err != nil {
-				return nil, err
-			}
-			if administrator.Role != "admin" {
-				return nil, adminRequiredError
-			}
-
-			// Only allow roles configured in the backend collection.
-			err = db.Collection("userroles").FindOne(
-				tx,
-				bson.M{
-					"name":   request.Role,
-					"active": true,
-				},
-			).Err()
-
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				return nil, invalidRole
-			}
-			if err != nil {
-				return nil, err
-			}
-
-			var user struct {
-				Username string `bson:"username"`
-				TenantID string `bson:"tenantId"`
-			}
-
-			err = db.Collection("users").FindOne(
-				tx,
-				bson.M{"_id": userID},
-			).Decode(&user)
-
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				return nil, userNotFound
-			}
-			if err != nil {
-				return nil, err
-			}
-
-			isCurrentUser := user.Username == session.Username &&
-				user.TenantID == session.TenantID
-
-			if isCurrentUser && request.Role != "admin" {
-				return nil, selfDemotion
-			}
-
-			_, err = db.Collection("users").UpdateOne(
-				tx,
-				bson.M{"_id": userID},
-				bson.M{
-					"$set": bson.M{
-						"role": request.Role,
-					},
-				},
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			// Existing sessions contain the old role.
-			_, err = db.Collection("sessions").DeleteMany(
-				tx,
-				bson.M{
-					"username": user.Username,
-					"tenantId": user.TenantID,
-				},
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			currentSessionCancelled = isCurrentUser
-			return nil, nil
-		},
-	)
-
-	switch {
-	case errors.Is(err, adminRequiredError):
-		writeError(http.StatusForbidden, "Administrator access required")
-		return
-
-	case errors.Is(err, invalidRole):
-		writeError(http.StatusBadRequest, "Selected role is not active or does not exist")
-		return
-
-	case errors.Is(err, userNotFound):
-		writeError(http.StatusNotFound, "User not found")
-		return
-
-	case errors.Is(err, selfDemotion):
-		writeError(
-			http.StatusConflict,
-			"Another administrator must change your role",
-		)
-		return
-
-	case err != nil:
-		log.Printf("Update user role failed: %v", err)
-		writeError(
-			http.StatusInternalServerError,
-			"Unable to update role. No changes were committed.",
-		)
-		return
-	}
-
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success":                 true,
-		"message":                 "Role updated. The user must sign in again.",
-		"currentSessionCancelled": currentSessionCancelled,
-	})
-}
-
-func UpdateAdminUserPasswordHandler(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	w.Header().Set("Cache-Control", "no-store")
-
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		http.Error(
-			w,
-			"Method not allowed",
-			http.StatusMethodNotAllowed,
-		)
-		return
-	}
-
-	// Also verify authorization here in case this handler
-	// is accidentally registered without adminRequired.
-	session, err := database.GetSession(r)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	if session.Role != "admin" {
-		http.Error(
-			w,
-			"Administrator access required",
-			http.StatusForbidden,
-		)
-		return
-	}
-
-	writeError := func(status int, message string) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(status)
-		_ = json.NewEncoder(w).Encode(map[string]string{
-			"message": message,
-		})
-	}
-
-	// Matches the custom header sent by administration.html.
-	if r.Header.Get("X-Ref-Ledger-Admin") != "1" {
-		writeError(http.StatusForbidden, "Invalid admin request.")
-		return
-	}
-
-	var payload struct {
-		UserID      string `json:"userId"`
-		NewPassword string `json:"newPassword"`
-	}
-
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
-	defer r.Body.Close()
-
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-
-	if err := decoder.Decode(&payload); err != nil {
-		writeError(
-			http.StatusBadRequest,
-			"Invalid password update request.",
-		)
-		return
-	}
-
-	// Reject additional JSON values after the request object.
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		writeError(
-			http.StatusBadRequest,
-			"Request must contain a single JSON object.",
-		)
-		return
-	}
-
-	userID, err := primitive.ObjectIDFromHex(
-		strings.TrimSpace(payload.UserID),
-	)
-	if err != nil {
-		writeError(http.StatusBadRequest, "Invalid user ID.")
-		return
-	}
-
-	// Validate without trimming the actual password:
-	// leading and trailing spaces may be intentional.
-	if strings.TrimSpace(payload.NewPassword) == "" {
-		writeError(
-			http.StatusBadRequest,
-			"New password cannot be blank.",
-		)
-		return
-	}
-
-	// bcrypt accepts a maximum of 72 bytes.
-	if len([]byte(payload.NewPassword)) > 72 {
-		writeError(
-			http.StatusBadRequest,
-			"New password cannot exceed 72 bytes.",
-		)
-		return
-	}
-
-	passwordHash, err := bcrypt.GenerateFromPassword(
-		[]byte(payload.NewPassword),
-		bcrypt.DefaultCost,
-	)
-	if err != nil {
-		writeError(
-			http.StatusInternalServerError,
-			"Unable to secure the new password.",
-		)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(
-		r.Context(),
-		10*time.Second,
-	)
-	defer cancel()
-
-	result, err := uc.Coll.UpdateOne(
-		ctx,
-		bson.M{
-			"_id": userID,
-		},
-		bson.M{
-			"$set": bson.M{
-				"passwordHash": string(passwordHash),
-			},
-		},
-	)
-	if err != nil {
-		// Never log the request body, password, or hash.
-		writeError(
-			http.StatusInternalServerError,
-			"Unable to update the user's password.",
-		)
-		return
-	}
-
-	if result.MatchedCount == 0 {
-		writeError(http.StatusNotFound, "User not found.")
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"message":                 "Password changed successfully.",
-		"currentSessionCancelled": false,
-	})
-}
-
 func main() {
 
 	var err error
@@ -8807,11 +8078,6 @@ func main() {
 	fmt.Println("Registering routes...")
 	utils.AuditLog.Println("Registering routes...")
 	mux := http.NewServeMux()
-	registerAdminUserRoutes(mux)
-
-	// User role management (administrator access required).
-	mux.HandleFunc("/api/admin/roles", authRequired(adminRequired(GetAdminRolesHandler)))
-	mux.HandleFunc("/api/admin/users/role", authRequired(adminRequired(UpdateAdminUserRoleHandler)))
 
 	mux.Handle("/images/", http.StripPrefix("/images/",
 		http.FileServer(http.Dir("./internal/html/images"))))
@@ -8821,7 +8087,6 @@ func main() {
 	mux.HandleFunc("/settings", authRequired(SettingsPage))
 	mux.HandleFunc("/api/settings/export-records", authRequired(ExportRecordsHandler))
 	mux.HandleFunc("/api/settings/delete-records", authRequired(readOnlyForbidden(DeleteRecordsHandler)))
-	mux.HandleFunc("/administration", authRequired(adminRequired(AdministrationPage)))
 
 	mux.HandleFunc("/expenses", authRequired(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "./internal/html/expenses.html")
@@ -8901,8 +8166,8 @@ func main() {
 	mux.HandleFunc("/api/loadSites", GetSitesHandler)
 	mux.HandleFunc("/api/loadSportsSupported", LoadSportsSupportedHandler)
 	mux.HandleFunc("/api/loadLevels", GetLevelsHandler)
-	mux.HandleFunc("/api/loadSports", authRequired(GetSportsHandler))
-	mux.HandleFunc("/api/sports", authRequired(sportsAccess(SportsHandler)))
+	mux.HandleFunc("/api/loadSports", authRequired(catalogReadOnly(GetSportsHandler)))
+	mux.HandleFunc("/api/sports", authRequired(catalogReadOnly(GetSportsHandler)))
 	mux.HandleFunc("/api/levels", authRequired(readOnlyForbidden(LevelsHandler)))
 	mux.HandleFunc("/api/loadAssociations", GetAssociationsHandler)
 	mux.HandleFunc("/api/officialsDirectory", GetOfficialsDirectoryHandler)
@@ -8912,8 +8177,6 @@ func main() {
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
 	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficial)
-	mux.HandleFunc("/api/sport-active", authRequired(adminRequired(ActivateSport)))
-	mux.HandleFunc("/api/sport-inactive", authRequired(adminRequired(DeactivateSport)))
 	mux.HandleFunc("/api/level-active", ActivateLevel)
 	mux.HandleFunc("/api/level-inactive", DeactivateLevel)
 	mux.HandleFunc("/api/updateExpense", authRequired(readOnlyForbidden(UpdateExpense)))
@@ -8942,8 +8205,6 @@ func main() {
 	mux.HandleFunc("/api/officials", authRequired(readOnlyForbidden(CreateOfficial)))
 	mux.HandleFunc("/api/officials-update", authRequired(readOnlyForbidden(UpdateOfficial)))
 	mux.HandleFunc("/api/expenses", authRequired(readOnlyForbidden(CreateExpense)))
-
-	mux.HandleFunc("/api/admin/users/password", authRequired(adminRequired(UpdateAdminUserPasswordHandler)))
 
 	mux.HandleFunc("/api/associations",
 		authRequired(readOnlyForbidden(CreateAssociation)))
@@ -8987,7 +8248,7 @@ func main() {
 	mux.HandleFunc("/api/logout", Logout)
 	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
 	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
-	mux.HandleFunc("/api/settings/official-roles", authRequired(officialRolesAccess(OfficialRolesHandler)))
+	mux.HandleFunc("/api/settings/official-roles", authRequired(catalogReadOnly(OfficialRolesHandler)))
 	mux.HandleFunc("/api/email-report", authRequired(readOnlyForbidden(EmailReport)))
 
 	mux.HandleFunc("/components-test", func(w http.ResponseWriter, r *http.Request) {
@@ -9018,22 +8279,24 @@ func main() {
 			log.Printf("Monitor proxy error: %v", err)
 			http.Error(
 				w,
-				"Metrics monitor is temporarily unavailable.",
+				"Administration service is temporarily unavailable.",
 				http.StatusBadGateway,
 			)
 		},
 	}
 
-	// Redirect to the trailing slash so relative API URLs resolve correctly.
-	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/metrics/", http.StatusTemporaryRedirect)
+	// Relative assets and API URLs must resolve beneath /admin/.
+	mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		http.Redirect(w, r, "/admin/", http.StatusTemporaryRedirect)
 	})
+	// /admin/api/... becomes /api/... on the monitor, which authenticates requests.
+	mux.Handle("/admin/", http.StripPrefix("/admin", monitorProxy))
 
-	// /metrics/api/... becomes /api/... on the monitor.
-	mux.Handle(
-		"/metrics/",
-		http.StripPrefix("/metrics", monitorProxy),
-	)
 	mux.Handle(
 		"/components/",
 		http.StripPrefix(
