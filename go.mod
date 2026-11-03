@@ -3,14 +3,15 @@ module ref-ledger-v2
 go 1.25.0
 
 require (
+	github.com/auth0/go-jwt-middleware/v2 v2.3.1
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/google/uuid v1.6.0
 	github.com/jung-kurt/gofpdf v1.16.2
 	github.com/resend/resend-go/v4 v4.8.1
 	github.com/spf13/cobra v1.10.2
 	go.mongodb.org/mongo-driver v1.17.9
-	golang.org/x/crypto v0.33.0
-	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
+	golang.org/x/crypto v0.45.0
+	gopkg.in/go-jose/go-jose.v2 v2.6.3
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
@@ -25,6 +26,6 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 )

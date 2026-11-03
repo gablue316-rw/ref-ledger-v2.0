@@ -1,0 +1,9 @@
+{
+  "appId": "com.refledger.mobile",
+  "appName": "Ref Ledger",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "loggingBehavior": "none"
+}

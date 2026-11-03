@@ -127,6 +127,10 @@ func isValidEmail(email string) bool {
 }
 
 func getTenantId(r *http.Request) (string, error) {
+	if account, ok := r.Context().Value(mobileAccountContextKey{}).(string); ok && account != "" {
+		return account, nil
+	}
+
 	cookie, err := r.Cookie("rl_session")
 	if err != nil {
 		return "", fmt.Errorf("retrieving session cookie: %w", err)
@@ -8239,6 +8243,7 @@ func main() {
 	mux.HandleFunc("/api/game-save", authRequired(readOnlyForbidden(SaveGame)))
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
+	mux.HandleFunc("/api/mobile/dashboard", MobileDashboard)
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))
 	mux.HandleFunc("/api/update-payment", authRequired(readOnlyForbidden(UpdatePayment)))
 	mux.HandleFunc("/api/payment-registry", authRequired(readOnlyForbidden(LoadPaymentRegistry)))
