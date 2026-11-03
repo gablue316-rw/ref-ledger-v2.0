@@ -2,7 +2,7 @@
 const issuer = 'https://ref-ledger-dev.us.auth0.com/';
 
 export const config = {
-  apiBase: 'https://damages-tension-onion-hudson.trycloudflare.com',
+  apiBase: 'https://powell-valuable-bargains-arrives.trycloudflare.com',
   issuer,
   clientId: 'I3B7w10esvoTWsSwclbGngyHiSmD8wQ1',
   audience: 'https://api.ref-ledger.com/dev',

@@ -21,6 +21,7 @@ async function initializeNavbar() {
 
         container.innerHTML = await response.text();
 
+        initializeSidebar();
         highlightCurrentPage();
         initializeLogout();
 
@@ -56,6 +57,8 @@ function highlightCurrentPage() {
     navigationLinks.forEach(function (link) {
         const linkPage = link.getAttribute("data-page");
         link.classList.toggle("active", linkPage === page);
+        if (linkPage === page) link.setAttribute("aria-current", "page");
+        else link.removeAttribute("aria-current");
     });
 }
 
@@ -251,4 +254,35 @@ async function logoutUser(event) {
         console.error("Unable to log out:", error);
         alert("Logout failed. Please try again.");
     }
+}
+
+// Compact screens use a dismissible navigation drawer.
+function initializeSidebar() {
+    document.body.classList.add("has-ledger-sidebar");
+    const toggle = document.querySelector(".sidebar-toggle");
+    const backdrop = document.querySelector(".sidebar-backdrop");
+    const nav = document.getElementById("main-navbar");
+    const media = window.matchMedia("(max-width: 800px)");
+    function setOpen(open, returnFocus = false) {
+        document.body.classList.toggle("ledger-sidebar-open", open);
+        toggle.setAttribute("aria-expanded", String(open));
+        backdrop.hidden = !open;
+        nav.inert = media.matches && !open;
+        if (open) nav.querySelector("a").focus();
+        if (returnFocus) toggle.focus();
+    }
+    toggle.addEventListener("click", () => setOpen(toggle.getAttribute("aria-expanded") !== "true"));
+    backdrop.addEventListener("click", () => setOpen(false, true));
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && toggle.getAttribute("aria-expanded") === "true") setOpen(false, true);
+        if (event.key === "Tab" && media.matches && toggle.getAttribute("aria-expanded") === "true") {
+            const items = [toggle, ...nav.querySelectorAll("a[href], button:not([disabled])")];
+            const first = items[0], last = items[items.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }
+    });
+    nav.addEventListener("click", event => { if (event.target.closest("a") && media.matches) setOpen(false); });
+    media.addEventListener("change", () => setOpen(false));
+    setOpen(false);
 }

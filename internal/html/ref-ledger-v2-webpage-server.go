@@ -6192,6 +6192,13 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if user.EmailVerified != nil && !*user.EmailVerified {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(map[string]string{"code": "EMAIL_NOT_VERIFIED", "message": "Confirm your email address before signing in."})
+		return
+	}
+
 	sessionID := uuid.New().String()
 
 	session := model.Session{
@@ -7622,6 +7629,17 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if len(req.Password) < 8 || len(req.Password) > 72 {
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Password must be 8 to 72 bytes."})
+		return
+	}
+	if err := handlers.VerificationConfigured(); err != nil {
+		log.Printf("Account verification configuration: %v", err)
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Account registration is temporarily unavailable."})
+		return
+	}
 	tenantID, err := uc.Add(r.Context(), req)
 	if err != nil {
 		switch {
@@ -7649,9 +7667,18 @@ func CreateAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if err := handlers.SendAccountVerification(ctx, strings.ToLower(strings.TrimSpace(req.Username)), tenantID); err != nil {
+		log.Printf("Account confirmation email failed: %v", err)
+		w.WriteHeader(http.StatusAccepted)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Account created but the confirmation email could not be sent. Use Resend confirmation email on the login page after one minute.", "status": "verification_email_failed"})
+		return
+	}
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message":  "account created",
+		"message":  "Check your email to activate your account.",
+		"status":   "verification_required",
 		"tenantId": tenantID,
 	})
 }
@@ -8229,6 +8256,13 @@ func main() {
 	})
 
 	mux.HandleFunc("/api/createAccount", CreateAccount)
+	mux.HandleFunc("/api/confirmEmail", handlers.ConfirmEmailHandler)
+	mux.HandleFunc("/api/resendVerification", handlers.ResendVerificationHandler)
+	mux.HandleFunc("/verifyEmail", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		http.ServeFile(w, r, "./internal/html/verifyEmail.html")
+	})
 	mux.HandleFunc("/api/sites", authRequired(readOnlyForbidden(CreateSite)))
 	mux.HandleFunc("/api/sites-update", authRequired(readOnlyForbidden(UpdateSite)))
 	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))

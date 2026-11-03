@@ -1,4 +1,8 @@
-<nav class="navbar" id="main-navbar">
+<button class="sidebar-toggle" type="button" aria-controls="main-navbar" aria-expanded="false">☰ <span>Menu</span></button>
+<button class="sidebar-backdrop" type="button" aria-label="Close navigation" hidden></button>
+<nav class="navbar" id="main-navbar" aria-label="Main navigation">
+  <a class="sidebar-brand" href="/home">Ref <span>Ledger</span></a>
+  <div class="sidebar-caption">SPORTS OFFICIATING</div>
   <div class="nav-links">
     <a data-page="home" href="/home">
       <i class="fa-solid fa-house"></i>
@@ -20,9 +24,9 @@
           aria-live="polite"
           class="nav-count-badge"
           id="pendingGames"
-          title="Pending games: Today / Next 7 Days"
+          title="Pending games: Today / Tomorrow / Next 7 Days"
         >
-          0/0
+          0/0/0
         </span>
       </span>
       <span>Games</span>

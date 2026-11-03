@@ -1,151 +1,300 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Ref-Ledger Login</title>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#132d3d">
+<title>Sign In | Ref Ledger</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #f4f6f8;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        margin: 0;
-    }
-
-    .login-container {
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        width: 320px;
-    }
-
-    h2 {
-        text-align: center;
-        margin-bottom: 20px;
-    }
-
-    input {
-        width: 100%;
-        padding: 10px;
-        margin: 10px 0;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-    }
-
-    button {
-        width: 100%;
-        padding: 10px;
-        background: #2563eb;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 16px;
-    }
-
-    button:hover {
-        background: #1d4ed8;
-    }
-
-    .error {
-        color: red;
-        text-align: center;
-        margin-top: 10px;
-        display: none;
-    }
-
-    .create-account {
-        text-align: center;
-        margin-top: 15px;
-    }
-
-    .create-account a {
-        color: #2563eb;
-        text-decoration: none;
-        font-weight: bold;
-    }
-
-    .create-account a:hover {
-        text-decoration: underline;
-    }    
-
-    .forgot-password {
-        text-align: center;
-        margin-top: 12px;
-    }
-
-    .forgot-password a {
-        color: #2563eb;
-        text-decoration: none;
-    }
-
-    .forgot-password a:hover {
-        text-decoration: underline;
-    }    
-
+:root {
+    color-scheme: light;
+    --navy: #132d3d;
+    --teal: #67c6ad;
+    --ink: #163247;
+    --muted: #5b6e7b;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 40px 24px;
+    display: grid;
+    place-items: center;
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: var(--ink);
+    background: radial-gradient(ellipse at top left, #dcece7, transparent 55%), #f3f6f9;
+}
+a { color: #216c60; text-underline-offset: 4px; }
+a:hover { text-decoration: underline; }
+.shell {
+    width: min(1060px, 100%);
+    display: grid;
+    grid-template-columns: 1.08fr 1fr;
+    background: white;
+    border-radius: 26px;
+    overflow: hidden;
+    box-shadow: 0 24px 80px #132d3d1c;
+    border: 1px solid #ffffff;
+}
+.brand {
+    position: relative;
+    padding: 48px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 64px;
+    color: #fff;
+    background: radial-gradient(circle at 100% 100%, #286359, transparent 65%), var(--navy);
+}
+.brand::after {
+    content: "";
+    position: absolute;
+    width: 370px;
+    height: 370px;
+    border: 1px solid #ffffff15;
+    border-radius: 50%;
+    right: -240px;
+    top: 110px;
+    box-shadow: 0 0 0 65px #ffffff04, 0 0 0 130px #ffffff03;
+    pointer-events: none;
+}
+.logo { display: flex; align-items: center; gap: 13px; font-size: 23px; font-weight: 700; }
+.mark {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+    background: var(--teal);
+    color: var(--navy);
+}
+.mark svg { width: 27px; height: 27px; }
+.eyebrow { font-size: 11px; letter-spacing: .18em; font-weight: 700; text-transform: uppercase; color: #91dcc6; }
+h1 { font-size: clamp(34px, 4vw, 49px); line-height: 1.12; letter-spacing: -.04em; margin: 20px 0; }
+h1 span { color: #91dcc6; }
+.intro { color: #d0e0e5; line-height: 1.75; font-size: 16px; max-width: 340px; }
+.features { display: grid; gap: 18px; margin: 32px 0 0; padding: 0; list-style: none; font-size: 14px; color: #e1eeed; }
+.features li { display: flex; align-items: center; gap: 12px; }
+.features li::before { content: "✓"; color: #91dcc6; font-weight: bold; }
+.brand-footer { color: #b5cece; font-size: 12px; line-height: 1.6; }
+.form-panel { padding: 64px 48px 42px; align-self: center; }
+.form-panel .eyebrow { color: #397265; }
+h2 { margin: 12px 0; font-size: 32px; letter-spacing: -.035em; }
+.subtitle { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 0 0 32px; }
+label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 9px; }
+.field { margin-bottom: 22px; }
+input {
+    width: 100%;
+    min-height: 52px;
+    padding: 14px 16px;
+    border: 1px solid #c7d3db;
+    border-radius: 10px;
+    background: #fbfcfd;
+    color: var(--ink);
+    font: inherit;
+    font-size: 16px;
+}
+input:focus { outline: 3px solid #67c6ad44; border-color: #358470; background: white; }
+.password-wrap { position: relative; }
+.password-wrap input { padding-right: 76px; }
+.toggle {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+    height: 40px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #326858;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+button:focus-visible, a:focus-visible { outline: 3px solid #358470; outline-offset: 4px; }
+.forgot { text-align: right; font-size: 13px; margin: -8px 0 26px; }
+.forgot a { text-decoration: none; }
+.submit {
+    width: 100%;
+    min-height: 52px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--teal);
+    color: #102f2a;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 5px 12px #67c6ad33;
+}
+.submit:hover { background: #81d4bd; }
+.submit:disabled { cursor: wait; opacity: .7; }
+.message { margin: 18px 0 0; padding: 12px 14px; border-radius: 8px; font-size: 14px; line-height: 1.5; }
+.error { background: #fff0ee; color: #962b21; border: 1px solid #f0c9c3; }
+.create { border-top: 1px solid #e5ebef; margin-top: 30px; padding-top: 26px; text-align: center; font-size: 14px; color: var(--muted); line-height: 1.8; }
+.create a { font-weight: 700; text-decoration: none; }
+.note { margin: 24px 0 0; font-size: 12px; line-height: 1.6; text-align: center; color: var(--muted); }
+[hidden] { display: none !important; }
+@media (max-width: 760px) {
+    body { padding: 20px 14px; }
+    .shell { grid-template-columns: 1fr; max-width: 480px; border-radius: 20px; }
+    .brand { padding: 28px; gap: 26px; }
+    h1 { font-size: 32px; margin: 0; }
+    .brand .eyebrow, .intro, .features, .brand-footer { display: none; }
+    .form-panel { padding: 32px 28px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+    .submit { transition: background .15s, box-shadow .15s; }
+}
 </style>
 </head>
-
 <body>
-
-<div class="login-container">
-    <h2>Ref-Ledger Login</h2>
-
-    <input type="text" id="username" placeholder="Username" required />
-    <input type="password" id="password" placeholder="Password" required />
-    
-    <button onclick="login()">Login</button>
-
-      <div class="forgot-password">
-         <a href="/forgotPassword">
-            Forgot Password?
-         </a>
-      </div>
-
-      <div class="create-account">
-           Don't have an account?
-         <a href="/createAccount">
-            Create Account
-         </a>
-      </div>
-
-    <div id="error" class="error">Invalid credentials</div>
-</div>
-
+<main class="shell">
+    <section class="brand" aria-label="Ref Ledger">
+        <div class="logo">
+            <span class="mark" aria-hidden="true">
+                <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="7" y="5" width="20" height="23" rx="3"/>
+                    <path d="M12 3v5M22 3v5M7 12h20M12 19l3 3 6-6"/>
+                </svg>
+            </span>
+            Ref Ledger
+        </div>
+        <div>
+            <div class="eyebrow">Built for sports officials</div>
+            <h1>Your games.<br>Your payments.<br><span>Your season.</span></h1>
+            <p class="intro">Stay organized from the first assignment to the final payment.</p>
+            <ul class="features">
+                <li>Keep your game schedule in one place</li>
+                <li>Track payments and outstanding fees</li>
+                <li>Organize expenses and season reports</li>
+            </ul>
+        </div>
+        <div class="brand-footer">Less paperwork. More focus on the game.</div>
+    </section>
+    <section class="form-panel" aria-labelledby="login-heading">
+        <div class="eyebrow">Your season starts here</div>
+        <h2 id="login-heading">Welcome back.</h2>
+        <p class="subtitle">Sign in to your Ref Ledger account.</p>
+        <form id="login-form" action="/api/login" method="post">
+            <div class="field">
+                <label for="username">Email address</label>
+                <input type="email" id="username" name="username" placeholder="you@example.com" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <div class="password-wrap">
+                    <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+                    <button class="toggle" id="toggle-password" type="button" aria-controls="password" aria-label="Show password" aria-pressed="false">Show</button>
+                </div>
+            </div>
+            <div class="forgot"><a href="/forgotPassword">Forgot password?</a></div>
+            <button class="submit" id="sign-in" type="submit">Sign In <span aria-hidden="true">→</span></button>
+            <button type="button" class="toggle" id="resend" hidden style="position:static;height:auto;margin-top:16px">Resend confirmation email</button>
+            <div id="error" class="message error" role="alert" hidden></div>
+        </form>
+        <div class="create">New to Ref Ledger? <a href="/createAccount">Create an account</a></div>
+    </section>
+</main>
 <script>
-async function login() {
-    const user = document.getElementById("username").value;
-    const pass = document.getElementById("password").value;
+const form = document.getElementById('login-form');
+const password = document.getElementById('password');
+const toggle = document.getElementById('toggle-password');
+const submit = document.getElementById('sign-in');
+const error = document.getElementById('error');
+let submitting = false;
 
-    if (!user || !pass) {
-       document.getElementById("error").innerText =
-           "Username and password are required.";
-       document.getElementById("error").style.display = "block";
-       return;
+toggle.addEventListener('click', () => {
+    const visible = password.type === 'password';
+    password.type = visible ? 'text' : 'password';
+    toggle.textContent = visible ? 'Hide' : 'Show';
+    toggle.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+    toggle.setAttribute('aria-pressed', String(visible));
+});
+
+form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+    error.hidden = true;
+    document.getElementById('resend').hidden = false;
+    const username = document.getElementById('username').value.trim();
+    const pass = password.value;
+    if (!username || !pass) {
+        error.textContent = 'Email address and password are required.';
+        error.hidden = false;
+        return;
     }
-
-    const res = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: `username=${user}&password=${pass}`
-    });
-
-    console.log(res);
-
-    if (res.ok) {
-        window.location.href = "/";
-    } else {
-        document.getElementById("error").style.display = "block";
+    submitting = true;
+    submit.disabled = true;
+    submit.textContent = 'Signing in…';
+    form.setAttribute('aria-busy', 'true');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ username, password: pass }),
+            signal: controller.signal
+        });
+        if (response.ok) {
+            window.location.assign('/');
+            return;
+        }
+        let code = '';
+        if ((response.headers.get('content-type') || '').includes('application/json')) {
+            const data = await response.json().catch(() => null);
+            code = data && data.code;
+        }
+        // Optional future backend contract: 403 + {"code":"EMAIL_NOT_VERIFIED"}.
+        // Account activation MUST be enforced by the server before creating a session.
+        if (response.status === 403 && code === 'EMAIL_NOT_VERIFIED') {
+            document.getElementById('resend').hidden = false;
+            error.textContent = 'Please confirm your email address before signing in. Check your inbox and spam folder for your confirmation email.';
+        } else if (response.status === 429) {
+            error.textContent = 'Too many sign-in attempts. Please wait and try again.';
+        } else if (response.status >= 500) {
+            error.textContent = 'Sign-in is temporarily unavailable. Please try again shortly.';
+        } else {
+            error.textContent = 'Unable to sign in. Check your email address and password.';
+        }
+        error.hidden = false;
+    } catch (err) {
+        error.textContent = err.name === 'AbortError'
+            ? 'The request timed out. Please try again.'
+            : 'Unable to connect. Check your connection and try again.';
+        error.hidden = false;
+    } finally {
+        clearTimeout(timeout);
+        submitting = false;
+        submit.disabled = false;
+        submit.textContent = 'Sign In →';
+        form.removeAttribute('aria-busy');
     }
-}
+});
+
+const resend = document.getElementById('resend');
+// Also available for users whose registration email failed or whose link expired.
+resend.hidden = false;
+resend.addEventListener('click', async () => {
+    if (!form.reportValidity()) return;
+    resend.disabled = true;
+    error.hidden = false;
+    error.textContent = 'Requesting confirmation email…';
+    try {
+        const response = await fetch('/api/resendVerification', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({username:document.getElementById('username').value.trim(), password:password.value}),
+            signal: AbortSignal.timeout(40000)
+        });
+        const data = await response.json();
+        error.textContent = data.message || 'Unable to request confirmation email.';
+    } catch (_) { error.textContent = 'Unable to contact the server. Wait one minute before trying again.'; }
+    finally { resend.disabled = false; }
+});
 </script>
-
 </body>
 </html>

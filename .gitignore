@@ -58,7 +58,9 @@ test-files
 
 # *.exe
 *.exe
+*.exe~
 ref-ledger-v2.exe
+
 
 # *.zip
 *.zip

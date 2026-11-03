@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta
+        name="referrer"
+        content="no-referrer"
+    >
+
+    <title>Confirm Email | Ref Ledger</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            padding: 24px;
+            display: grid;
+            place-items: center;
+            background: #f3f6f9;
+            color: #163247;
+            font: 16px/1.7 "Segoe UI", sans-serif;
+        }
+
+        main {
+            max-width: 520px;
+            padding: 40px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 70px #132d3d18;
+        }
+
+        h1 {
+            line-height: 1.2;
+        }
+
+        h2 {
+            color: #216c60;
+            font-size: 16px;
+        }
+
+        p {
+            color: #506572;
+        }
+
+        button,
+        a {
+            font: inherit;
+        }
+
+        button {
+            padding: 14px 24px;
+            background: #67c6ad;
+            color: #132d3d;
+            border: 0;
+            border-radius: 9px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.65;
+        }
+
+        a {
+            color: #216c60;
+        }
+
+        :focus-visible {
+            outline: 3px solid #216c60;
+            outline-offset: 4px;
+        }
+
+        [hidden] {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h2>REF LEDGER</h2>
+
+        <h1>Confirm your email.</h1>
+
+        <p id="message" role="status">
+            Select Confirm Email to activate your account.
+        </p>
+
+        <button id="confirm" type="button">
+            Confirm Email
+        </button>
+
+        <p>
+            <a href="/login">Continue to Sign In</a>
+        </p>
+    </main>
+
+    <script>
+        const token =
+            new URLSearchParams(location.hash.slice(1))
+                .get('token') || '';
+
+        history.replaceState(null, '', location.pathname);
+
+        const button = document.getElementById('confirm');
+        const message = document.getElementById('message');
+
+        if (!/^[0-9a-f]{64}$/.test(token)) {
+            button.hidden = true;
+
+            message.textContent =
+                'This confirmation link is incomplete. ' +
+                'Open the full link in your email, or request ' +
+                'a new email from the login page.';
+        }
+
+        button.addEventListener('click', async () => {
+            button.disabled = true;
+
+            try {
+                const response = await fetch(
+                    '/api/confirmEmail',
+                    {
+                        method: 'POST',
+
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+
+                        body: JSON.stringify({
+                            token
+                        }),
+
+                        signal: AbortSignal.timeout(15000)
+                    }
+                );
+
+                const data = await response.json();
+
+                message.textContent =
+                    data.message || 'Unable to confirm email.';
+
+                if (response.ok) {
+                    button.hidden = true;
+
+                    document.querySelector('h1').textContent =
+                        'You’re ready to go.';
+                }
+            } catch (_) {
+                message.textContent =
+                    'Unable to contact the server. Please try again.';
+            } finally {
+                button.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

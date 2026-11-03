@@ -5,12 +5,15 @@ import "time"
 var ModelsVersion string = "ref-ledger-models-v2.1.0"
 
 type User struct {
-	Username     string    `bson:"username" json:"username"`
-	PasswordHash string    `bson:"passwordHash" json:"-"`
-	TenantID     string    `bson:"tenantId" json:"tenantId"`
-	Role         string    `bson:"role" json:"role"`
-	CreatedAt    time.Time `bson:"createdAt" json:"createdAt"`
-	Name         string    `bson:"name" json:"name"`
+	// Missing means an existing account created before email confirmation.
+	EmailVerified   *bool      `bson:"emailVerified,omitempty" json:"emailVerified,omitempty"`
+	EmailVerifiedAt *time.Time `bson:"emailVerifiedAt,omitempty" json:"emailVerifiedAt,omitempty"`
+	Username        string     `bson:"username" json:"username"`
+	PasswordHash    string     `bson:"passwordHash" json:"-"`
+	TenantID        string     `bson:"tenantId" json:"tenantId"`
+	Role            string     `bson:"role" json:"role"`
+	CreatedAt       time.Time  `bson:"createdAt" json:"createdAt"`
+	Name            string     `bson:"name" json:"name"`
 }
 
 type Session struct {

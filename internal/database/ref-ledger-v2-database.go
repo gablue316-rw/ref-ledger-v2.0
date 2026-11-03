@@ -5596,7 +5596,13 @@ func (uc *UsersCollection) Init(client *mongo.Client) error {
 	uc.DB = client.Database(Database)
 	uc.Coll = uc.DB.Collection("users")
 
-	return nil
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err := uc.Coll.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "username", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	return err
 }
 
 func (uc *UsersCollection) SetSportsSupported(
@@ -5723,8 +5729,8 @@ func (uc *UsersCollection) Add(
 		return "", fmt.Errorf("username is required")
 	}
 
-	if req.Password == "" {
-		return "", fmt.Errorf("password is required")
+	if len(req.Password) < 8 || len(req.Password) > 72 {
+		return "", fmt.Errorf("password must be 8 to 72 bytes")
 	}
 
 	if !validEmail(req.Username) {
@@ -5757,17 +5763,22 @@ func (uc *UsersCollection) Add(
 
 	tenantID := primitive.NewObjectID().Hex()
 
+	verified := false
 	user := model.User{
-		Username:     req.Username,
-		PasswordHash: string(passwordHash),
-		TenantID:     tenantID,
-		Role:         "user",
-		CreatedAt:    time.Now(),
-		Name:         req.Name,
+		EmailVerified: &verified,
+		Username:      req.Username,
+		PasswordHash:  string(passwordHash),
+		TenantID:      tenantID,
+		Role:          "user",
+		CreatedAt:     time.Now(),
+		Name:          req.Name,
 	}
 
 	_, err = uc.Coll.InsertOne(ctx, user)
 	if err != nil {
+		if mongo.IsDuplicateKeyError(err) {
+			return "", ErrUserAlreadyExists
+		}
 		return "", fmt.Errorf("failed to save user account: %w", err)
 	}
 
