@@ -8311,8 +8311,11 @@ func main() {
 		Rewrite: func(r *httputil.ProxyRequest) {
 			r.SetURL(monitorURL)
 
-			// Ref Ledger's session cookies are not needed by the monitor.
+			// Forward only the monitor's admin session cookie.
 			r.Out.Header.Del("Cookie")
+			if cookie, err := r.In.Cookie("rl_admin_session"); err == nil {
+				r.Out.AddCookie(cookie)
+			}
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			log.Printf("Monitor proxy error: %v", err)
