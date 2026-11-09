@@ -1,8 +1,8 @@
-// Public development settings. No client secret is needed.
+// Production API with the existing Auth0 tenant. No client secret belongs in this app.
 const issuer = 'https://ref-ledger-dev.us.auth0.com/';
 
 export const config = {
-  apiBase: 'https://powell-valuable-bargains-arrives.trycloudflare.com',
+  apiBase: 'https://www.ref-ledger.com',
   issuer,
   clientId: 'I3B7w10esvoTWsSwclbGngyHiSmD8wQ1',
   audience: 'https://api.ref-ledger.com/dev',
@@ -12,5 +12,5 @@ export const config = {
   revocationEndpoint: new URL('oauth/revoke', issuer).href,
 
   redirectUrl: 'com.refledger.mobile:/oauth2redirect',
-  scope: 'openid offline_access dashboard:read'
+  scope: 'openid email profile offline_access dashboard:read'
 };

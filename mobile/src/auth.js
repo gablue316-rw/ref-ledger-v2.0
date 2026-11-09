@@ -13,10 +13,10 @@ async function accept(result){
  access=p.access;expires=p.expires;
  return access;
 }
-export async function login(){
+export async function login(signup=false){
  configured();
  const platform={appId:c.clientId,responseType:'code',redirectUrl:c.redirectUrl,pkceEnabled:true,logsEnabled:false};
- return accept(await GenericOAuth2.authenticate({appId:c.clientId,authorizationBaseUrl:c.authorizationBaseUrl,accessTokenEndpoint:c.accessTokenEndpoint,redirectUrl:c.redirectUrl,responseType:'code',scope:c.scope,additionalParameters:{audience:c.audience},pkceEnabled:true,logsEnabled:false,android:platform,ios:platform}));
+ return accept(await GenericOAuth2.authenticate({appId:c.clientId,authorizationBaseUrl:c.authorizationBaseUrl,accessTokenEndpoint:c.accessTokenEndpoint,redirectUrl:c.redirectUrl,responseType:'code',scope:c.scope,additionalParameters:{audience:c.audience,...(signup?{screen_hint:'signup',prompt:'login'}:{})},pkceEnabled:true,logsEnabled:false,android:platform,ios:platform}));
 }
 export async function token(){
  configured();if(access && Date.now()<expires-30000)return access;
@@ -42,5 +42,22 @@ export async function logout(){
 export async function apiGet(url){
  const request=async()=>CapacitorHttp.get({url,headers:{Authorization:`Bearer ${await token()}`,Accept:'application/json'},connectTimeout:10000,readTimeout:15000});
  let response=await request();if(response.status===401){expireAccess();response=await request();}
+ return response;
+}
+
+export async function registerAccount(){
+ configured();
+ const url=new URL('/api/mobile/register',c.apiBase).toString();
+ const request=async()=>CapacitorHttp.post({
+  url,
+  headers:{Authorization:`Bearer ${await token()}`},
+  connectTimeout:10000,
+  readTimeout:25000
+ });
+ let response=await request();
+ if(response.status===401){
+  expireAccess();
+  response=await request();
+ }
  return response;
 }

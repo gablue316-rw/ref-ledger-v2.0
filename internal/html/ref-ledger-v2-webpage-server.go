@@ -6164,7 +6164,6 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user model.User
-	sessionDuration := 15 * time.Minute
 
 	username := strings.ToLower(strings.TrimSpace(r.FormValue("username")))
 	password := r.FormValue("password")
@@ -6199,6 +6198,15 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := createWebSession(w, r, user, false); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func createWebSession(w http.ResponseWriter, r *http.Request, user model.User, secure bool) error {
+	sessionDuration := 15 * time.Minute
 	sessionID := uuid.New().String()
 
 	session := model.Session{
@@ -6209,14 +6217,13 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Role:      user.Role,
 	}
 
-	_, err = database.Client.
+	_, err := database.Client.
 		Database(database.GetMongoDbName()).
 		Collection("sessions").
 		InsertOne(r.Context(), session)
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return err
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -6224,11 +6231,12 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   secure,
 		MaxAge:   int(sessionDuration.Seconds()),
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	w.WriteHeader(http.StatusOK)
+	return nil
 }
 
 func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
@@ -7962,8 +7970,18 @@ func LevelsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	webAuth, err := configureWebAuth0()
+	if err != nil {
+		log.Fatalf("Web authentication configuration: %v", err)
+	}
 
-	var err error
+	registration, err := configureAuth0Registration()
+	if err != nil {
+		log.Fatalf("Auth0 registration configuration: %v", err)
+	}
+	if webAuth != nil {
+		webAuth.registration = registration
+	}
 
 	if err = utils.InitLogging(); err != nil {
 		panic(err)
@@ -8108,6 +8126,23 @@ func main() {
 
 	fmt.Println("Registering routes...")
 	utils.AuditLog.Println("Registering routes...")
+	if webAuth != nil {
+		indexCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		indexErr := ensureWebAuthIdentityIndex(indexCtx)
+		cancel()
+		if registration != nil {
+			signupCtx, cancelSignup := context.WithTimeout(context.Background(), 15*time.Second)
+			signupErr := registration.initialize(signupCtx)
+			cancelSignup()
+			if signupErr != nil {
+				log.Fatalf("Could not initialize Auth0 registration: %v", signupErr)
+			}
+		}
+		if indexErr != nil {
+			log.Fatalf("Could not ensure unique Auth0 account links: %v", indexErr)
+		}
+	}
+
 	mux := http.NewServeMux()
 
 	mux.Handle("/images/", http.StripPrefix("/images/",
@@ -8163,9 +8198,25 @@ func main() {
 		http.ServeFile(w, r, "./internal/html/contact.html")
 	}))
 
-	mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./internal/html/login.html")
-	})
+	if webAuth != nil {
+		mux.HandleFunc("/login", webAuth.login)
+		mux.HandleFunc(webAuthCallback, webAuth.callback)
+		if registration != nil {
+			mux.HandleFunc("/createAccount", webAuth.signup)
+			mux.HandleFunc("GET "+mobileSignupPath, func(w http.ResponseWriter, r *http.Request) {
+				http.ServeFile(w, r, "./internal/html/mobileCreateAccount.html")
+			})
+			mux.HandleFunc("GET "+mobileSetupPath, authRequired(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Cache-Control", "no-store")
+				http.ServeFile(w, r, "./internal/html/mobileSetup.html")
+			}))
+			mux.HandleFunc("/api/mobile/register", webAuth.mobileRegistration)
+		}
+	} else {
+		mux.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./internal/html/login.html")
+		})
+	}
 
 	mux.HandleFunc("/api/games/pending-games/count", GetPendingGamesCount)
 
@@ -8243,26 +8294,29 @@ func main() {
 	mux.HandleFunc("/api/associations-update",
 		authRequired(readOnlyForbidden(UpdateAssociation)))
 
-	mux.HandleFunc("/createAccount", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./internal/html/createAccount.html")
-	})
+	if webAuth == nil {
+		mux.HandleFunc("/createAccount", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./internal/html/createAccount.html")
+		})
 
-	mux.HandleFunc("/forgotPassword", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./internal/html/forgotPassword.html")
-	})
+		mux.HandleFunc("/forgotPassword", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./internal/html/forgotPassword.html")
+		})
 
-	mux.HandleFunc("/resetPassword", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./internal/html/resetPassword.html")
-	})
+		mux.HandleFunc("/resetPassword", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./internal/html/resetPassword.html")
+		})
 
-	mux.HandleFunc("/api/createAccount", CreateAccount)
-	mux.HandleFunc("/api/confirmEmail", handlers.ConfirmEmailHandler)
-	mux.HandleFunc("/api/resendVerification", handlers.ResendVerificationHandler)
-	mux.HandleFunc("/verifyEmail", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "no-store")
-		w.Header().Set("Referrer-Policy", "no-referrer")
-		http.ServeFile(w, r, "./internal/html/verifyEmail.html")
-	})
+		mux.HandleFunc("/api/createAccount", CreateAccount)
+		mux.HandleFunc("/api/confirmEmail", handlers.ConfirmEmailHandler)
+		mux.HandleFunc("/api/resendVerification", handlers.ResendVerificationHandler)
+		mux.HandleFunc("/verifyEmail", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set("Referrer-Policy", "no-referrer")
+			http.ServeFile(w, r, "./internal/html/verifyEmail.html")
+		})
+	}
+
 	mux.HandleFunc("/api/sites", authRequired(readOnlyForbidden(CreateSite)))
 	mux.HandleFunc("/api/sites-update", authRequired(readOnlyForbidden(UpdateSite)))
 	mux.HandleFunc("/api/games/status", authRequired(readOnlyForbidden(UpdateGameStatus)))
@@ -8283,10 +8337,12 @@ func main() {
 	mux.HandleFunc("/api/payment-registry", authRequired(readOnlyForbidden(LoadPaymentRegistry)))
 	mux.HandleFunc("/api/expense-registry", authRequired(readOnlyForbidden(LoadExpenseRegistry)))
 	mux.HandleFunc("/api/deletePayment", authRequired(readOnlyForbidden(DeletePayment)))
-	mux.HandleFunc("/api/login", ValidateLogin)
+	if webAuth == nil {
+		mux.HandleFunc("/api/login", ValidateLogin)
+		mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
+		mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
+	}
 	mux.HandleFunc("/api/logout", Logout)
-	mux.HandleFunc("/api/forgotPassword", handlers.ForgotPasswordHandler)
-	mux.HandleFunc("/api/resetPassword", handlers.ResetPasswordHandler)
 	mux.HandleFunc("/api/settings/official-roles", authRequired(catalogReadOnly(OfficialRolesHandler)))
 	mux.HandleFunc("/api/email-report", authRequired(readOnlyForbidden(EmailReport)))
 

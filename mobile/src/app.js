@@ -1,4 +1,5 @@
-import {login,logout,apiGet} from './auth.js';
+import { Browser } from '@capacitor/browser';
+import {login, logout, apiGet, registerAccount} from './auth.js';
 import {config} from './config.js';
 import {summarize,dashboardURL} from './data.js';
 
@@ -95,7 +96,32 @@ async function load(){
    return;
   }
 
-  const r=await apiGet(dashboardURL(config.apiBase,filters));
+    const url = dashboardURL(config.apiBase, filters);
+  let r = await apiGet(url);
+
+  if (current !== generation) return;
+
+  if (r.status === 403) {
+   const setup = await registerAccount();
+
+   if (current !== generation) return;
+
+   if (setup.status === 204) {
+    r = await apiGet(url);
+   } else if (setup.status === 403) {
+    throw new Error('Verify your email in Auth0, then sign in again. If you already verified it, contact Ref Ledger support.');
+   } else if (setup.status === 409 && typeof setup.data === 'string') {
+    throw new Error(setup.data.trim());
+   } else if (setup.status === 502) {
+    throw new Error('Could not verify your Auth0 profile. Sign in again and retry.');
+   } else if (setup.status === 503) {
+    throw new Error('Account setup is temporarily unavailable. Please try again.');
+   } else if (setup.status === 401) {
+    throw new Error('Your session expired. Sign out and sign in again.');
+   } else {
+    throw new Error('Unable to set up your account. Please retry or contact Ref Ledger support.');
+   }
+  }
   
   console.log('Dashboard response:', {
     status: r.status,
@@ -105,7 +131,7 @@ async function load(){
 
   if(current!==generation)return;
 
-  if(r.status===404){
+  if(r.status===404 && r.data?.message === 'No games were found matching your search criteria.'){
    render([]);
    return;
   }
@@ -137,21 +163,43 @@ async function load(){
  }
 }
 
-$('login').onclick=async()=>{
- $('login').disabled=true;
- message('Opening secure sign-in…');
+const signupButton = document.createElement('button');
+signupButton.type = 'button';
+signupButton.className = 'secondary';
+signupButton.textContent = 'Create account';
+$('login').after(signupButton);
 
- try{
-  await login();
-  preview=false;
+async function openAuth(signup) {
+ $('login').disabled = true;
+ signupButton.disabled = true;
+ message(signup ? 'Opening account signup…' : 'Opening secure sign-in…');
+
+ try {
+  await login(signup);
+  preview = false;
   await load();
- }catch(error){
-  // Show only a plugin error identifier, never raw authentication details.
-  const detail=`${error?.code??''} ${error?.message??''}`;
-  const code=detail.match(/\bERR_[A-Z0-9_]+\b/)?.[0];
-  message(`Sign-in failed: ${code||'No plugin error code returned'}`);
- }finally{
-  $('login').disabled=false;
+ } catch (error) {
+  // Show only a plugin error identifier.
+  const detail = `${error?.code ?? ''} ${error?.message ?? ''}`;
+  const code = detail.match(/\bERR_[A-Z0-9_]+\b/)?.[0];
+  message(`Sign-in failed: ${code || 'No plugin error code returned'}`);
+ } finally {
+  $('login').disabled = false;
+  signupButton.disabled = false;
+ }
+}
+
+$('login').onclick = () => openAuth(false);
+signupButton.onclick = async () => {
+ signupButton.disabled = true;
+ try {
+  const url = new URL('/mobile/create-account', config.apiBase);
+  if (url.protocol !== 'https:') throw new Error('HTTPS is required.');
+  await Browser.open({ url: url.href });
+ } catch {
+  message('Could not open the account page. Please try again.');
+ } finally {
+  signupButton.disabled = false;
  }
 };
 
