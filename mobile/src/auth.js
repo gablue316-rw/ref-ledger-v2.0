@@ -2,7 +2,7 @@ import {Capacitor,CapacitorHttp} from '@capacitor/core';
 import {GenericOAuth2} from '@capacitor-community/generic-oauth2';
 import {SecureStoragePlugin as vault} from 'capacitor-secure-storage-plugin';
 import {config as c} from './config.js';
-import {normalizeTokens} from './data.js';
+import {normalizeTokens,authorizationParameters} from './data.js';
 const key=`ref-ledger-refresh:${encodeURIComponent(c.issuer)}:${encodeURIComponent(c.clientId)}:${encodeURIComponent(c.audience)}`;
 let access='',expires=0,refreshing;
 function native(){if(!Capacitor.isNativePlatform())throw new Error('Secure sign-in requires the Android or iPhone app.');}
@@ -13,10 +13,10 @@ async function accept(result){
  access=p.access;expires=p.expires;
  return access;
 }
-export async function login(signup=false){
+export async function login(signup=false,forceCredentials=false){
  configured();
  const platform={appId:c.clientId,responseType:'code',redirectUrl:c.redirectUrl,pkceEnabled:true,logsEnabled:false};
- return accept(await GenericOAuth2.authenticate({appId:c.clientId,authorizationBaseUrl:c.authorizationBaseUrl,accessTokenEndpoint:c.accessTokenEndpoint,redirectUrl:c.redirectUrl,responseType:'code',scope:c.scope,additionalParameters:{audience:c.audience,...(signup?{screen_hint:'signup',prompt:'login'}:{})},pkceEnabled:true,logsEnabled:false,android:platform,ios:platform}));
+ return accept(await GenericOAuth2.authenticate({appId:c.clientId,authorizationBaseUrl:c.authorizationBaseUrl,accessTokenEndpoint:c.accessTokenEndpoint,redirectUrl:c.redirectUrl,responseType:'code',scope:c.scope,additionalParameters:authorizationParameters(c,signup,forceCredentials),pkceEnabled:true,logsEnabled:false,android:platform,ios:platform}));
 }
 export async function token(){
  configured();if(access && Date.now()<expires-30000)return access;

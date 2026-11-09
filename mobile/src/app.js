@@ -1,7 +1,7 @@
 import { Browser } from '@capacitor/browser';
 import {login, logout, apiGet, registerAccount} from './auth.js';
 import {config} from './config.js';
-import {summarize,dashboardURL} from './data.js';
+import {summarize,dashboardURL,assignmentEarnings} from './data.js';
 
 const $=id=>document.getElementById(id),
  currency=n=>new Intl.NumberFormat('en-US',{
@@ -9,23 +9,21 @@ const $=id=>document.getElementById(id),
   currency:'USD'
  }).format(n);
 
-let preview=false,busy=false,generation=0;
+let busy=false,authBusy=false,generation=0;
 
-const samples=[{
- GameId:1042,
- Date:'11/6/2026 (Fri)',
- Time:'7:00 PM',
- Sport:'Basketball',
- Level:'Varsity',
- Site:'Sample High School',
- Association:'MCBOA',
- Status:'Pending',
- Home:'Home team',
- Visitor:'Visiting team',
- NumOfGames:1,
- TotalEarnings:'$85.00',
- Officials:[{title:'Referee',name:'Sample Official'}]
-}];
+function updateControls() {
+ for (const id of ['login','reauth','logout','refresh']) $(id).disabled=busy||authBusy;
+ signupButton.disabled=busy||authBusy;
+}
+
+function clearDashboard() {
+ ++generation;
+ $('games').replaceChildren();
+ for (const id of ['assignments','gameCount','earnings']) $(id).textContent='—';
+ $('dashboard').hidden=true;
+ $('signin').hidden=false;
+ $('logout').hidden=true;
+}
 
 function message(text){
  $('message').textContent=text;
@@ -48,7 +46,7 @@ function render(games){
    ['p',g.Site],
    ['p',`${g.Home||'—'} vs ${g.Visitor||'—'}`],
    ['p',`${g.Association} · Game ${g.GameId}`],
-   ['strong',g.TotalEarnings||g.GameFee]
+   ['strong',currency(assignmentEarnings(g))]
   ]){
    const el=document.createElement(tag);
    el.textContent=text??'';
@@ -67,7 +65,6 @@ function render(games){
  $('signin').hidden=true;
  $('dashboard').hidden=false;
  $('logout').hidden=false;
- $('sample').hidden=!preview;
  message(games.length?'':'No games match these filters.');
 }
 
@@ -76,7 +73,7 @@ async function load(){
  busy=true;
  const current=++generation;
  message('Loading games…');
- $('refresh').disabled=true;
+ updateControls();
 
  try{
   const filters=Object.fromEntries(new FormData($('filters')));
@@ -84,16 +81,6 @@ async function load(){
   if(filters.begindate && filters.enddate &&
      filters.begindate>filters.enddate){
    throw new Error('The through date must follow the from date.');
-  }
-
-  if(preview){
-   render(samples
-    .filter(g=>!filters.status||g.Status===filters.status)
-    .filter(g=>!filters.sport||
-     g.Sport.toLowerCase()===filters.sport.toLowerCase())
-    .filter(g=>!filters.association||
-     g.Association.toLowerCase()===filters.association.toLowerCase()));
-   return;
   }
 
     const url = dashboardURL(config.apiBase, filters);
@@ -159,7 +146,7 @@ async function load(){
   }
  }finally{
   busy=false;
-  $('refresh').disabled=false;
+  updateControls();
  }
 }
 
@@ -169,14 +156,19 @@ signupButton.className = 'secondary';
 signupButton.textContent = 'Create account';
 $('login').after(signupButton);
 
-async function openAuth(signup) {
- $('login').disabled = true;
- signupButton.disabled = true;
+async function openAuth(signup, forceCredentials=false) {
+ if (busy || authBusy) return;
+ authBusy=true;
+ updateControls();
  message(signup ? 'Opening account signup…' : 'Opening secure sign-in…');
 
  try {
-  await login(signup);
-  preview = false;
+  if (forceCredentials) {
+   clearDashboard();
+   $('filters').reset();
+   await logout();
+  }
+  await login(signup,forceCredentials);
   await load();
  } catch (error) {
   // Show only a plugin error identifier.
@@ -184,8 +176,8 @@ async function openAuth(signup) {
   const code = detail.match(/\bERR_[A-Z0-9_]+\b/)?.[0];
   message(`Sign-in failed: ${code || 'No plugin error code returned'}`);
  } finally {
-  $('login').disabled = false;
-  signupButton.disabled = false;
+  authBusy=false;
+  updateControls();
  }
 }
 
@@ -203,10 +195,7 @@ signupButton.onclick = async () => {
  }
 };
 
-$('preview').onclick=()=>{
- preview=true;
- load();
-};
+$('reauth').onclick=()=>openAuth(false,true);
 
 $('refresh').onclick=load;
 
@@ -216,23 +205,22 @@ $('filters').onsubmit=e=>{
 };
 
 $('logout').onclick=async()=>{
- ++generation;
- const sample=preview;
- preview=false;
- $('games').replaceChildren();
- $('dashboard').hidden=true;
- $('signin').hidden=false;
- $('logout').hidden=true;
- message('');
-
- if(!sample){
+ if (busy || authBusy) return;
+ authBusy=true;
+ updateControls();
+ clearDashboard();
+ message('Signing out…');
+ try {
   const revoked=await logout();
-  message(revoked
-   ?'Signed out.'
-   :'Signed out on this device. Server revocation could not be confirmed; use your identity-provider session controls if needed.');
+  message(revoked ? 'Signed out.' : 'Signed out on this device. Server revocation could not be confirmed.');
+ } catch {
+  message('Could not finish signing out. Please retry.');
+ } finally {
+  authBusy=false;
+  updateControls();
  }
 };
 
-// Restore only inside a native build. Browser preview never reads or stores tokens.
+// Restore only inside a native build. Browser mode never reads or stores tokens.
 import {Capacitor} from '@capacitor/core';
 if(Capacitor.isNativePlatform())load();
