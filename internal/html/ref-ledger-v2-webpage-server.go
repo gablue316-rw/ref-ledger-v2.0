@@ -8447,7 +8447,7 @@ func main() {
 	address := ":" + port
 
 	fmt.Printf("Ref Ledger listening on %s\n", address)
-	loggedMux := LogRequest(HTTPBytesMiddleware(mux))
+	loggedMux := LogRequest(HTTPBytesMiddleware(maintenanceMiddleware(mux)))
 
 	if err := http.ListenAndServe(address, loggedMux); err != nil {
 		log.Fatal(err)

@@ -68,3 +68,5 @@ ref-ledger-v2.exe
 *.txt
 *.doc
 *.docx
+# Local mobile IDE workspace
+/mobile/.idea/

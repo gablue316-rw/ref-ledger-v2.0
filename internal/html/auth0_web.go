@@ -272,6 +272,12 @@ func (auth *webAuth0) callback(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := findAuth0Account(ctx, identity)
 	if errors.Is(err, mongo.ErrNoDocuments) && auth.registration != nil {
+		release, lockErr := beginMaintenanceWrite(database.Client.Database(database.Database))
+		if lockErr != nil {
+			maintenanceUnavailable(w, r)
+			return
+		}
+		defer release()
 		profile.Subject = identity.Subject
 		user, err = auth.registration.account(ctx, identity, profile.auth0Profile)
 	}
