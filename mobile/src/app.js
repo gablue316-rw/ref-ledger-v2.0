@@ -1,3 +1,6 @@
+import {createGameActions} from './game-actions.js';
+import {bulkGames} from './game-bulk.js';
+import {editGame} from './game-editor.js';
 import { Browser } from '@capacitor/browser';
 import {login, logout, apiGet, registerAccount} from './auth.js';
 import {config} from './config.js';
@@ -10,14 +13,21 @@ const $=id=>document.getElementById(id),
  }).format(n);
 
 let busy=false,authBusy=false,generation=0;
+const gameActions=createGameActions({container:$('games'),
+ onEdit:g=>editGame(g,load),
+ onDelete:g=>bulkGames([g],'DELETE',load),
+ onBulk:(games,method)=>bulkGames(games,method,load)
+});
 
 function updateControls() {
  for (const id of ['login','reauth','logout','refresh']) $(id).disabled=busy||authBusy;
  signupButton.disabled=busy||authBusy;
+ gameActions.setDisabled(busy||authBusy);
 }
 
 function clearDashboard() {
  ++generation;
+ gameActions.reset();
  $('games').replaceChildren();
  for (const id of ['assignments','gameCount','earnings']) $(id).textContent='—';
  $('dashboard').hidden=true;
@@ -30,6 +40,7 @@ function message(text){
 }
 
 function render(games){
+ gameActions.reset(games);
  const totals=summarize(games);
  $('assignments').textContent=totals.assignments;
  $('gameCount').textContent=totals.games;
@@ -43,7 +54,7 @@ function render(games){
   for(const [tag,text] of [
    ['small',`${g.Status} · ${g.Sport} · ${g.Level}`],
    ['h2',`${g.Date} · ${g.Time}`],
-   ['p',g.Site],
+   ['p',`${g.Site || '—'} · Field: ${g.Field || '—'}`],
    ['p',`${g.Home||'—'} vs ${g.Visitor||'—'}`],
    ['p',`${g.Association} · Game ${g.GameId}`],
    ['strong',currency(assignmentEarnings(g))]
@@ -59,6 +70,7 @@ function render(games){
    card.append(el);
   }
 
+  gameActions.decorate(card,g);
   $('games').append(card);
  }
 
@@ -138,6 +150,7 @@ async function load(){
   render(r.data);
  }catch(error){
   if(current===generation){
+   gameActions.reset();
    $('games').replaceChildren();
    $('assignments').textContent='—';
    $('gameCount').textContent='—';
