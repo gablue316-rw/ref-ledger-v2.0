@@ -1,3 +1,4 @@
+import {changeGameStatuses} from './game-status.js';
 import {createGameActions} from './game-actions.js';
 import {bulkGames} from './game-bulk.js';
 import {editGame} from './game-editor.js';
@@ -16,7 +17,8 @@ let busy=false,authBusy=false,generation=0;
 const gameActions=createGameActions({container:$('games'),
  onEdit:g=>editGame(g,load),
  onDelete:g=>bulkGames([g],'DELETE',load),
- onBulk:(games,method)=>bulkGames(games,method,load)
+ onBulk:(games,method)=>bulkGames(games,method,load),
+ onStatus:(games,status)=>changeGameStatuses(games,status,load)
 });
 
 function updateControls() {
