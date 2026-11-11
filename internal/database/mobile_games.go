@@ -3,21 +3,20 @@ package database
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"ref-ledger-v2/internal/model"
 )
 
-var ErrMobileConflict = errors.New("game changed; close and reopen it before saving")
+var ErrMobileConflict = errors.New("game changed since it was loaded; refresh the game list and retry your action")
 var ErrMobilePaid = errors.New("paid games cannot be edited or deleted")
 
 // MobileGameSnapshot retains the exact database predicates for a conditional write.
 type MobileGameSnapshot struct {
 	Game    model.GameDescriptor
 	Version string
-	Filter  bson.M
+	Filter  bson.Raw
 	Doc     model.GameDoc
 }
 
@@ -27,15 +26,23 @@ func LoadMobileGame(ctx context.Context, tenant, association string, id int64) (
 	if err != nil {
 		return s, err
 	}
-	if err = bson.Unmarshal(raw, &s.Filter); err != nil {
+	return decodeMobileGameSnapshot(raw)
+}
+
+func decodeMobileGameSnapshot(raw bson.Raw) (MobileGameSnapshot, error) {
+	var s MobileGameSnapshot
+	if err := raw.Validate(); err != nil {
 		return s, err
 	}
-	if err = bson.Unmarshal(raw, &s.Doc); err != nil {
+	// Keep embedded documents in their stored BSON order. Decoding the filter
+	// into maps reorders officials on re-encoding, so MongoDB equality can reject
+	// an unchanged record. Copy bytes because the query result owns its buffer.
+	s.Filter = append(bson.Raw(nil), raw...)
+	if err := bson.Unmarshal(raw, &s.Doc); err != nil {
 		return s, err
 	}
 	s.Game = convertGameDocWithOfficials(s.Doc)
-	data, _ := json.Marshal(s.Filter)
-	s.Version = fmt.Sprintf("%x", sha256.Sum256(data))
+	s.Version = fmt.Sprintf("%x", sha256.Sum256(s.Filter))
 	return s, nil
 }
 func WriteMobileGame(ctx context.Context, s MobileGameSnapshot, game *model.GameDescriptor, version string) error {
