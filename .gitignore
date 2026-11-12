@@ -26,8 +26,15 @@ port-forward.log
 # Logs
 logs/
 
-# Tests
-tests/
+# Generated test output
+tests/**/*.exe
+tests/**/*.log
+tests/**/*.rpt
+tests/**/__pycache__/
+tests/**/.pytest_cache/
+tests/**/reports/
+tests/**/test-results/
+tests/e2e/*.png
 
 # values.yaml.atlas and values.yaml.local
 values.yaml.atlas

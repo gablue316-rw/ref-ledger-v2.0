@@ -30,7 +30,7 @@ import (
 
 var Client *mongo.Client
 var IsConnected bool
-var GameFilters bson.M = bson.M{}
+
 var Database string
 var URI string
 
@@ -176,18 +176,6 @@ func convertDateStringToTime(date, gameTime string) (time.Time, error) {
 	return dt, nil
 }
 
-func foundAssociation(assoc string) bool {
-
-	associations := []string{"GOLLC", "MCBOA", "MSO"}
-
-	for _, a := range associations {
-		if assoc == a {
-			return true
-		}
-	}
-	return false
-}
-
 func GetEnvironment() EnvironmentInfo {
 	envInfo := EnvironmentInfo{
 		Environment: os.Getenv("APP_ENV"),
@@ -226,312 +214,6 @@ func GetMongoDbName() string {
 
 	fmt.Println("MongoDB Name:", dbName)
 	return dbName
-
-}
-
-func ClearGames(parentCtx context.Context, gameIds []int64) {
-
-	filter := bson.M{
-		"gameId": bson.M{
-			"$in": gameIds,
-		},
-	}
-
-	update := bson.M{
-		"$set": bson.M{
-			"gameFee":     0,
-			"travelPay":   0,
-			"assignorFee": 0,
-			"deductions":  0,
-			"status":      "Cancelled",
-		},
-	}
-
-	if len(gameIds) > 1 {
-		UpdateManyDoc(parentCtx, filter, update, Database, "games")
-	} else {
-		err := UpdateOneDoc(parentCtx, filter, update, Database, "games")
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Println("Successfully updated game with game id[s]:", gameIds)
-		}
-	}
-}
-
-func GetGamesPaidForPerAssoc(assoc string) ([]int64, error) {
-
-	var gameIdList []int64 = []int64{}
-
-	if assoc == "" || !foundAssociation(assoc) {
-		return gameIdList, fmt.Errorf("GetGamesPaidForPerAssoc failure.  Reason: Invalid Association: %s", assoc)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"association": assoc,
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("payments")
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		return gameIdList, fmt.Errorf("GetGamesPaidForPerAssoc failure.  Reason: %s", err)
-	}
-
-	var results []model.PaymentDoc
-	err = cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return gameIdList, fmt.Errorf("GetGamesPaidForPerAssoc failure.  Reason: %s", err)
-	}
-
-	for _, r := range results {
-		gameIdList = append(gameIdList, r.GameIds...)
-	}
-
-	return gameIdList, nil
-}
-
-func GetGamesInPaidStatusPerAssoc(assoc string) ([]int64, error) {
-
-	var gameIdList []int64 = []int64{}
-
-	if assoc == "" || !foundAssociation(assoc) {
-		return gameIdList, fmt.Errorf("GetGamesInPaidStatusPerAssoc failure.  Reason: Invalid Association: %s", assoc)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"association": assoc,
-		"status":      "Paid",
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		return gameIdList, fmt.Errorf("GetGamesInPaidStatusPerAssoc failure.  Reason: %s", err)
-	}
-
-	var results []model.GameDoc
-	err = cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return gameIdList, fmt.Errorf("GetGamesInPaidStatusPerAssoc failure.  Reason: %s", err)
-	}
-
-	for _, r := range results {
-		gameIdList = append(gameIdList, r.GameId)
-	}
-
-	return gameIdList, nil
-}
-
-func GetTotalGames(assoc string) (int64, error) {
-
-	totalGames := int64(0)
-
-	if assoc == "" || !foundAssociation(assoc) {
-		return totalGames, fmt.Errorf("GetTotalGames failure.  Reason: Invalid Association: %s", assoc)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"association": assoc,
-		"status":      "Paid",
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		return totalGames, fmt.Errorf("GetTotalGames failure.  Reason: %s", err)
-	}
-
-	var results []model.GameDoc
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return totalGames, fmt.Errorf("GetTotalGames failure.  Reason: %s", err)
-	}
-
-	for _, r := range results {
-		totalGames += r.NumOfGames
-	}
-	return totalGames, nil
-}
-
-func GetTotalTravelPay(assoc string) (int64, error) {
-
-	totalTravelPay := int64(0)
-
-	if assoc == "" || !foundAssociation(assoc) {
-		return totalTravelPay, fmt.Errorf("GetTotalTravelPay failure.  Reason: Invalid Association: %s", assoc)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"association": assoc,
-		"status":      "Paid",
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		return totalTravelPay, fmt.Errorf("GetTotalTravelPay failure.  Reason: %s", err)
-	}
-
-	var results []model.GameDoc
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return totalTravelPay, fmt.Errorf("GetTotalTravelPay failure.  Reason: %s", err)
-	}
-
-	for _, r := range results {
-		totalTravelPay += r.TravelPay
-	}
-
-	return totalTravelPay, nil
-
-}
-
-func GetTotalAssignorFee(assoc string) (int64, error) {
-
-	totalAssignorFee := int64(0)
-
-	if assoc == "" || !foundAssociation(assoc) {
-		return totalAssignorFee, fmt.Errorf("GetTotalAssignorFee failure.  Reason: Invalid Association: %s", assoc)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"association": assoc,
-		"status":      "Paid",
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		return totalAssignorFee, fmt.Errorf("GetTotalAssignorFee failure.  Reason: %s", err)
-	}
-
-	var results []model.GameDoc
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return totalAssignorFee, fmt.Errorf("GetTotalAssignorFee failure.  Reason: %s", err)
-	}
-
-	for _, r := range results {
-		totalAssignorFee += r.AssignorFee
-	}
-
-	return totalAssignorFee, nil
-
-}
-
-func GetTotalDeductions(assoc, tId string) (int64, error) {
-
-	totalDeductions := int64(0)
-
-	if assoc == "" || !foundAssociation(assoc) {
-		return totalDeductions, fmt.Errorf("GetTotalDeductions failure.  Reason: Invalid Association: %s", assoc)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"association": assoc,
-		"status":      "Paid",
-		"tenantId":    tId,
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		return totalDeductions, fmt.Errorf("GetTotalDeductions failure.  Reason: %s", err)
-	}
-
-	var results []model.GameDoc
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return totalDeductions, fmt.Errorf("GetTotalDeductions failure.  Reason: %s", err)
-	}
-
-	for _, r := range results {
-		totalDeductions += r.Deductions
-	}
-
-	return totalDeductions, nil
-
-}
-
-func GetTotalGrossGameFee(assoc string) (int64, error) {
-
-	totalGrossGameFee := int64(0)
-
-	if assoc == "" || !foundAssociation(assoc) {
-		return totalGrossGameFee, fmt.Errorf("GetTotalGrossGameFee failure.  Reason: Invalid Association: %s", assoc)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"association": assoc,
-		"status":      "Paid",
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		return totalGrossGameFee, fmt.Errorf("GetTotalGrossGameFee failure.  Reason: %s", err)
-	}
-
-	var results []model.GameDoc
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return totalGrossGameFee, fmt.Errorf("GetTotalGrossGameFee failure.  Reason: %s", err)
-	}
-
-	for _, r := range results {
-		totalGrossGameFee += r.GameFee * r.NumOfGames
-	}
-
-	return totalGrossGameFee, nil
 
 }
 
@@ -629,19 +311,6 @@ func GetGameByGameIdAndAssoc(assoc, gameId, tId string) (model.GameDescriptor, e
 	return gameRecord, nil
 }
 
-func CalcSingleGameFee(game model.GameDescriptor) (int64, error) {
-
-	numOfGames, _ := utils.ConvertStrToInt64(game.NumOfGames)
-	gameFee, _ := utils.ConvertAmtStrToInt64(game.GameFee)
-	travelPay, _ := utils.ConvertAmtStrToInt64(game.TravelPay)
-	assignorFee, _ := utils.ConvertAmtStrToInt64(game.AssignorFee)
-	deductions, _ := utils.ConvertAmtStrToInt64(game.Deductions)
-
-	totalGameFee := numOfGames*gameFee + travelPay - assignorFee - deductions
-	return totalGameFee, nil
-
-}
-
 func GetSingleGame(
 	parentCtx context.Context,
 	gameId, association, tenantId string,
@@ -697,55 +366,6 @@ func GetSingleGame(
 	}
 
 	return convertGameDocWithOfficials(games[0]), nil
-}
-
-func QueryOfficials(parentCtx context.Context, dbase, collection, assoc, official string) ([]model.OfficialDescriptor, error) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{}
-
-	if len(assoc) > 0 {
-		assocValues := utils.ParseCsv(assoc)
-		filter["association"] = bson.M{
-			"$in": assocValues,
-		}
-	}
-
-	if len(official) > 0 {
-		parts := strings.Split(official, " ")
-		if len(parts) == 1 {
-			filter["$or"] = []bson.M{
-				{"firstName": parts[0]},
-				{"lastName": parts[0]},
-			}
-		} else {
-			filter["firstName"] = parts[0]
-			filter["lastName"] = parts[1]
-		}
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection(collection)
-
-	cursor, err := coll.Find(ctx, filter)
-
-	var results []model.OfficialDoc
-	var officialRecords []model.OfficialDescriptor
-
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.OfficialDescriptor{}, err
-	}
-
-	for _, r := range results {
-
-		officialRecords = append(officialRecords, utils.ConvertOfficialDocToOfficialDescr(r))
-
-	}
-	return officialRecords, nil
 }
 
 func GetExpenseRegistry(
@@ -952,278 +572,80 @@ func DeletePayment(paymentId, association, tid string) error {
 	return nil
 }
 
-func QueryPayments(parentCtx context.Context, dbase, collection string, assoc []string) ([]model.PaymentDescriptor, error) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{}
-
-	if len(assoc) > 0 {
-		filter["association"] = bson.M{
-			"$in": assoc,
-		}
+// documentExists stops at the first match and only retrieves its identity.
+func documentExists(ctx context.Context, coll *mongo.Collection, filter bson.M) (bool, error) {
+	err := coll.FindOne(ctx, filter, options.FindOne().SetProjection(bson.M{"_id": 1})).Err()
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return false, nil
 	}
-
-	db := Client.Database(Database)
-	coll := db.Collection(collection)
-
-	cursor, err := coll.Find(ctx, filter)
-
-	var results []model.PaymentDoc
-	var paymentRecords []model.PaymentDescriptor
-
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.PaymentDescriptor{}, err
-	}
-
-	for _, r := range results {
-
-		paymentRecords = append(paymentRecords, utils.ConvertPaymentDocToPaymentDescr(r))
-
-	}
-	return paymentRecords, nil
-}
-
-func QueryAggregatedGames(parentCtx context.Context, dbase, collection string, filter bson.M) ([]model.GameDescriptor, error) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	fmt.Println("mongoDbFilter:", filter)
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	opts := options.Find().
-		SetSort(bson.D{
-			{Key: "gameDateTime", Value: 1},
-		})
-
-	cursor, err := coll.Find(ctx, filter, opts)
-
-	if err != nil {
-		fmt.Println("Find failed.  Reason:", err)
-		return []model.GameDescriptor{}, err
-	}
-
-	var results []model.GameDoc
-	var gameRecords []model.GameDescriptor
-
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.GameDescriptor{}, err
-	}
-
-	for _, r := range results {
-
-		gameRecords = append(gameRecords, convertGameDocWithOfficials(r))
-
-	}
-	return gameRecords, nil
+	return err == nil, err
 }
 
 func PaymentExists(doc model.PaymentDoc, tenantId string) (bool, error) {
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	filter := bson.M{}
-
-	var paymentExists bool = false
-
-	db := Client.Database(Database)
-	coll := db.Collection("payments")
-
-	filter = bson.M{
-		"paymentId":   doc.PaymentId,
-		"association": doc.Association,
-		"tenantId":    tenantId,
-	}
-
-	// Query to find all documents
-	count, err := coll.CountDocuments(ctx, filter)
-	if err != nil {
-		return false, fmt.Errorf("CountDocuments failure.  Reason: %s", err)
-	}
-
-	if count > 0 {
-		fmt.Println("Payment exists!")
-		paymentExists = true
-	}
-
-	return paymentExists, nil
+	return documentExists(ctx, Client.Database(Database).Collection("payments"), bson.M{
+		"paymentId": doc.PaymentId, "association": doc.Association, "tenantId": tenantId,
+	})
 }
 
 func GameExists(doc model.GameDoc) (bool, error) {
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	filter := bson.M{}
-
-	var gameExists bool = false
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	filter = bson.M{
-		"gameId":      doc.GameId,
-		"association": doc.Association,
-	}
-
-	// Query to find all documents
-	count, err := coll.CountDocuments(ctx, filter)
-	if err != nil {
-		return false, fmt.Errorf("CountDocuments failure.  Reason: %s", err)
-	}
-
-	if count > 0 {
-		fmt.Println("Game exists!")
-		gameExists = true
-	}
-
-	return gameExists, nil
-}
-
-func BuildMongoExpenseFilter(filter model.ExpenseFilter) bson.M {
-	fmt.Println("Building MongoDb Expense Filter")
-	mongoFilter := bson.M{}
-
-	if len(filter.Association) > 0 {
-		mongoFilter["association"] = bson.M{
-			"$in": filter.Association,
-		}
-	}
-
-	if len(filter.ExpenseType) > 0 {
-		mongoFilter["type"] = bson.M{
-			"$in": filter.ExpenseType,
-		}
-	}
-
-	if filter.Date != nil {
-		fromTime, fromErr := time.Parse("1/2/2006", filter.Date.From)
-		toTime, toErr := time.Parse("1/2/2006", filter.Date.To)
-
-		if fromErr == nil && toErr == nil {
-			mongoFilter["$expr"] = bson.M{
-				"$and": []bson.M{
-					{
-						"$gte": []interface{}{
-							bson.M{
-								"$dateFromString": bson.M{
-									"dateString": "$date",
-									"format":     "%m/%d/%Y",
-								},
-							},
-							fromTime,
-						},
-					},
-					{
-						"$lte": []interface{}{
-							bson.M{
-								"$dateFromString": bson.M{
-									"dateString": "$date",
-									"format":     "%m/%d/%Y",
-								},
-							},
-							toTime,
-						},
-					},
-				},
-			}
-		}
-	}
-	return mongoFilter
-}
-
-func BuildMongoExpenseFilterFromFile(path string) (bson.M, error) {
-
-	fmt.Println("Building MongoDb Expense Filter from File")
-	if path == "" {
-		return bson.M{}, nil
-	}
-
-	file, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	var filter model.ExpenseFilter
-	if err := json.Unmarshal(file, &filter); err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	fmt.Println("Filter is loaded!")
-	mongoFilter := BuildMongoExpenseFilter(filter)
-
-	fmt.Println("mongoFilter:", mongoFilter)
-	return mongoFilter, nil
+	return documentExists(ctx, Client.Database(Database).Collection("games"), bson.M{
+		"gameId": doc.GameId, "association": doc.Association, "tenantId": doc.TenantId,
+	})
 }
 
 func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 
-	fmt.Println("Building MongoDb Game Filter using:", filter)
 	mongoFilter := bson.M{}
 
-	fmt.Println("Building MongoDb Game Filter with Tenant ID:", filter.TenantId)
 	mongoFilter["tenantId"] = filter.TenantId
 
 	if len(filter.Status) > 0 {
-		fmt.Println("Adding Statuses...")
 		mongoFilter["status"] = bson.M{
 			"$in": filter.Status,
 		}
 	}
 
 	if len(filter.Association) > 0 {
-		fmt.Println("Adding Associations...")
 		mongoFilter["association"] = bson.M{
 			"$in": filter.Association,
 		}
 	}
 
 	if len(filter.GameId) > 0 {
-		fmt.Println("Adding GameIds...")
 		mongoFilter["gameId"] = bson.M{
 			"$in": filter.GameId,
 		}
 	}
 
 	if len(filter.Site) > 0 {
-		fmt.Println("Adding Sites...")
 		mongoFilter["site"] = bson.M{
 			"$in": filter.Site,
 		}
 	}
 
 	if len(filter.Sport) > 0 {
-		fmt.Println("Adding Sports...")
 		mongoFilter["sport"] = bson.M{
 			"$in": filter.Sport,
 		}
 	}
 
 	if len(filter.Level) > 0 {
-		fmt.Println("Adding Levels...")
 		mongoFilter["level"] = bson.M{
 			"$in": filter.Level,
 		}
 	}
 
 	if len(filter.Assignor) > 0 {
-		fmt.Println("Adding Assignors...")
 		mongoFilter["assignor"] = bson.M{
 			"$in": filter.Assignor,
 		}
 	}
 
 	if strings.TrimSpace(filter.TaxYear) != "" {
-		fmt.Println("Adding TaxYear...")
 		mongoFilter["taxYear"] = strings.TrimSpace(filter.TaxYear)
 	}
 
@@ -1409,116 +831,7 @@ func BuildMongoGameFilter(filter model.GameFilter) bson.M {
 		fmt.Println(err)
 	}
 
-	fmt.Println("Mongo DB Filter successfully built!")
-
 	return mongoFilter
-}
-
-func BuildMongoGameFilterFromFile(path string) (bson.M, error) {
-
-	fmt.Println("Building MongoDb Game Filter from File")
-	if path == "" {
-		return bson.M{}, nil
-	}
-
-	file, err := os.ReadFile(path)
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	var filter model.GameFilter
-	if err := json.Unmarshal(file, &filter); err != nil {
-		fmt.Println(err)
-		return nil, err
-	}
-
-	fmt.Println("Filter is loaded!")
-	mongoFilter := BuildMongoGameFilter(filter)
-
-	fmt.Println("mongoFilter:", mongoFilter)
-	return mongoFilter, nil
-}
-
-func QueryCollection(filter bson.M, dbase, collection string) *mongo.Cursor {
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-
-	if collection == "games" {
-
-	}
-
-	// Query to find all documents
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	count, err := coll.CountDocuments(ctx, filter)
-
-	fmt.Println("coll.Find() found", count, "documents")
-	return cursor
-
-}
-
-func QueryExpenses(parentCtx context.Context, dbase, collection string, filter bson.M) ([]model.ExpenseDescriptor, error) {
-
-	fmt.Println("filter:", filter)
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	cursor, err := coll.Find(ctx, filter)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.ExpenseDescriptor{}, err
-	}
-
-	var results []model.ExpenseDoc
-	var expenseRecords []model.ExpenseDescriptor
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.ExpenseDescriptor{}, err
-	}
-
-	for _, r := range results {
-		expenseRecords = append(expenseRecords, utils.ConvertExpenseDocToExpenseDescr(r))
-	}
-	return expenseRecords, nil
-}
-
-func QueryGames(parentCtx context.Context, dbase, collection, filter string) ([]model.GameDescriptor, error) {
-
-	mongoDbFilter, err := BuildMongoGameFilterFromFile(filter)
-
-	if err != nil {
-		fmt.Println("Failed to build Mongo DB Filter for games collection")
-		return []model.GameDescriptor{}, err
-	}
-
-	cursor := QueryCollection(mongoDbFilter, dbase, collection)
-
-	var results []model.GameDoc
-	var gameRecords []model.GameDescriptor
-
-	err = cursor.All(context.TODO(), &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.GameDescriptor{}, err
-	}
-
-	for _, r := range results {
-
-		gameRecords = append(gameRecords, convertGameDocWithOfficials(r))
-
-	}
-	return gameRecords, nil
 }
 
 func IsSessionIndexed() bool {
@@ -1569,26 +882,6 @@ func CreateSessionIndices() {
 
 	fmt.Println("Created index:", name)
 
-}
-
-func DeleteSessions(username string) {
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(Database)
-	coll := db.Collection("sessions")
-	result, err := coll.DeleteMany(
-		ctx,
-		bson.M{"username": username},
-	)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	fmt.Printf("Deleted %d sessions for user %s\n", result.DeletedCount, username)
 }
 
 func GetSession(r *http.Request) (*model.Session, error) {
@@ -1804,36 +1097,6 @@ func Connect() error {
 
 }
 
-func GetContext() (context.Context, context.CancelFunc) {
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	return ctx, cancel
-}
-
-func GetExpensesCollection(parentCtx context.Context) ([]model.ExpenseDoc, error) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(Database)
-	coll := db.Collection("expenses")
-	collectionName := coll.Name()
-
-	fmt.Println("Retrieving", collectionName, "collection")
-
-	cursor := QueryCollection(bson.M{}, Database, "expenses")
-
-	var results []model.ExpenseDoc
-
-	err := cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.ExpenseDoc{}, err
-	}
-
-	return results, nil
-}
-
 // DELETE THIS
 /*
 func GetOfficialNames() ([]OfficialName, error) {
@@ -1877,30 +1140,6 @@ func GetOfficialNames() ([]OfficialName, error) {
 }
 */
 
-func GetOfficialsCollection(parentCtx context.Context) ([]model.OfficialDoc, error) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(Database)
-	coll := db.Collection("officials")
-	collectionName := coll.Name()
-
-	fmt.Println("Retrieving", collectionName, "collection")
-
-	cursor := QueryCollection(bson.M{}, Database, "officials")
-
-	var results []model.OfficialDoc
-
-	err := cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.OfficialDoc{}, err
-	}
-
-	return results, nil
-}
-
 func GetPayment(paymentId, association, tid string) (model.PaymentDoc, error) {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
@@ -1923,154 +1162,6 @@ func GetPayment(paymentId, association, tid string) (model.PaymentDoc, error) {
 	return result, nil
 }
 
-func GetPaymentsCollection(parentCtx context.Context) ([]model.PaymentDoc, error) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(Database)
-	coll := db.Collection("payments")
-	collectionName := coll.Name()
-
-	fmt.Println("Retrieving", collectionName, "collection")
-
-	cursor := QueryCollection(bson.M{}, Database, "payments")
-
-	var results []model.PaymentDoc
-
-	err := cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.PaymentDoc{}, err
-	}
-
-	return results, nil
-}
-
-func ClearGamesCollection(parentCtx context.Context, assoc string) {
-
-	filter := bson.M{}
-
-	if len(assoc) > 0 {
-		assocValues := utils.ParseCsv(assoc)
-		fmt.Println("Attempting to delete all games for association(s):", assocValues)
-		filter["association"] = bson.M{
-			"$in": assocValues,
-		}
-	}
-	DeleteManyDoc(parentCtx, filter, Database, "games")
-
-}
-
-func GetGamesCollection(parentCtx context.Context, assoc string) ([]model.GameDoc, error) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{}
-
-	if len(assoc) > 0 {
-		assocValues := utils.ParseCsv(assoc)
-		filter["association"] = bson.M{
-			"$in": assocValues,
-		}
-	}
-
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-	collectionName := coll.Name()
-
-	fmt.Println("Retrieving", collectionName, "collection")
-
-	cursor := QueryCollection(filter, Database, "games")
-
-	var results []model.GameDoc
-
-	err := cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		return []model.GameDoc{}, err
-	}
-
-	for i := range results {
-		results[i].Officials = gameOfficialsForRead(results[i])
-	}
-	return results, nil
-}
-
-func DelCollection(parentCtx context.Context, dbase, collection string) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-
-	fmt.Println("Deleting", coll.Name())
-
-	err := coll.Drop(ctx)
-	if err != nil {
-		fmt.Println("Failed to delete", coll.Name())
-		log.Fatal(err)
-		return
-	}
-
-	fmt.Println("Collection deleted successfully")
-
-}
-
-func UpdateManyDoc(parentCtx context.Context, filter, update bson.M, dbase, collection string) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-
-	fmt.Println("Updating Many", coll.Name())
-	coll.UpdateMany(ctx, filter, update)
-}
-
-func UpdateOneDoc(parentCtx context.Context, filter, update bson.M, dbase, collection string) error {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-
-	//fmt.Println("Updating One", coll.Name())
-	results, err := coll.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return fmt.Errorf("Attempt to update %s failed.  Reason: %s", coll.Name(), err)
-	}
-
-	if results.ModifiedCount != 1 {
-		return fmt.Errorf("No records modified in collection %s", coll.Name())
-	}
-
-	return nil
-}
-
-func DeleteManyDoc(parentCtx context.Context, filter bson.M, dbase, collection string) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-	fmt.Println("Deleting multiple documents from", collectionName)
-
-	result, err := coll.DeleteMany(ctx, filter)
-	if err != nil {
-		fmt.Println("Delete failed.  Reason:", err)
-		return
-	}
-
-	fmt.Println("Deleted Records with GameIds of", filter["gameId"], " Records Deleted:", result.DeletedCount)
-}
-
 func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection string) {
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
@@ -2090,37 +1181,6 @@ func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection st
 	MetricsDeleted(filter["tenantId"].(string), collection, result.DeletedCount)
 
 	fmt.Println("Deleted Record with GameId of", filter["gameId"], " Records Deleted:", result.DeletedCount)
-}
-
-func InsertOfficialDocs(parentCtx context.Context, game []model.OfficialDescriptor, dbase, collection string) {
-
-	utils.AuditLog.Printf("InsertOfficialDocs: Inserting %d official records into collection %s", len(game), collection)
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-	fmt.Println("Inserting records into", collectionName)
-
-	officialId := 1
-
-	recordsInserted := 0
-	for _, v := range game {
-
-		doc := utils.ConvertOfficialDescrToOfficialDoc(v)
-		doc.OfficialId = officialId
-
-		fmt.Println("Official Doc:", doc)
-		_, err := coll.InsertOne(ctx, doc)
-		if err != nil {
-			fmt.Println("Insert failed.  Reason:", err)
-			return
-		}
-		recordsInserted++
-		officialId++
-	}
-	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
 }
 
 func UpdateGameStatusToPaid(
@@ -2215,73 +1275,56 @@ func UpdateGameStatusToPaid(
 }
 
 func VerifyGameStatus(gameIds []int64, association, tenantId string) []error {
-
-	var gameErrors []error
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-	ctx := context.Background()
-
-	for _, gameID := range gameIds {
-
-		filter := bson.M{
-			"gameId":      gameID,
-			"tenantId":    tenantId,
-			"association": association,
-			"status":      "Completed",
-		}
-
-		result := coll.FindOne(ctx, filter)
-
-		err := result.Err()
-
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			gameErrors = append(gameErrors, fmt.Errorf("game %d was not found assigned to association %s in Completed Status", gameID, association))
-			continue
-		}
-
-		if err != nil {
-			gameErrors = append(gameErrors, fmt.Errorf("VerifyGameStatus failure.  Reason: %s", err))
-			continue
-		}
-
-	}
-
-	return gameErrors
+	return verifySelectedGames(gameIds, association, tenantId, true)
 }
 
 func VerifyGameMatchesAssociation(gameIds []int64, association, tenantId string) []error {
+	return verifySelectedGames(gameIds, association, tenantId, false)
+}
 
-	ctx := context.TODO()
-
-	var gameErrors []error
-	db := Client.Database(Database)
-	coll := db.Collection("games")
-
-	for _, gameID := range gameIds {
-
-		filter := bson.M{
-			"gameId":      gameID,
-			"tenantId":    tenantId,
-			"association": association,
-		}
-
-		result := coll.FindOne(ctx, filter)
-
-		err := result.Err()
-
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			gameErrors = append(gameErrors, fmt.Errorf("game %d was not found assigned to association %s", gameID, association))
-			continue
-		}
-
-		if err != nil {
-			gameErrors = append(gameErrors, fmt.Errorf("VerifyGameMatchesAssociation failure.  Reason: %s", err))
-			continue
-		}
-
+// Fetch all requested identities in one bounded query, rather than one round trip per game.
+func verifySelectedGames(ids []int64, association, tenantID string, completedOnly bool) []error {
+	if len(ids) == 0 {
+		return nil
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	filter := bson.M{"tenantId": tenantID, "association": association, "gameId": bson.M{"$in": ids}}
+	if completedOnly {
+		filter["status"] = "Completed"
+	}
+	cursor, err := Client.Database(Database).Collection("games").Find(ctx, filter,
+		options.Find().SetProjection(bson.M{"_id": 0, "gameId": 1}))
+	if err != nil {
+		return []error{fmt.Errorf("verify games: %w", err)}
+	}
+	defer cursor.Close(ctx)
+	var rows []struct {
+		ID int64 `bson:"gameId"`
+	}
+	if err := cursor.All(ctx, &rows); err != nil {
+		return []error{fmt.Errorf("decode selected games: %w", err)}
+	}
+	found := make(map[int64]bool, len(rows))
+	for _, row := range rows {
+		found[row.ID] = true
+	}
+	return missingSelectedGames(ids, found, association, completedOnly)
+}
 
-	return gameErrors
+func missingSelectedGames(ids []int64, found map[int64]bool, association string, completedOnly bool) []error {
+	var failures []error
+	for _, id := range ids {
+		if found[id] {
+			continue
+		}
+		message := fmt.Sprintf("game %d was not found assigned to association %s", id, association)
+		if completedOnly {
+			message += " in Completed Status"
+		}
+		failures = append(failures, errors.New(message))
+	}
+	return failures
 }
 
 //
@@ -2590,9 +1633,6 @@ func UpdatePaymentDocs(
 
 		// statusErrors := VerifyGameStatus(gameIds, v.Association, tId)
 		// if len(statusErrors) > 0 {
-		// 	totalErrors++
-		// 	importErrors = append(importErrors, statusErrors...)
-		// 	continue
 		// }
 
 		// If game IDs change, removed games need to return to Completed,
@@ -2699,33 +1739,6 @@ func UpdatePaymentDocs(
 	)
 
 	return recordsUpdated, totalErrors, gamesUpdatedToPaid, importErrors
-}
-
-func InsertExpenseDocs(parentCtx context.Context, expense []model.ExpenseDescriptor, dbase, collection string) {
-
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-	fmt.Println("Inserting records into", collectionName)
-	recordsInserted := 0
-	totalErrors := 0
-	for _, v := range expense {
-
-		doc := utils.ConvertExpenseDescrToExpenseDoc(v)
-		_, err := coll.InsertOne(ctx, doc)
-		if err != nil {
-			fmt.Println("Insert failed.  Reason:", err)
-			totalErrors++
-			continue
-		}
-		fmt.Println("Inserted Expense with Id:", doc.ExpenseId, "Date:", doc.Date, "Type:", doc.Type, "Amount:", doc.Amount, "Association:", doc.Association, "GameId:", doc.GameId, "Description:", doc.Description)
-		recordsInserted++
-	}
-	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted, "Total Errors:", totalErrors)
-
 }
 
 func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbase, collection, tId string) error {
@@ -2893,22 +1906,9 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 		MetricsAdded(tId, "games", 1)
 		recordsInserted++
 
-		//fmt.Println("Inserted ID:", result.InsertedID)
 	}
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
 	fmt.Println("Total Errors:", totalErrors)
-}
-
-func ClearGameFilters() {
-	GameFilters = bson.M{}
-}
-
-func SetGameFilters(field, value string) {
-	GameFilters[field] = value
-}
-
-func GetGameFilters() bson.M {
-	return GameFilters
 }
 
 // Association Colleciton, Documents and API Code
@@ -2973,23 +1973,6 @@ func (ac *AssociationCollection) ConvAssocJsonToAssoc(
 		Email:     association.Email,
 		Assignors: association.Assignors,
 	}
-}
-
-func (ac *AssociationCollection) DeleteAll(tenantId string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	results, err := ac.Coll.DeleteMany(ctx, bson.M{"tenantId": tenantId})
-	if err != nil {
-		MetricsErrors(tenantId, "associations", 1)
-		ac.LastError = err
-		return fmt.Errorf("Delete failed.  Reason: %v", err)
-	}
-
-	MetricsDeleted(tenantId, "associations", results.DeletedCount)
-
-	fmt.Println("Total Records deleted from associations collection for tenantId", tenantId, ":", results.DeletedCount)
-	return nil
 }
 
 func (ac *AssociationCollection) convAssocToDoc(association Association) AssociationDoc {
@@ -3313,82 +2296,6 @@ func (ac *AssociationCollection) Delete(id string, tenantId string) error {
 	return nil
 }
 
-func (ac *AssociationCollection) GetAssociationNames(tenantId string) ([]AssociationName, error) {
-	var associations []AssociationName = []AssociationName{}
-
-	filter := bson.M{
-		"tenantId": tenantId,
-	}
-
-	cursor, err := ac.Coll.Find(context.TODO(), filter)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to query associations.  Reason: %v", err)
-	}
-	defer cursor.Close(context.TODO())
-
-	for cursor.Next(context.TODO()) {
-		var doc AssociationDoc
-		if err := cursor.Decode(&doc); err != nil {
-			return nil, fmt.Errorf("Failed to decode association document.  Reason: %v", err)
-		}
-
-		for part := range strings.SplitSeq(doc.Name, ",") {
-			associations = append(associations, AssociationName{Name: strings.TrimSpace(part)})
-		}
-	}
-
-	return associations, nil
-}
-
-func (ac *AssociationCollection) GetAssociationNamesAsStrings(
-	tenantId string,
-) ([]string, error) {
-
-	associations := []string{}
-	ctx := context.TODO()
-
-	filter := bson.M{
-		"tenantId": tenantId,
-	}
-
-	cursor, err := ac.Coll.Find(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to query associations: %w",
-			err,
-		)
-	}
-	defer cursor.Close(ctx)
-
-	for cursor.Next(ctx) {
-		var doc AssociationDoc
-
-		if err := cursor.Decode(&doc); err != nil {
-			return nil, fmt.Errorf(
-				"failed to decode association document: %w",
-				err,
-			)
-		}
-
-		for part := range strings.SplitSeq(doc.Name, ",") {
-			name := strings.TrimSpace(part)
-
-			if name != "" {
-				associations = append(associations, name)
-			}
-		}
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf(
-			"error while reading association documents: %w",
-			err,
-		)
-	}
-
-	return associations, nil
-}
-
 func (ac *AssociationCollection) GetAssociationIds(tenantId string) ([]AssociationId, error) {
 	var ids []AssociationId = []AssociationId{}
 
@@ -3418,88 +2325,6 @@ func (ac *AssociationCollection) GetAssociationIds(tenantId string) ([]Associati
 	fmt.Println("Total associations found for tenant", tenantId, ":", totalAssociations)
 
 	return ids, nil
-}
-
-func (ac *AssociationCollection) GetAssociationIdsAsStrings(
-	tenantId string,
-) ([]string, error) {
-
-	ids := []string{}
-	ctx := context.TODO()
-
-	filter := bson.M{
-		"tenantId": tenantId,
-	}
-
-	fmt.Println("Retrieving association IDs for tenant:", tenantId)
-
-	cursor, err := ac.Coll.Find(ctx, filter)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to query associations: %w", err,
-		)
-	}
-	defer cursor.Close(ctx)
-
-	var totalAssociations int64
-
-	for cursor.Next(ctx) {
-		var doc AssociationDoc
-
-		if err := cursor.Decode(&doc); err != nil {
-			return nil, fmt.Errorf(
-				"failed to decode association document: %w",
-				err,
-			)
-		}
-
-		totalAssociations++
-
-		for part := range strings.SplitSeq(doc.Id, ",") {
-			id := strings.TrimSpace(part)
-
-			if id != "" {
-				ids = append(ids, id)
-			}
-		}
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, fmt.Errorf(
-			"error while reading association documents: %w",
-			err,
-		)
-	}
-
-	fmt.Println(
-		"Total associations found for tenant",
-		tenantId,
-		":",
-		totalAssociations,
-	)
-
-	return ids, nil
-}
-
-func (ac *AssociationCollection) Dump(id string, tenantId string) error {
-
-	fmt.Println("Retrieving association with ID:", id)
-
-	var assoc *Association
-	assoc, err := ac.Get(id, tenantId)
-	if err != nil {
-		return fmt.Errorf("Failed to get association.  Reason: %v", err)
-	}
-
-	fmt.Println("Dumping Record with Association Id of", assoc.Id)
-
-	fmt.Println("Name:", assoc.Name)
-	fmt.Println("Contact:", assoc.Contact)
-	fmt.Println("Phone:", assoc.Phone)
-	fmt.Println("Email:", assoc.Email)
-	fmt.Println("Assignors:", assoc.Assignors)
-
-	return nil
 }
 
 // Site Colleciton, Documents and API Code
@@ -3686,30 +2511,6 @@ func (sc *SiteCollection) Get(name, tenantId string) (*Site, error) {
 	return &site, nil
 }
 
-func (sc *SiteCollection) GetSiteName(name, tenantId string) (string, error) {
-	var site Site
-	var doc SiteDoc
-
-	filter := bson.M{
-		"name":     name,
-		"tenantId": tenantId,
-	}
-
-	fmt.Println("Retrieving site name for name ", name, "and tenant ID ", tenantId, "using the following filter:", filter)
-	err := sc.Coll.FindOne(context.TODO(), filter).Decode(&doc)
-
-	if err != nil {
-		fmt.Println("Error:", err)
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			return "", fmt.Errorf("site not found")
-		}
-		return "", err
-	}
-	site = sc.convDocToSite(doc)
-
-	return site.Name, nil
-}
-
 func (sc *SiteCollection) GetSiteNames(
 	tenantId string,
 ) ([]SiteName, error) {
@@ -3885,26 +2686,6 @@ func (sc *SiteCollection) Update(site Site, tenantId string) error {
 	return nil
 }
 
-func (sc *SiteCollection) DeleteAll(tenantId string) error {
-
-	var result *mongo.DeleteResult
-
-	filter := bson.M{
-		"tenantId": tenantId,
-	}
-
-	result, sc.LastError = sc.Coll.DeleteMany(context.TODO(), filter)
-	if sc.LastError != nil {
-		MetricsErrors(tenantId, "sites", 1)
-		return fmt.Errorf("Failed to delete all sites.  Reason: %v", sc.LastError)
-	}
-
-	MetricsDeleted(tenantId, "sites", result.DeletedCount)
-
-	fmt.Println("Deleted ", result.DeletedCount, " records from ", sc.Coll.Name())
-	return nil
-}
-
 func (sc *SiteCollection) Delete(name, tenantId string) error {
 
 	var filter bson.M
@@ -3929,26 +2710,6 @@ func (sc *SiteCollection) Delete(name, tenantId string) error {
 	MetricsDeleted(tenantId, "sites", result.DeletedCount)
 
 	fmt.Println("Deleted Record with Site Name of", filter["name"], " in", sc.Coll.Name(), "Records Deleted:", result.DeletedCount)
-
-	return nil
-}
-
-func (sc *SiteCollection) Dump(name, tenantId string) error {
-
-	fmt.Println("Retrieving site with Name:", name)
-
-	var site *Site
-	site, err := sc.Get(name, tenantId)
-	if err != nil {
-		return fmt.Errorf("Failed to get site.  Reason: %v", err)
-	}
-
-	fmt.Println("Dumping Record with Site Name of", site.Name)
-
-	fmt.Println("Name:", site.Name)
-	fmt.Println("Contact:", site.Contact)
-	fmt.Println("Phone:", site.Phone)
-	fmt.Println("Email:", site.Email)
 
 	return nil
 }
@@ -4110,81 +2871,6 @@ func (gc *GameCollection) Add(
 
 	return nil
 }
-
-// func (gc *GameCollection) UpdateGameStatus(gameIds []int64, status, tid string) {
-
-// 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-// 	defer cancel()
-// 	update := bson.M{}
-// 	filter := bson.M{}
-
-// 	db := Client.Database(Database)
-// 	coll := db.Collection("games")
-// 	collectionName := coll.Name()
-// 	fmt.Println("##### Updating Games Status to", status, "for game ids:", gameIds, "#####")
-
-// 	recordsUpdated := 0
-// 	totalErrors := 0
-
-// 	if status == "Cancelled" {
-// 		fmt.Println("##### Cancelling game....setting financials to 0.00 #####")
-// 		update = bson.M{
-// 			"$set": bson.M{
-// 				"gameFee":     int64(0),
-// 				"travelPay":   int64(0),
-// 				"assignorFee": int64(0),
-// 				"deductions":  int64(0),
-// 				"status":      "Cancelled",
-// 			},
-// 		}
-// 	} else {
-// 		update = bson.M{
-// 			"$set": bson.M{
-// 				"status": status,
-// 			},
-// 		}
-// 	}
-// 	var game model.GameDescriptor = model.GameDescriptor{}
-
-// 	for _, id := range gameIds {
-
-// 		gameIdStr, err := utils.ConvertSingleGameIdToStr(id)
-
-// 		if err != nil {
-// 			fmt.Println("Failed to convert Game Id to string.  Reason:", err)
-// 			continue
-// 		}
-
-// 		game, err = GetSingleGame(ctx, gameIdStr)
-
-// 		if err != nil {
-// 			fmt.Println("Failed to get game record.  Reason:", err)
-// 			continue
-// 		}
-
-// 		if game.Status == status {
-// 			fmt.Println("Game Id", id, "already set to status", status)
-// 			continue
-// 		}
-
-// 		filter = bson.M{
-// 			"gameId":      id,
-// 			"association": game.Association,
-// 			"tenantId":    tid,
-// 		}
-
-// 		err = UpdateOneDoc(ctx, filter, update, Database, "games")
-// 		if err != nil {
-// 			totalErrors++
-// 			fmt.Println(err)
-// 		} else {
-// 			recordsUpdated++
-// 		}
-
-// 	}
-
-// 	fmt.Println("Total Records Updated", collectionName, ":", recordsUpdated, "Total Errors", totalErrors)
-// }
 
 func (gc *GameCollection) Get7DayPendingGames(tId string) ([]model.GameDoc, int, error) {
 
@@ -4621,35 +3307,6 @@ func (oc *OfficialCollection) convDocToOfficial(doc OfficialDoc) Official {
 	}
 }
 
-func (oc *OfficialCollection) IsIndexed() (bool, error, int) {
-
-	ctx := context.Background()
-
-	cursor, err := oc.Coll.Indexes().List(ctx)
-	if err != nil {
-		return false, err, -1
-	}
-
-	var indexes []bson.M
-	if err := cursor.All(ctx, &indexes); err != nil {
-		return false, err, -1
-	}
-
-	numOfIndices := len(indexes)
-
-	switch numOfIndices {
-	case 0:
-		return false, fmt.Errorf("Officials collection has 0 indices"), numOfIndices
-	case 1:
-		return false, fmt.Errorf("Sites collection is not fully indexed.  It contains only the default _id index"), numOfIndices
-	case 2:
-		return true, nil, numOfIndices
-	default:
-		return false, fmt.Errorf("Sites collection contains more indices than expected!"), numOfIndices
-	}
-
-}
-
 func (oc *OfficialCollection) CreateIndices() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -4681,31 +3338,6 @@ func (oc *OfficialCollection) Init(client *mongo.Client) error {
 	oc.Initialized = true
 
 	return nil
-}
-
-func (oc *OfficialCollection) GetOfficialView(official, tenantId string) (model.OfficialView, error) {
-
-	var err error
-
-	parts := strings.Fields(official)
-
-	if len(parts) < 2 {
-		return model.OfficialView{}, fmt.Errorf("Invalid name")
-	}
-
-	firstName := parts[0]
-	lastName := parts[len(parts)-1]
-
-	o, err := oc.Get(firstName, lastName, tenantId)
-
-	if err != nil {
-		return model.OfficialView{}, err
-	}
-
-	return model.OfficialView{
-		OfficialId: o.Id,
-		Name:       o.FirstName + " " + o.LastName,
-	}, nil
 }
 
 func (oc *OfficialCollection) Add(official Official, tenantId string) error {
@@ -4934,24 +3566,6 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 	return nil
 }
 
-func (oc *OfficialCollection) DeleteAll(tenantId string) error {
-
-	var result *mongo.DeleteResult
-
-	filter := bson.M{
-		"tenantId": tenantId,
-	}
-	result, oc.LastError = oc.Coll.DeleteMany(context.TODO(), filter)
-	if oc.LastError != nil {
-		MetricsErrors(tenantId, "officials", 1)
-		return fmt.Errorf("Failed to delete all officials.  Reason: %v", oc.LastError)
-	}
-
-	MetricsDeleted(tenantId, "officials", result.DeletedCount)
-	fmt.Println("Deleted ", result.DeletedCount, " records from ", oc.Coll.Name())
-	return nil
-}
-
 func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -5017,27 +3631,6 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error
 	MetricsDeleted(tenantId, "officials", result.DeletedCount)
 	fmt.Println("Deleted official:", firstName, lastName)
 	return nil
-}
-
-func (oc *OfficialCollection) Dump(firstName, lastName, tenantId string) error {
-
-	fmt.Println("Retrieving official with Name:", firstName, lastName)
-
-	var official Official
-	official, err := oc.Get(firstName, lastName, tenantId)
-	if err != nil {
-		return fmt.Errorf("Failed to get official.  Reason: %v", err)
-	}
-
-	fmt.Println("Dumping Record with Official Id of", official.FirstName, official.LastName)
-
-	fmt.Println("Name:", official.FirstName, official.LastName)
-	fmt.Println("Contact:", official.Phone)
-	fmt.Println("Phone:", official.Phone)
-	fmt.Println("Email:", official.Email)
-
-	return nil
-
 }
 
 func (oc *OfficialCollection) GetOfficialsNames(tenantId string) ([]OfficialName, error) {
@@ -5251,56 +3844,6 @@ func (ec *ExpensesCollection) ConvJsonToExpense(expenseJson ExpenseJson) Expense
 	}
 }
 
-func (ec *ExpensesCollection) GetExpense(assoc, tenantId, expenseType, taxYear string) (int64, error) {
-
-	totalExpense := int64(0)
-
-	if assoc == "" || !foundAssociation(assoc) {
-		return totalExpense, fmt.Errorf("GetExpense failure.  Reason: Invalid Association: %s", assoc)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	filter := bson.M{
-		"association": assoc,
-		"tenantId":    tenantId,
-		"type":        expenseType,
-	}
-
-	if taxYear != "" {
-		filter["taxYear"] = taxYear
-	}
-
-	// Query to find all documents
-	cursor, err := ec.Coll.Find(ctx, filter)
-	if err != nil {
-		MetricsErrors(tenantId, "expenses", 1)
-		return totalExpense, fmt.Errorf("GetExpense failure.  Reason: %s", err)
-	}
-
-	var results []model.ExpenseDoc
-	err = cursor.All(ctx, &results)
-	if err != nil {
-		fmt.Println("Error", err)
-		MetricsErrors(tenantId, "expenses", 1)
-		return totalExpense, fmt.Errorf("GetExpense failure.  Reason: %s", err)
-	}
-
-	if expenseType == "Mileage" {
-		for _, r := range results {
-			totalExpense += r.Mileage
-		}
-	} else {
-		for _, r := range results {
-			totalExpense += r.Amount
-		}
-	}
-
-	return totalExpense, nil
-
-}
-
 func (ec *ExpensesCollection) GenerateExpenseId(expense Expense) string {
 
 	var month int
@@ -5343,7 +3886,6 @@ func (ec *ExpensesCollection) GenerateExpenseId(expense Expense) string {
 
 func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string) error {
 
-	//fmt.Println("Deleting expense")
 	fmt.Println("===== Attempting to delete Expense Id", expenseId, "for Association", association, "and tenant id", tenantId, "=====")
 
 	expenseId = strings.TrimSpace(expenseId)
@@ -5793,35 +4335,6 @@ func validEmail(username string) bool {
 
 	// Prevent values such as "Randall <randall@example.com>".
 	return address.Address == username
-}
-
-func (uc *UsersCollection) UserExists(username string) (bool, error) {
-
-	username = strings.ToLower(strings.TrimSpace(username))
-
-	filter := bson.M{
-		"username": username,
-	}
-
-	err := uc.Coll.FindOne(
-		context.TODO(),
-		filter,
-		options.FindOne().SetProjection(bson.M{"_id": 1}),
-	).Err()
-
-	if errors.Is(err, mongo.ErrNoDocuments) {
-		return false, nil
-	}
-
-	if err != nil {
-		return false, fmt.Errorf(
-			"failed to check whether user %q exists: %w",
-			username,
-			err,
-		)
-	}
-
-	return true, nil
 }
 
 func (uc *UsersCollection) GetNumOfUserAccounts() (int64, error) {
@@ -6320,224 +4833,6 @@ func (sc *SportsCollection) GetSports(activeOnly bool) ([]Sport, error) {
 
 	fmt.Println("Total sports found:", len(sports))
 	return sports, nil
-}
-
-func (sc *SportsCollection) Add(sport Sport) error {
-
-	sport.ID = strings.TrimSpace(sport.ID)
-	sport.Name = strings.TrimSpace(sport.Name)
-
-	if sport.ID == "" {
-		return fmt.Errorf("sport ID is required")
-	}
-
-	if sport.Name == "" {
-		return fmt.Errorf("sport name is required")
-	}
-
-	duplicateFilter := bson.M{
-		"$or": bson.A{
-			bson.M{"id": sport.ID},
-			bson.M{"name": sport.Name},
-		},
-	}
-
-	var existingSport Sport
-
-	err := sc.Coll.FindOne(
-		context.Background(),
-		duplicateFilter,
-	).Decode(&existingSport)
-
-	if err == nil {
-		return fmt.Errorf(
-			"sport %q already exists",
-			sport.Name,
-		)
-	}
-
-	if !errors.Is(err, mongo.ErrNoDocuments) {
-		return fmt.Errorf(
-			"failed to check for duplicate sport %q: %w",
-			sport.Name,
-			err,
-		)
-	}
-
-	_, err = sc.Coll.InsertOne(
-		context.Background(),
-		sport,
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"failed to add sport %q: %w",
-			sport.Name,
-			err,
-		)
-	}
-
-	return nil
-}
-
-func (sc *SportsCollection) Delete(sportID string) error {
-
-	sportID = strings.TrimSpace(sportID)
-
-	if sportID == "" {
-		return fmt.Errorf("sport ID is required")
-	}
-
-	gamesFilter := bson.M{
-		"sport": sportID,
-	}
-
-	gamesCollection := Client.Database(Database).Collection("games")
-
-	count, err := gamesCollection.CountDocuments(context.Background(), gamesFilter)
-	if err != nil {
-		return fmt.Errorf("failed to query games collection: %w", err)
-	}
-
-	if count > 0 {
-		return fmt.Errorf("Failed to delete sport as it is assigned to games.")
-	}
-
-	filter := bson.M{
-		"id": sportID,
-	}
-
-	result, err := sc.Coll.DeleteOne(
-		context.Background(),
-		filter,
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"failed to delete sport %q: %w",
-			sportID,
-			err,
-		)
-	}
-
-	if result.DeletedCount == 0 {
-		return fmt.Errorf(
-			"sport %q was not found",
-			sportID,
-		)
-	}
-
-	return nil
-}
-
-func (sc *SportsCollection) Activate(sport Sport) error {
-
-	sport.ID = strings.TrimSpace(sport.ID)
-	sport.Name = strings.TrimSpace(sport.Name)
-
-	fmt.Println("Sport:", sport)
-	filter := bson.M{
-		"id": sport.ID,
-	}
-
-	update := bson.M{
-		"$set": bson.M{
-			"active": true,
-		},
-	}
-
-	result, err := sc.Coll.UpdateOne(context.Background(), filter, update)
-	if err != nil {
-		return fmt.Errorf("Attempt to activate %s failed.  Reason: %s", sport.Name, err)
-	}
-
-	fmt.Println("Activate Results: ", result)
-
-	if result.ModifiedCount == 1 {
-		return nil
-	}
-
-	if result.MatchedCount != 1 {
-		return fmt.Errorf("%s not found.", sport.Name)
-	}
-
-	if result.MatchedCount == 1 && result.ModifiedCount == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("Generic error attempting to activate %s", sport.Name)
-
-}
-
-func (sc *SportsCollection) Deactivate(sport Sport) error {
-
-	sport.ID = strings.TrimSpace(sport.ID)
-	sport.Name = strings.TrimSpace(sport.Name)
-
-	fmt.Println("Sport:", sport)
-
-	//
-	// Check if the sport is being called by any users before deactivating it. If it is, return an error.
-	//
-	usersFilter := bson.M{
-		"sports": sport.ID,
-	}
-
-	usersCollection := Client.Database(Database).Collection("users")
-
-	count, err := usersCollection.CountDocuments(context.Background(), usersFilter)
-	if err != nil {
-		return fmt.Errorf("failed to query users collection: %w", err)
-	}
-
-	if count > 0 {
-		return fmt.Errorf("Failed to deactivate sport as it is assigned to users.")
-	}
-
-	//
-	// Check if games are associated with this sport before deactivating it. If there are, return an error.
-	gamesFilter := bson.M{
-		"sport": sport.ID,
-	}
-
-	gamesCollection := Client.Database(Database).Collection("games")
-
-	gamesCount, err := gamesCollection.CountDocuments(context.Background(), gamesFilter)
-	if err != nil {
-		return fmt.Errorf("failed to query games collection: %w", err)
-	}
-
-	if gamesCount > 0 {
-		return fmt.Errorf("Failed to deactivate sport as it is assigned to games.")
-	}
-
-	filter := bson.M{
-		"id": sport.ID,
-	}
-
-	update := bson.M{
-		"$set": bson.M{
-			"active": false,
-		},
-	}
-
-	result, err := sc.Coll.UpdateOne(context.Background(), filter, update)
-	if err != nil {
-		return fmt.Errorf("Attempt to deactivate %s failed.  Reason: %s", sport.Name, err)
-	}
-
-	fmt.Println("Deactivate Results: ", result)
-	if result.ModifiedCount == 1 {
-		return nil
-	}
-
-	if result.MatchedCount != 1 {
-		return fmt.Errorf("%s not found.", sport.Name)
-	}
-
-	if result.MatchedCount == 1 && result.ModifiedCount == 0 {
-		return nil
-	}
-
-	return fmt.Errorf("Generic error attempting to deactivate %s", sport.Name)
 }
 
 func formatInt64Hundredths(value int64) string {
@@ -7921,102 +6216,6 @@ func CreateSettingsIndexes() error {
 	return nil
 }
 
-func AddOfficialRoles(request model.OfficialRolesRequest) error {
-
-	if strings.TrimSpace(request.Sport) == "" {
-		return fmt.Errorf("sport is required")
-	}
-
-	if request.Roles == nil {
-		request.Roles = make([]model.OfficialRole, 0)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(Database)
-	coll := db.Collection("roles")
-
-	sportSettings := bson.M{
-		"sport": request.Sport,
-		"roles": request.Roles,
-	}
-
-	// Keep other sports, then append this sport's current configuration.
-	update := mongo.Pipeline{
-		bson.D{{Key: "$set", Value: bson.M{
-			"officialRoles": bson.M{
-				"$concatArrays": bson.A{
-					bson.M{
-						"$filter": bson.M{
-							"input": bson.M{
-								"$ifNull": bson.A{"$officialRoles", bson.A{}},
-							},
-							"as": "entry",
-							"cond": bson.M{
-								"$ne": bson.A{
-									"$$entry.sport",
-									bson.M{"$literal": request.Sport},
-								},
-							},
-						},
-					},
-					bson.M{"$literal": bson.A{sportSettings}},
-				},
-			},
-		}}},
-	}
-
-	_, err := coll.UpdateOne(
-		ctx,
-		bson.M{},
-		update,
-		options.Update().SetUpsert(true),
-	)
-	if err != nil {
-		return fmt.Errorf(
-			"failed to save official roles for %q: %w",
-			request.Sport,
-			err,
-		)
-	}
-
-	return nil
-}
-
-func DeleteOfficialRoles(sport string) error {
-
-	if strings.TrimSpace(sport) == "" {
-		return fmt.Errorf("sport is required")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	coll := Client.Database(Database).Collection("roles")
-
-	filter := bson.M{}
-
-	update := bson.M{
-		"$pull": bson.M{
-			"officialRoles": bson.M{
-				"sport": sport,
-			},
-		},
-	}
-
-	_, err := coll.UpdateOne(ctx, filter, update)
-	if err != nil {
-		return fmt.Errorf(
-			"failed to delete official roles for %q: %w",
-			sport,
-			err,
-		)
-	}
-
-	return nil
-}
-
 func GetOfficialRoles(sport string) (model.OfficialRolesRequest, error) {
 	response := model.OfficialRolesRequest{
 		Sport: sport,
@@ -8074,23 +6273,6 @@ func GetOfficialRoles(sport string) (model.OfficialRolesRequest, error) {
 		return response.Roles[i].DisplayOrder < response.Roles[j].DisplayOrder
 	})
 
-	return response, nil
-}
-
-// GetActiveOfficialRoles supplies the new-game HTML with configured, active fields.
-// Keep GetOfficialRoles unchanged for the Settings page, which needs inactive roles too.
-func GetActiveOfficialRoles(sport string) (model.OfficialRolesRequest, error) {
-	response, err := GetOfficialRoles(sport)
-	if err != nil {
-		return response, err
-	}
-	active := make([]model.OfficialRole, 0)
-	for _, role := range response.Roles {
-		if role.Active {
-			active = append(active, role)
-		}
-	}
-	response.Roles = active
 	return response, nil
 }
 

@@ -5,8 +5,9 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
 	"ref-ledger-v2/internal/model"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 var ErrMobileConflict = errors.New("game changed since it was loaded; refresh the game list and retry your action")

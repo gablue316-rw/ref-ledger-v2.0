@@ -52,8 +52,6 @@ import (
 /* Check environment_variables.txt for the environment variables that must be set for Ref Ledger to run properly. */
 
 var Client *mongo.Client
-var uri string
-var dbName string
 
 const MaxNotesLength = 150
 
@@ -120,11 +118,6 @@ var lc database.LevelsCollection
 var spc database.SportsCollection
 
 var AuditLog *log.Logger = nil
-
-func isValidEmail(email string) bool {
-	_, err := mail.ParseAddress(email)
-	return err == nil
-}
 
 func getTenantId(r *http.Request) (string, error) {
 	if account, ok := r.Context().Value(mobileAccountContextKey{}).(string); ok && account != "" {
@@ -278,23 +271,6 @@ func PaymentDocToPaymentDescr(p Payment) model.PaymentDescriptor {
 		TaxYear:     strconv.Itoa(taxYear),
 		GameIds:     strings.Join(gameIds, ";"),
 	}
-}
-
-func ExpenseDocToExpenseDescr(e Expense) model.ExpenseDescriptor {
-
-	t, _ := time.Parse("2006-01-02", e.Date)
-	formattedDate := t.Format("1/2/2006")
-
-	return model.ExpenseDescriptor{
-		Date:        formattedDate,
-		Type:        e.ExpenseType,
-		Amount:      strconv.FormatFloat(e.Amount, 'f', 2, 64),
-		Mileage:     strconv.FormatFloat(e.Mileage/100, 'f', 0, 64),
-		Association: e.Association,
-		GameId:      strconv.Itoa(e.GameID),
-		Description: e.Description,
-	}
-
 }
 
 type UserSessionResponse struct {
@@ -1522,10 +1498,6 @@ func normalizeAssociationId(associationId string) string {
 func normalizeOfficialName(firstName string, lastName string) string {
 
 	return strings.ToLower(strings.TrimSpace(firstName)) + "|" + strings.ToLower(strings.TrimSpace(lastName))
-}
-
-func normalizeSiteId(siteId string) string {
-	return strings.ToLower(strings.TrimSpace(siteId))
 }
 
 func buildGamePreviewRow(
@@ -4552,28 +4524,6 @@ func GetIpAddress(r *http.Request) string {
 
 }
 
-func OpenLog(f string) *os.File {
-
-	// Open or create log file
-	file, err := os.OpenFile(
-		f,
-		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
-		0666,
-	)
-
-	if err != nil {
-		log.Fatal(err)
-		return nil
-	}
-
-	// Send logs to file (and optionally terminal)
-	log.SetOutput(file)
-	log.SetFlags(log.Ldate | log.Ltime)
-	log.SetOutput(io.MultiWriter(os.Stdout, file))
-
-	return file
-}
-
 func LogVisitor(r *http.Request) {
 
 	remoteIpAddr := GetIpAddress(r)
@@ -4615,72 +4565,11 @@ func LogVisitor(r *http.Request) {
 //
 // Obsolete:  Use the new Generate Report Functions instead.
 //
-
-// func generatePaymentsReport(assoc []string, tid string) []string {
-
-// 	var rept []string = []string{}
-// 	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
-// 	if err != nil {
-// 		rept = append(rept, "Error generating payment report.  Failed to retrieve payment records.")
-// 		return rept
-// 	}
-// 	rept = reports.GeneratePaymentReport(paymentRecords, tid)
-// 	return rept
 // }
-
-// func generateReconciliationReport(assoc []string, tid string) []string {
-
-// 	var rept []string = []string{}
-
-// 	paymentRecords, err := database.QueryPayments(context.TODO(), database.GetMongoDbName(), "payments", assoc)
-// 	if err != nil {
-// 		rept = append(rept, "Error generating reconciliation report.  Failed to retrieve payment records.")
-// 		return rept
-// 	}
-// 	rept = reports.GenerateReconciliationReport(paymentRecords, tid)
-
-// 	return rept
 // }
-
-// func generateAccountsReceivableReport(assoc []string, tid string) []string {
-
-// 	var rept []string = []string{}
-// 	rept = reports.GenerateAcctsRecvReport(context.TODO(), assoc, tid)
-// 	return rept
 // }
-
-// func generateIncomeReport(assoc []string, tid string) []string {
-
-// 	var rept []string = []string{}
-// 	rept = reports.GenerateIncomeReport(assoc, tid)
-// 	return rept
 // }
-
-// func generateExpenseReport(filter bson.M) []string {
-
-// 	var rept []string = []string{}
-
-// 	expenseRecords, err := database.QueryExpenses(context.TODO(), database.GetMongoDbName(), "expenses", filter)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		return []string{}
-// 	}
-// 	rept = reports.GenerateExpenseReport(expenseRecords)
-
-// 	return rept
 // }
-
-// func generateGamesReport(gameFilter bson.M) []string {
-// 	// Implementation for generating games report
-
-// 	gameRecords, err := database.QueryAggregatedGames(context.TODO(), database.GetMongoDbName(), "games", gameFilter)
-// 	if err != nil {
-// 		fmt.Println("Failed to query aggregated games")
-// 		return []string{}
-// 	}
-// 	rept := reports.GenerateGameReport(gameRecords)
-
-// 	return rept
 
 // }
 
@@ -5119,145 +5008,9 @@ func GenerateExpenseReport(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GenerateReport keeps the retired endpoint explicit for old bookmarks.
 func GenerateReport(w http.ResponseWriter, r *http.Request) {
-
-	//
-	// Obsolete
-	// This function is no longer used.  It is replaced by the GenerateGameReport, GenerateExpenseReport,
-	// GenerateIncomeReport, GeneratePaymentsReport, GenerateReconciliationReport, and GenerateAccountsReceivableReport functions.
-	//
-
-	// fmt.Println("GenerateReport is called")
-	// LogVisitor(r)
-
-	// var tId string
-	// var err error
-	// //var siteId string
-
-	// gameFilters := model.GFilters{}
-	// //expenseFilters := model.EFilters{}
-
-	// rType := r.URL.Query().Get("type")
-	// rEmail := r.URL.Query().Get("emailaddr")
-	// rFile := r.URL.Query().Get("filename")
-	// rGameIds := r.URL.Query().Get("gameids")
-
-	// rSites := r.URL.Query()["site"]
-	// rStatuses := r.URL.Query()["status"]
-	// rAssociations := r.URL.Query()["association"]
-
-	// rept := []string{}
-
-	// if tId == "na" {
-	// 	tId, err = getTenantId(r)
-
-	// 	if err != nil {
-	// 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
-	// 		return
-	// 	}
-	// }
-
-	// // The HTML uses the site name, so we need to convert it to an ID
-	// // if rSite != "" {
-	// // 	siteId, err = sc.GetSiteId(rSite, tId)
-	// // 	if err != nil {
-	// // 		http.Error(w, "Invalid site ID", http.StatusBadRequest)
-	// // 		return
-	// // 	}
-	// // }
-
-	// if len(rGameIds) > 0 {
-	// 	ids, err := utils.ConvertGameIdStrToInt(rGameIds)
-	// 	if err != nil {
-	// 		fmt.Println("Error:", err)
-	// 		return
-	// 	}
-	// 	gameFilters.GameId, err = utils.ConvertGameIdIntToStr(ids)
-	// 	if err != nil {
-	// 		fmt.Println("Error:", err)
-	// 		return
-	// 	}
-	// } else {
-	// 	gameFilters.GameId = rGameIds
-	// }
-
-	// gameFilters.Association = ""
-	// gameFilters.Status = ""
-	// gameFilters.Site = ""
-	// gameFilters.TenantId = tId
-	// fmt.Println("Tenant ID:", tId, "Game Filters Tenant ID:", gameFilters.TenantId)
-
-	// gameFilter := bson.M{}
-	// expenseFilter := bson.M{}
-
-	// if len(rStatuses) > 0 {
-	// 	gameFilter["status"] = bson.M{
-	// 		"$in": rStatuses,
-	// 	}
-	// }
-
-	// if len(rAssociations) > 0 {
-	// 	gameFilter["association"] = bson.M{
-	// 		"$in": rAssociations,
-	// 	}
-
-	// 	expenseFilter["association"] = bson.M{
-	// 		"$in": rAssociations,
-	// 	}
-	// }
-
-	// if len(rSites) > 0 {
-	// 	gameFilter["site"] = bson.M{
-	// 		"$in": rSites,
-	// 	}
-	// }
-
-	// switch rType {
-	// case "Games":
-	// 	rept = generateGamesReport(gameFilter)
-	// case "Expenses":
-	// 	rept = generateExpenseReport(expenseFilter)
-	// case "Income":
-	// 	rept = generateIncomeReport(rAssociations, tId)
-	// case "Payments":
-	// 	rept = generatePaymentsReport(rAssociations, tId)
-	// case "Reconciliation":
-	// 	rept = generateReconciliationReport(rAssociations, tId)
-	// case "Accounts Receivable":
-	// 	rept = generateAccountsReceivableReport(rAssociations, tId)
-	// default:
-	// 	w.Header().Set("Content-Type", "text/plain")
-	// 	fmt.Fprint(w, "Invalid Report Type")
-	// 	return
-	// }
-
-	// if rEmail != "" {
-	// 	var email email.Email
-	// 	email.Initialize()
-	// 	if rFile == "" {
-	// 		rFile = rType + "_report.pdf"
-	// 	}
-	// 	reports.WriteReportToFile(rept, rFile)
-	// 	// Send report via email
-	// 	email.SetSubject("Ref Ledger V2 Report")
-	// 	email.SetBody("Please see the attached report.\n\nThanks!\n\nGenerated and Sent by Ref Ledger V2.0")
-	// 	email.AddAttachment(rFile)
-	// 	email.SetTo(strings.Split(rEmail, ","))
-	// 	email.Send()
-	// 	w.Header().Set("Content-Type", "text/plain")
-	// 	fmt.Fprint(w, "Email sent")
-	// } else {
-	// 	w.Header().Set("Content-Type", "text/plain")
-	// 	output := strings.Join(rept, "\n")
-
-	// 	_, err := w.Write([]byte(output))
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		fmt.Fprint(w, "Error generating report")
-	// 	}
-	// }
-
-	http.Error(w, "Game not found", http.StatusNotFound)
+	http.Error(w, "This report endpoint has been retired; use /reports_v2.", http.StatusGone)
 }
 
 func UpdateGame(w http.ResponseWriter, r *http.Request) {
@@ -5419,6 +5172,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 
 	gDoc.GameId = int64(game.GameId)
 	gDoc.Association = game.Association
+	gDoc.TenantId = tId
 
 	checkForDup := true
 	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup, tId)
@@ -7112,7 +6866,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 
 	var games []model.HtmlResponse
 	gameViews := make([]dashboardGameView, 0)
-	gameFilters := model.GFilters{}
+	gameFilter := model.GameFilter{}
 
 	var totals reports.AssocGameTotalsMap
 	totals.Init()
@@ -7211,42 +6965,17 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if gameId != "" {
-		ids, err := utils.ConvertGameIdStrToInt(gameId)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		gameFilters.GameId, err = utils.ConvertGameIdIntToStr(ids)
+		gameFilter.GameId, err = utils.ConvertGameIdStrToInt(gameId)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 	}
-
-	gameFilters.FromDate = bDate
-	gameFilters.ToDate = eDate
-	gameFilters.TenantId = tId
-	gameFilters.Home = home
-	gameFilters.Visitor = visitor
-
-	gfilter, err := utils.ConvertGameFiltersToJsonFile(gameFilters)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	mongoDbFilter, err := database.BuildMongoGameFilterFromFile(gfilter)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if mongoDbFilter == nil {
-		mongoDbFilter = bson.M{}
-	}
-
-	mongoDbFilter["tenantId"] = tId
+	gameFilter.Date = &model.Date{From: bDate, To: eDate}
+	gameFilter.TenantId = tId
+	gameFilter.Home = home
+	gameFilter.Visitor = visitor
+	mongoDbFilter := database.BuildMongoGameFilter(gameFilter)
 
 	if taxYear != "" {
 		mongoDbFilter["taxYear"] = taxYear
