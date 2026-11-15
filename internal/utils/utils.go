@@ -3,7 +3,6 @@ package utils
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -87,108 +86,6 @@ func InitLogging() error {
 
 }
 
-func getEndOfWeek(startOfWeek string) string {
-
-	date, err := time.Parse(layout, startOfWeek)
-	if err != nil {
-		fmt.Println("Error parsing date")
-		return ""
-	}
-
-	endOfWeek := date.AddDate(0, 0, 6)
-	newDate := endOfWeek.Format(layout)
-
-	return newDate
-
-}
-
-func getEndOfMonth(startOfMonth string) string {
-
-	date, err := time.Parse(layout, startOfMonth)
-	if err != nil {
-		fmt.Println("Error parsing date")
-		return ""
-	}
-
-	endOfMonth := date.AddDate(0, 1, -1)
-	newDate := endOfMonth.Format(layout)
-	return newDate
-
-}
-
-func getStartOfNextWeek() string {
-
-	startOfThisWeek := getStartOfThisWeek()
-	date, err := time.Parse(layout, startOfThisWeek)
-	if err != nil {
-		fmt.Println("Error parsing date")
-		return ""
-	}
-
-	startOfNextWeek := date.AddDate(0, 0, 7)
-	newDate := startOfNextWeek.Format(layout)
-	return newDate
-
-}
-
-func getStartOfLastWeek() string {
-
-	startOfThisWeek := getStartOfThisWeek()
-	date, err := time.Parse(layout, startOfThisWeek)
-	if err != nil {
-		fmt.Println("Error parsing date")
-		return ""
-	}
-
-	startOfLastWeek := date.AddDate(0, 0, -7)
-	newDate := startOfLastWeek.Format(layout)
-	return newDate
-}
-
-func getStartOfThisWeek() string {
-
-	currentDate := time.Now()
-	weekday := currentDate.Weekday()
-	shift := int(weekday) % 7
-	startOfWeek := currentDate.AddDate(0, 0, -shift)
-	newDate := startOfWeek.Format(layout)
-
-	return newDate
-}
-
-func getLastDayOfMonth(startOfMonth string) string {
-
-	date, err := time.Parse(layout, startOfMonth)
-	if err != nil {
-		fmt.Println("Error parsing date")
-		return ""
-	}
-
-	lastDay := date.AddDate(0, 1, 0).AddDate(0, 0, -1)
-	return lastDay.Format(layout)
-}
-
-func getStartOfThisMonth() string {
-
-	tempDate := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.Now().Location())
-	startOfThisMonth := tempDate.Format(layout)
-	return startOfThisMonth
-}
-
-func getStartOfLastMonth() string {
-
-	tempDate := time.Date(time.Now().Year(), time.Now().Month()-1, 1, 0, 0, 0, 0, time.Now().Location())
-	startOfLastMonth := tempDate.Format(layout)
-	return startOfLastMonth
-}
-
-func getStartOfNextMonth() string {
-
-	tempDate := time.Date(time.Now().Year(), time.Now().Month()+1, 1, 0, 0, 0, 0, time.Now().Location())
-	startOfLastMonth := tempDate.Format(layout)
-	return startOfLastMonth
-}
-
 func FormatDateFilter(begin, end string) (string, string, error) {
 	const (
 		inputLayout  = "2006-01-02"
@@ -245,87 +142,6 @@ func FormatDateFilter(begin, end string) (string, string, error) {
 	return formattedBegin, formattedEnd, nil
 }
 
-func ConvertJsonToGameDescriptor(file string) ([]model.GameDescriptor, error) {
-
-	data, err := os.ReadFile(file)
-	if err != nil {
-		return []model.GameDescriptor{}, fmt.Errorf("Failed to read json file")
-	}
-
-	games := []model.JsonDoc{}
-	gameDescr := []model.GameDescriptor{}
-
-	err = json.Unmarshal(data, &games)
-	if err != nil {
-		return []model.GameDescriptor{}, fmt.Errorf("Failed to unmarshal json file.  Reason: %w", err)
-	}
-
-	// Convert Game to GameDescriptor
-
-	for _, g := range games {
-		gameDescr = append(gameDescr, model.GameDescriptor{
-			GameId:      strconv.FormatInt(g.GameId, 10),
-			Date:        g.Date,
-			TaxYear:     g.TaxYear,
-			Time:        g.Time,
-			Sport:       g.Sport,
-			Site:        g.Site,
-			Field:       g.Field,
-			NumOfGames:  strconv.FormatInt(g.NumOfGames, 10),
-			Level:       g.Level,
-			Home:        g.Home,
-			Visitor:     g.Visitor,
-			GameFee:     g.GameFee,
-			TravelPay:   g.TravelPay,
-			AssignorFee: g.AssignorFee,
-			Deductions:  g.Deductions,
-			Association: g.Association,
-			Status:      g.Status,
-			Officials:   copyGameOfficials(g.Officials),
-			Assignor:    g.Assignor,
-			Notes:       g.Notes,
-		})
-
-	}
-
-	//fmt.Println("Game Descriptors:", gameDescr)
-
-	return gameDescr, nil
-}
-
-func ParseInt64CSV(input string) ([]int64, error) {
-	parts := strings.Split(input, ",")
-	var result []int64
-
-	for _, p := range parts {
-		val := strings.TrimSpace(p)
-		if val == "" {
-			continue
-		}
-
-		num, err := strconv.ParseInt(val, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, num)
-	}
-	return result, nil
-}
-
-func ParseCsv(s string) []string {
-
-	parts := strings.Split(s, ",")
-	var result []string
-
-	for _, p := range parts {
-		val := strings.TrimSpace(p)
-		if val != "" {
-			result = append(result, val)
-		}
-	}
-	return result
-}
-
 func GenerateRandomString(length int) string {
 
 	b := make([]byte, length)
@@ -339,106 +155,6 @@ func DayOfWeekAbbreviation(date string) string {
 	d, _ := time.Parse(layout, date)
 	abbreviation := d.Format("Mon")
 	return abbreviation
-}
-
-func ConvertExpenseFilterToJsonFile(filters model.EFilters) (string, error) {
-
-	var jsonFilters model.ExpenseFilter
-	var fileName string = "expenseReportFiltersV2.json"
-	assocValues := ParseCsv(filters.Association)
-	expenseValues := ParseCsv(filters.ExpenseType)
-	gameIdValues, _ := ParseInt64CSV(filters.GameId)
-
-	jsonFilters.Association = assocValues
-	jsonFilters.GameId = gameIdValues
-	jsonFilters.ExpenseType = expenseValues
-	jsonFilters.TaxYear = filters.TaxYear
-
-	if filters.FromDate != "" || filters.ToDate != "" {
-		jsonFilters.Date = &model.Date{}
-	}
-
-	if filters.FromDate != "" {
-		jsonFilters.Date.From = filters.FromDate
-	}
-
-	if filters.ToDate != "" {
-		jsonFilters.Date.To = filters.ToDate
-	}
-
-	// write JSON file
-	file, err := os.Create(fileName)
-	if err != nil {
-		return "", fmt.Errorf("Failed to open %s", fileName)
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(jsonFilters); err != nil {
-		return "", fmt.Errorf("Failed to encode filters to file %s", fileName)
-	}
-	return fileName, nil
-}
-
-func ConvertGameFiltersToJsonFile(filters model.GFilters) (string, error) {
-
-	var jsonFilters model.GameFilter
-	var fileName string = "gamesReportFiltersV2.json"
-
-	assocValues := ParseCsv(filters.Association)
-	gameIdValues, _ := ParseInt64CSV(filters.GameId)
-	statusValues := ParseCsv(filters.Status)
-	siteValues := ParseCsv(filters.Site)
-	sportValues := ParseCsv(filters.Sport)
-	levelValues := ParseCsv(filters.Level)
-
-	jsonFilters.Association = assocValues
-	jsonFilters.GameId = gameIdValues
-	jsonFilters.Status = statusValues
-	jsonFilters.Site = siteValues
-	jsonFilters.Sport = sportValues
-	jsonFilters.Level = levelValues
-	jsonFilters.Home = filters.Home
-	jsonFilters.Visitor = filters.Visitor
-
-	if filters.FromDate != "" || filters.ToDate != "" {
-		jsonFilters.Date = &model.Date{}
-	}
-
-	if filters.FromDate != "" {
-		jsonFilters.Date.From = filters.FromDate
-	}
-
-	if filters.ToDate != "" {
-		jsonFilters.Date.To = filters.ToDate
-	}
-
-	jsonFilters.Official = ParseCsv(filters.Official)
-	jsonFilters.TenantId = filters.TenantId
-	jsonFilters.TaxYear = filters.TaxYear
-
-	fmt.Println("JSON Filters:", jsonFilters)
-	// write JSON file
-	file, err := os.Create(fileName)
-	if err != nil {
-		return "", fmt.Errorf("Failed to open %s", fileName)
-	}
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	encoder.SetIndent("", "  ")
-
-	if err := encoder.Encode(jsonFilters); err != nil {
-		return "", fmt.Errorf("Failed to encode filters to file %s", fileName)
-	}
-
-	return fileName, nil
-}
-
-func CovertTextFileToJson(f string) error {
-
-	return nil
 }
 
 func ConvertGameIdRangeToInt(g string) ([]int64, error) {
@@ -467,34 +183,6 @@ func ConvertGameIdRangeToInt(g string) ([]int64, error) {
 	}
 
 	return gameIds, nil
-}
-
-func FormatGameIdStrSplice(gameIdStr string, maxLength int) []string {
-
-	var gameIdSplice []string = []string{}
-	var line string = ""
-
-	gameIdList := strings.Split(gameIdStr, ";")
-	for _, v := range gameIdList {
-
-		if len(v)+len(line) >= maxLength {
-			if line[len(line)-1] == ';' {
-				line = line[:len(line)-1] + " "
-			}
-			gameIdSplice = append(gameIdSplice, line)
-			line = ""
-		}
-		line += v + ";"
-	}
-
-	if len(line) > 0 {
-		if line[len(line)-1] == ';' {
-			line = line[:len(line)-1]
-		}
-		gameIdSplice = append(gameIdSplice, line)
-	}
-
-	return gameIdSplice
 }
 
 func ConvertGameIdsToRange(gameIds []int64) (string, int) {
@@ -543,27 +231,6 @@ func ConvertGameIdsToRange(gameIds []int64) (string, int) {
 	}
 
 	return gameIdStr, numOfGameIds
-
-}
-
-func ConvertSingleGameIdToStr(g int64) (string, error) {
-
-	return strconv.FormatInt(g, 10), nil
-}
-
-func ConvertGameIdIntToStr(g []int64) (string, error) {
-
-	var gameIdStr string
-
-	if len(g) == 0 {
-		return gameIdStr, nil
-	}
-
-	strSlice := make([]string, len(g))
-	for i, v := range g {
-		strSlice[i] = strconv.FormatInt(v, 10)
-	}
-	return strings.Join(strSlice, ","), nil
 
 }
 
@@ -691,22 +358,6 @@ func ConvertAmtStrToInt64(s string) (int64, error) {
 
 }
 
-func ConvertGameDocToJson(doc []model.GameDoc, file string) error {
-
-	// Convert to JSON
-	jsonData, err := json.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	// Write to file
-	err = os.WriteFile(file, jsonData, 0644)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 
 	gameId := ConvertInt64ToStr(doc.GameId)
@@ -740,31 +391,6 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 	}
 
 	return gameDescr
-}
-
-func ConvertOfficialDescrToOfficialDoc(officialDescr model.OfficialDescriptor) model.OfficialDoc {
-
-	doc := model.OfficialDoc{
-		OfficialId:  0,
-		FirstName:   officialDescr.FirstName,
-		LastName:    officialDescr.LastName,
-		Phone:       officialDescr.Phone,
-		Association: officialDescr.Association,
-	}
-	return doc
-}
-
-func ConvertOfficialDocToOfficialDescr(doc model.OfficialDoc) model.OfficialDescriptor {
-
-	officialDescr := model.OfficialDescriptor{
-		OfficialId:  doc.OfficialId,
-		FirstName:   doc.FirstName,
-		LastName:    doc.LastName,
-		Phone:       doc.Phone,
-		Association: doc.Association,
-	}
-
-	return officialDescr
 }
 
 func ConvertPaymentDocToPaymentDescr(doc model.PaymentDoc) model.PaymentDescriptor {
@@ -814,43 +440,6 @@ func ConvertPaymentDescrToPaymentDoc(paymentDescr model.PaymentDescriptor) model
 	}
 }
 
-func ConvertExpenseDescrToExpenseDoc(expenseDescr model.ExpenseDescriptor) model.ExpenseDoc {
-
-	expenseAmt, _ := ConvertAmtStrToInt64(expenseDescr.Amount)
-	gameId, err := ConvertStrToInt64(expenseDescr.GameId)
-	mileage, _ := ConvertStrToInt64(expenseDescr.Mileage)
-	if err != nil {
-		fmt.Println("Error converting GameId to int64.  Reason:", err)
-		return model.ExpenseDoc{}
-	}
-	doc := model.ExpenseDoc{
-		ExpenseId:   expenseDescr.ExpenseId,
-		Date:        expenseDescr.Date,
-		Type:        expenseDescr.Type,
-		Amount:      expenseAmt,
-		Mileage:     mileage,
-		Association: expenseDescr.Association,
-		GameId:      gameId,
-		Description: expenseDescr.Description,
-		TaxYear:     expenseDescr.TaxYear,
-	}
-	return doc
-}
-
-func ConvertHTMLDate(dateValue string) (string, error) {
-
-	if dateValue == "" {
-		return "", nil
-	}
-
-	parsedDate, err := time.Parse("2006-01-02", dateValue)
-	if err != nil {
-		return "", fmt.Errorf("invalid date %q: %w", dateValue, err)
-	}
-
-	return parsedDate.Format("1/2/2006"), nil
-}
-
 func CalculateGameFee(gameRec model.GameDescriptor) int64 {
 
 	var gameFee int64
@@ -873,7 +462,6 @@ func CalculateGameFee(gameRec model.GameDescriptor) int64 {
 
 func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescriptor {
 
-	fmt.Println("ConvertExpenseDocToExpenseDescr: ExpenseDoc:", doc)
 	expenseAmt := ConvertInt64ToAmtStr(doc.Amount)
 	gameId := ConvertInt64ToStr(doc.GameId)
 	mileage := ConvertMilesToStr(doc.Mileage)
@@ -888,7 +476,6 @@ func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescript
 		Description: doc.Description,
 		TaxYear:     doc.TaxYear,
 	}
-	fmt.Println("ConvertExpenseDocToExpenseDescr: ExpenseDescriptor:", descr)
 	return descr
 }
 
@@ -959,20 +546,4 @@ func ConvertDateStringToTime(
 	}
 
 	return gameDateTime, nil
-}
-
-func CenterText(text string, length int) string {
-
-	midPoint := length / 2
-	strLen := len(text)
-	strMidPoint := strLen / 2
-	newStr := ""
-
-	if strLen >= length {
-		return text
-	}
-
-	strFormat := strings.Replace("%-%ds%s", "%d", strconv.Itoa(midPoint-strMidPoint), -1)
-	newStr = fmt.Sprintf(strFormat, " ", text)
-	return newStr
 }

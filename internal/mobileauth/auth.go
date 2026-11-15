@@ -4,10 +4,10 @@ package mobileauth
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
-	"log"
 	"time"
 
 	"github.com/auth0/go-jwt-middleware/v2/jwks"
@@ -57,10 +57,10 @@ func (v *Validator) Validate(ctx context.Context, token string) (Identity, error
 		return Identity{}, fail
 	}
 	result, err := v.jwt.ValidateToken(ctx, token)
-    if err != nil {
-        log.Printf("Mobile JWT validation failed: %v", err)
-        return Identity{}, fail
-    }
+	if err != nil {
+		log.Printf("Mobile JWT validation failed: %v", err)
+		return Identity{}, fail
+	}
 	claims, ok := result.(*validator.ValidatedClaims)
 	if !ok || claims.RegisteredClaims.Subject == "" || claims.RegisteredClaims.Expiry <= time.Now().Unix() {
 		return Identity{}, fail

@@ -76,20 +76,12 @@ func (e *Email) Send() error {
 	return nil
 }
 
-func (e *Email) AddAttachment(attachment string) {
-	e.Attachment = attachment
-}
-
 func (e *Email) SetBody(body string) {
 	e.Body = body
 }
 
 func (e *Email) SetTo(to []string) {
 	e.To = to
-}
-
-func (e *Email) SetFrom(from string) {
-	e.From = from
 }
 
 func (e *Email) SetSubject(subject string) {

@@ -705,8 +705,17 @@
 </div>
 </div>
 <div class="card-body">
+<dialog id="levelEditDialog" aria-labelledby="levelEditTitle" style="width:min(440px,calc(100% - 32px));border:0;border-radius:12px;padding:24px;box-sizing:border-box">
+<form id="levelEditForm">
+<h2 id="levelEditTitle">Edit Level</h2>
+<div class="form-group"><label for="editLevelSport">Sport</label><select class="form-control" id="editLevelSport" required></select></div>
+<div class="form-group"><label for="editLevelName">Level Name</label><input class="form-control" id="editLevelName" required maxlength="50"></div>
+<div class="form-group"><label for="editLevelFee">Game Fee</label><input class="form-control" id="editLevelFee" type="number" required min="0" step="0.01" inputmode="decimal"></div>
+<p id="levelEditError" role="alert" style="color:#b91c1c"></p>
+<div style="display:flex;gap:12px;justify-content:flex-end"><button type="button" class="btn btn-secondary" id="cancelLevelDialog">Cancel</button><button type="submit" class="btn btn-primary" id="saveLevelDialog">Save Level</button></div>
+</form></dialog>
 <form id="levelForm" autocomplete="off">
-<input id="levelOriginalId" type="hidden"/>
+
 <div class="form-group">
 <label for="levelSport">Sport</label>
 <select class="form-control" id="levelSport" required><option value="">Select Sport</option></select>
@@ -735,9 +744,7 @@
                                 Add Level
                             </button>
 </div>
-<button class="btn btn-secondary" hidden="" id="cancelLevelEditButton" type="button">
-                            Cancel Edit
-                        </button>
+
 </form>
 <hr class="section-divider"/>
 <div class="list-header">
@@ -1258,28 +1265,53 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
                 levelsBody.appendChild(row);
             });
         }
+        let editedLevelId = null;
+        let levelEditBusy = false;
         function editLevel(levelId) {
-            const level = levels.find(
-                item => item.id === levelId
-            );
-            if (!level) {
-                return;
-            }
-            document.getElementById("levelOriginalId").value =
-                level.id;
-            populateLevelSports(level.sport);
-            document.getElementById("levelName").readOnly = true;
-            document.getElementById("levelName").value =
-                level.name;
-            document.getElementById("levelGameFee").value = formatGameFee(level.gameFee);
-            document.getElementById("saveLevelButton").innerHTML = `
-                <i class="fa-solid fa-floppy-disk"></i>
-                Save Level
-            `;
-            document.getElementById(
-                "cancelLevelEditButton"
-            ).hidden = false;
+            const level = levels.find(item => item.id === levelId);
+            if (!level) return;
+            editedLevelId = level.id;
+            const sportSelect = document.getElementById("editLevelSport");
+            sportSelect.replaceChildren(new Option("Select Sport", ""));
+            sports.filter(s => s.name).forEach(s => sportSelect.add(new Option(s.name, s.name)));
+            if (level.sport && !Array.from(sportSelect.options).some(o => o.value === level.sport)) sportSelect.add(new Option(level.sport, level.sport));
+            sportSelect.value = level.sport || "";
+            document.getElementById("editLevelName").value = level.name;
+            document.getElementById("editLevelFee").value = formatGameFee(level.gameFee);
+            document.getElementById("levelEditError").textContent = "";
+            document.getElementById("levelEditDialog").showModal();
+            document.getElementById("editLevelName").focus();
         }
+        document.getElementById("cancelLevelDialog").addEventListener("click", () => document.getElementById("levelEditDialog").close());
+        document.getElementById("levelEditDialog").addEventListener("cancel", event => { if (levelEditBusy) event.preventDefault(); });
+        document.getElementById("levelEditForm").addEventListener("submit", async event => {
+            event.preventDefault();
+            if (levelEditBusy) return;
+            const name = document.getElementById("editLevelName").value.trim();
+            const errorBox = document.getElementById("levelEditError");
+            if (!name) { errorBox.textContent = "Level name is required."; return; }
+            levelEditBusy = true;
+            const save = document.getElementById("saveLevelDialog");
+            const cancel = document.getElementById("cancelLevelDialog");
+            save.disabled = cancel.disabled = true;
+            errorBox.textContent = "";
+            try {
+                const response = await fetch("/api/levels", {
+                    method: "PUT", headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({id: editedLevelId, name,
+                        sport: document.getElementById("editLevelSport").value,
+                        gameFee: formatGameFee(document.getElementById("editLevelFee").value)})
+                });
+                if (response.status === 401 || response.redirected) { window.location.href = "/login"; return; }
+                const text = await response.text();
+                let data = {}; try { data = JSON.parse(text); } catch {}
+                if (!response.ok) throw new Error(data.message || text || "Unable to save level.");
+                await loadLevels();
+                document.getElementById("levelEditDialog").close();
+                showMessage(data.message || "Level saved successfully", "success");
+            } catch (error) { errorBox.textContent = error.message || "Unable to save level."; }
+            finally { levelEditBusy = false; save.disabled = cancel.disabled = false; }
+        });
         let levelPendingDeletion = null;
         function deleteLevel(levelId) {
             levelPendingDeletion = levels.find(
@@ -1384,15 +1416,7 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
             const selectedSport = document.getElementById("levelSport").value;
             document.getElementById("levelForm").reset();
             document.getElementById("levelSport").value = selectedSport;
-            document.getElementById("levelName").readOnly = false;
-            document.getElementById("levelOriginalId").value = "";
-            document.getElementById("saveLevelButton").innerHTML = `
-                <i class="fa-solid fa-plus"></i>
-                Add Level
-            `;
-            document.getElementById(
-                "cancelLevelEditButton"
-            ).hidden = true;
+
         }
         document
             .getElementById("levelForm")
@@ -1419,8 +1443,7 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
                 }
                 const gameFee = formatGameFee(feeInput.value);
                 feeInput.value = gameFee;
-                const originalId = document.getElementById("levelOriginalId").value;
-                const editing = originalId !== "";
+                const editing = false;
                 const saveButton =
                     document.getElementById("saveLevelButton");
                 saveButton.disabled = true;
@@ -1432,7 +1455,7 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
                             "Content-Type": "application/json"
                         },
                         body: JSON.stringify({
-                            id: originalId || levelName,
+                            id: levelName,
                             name: levelName,
                             sport: levelSport,
                             gameFee: gameFee
@@ -1462,8 +1485,7 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
                     resetLevelForm();
                     document.getElementById("levelName").focus();
                     showMessage(
-                        responseData.message ||
-                        editing ? "Level saved successfully" : "Level added successfully",
+                        responseData.message || "Level added successfully",
                         "success"
                     );
                 } catch (error) {
@@ -1475,9 +1497,6 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
                     saveButton.disabled = false;
                 }
             });
-        document
-            .getElementById("cancelLevelEditButton")
-            .addEventListener("click", resetLevelForm);
         document
             .getElementById("cancelLevelDeleteButton")
             .addEventListener("click", closeLevelDeleteModal);
