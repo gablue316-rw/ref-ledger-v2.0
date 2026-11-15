@@ -263,7 +263,7 @@ func (auth *webAuth0) callback(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, mobileSignupPath+"#verify", http.StatusSeeOther)
 			return
 		}
-		http.Error(w, errAuth0EmailUnverified.Error(), http.StatusForbidden)
+		http.Redirect(w, r, "/account/sign-in?notice=verify", http.StatusSeeOther)
 		return
 	}
 
@@ -286,7 +286,11 @@ func (auth *webAuth0) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		auth0RegistrationFailure(w, err)
+		if mobileOnboarding {
+			auth0RegistrationFailure(w, err)
+		} else {
+			renderAuth0SignIn(w, auth0SignInView{Failed: true, Message: webRegistrationMessage(err), Signup: auth.registration != nil})
+		}
 		return
 	}
 	if err := createWebSession(w, r.WithContext(ctx), user, true); err != nil {

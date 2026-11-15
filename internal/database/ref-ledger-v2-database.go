@@ -4490,10 +4490,14 @@ func normalizeLevelGameFee(value string) (string, error) {
 // Update assigns the sport and fee for an existing level owned by this tenant.
 func (lc *LevelsCollection) Update(level Level, tenantId string) error {
 	level.ID = strings.TrimSpace(level.ID)
+	level.Name = strings.TrimSpace(level.Name)
 	level.Sport = strings.TrimSpace(level.Sport)
 	tenantId = strings.TrimSpace(tenantId)
 	if level.ID == "" || tenantId == "" || tenantId == "na" || level.Sport == "" {
 		return fmt.Errorf("level ID, sport, and valid tenant ID are required")
+	}
+	if level.Name == "" || len([]rune(level.Name)) > 50 {
+		return fmt.Errorf("level name must contain 1 to 50 characters")
 	}
 	if level.GameFee < 0 {
 		return fmt.Errorf("game fee cannot be negative")
@@ -4508,19 +4512,19 @@ func (lc *LevelsCollection) Update(level Level, tenantId string) error {
 	if err := lc.validateLevelSport(ctx, level.Sport); err != nil {
 		return err
 	}
-	// Keep the saved name and stable ID when assigning a sport or changing a fee.
+	// Preserve the stable ID while editing the configured name, sport, or fee.
 	err := lc.Coll.FindOne(ctx, bson.M{
-		"tenantId": tenantId, "sport": level.Sport, "name": existing.Name,
+		"tenantId": tenantId, "sport": level.Sport, "name": level.Name,
 		"id": bson.M{"$ne": existing.ID},
 	}).Err()
 	if err == nil {
-		return fmt.Errorf("level %q already exists for %s", existing.Name, level.Sport)
+		return fmt.Errorf("level %q already exists for %s", level.Name, level.Sport)
 	}
 	if !errors.Is(err, mongo.ErrNoDocuments) {
 		return fmt.Errorf("failed to check level: %w", err)
 	}
 	result, err := lc.Coll.UpdateOne(ctx, filter,
-		bson.M{"$set": bson.M{"sport": level.Sport, "gameFee": level.GameFee}})
+		bson.M{"$set": bson.M{"name": level.Name, "sport": level.Sport, "gameFee": level.GameFee}})
 	if err != nil {
 		return fmt.Errorf("failed to update level: %w", err)
 	}

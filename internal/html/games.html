@@ -839,6 +839,29 @@ body {
     white-space: normal;
 }
 
+/* Keep save confirmation visible at any scroll position. */
+.save-notice {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    width: min(560px, calc(100% - 32px));
+    box-sizing: border-box;
+    padding: 16px;
+    border: 1px solid #15803d;
+    border-radius: 10px;
+    background: #f0fdf4;
+    color: #14532d;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .2);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    overflow-wrap: anywhere;
+}
+.save-notice[hidden] { display: none; }
+.save-notice span { flex: 1; }
+.save-notice button { cursor: pointer; padding: 8px 12px; }
         </style>
     </head>
     <body>
@@ -1364,6 +1387,10 @@ body {
                     </form>
                 </section>
             </div>
+            <div class="save-notice" id="gameSaveNotice" hidden>
+                <span id="gameSaveNoticeText" role="status" aria-live="polite" aria-atomic="true"></span>
+                <button type="button" id="dismissGameSaveNotice" aria-label="Close game save confirmation">Close</button>
+            </div>
             <div aria-live="polite" class="message" id="message" role="status">
                 Ready to enter games.
             </div>
@@ -1497,6 +1524,14 @@ body {
         <script src="/components/navbar.js?v=12">
         </script>
         <script>
+function showGameSaveNotice(message) {
+    document.getElementById("gameSaveNotice").hidden = false;
+    document.getElementById("gameSaveNoticeText").textContent = message;
+}
+document.getElementById("dismissGameSaveNotice").addEventListener("click", () => {
+    document.getElementById("gameSaveNotice").hidden = true;
+});
+
             // Set this URL to your existing sport-role GET route if its name differs.
 const OFFICIAL_ROLES_API = "/api/settings/official-roles";
 let isUpdateMode = false;
@@ -2405,6 +2440,7 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         }
         document.getElementById("message").innerText =
             message || "Game saved successfully.";
+        showGameSaveNotice(message || "Game saved successfully.");
         if (!document.getElementById("registrySection").hidden) await loadGameDirectory();
         document.getElementById("message").textContent = message || "Game saved successfully.";
         // Reload the navbar count after a successful save.

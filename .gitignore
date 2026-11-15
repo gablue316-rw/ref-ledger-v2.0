@@ -77,3 +77,6 @@ ref-ledger-v2.exe
 *.docx
 # Local mobile IDE workspace
 /mobile/.idea/
+/docs
+
+ref-ledger-v2-web-page-server.exe

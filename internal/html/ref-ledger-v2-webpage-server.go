@@ -7929,6 +7929,7 @@ func main() {
 
 	if webAuth != nil {
 		mux.HandleFunc("/login", webAuth.login)
+		mux.HandleFunc("/account/sign-in", webAuth.signInPage)
 		mux.HandleFunc(webAuthCallback, webAuth.callback)
 		if registration != nil {
 			mux.HandleFunc("/createAccount", webAuth.signup)
