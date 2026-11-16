@@ -7,8 +7,13 @@ function element(tag,text){const el=document.createElement(tag);if(text!==undefi
 async function request(url,method,data){const r=await apiRequest(url,method,data);if(r.status<200||r.status>=300)throw new Error(responseError(r));return r.data;}
 
 export async function editGame(summary,onSaved){
+ const creating=!summary;
+ if(creating){
+  const now=new Date(),date=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  summary={GameId:'',Association:'',Date:date,Time:'6:00 PM',Sport:'Softball',Level:'',Site:'',NumOfGames:'1',GameFee:'0.00',TravelPay:'0.00',AssignorFee:'0.00',Deductions:'0.00',TaxYear:String(now.getFullYear()),Status:'Pending',Assignor:'Unassigned',Officials:[]};
+ }
  const dialog=element('dialog');dialog.className='game-editor';
- const title=element('h2',`Game ${summary.GameId} · ${summary.Association}`);dialog.append(title);
+ const title=element('h2',creating?'Add game':`Game ${summary.GameId} · ${summary.Association}`);dialog.append(title);
  const note=element('p','Loading game…');note.setAttribute('role','status');dialog.append(note);
  const close=element('button','Close');close.type='button';close.className='secondary';dialog.append(close);
  let working=false;
@@ -16,19 +21,21 @@ export async function editGame(summary,onSaved){
  dialog.addEventListener('cancel',e=>{e.preventDefault();dismiss();});
  document.body.append(dialog);dialog.showModal();
  try{
-  const url=gameURL(config.apiBase,summary);
-  const snapshot=await request(url);
+  const url=creating?new URL('/api/mobile/game',config.apiBase).href:gameURL(config.apiBase,summary);
+  const access=creating?await request(new URL('/api/mobile/access',config.apiBase).href):null;
+  const snapshot=creating?{game:summary,...access}:await request(url);
   if(!dialog.isConnected)return;
   const game=snapshot.game;
   const directory=await request(new URL('/api/mobile/officials',config.apiBase).href);
   if(!dialog.isConnected)return;
   const form=element('form');form.id='game-form';
   const inputs={};
-  for(const [key,text,type='text'] of gameFields){
+  for(const [key,text,type='text'] of (creating?[['GameId','Game ID','number'],['Association','Association'],...gameFields]:gameFields)){
    const label=element('label',text),input=element('input');input.name=key;input.type=type;
    input.value=key==='Date'?inputDate(game[key]):key==='Time'?inputTime(game[key]):game[key]??'';
-   input.required=['Date','Time','Sport','Level','Site','NumOfGames','TaxYear','GameFee','TravelPay','AssignorFee','Deductions'].includes(key);
-   if(type==='number'){input.min=key==='NumOfGames'?'1':key==='TaxYear'?'2000':'0';input.step=['NumOfGames','TaxYear'].includes(key)?'1':'0.01';}
+   if(['GameFee','TravelPay','AssignorFee','Deductions'].includes(key))input.value=String(game[key]??'0').replace(/[$,]/g,'');
+   input.required=['GameId','Association','Date','Time','Sport','Level','Site','NumOfGames','TaxYear','GameFee','TravelPay','AssignorFee','Deductions'].includes(key);
+   if(type==='number'){input.min=['GameId','NumOfGames'].includes(key)?'1':key==='TaxYear'?'2000':'0';input.step=['GameId','NumOfGames','TaxYear'].includes(key)?'1':'0.01';}
    if(key==='TaxYear')input.max='2100';
    if(key==='Date'){input.min='2000-01-01';input.max='2100-12-31';}
    inputs[key]=input;label.append(input);form.append(label);
@@ -66,24 +73,24 @@ export async function editGame(summary,onSaved){
   };
   inputs.Sport.onchange=loadRoles;
   const notesLabel=element('label','Notes'),notes=element('textarea');notes.name='Notes';notes.value=game.Notes||'';notes.maxLength=snapshot.notesLimit;notes.rows=4;notesLabel.className='wide';notesLabel.append(notes);form.append(notesLabel);
-  const warning=element('p','Game ID and association identify this assignment. Record payments on the website. Cancelling a game clears all fees.');warning.className='wide';form.append(warning);
-  const save=element('button','Save changes');save.type='submit';form.append(save);
-  const remove=element('button','Delete game');remove.type='button';remove.className='danger';form.append(remove);
+  const warning=element('p','Use the sport, level, site, and association from your account. Record payments on the website. Cancelling a game clears all fees.');warning.className='wide';form.append(warning);
+  const save=element('button',creating?'Add game':'Save changes');save.type='submit';form.append(save);
+  const remove=element('button','Delete game');remove.type='button';remove.className='danger';remove.hidden=creating;form.append(remove);
   dialog.insertBefore(form,close);
   const lock=value=>{working=value;for(const el of form.elements)el.disabled=value;close.disabled=value;};
-  const finish=async()=>{dialog.close();dialog.remove();await onSaved();};
+  const finish=async text=>{dialog.close();dialog.remove();await onSaved(text);};
   form.onsubmit=async e=>{
    e.preventDefault();if(working||rolesLoading||rolesFailed||!form.reportValidity())return;
    const values=Object.fromEntries(new FormData(form));
    if(values.Status==='Cancelled'&&game.Status!=='Cancelled'&&!confirm('Cancel this game and set all fees to zero?'))return;
    lock(true);note.textContent='Saving changes…';
-   try{await request(url,'PUT',{game:buildGame(game,values,assignments),version:snapshot.version});await finish();}
+   try{await request(url,creating?'POST':'PUT',{game:buildGame(game,values,assignments),...(creating?{}:{version:snapshot.version})});await finish(creating?'Game added successfully. Adjust the filters if it is not shown.':'Game updated successfully.');}
    catch(error){note.textContent=error.message;lock(false);}
   };
   remove.onclick=async()=>{
    if(working||!confirm(`Permanently delete game ${game.GameId} for ${game.Association}?`))return;
    lock(true);note.textContent='Deleting game…';
-   try{await request(url,'DELETE',{version:snapshot.version});await finish();}
+   try{await request(url,'DELETE',{version:snapshot.version});await finish('Game deleted successfully.');}
    catch(error){note.textContent=error.message;lock(false);}
   };
   await loadRoles();

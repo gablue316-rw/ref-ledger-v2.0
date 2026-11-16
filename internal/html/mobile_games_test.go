@@ -10,7 +10,7 @@ import (
 
 func TestMobileGameCookieCannotAuthorizeWrites(t *testing.T) {
 	t.Setenv("MAINTENANCE_MODE", "false")
-	for _, method := range []string{"GET", "PUT", "DELETE"} {
+	for _, method := range []string{"GET", "POST", "PUT", "DELETE"} {
 		called := false
 		handler := mobileAccountHandler(func(http.ResponseWriter, *http.Request) { called = true })
 		r := httptest.NewRequest(method, "/api/mobile/game?tenantId=other", nil)
@@ -25,7 +25,7 @@ func TestMobileGameCookieCannotAuthorizeWrites(t *testing.T) {
 
 // Test the same admission boundary used by the application's outer middleware.
 func TestMobileWritesRespectMaintenance(t *testing.T) {
-	for _, method := range []string{"PUT", "DELETE"} {
+	for _, method := range []string{"POST", "PUT", "DELETE"} {
 		admitted := false
 		handler := maintenanceMiddlewareWithAdmission(mobileAccountHandler(func(http.ResponseWriter, *http.Request) { t.Fatal("write allowed") }), func() (func(), error) { admitted = true; return nil, errors.New("maintenance active") })
 		w := httptest.NewRecorder()

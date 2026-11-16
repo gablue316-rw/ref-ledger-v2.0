@@ -30,7 +30,7 @@ export function authorizationParameters(config, signup=false, forceCredentials=f
 export function dashboardURL(base,filters) {
  const url=new URL('/api/mobile/dashboard',base);
  if(url.protocol!=='https:')throw new Error('HTTPS is required.');
- for(const key of ['status','sport','association','begindate','enddate','taxYear']) {
+ for(const key of ['status','sport','association','begindate','enddate','taxYear','gameId','site','level','home','visitor']) {
   if(filters[key])url.searchParams.set(key,filters[key]);
  }
  return url.href;
