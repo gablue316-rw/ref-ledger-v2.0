@@ -1,3 +1,4 @@
+import {loadCatalog,bindGameCatalog} from './catalog.js';
 import {apiRequest} from './auth.js';
 import {config} from './config.js';
 import {gameURL,inputDate,inputTime,buildGame,responseError,gameFields} from './game-data.js';
@@ -10,7 +11,7 @@ export async function editGame(summary,onSaved){
  const creating=!summary;
  if(creating){
   const now=new Date(),date=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  summary={GameId:'',Association:'',Date:date,Time:'6:00 PM',Sport:'Softball',Level:'',Site:'',NumOfGames:'1',GameFee:'0.00',TravelPay:'0.00',AssignorFee:'0.00',Deductions:'0.00',TaxYear:String(now.getFullYear()),Status:'Pending',Assignor:'Unassigned',Officials:[]};
+  summary={GameId:'',Association:'',Date:date,Time:'6:00 PM',Sport:'',Level:'',Site:'',NumOfGames:'1',GameFee:'0.00',TravelPay:'0.00',AssignorFee:'0.00',Deductions:'0.00',TaxYear:String(now.getFullYear()),Status:'Pending',Assignor:'Unassigned',Officials:[]};
  }
  const dialog=element('dialog');dialog.className='game-editor';
  const title=element('h2',creating?'Add game':`Game ${summary.GameId} · ${summary.Association}`);dialog.append(title);
@@ -26,12 +27,12 @@ export async function editGame(summary,onSaved){
   const snapshot=creating?{game:summary,...access}:await request(url);
   if(!dialog.isConnected)return;
   const game=snapshot.game;
-  const directory=await request(new URL('/api/mobile/officials',config.apiBase).href);
+  const [directory,catalog]=await Promise.all([request(new URL('/api/mobile/officials',config.apiBase).href),loadCatalog()]);
   if(!dialog.isConnected)return;
   const form=element('form');form.id='game-form';
   const inputs={};
-  for(const [key,text,type='text'] of (creating?[['GameId','Game ID','number'],['Association','Association'],...gameFields]:gameFields)){
-   const label=element('label',text),input=element('input');input.name=key;input.type=type;
+  for(const [key,text,type='text'] of (creating?[['GameId','Game ID','number'],['Association','Association'],...gameFields]:[['Association','Association'],...gameFields])){
+   const label=element('label',text),input=element(['Sport','Association','Assignor','Level','Site'].includes(key)?'select':'input');input.name=key;if(input.tagName==='INPUT')input.type=type;
    input.value=key==='Date'?inputDate(game[key]):key==='Time'?inputTime(game[key]):game[key]??'';
    if(['GameFee','TravelPay','AssignorFee','Deductions'].includes(key))input.value=String(game[key]??'0').replace(/[$,]/g,'');
    input.required=['GameId','Association','Date','Time','Sport','Level','Site','NumOfGames','TaxYear','GameFee','TravelPay','AssignorFee','Deductions'].includes(key);
@@ -40,6 +41,8 @@ export async function editGame(summary,onSaved){
    if(key==='Date'){input.min='2000-01-01';input.max='2100-12-31';}
    inputs[key]=input;label.append(input);form.append(label);
   }
+  bindGameCatalog(inputs,catalog,game,creating);
+  inputs.Association.disabled=!creating;
   const statusLabel=element('label','Status'),status=element('select');status.name='Status';
   for(const s of ['Pending','Completed','Cancelled',...(game.Status==='Paid'?['Paid']:[])])status.append(new Option(s,s));
   status.value=game.Status;statusLabel.append(status);form.append(statusLabel);
@@ -60,6 +63,7 @@ export async function editGame(summary,onSaved){
   };
   const loadRoles=async()=>{
    const version=++roleGeneration;rolesLoading=true;rolesFailed=false;save.disabled=true;
+   if(!inputs.Sport.value){assignments=[];renderRoles();rolesLoading=false;note.textContent='Select a sport to load levels and official roles.';return;}
    try{
     const rolesURL=new URL('/api/mobile/roles',config.apiBase);rolesURL.searchParams.set('sport',inputs.Sport.value);
     const result=await request(rolesURL.href);
@@ -73,11 +77,11 @@ export async function editGame(summary,onSaved){
   };
   inputs.Sport.onchange=loadRoles;
   const notesLabel=element('label','Notes'),notes=element('textarea');notes.name='Notes';notes.value=game.Notes||'';notes.maxLength=snapshot.notesLimit;notes.rows=4;notesLabel.className='wide';notesLabel.append(notes);form.append(notesLabel);
-  const warning=element('p','Use the sport, level, site, and association from your account. Record payments on the website. Cancelling a game clears all fees.');warning.className='wide';form.append(warning);
+  const warning=element('p','Dropdowns use your account settings. Choose a level to fill its game fee. Record payments on the website. Cancelling a game clears all fees.');warning.className='wide';form.append(warning);
   const save=element('button',creating?'Add game':'Save changes');save.type='submit';form.append(save);
   const remove=element('button','Delete game');remove.type='button';remove.className='danger';remove.hidden=creating;form.append(remove);
   dialog.insertBefore(form,close);
-  const lock=value=>{working=value;for(const el of form.elements)el.disabled=value;close.disabled=value;};
+  const lock=value=>{working=value;for(const el of form.elements)el.disabled=value;inputs.Association.disabled=value||!creating;close.disabled=value;};
   const finish=async text=>{dialog.close();dialog.remove();await onSaved(text);};
   form.onsubmit=async e=>{
    e.preventDefault();if(working||rolesLoading||rolesFailed||!form.reportValidity())return;

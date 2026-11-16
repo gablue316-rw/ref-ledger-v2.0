@@ -1,3 +1,4 @@
+import {loadCatalog,bindExpenseAssociation,clearFilterCatalog} from './catalog.js';
 import {apiRequest} from './auth.js';
 import {config} from './config.js';
 import {inputDate,responseError} from './game-data.js';
@@ -18,9 +19,11 @@ export function createExpenses(){
   try{
    const url=new URL('/api/mobile/expenses',config.apiBase);
    for(const [key,value] of filters)if(value)url.searchParams.set(key,value);
-   const data=await request(url.href);
+   const [data,catalog]=await Promise.all([request(url.href),loadCatalog()]);
    if(current!==generation)return;
    if(!Array.isArray(data.items)||!Array.isArray(data.types))throw new Error('Unable to read expenses.');
+   const associationFilter=$('expense-filters').elements.namedItem('association');
+   bindExpenseAssociation(associationFilter,catalog,associationFilter.value,true);
    canWrite=data.canWrite;types=data.types.map(t=>t.expenseType);
    const selected=$('expense-filter-type').value;
    $('expense-filter-type').replaceChildren(new Option('All types',''),...types.map(t=>new Option(t,t)));
@@ -57,16 +60,17 @@ export function createExpenses(){
   close.onclick=dismiss;modal.addEventListener('cancel',e=>{e.preventDefault();dismiss();});
   document.body.append(modal);modal.showModal();
   try{
-   const snapshot=record?await request(address(record)):null;
+   const [snapshot,catalog]=await Promise.all([record?request(address(record)):Promise.resolve(null),loadCatalog()]);
    if(!modal.isConnected||current!==generation)return;
    const e=snapshot?.expense;
    const now=new Date();const localDate=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
    const values=e?expenseInput(e):{date:localDate,type:types[0],value:'0.00',association:'',gameId:'',description:'',taxYear:String(now.getFullYear())};
    const writable=snapshot?snapshot.canWrite:canWrite;
    const form=el('form'),inputs={};
-   for(const [key,label,type] of [['date','Date','date'],['type','Type','select'],['value','Amount ($)','number'],['association','Association','text'],['gameId','Game ID (optional)','number'],['taxYear','Tax year','number'],['description','Description','textarea']]){
+   for(const [key,label,type] of [['date','Date','date'],['type','Type','select'],['value','Amount ($)','number'],['association','Association','select'],['gameId','Game ID (optional)','number'],['taxYear','Tax year','number'],['description','Description','textarea']]){
     const field=el('label',label);const input=el(type==='select'?'select':type==='textarea'?'textarea':'input');input.name=key;
-    if(type==='select'){for(const t of new Set([...types,...(e?[e.Type]:[])]))input.append(new Option(t,t));}
+    if(key==='association'){input.required=true;bindExpenseAssociation(input,catalog,values.association,Boolean(record));}
+    else if(type==='select'){for(const t of new Set([...types,...(e?[e.Type]:[])]))input.append(new Option(t,t));}
     else if(type!=='textarea')input.type=type;
     input.value=values[key]??'';
     input.required=['date','type','value','association','taxYear'].includes(key);
@@ -78,7 +82,7 @@ export function createExpenses(){
    const valueLabel=inputs.value.parentElement;
    function valueMode(){valueLabel.firstChild.textContent=inputs.type.value==='Mileage'?'Whole miles':'Amount ($)';inputs.value.step=inputs.type.value==='Mileage'?'1':'0.01';}
    inputs.type.onchange=valueMode;valueMode();
-   const hint=el('p','Use an association ID from your Ref Ledger account. Mileage records store miles; other types store dollars.');hint.className='wide';form.append(hint);
+   const hint=el('p','Mileage records store miles; other types store dollars.');hint.className='wide';form.append(hint);
    const save=el('button',record?'Save changes':'Add expense');save.type='submit';save.disabled=!writable;form.append(save);
    modal.insertBefore(form,close);note.textContent=writable?'':'This account has read-only access.';
    form.onsubmit=async event=>{
@@ -95,5 +99,5 @@ export function createExpenses(){
  $('expense-filters').onsubmit=e=>{e.preventDefault();load();};
  $('expense-filters').onreset=()=>{if(!clearing)queueMicrotask(()=>load());};
  $('refresh-expenses').onclick=()=>load();$('add-expense').onclick=()=>editor();
- return {load,clear(){++generation;loading=false;canWrite=false;types=[];if(dialog){dialog.close();dialog.remove();dialog=null;}$('expense-list').replaceChildren();clearing=true;$('expense-filters').reset();clearing=false;tell('');controls();}};
+ return {load,clear(){++generation;loading=false;canWrite=false;types=[];if(dialog){dialog.close();dialog.remove();dialog=null;}$('expense-list').replaceChildren();clearFilterCatalog($('expense-filters'),['association']);clearing=true;$('expense-filters').reset();clearing=false;tell('');controls();}};
 }
