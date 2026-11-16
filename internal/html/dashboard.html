@@ -1409,6 +1409,7 @@ function renderGames(
                     value="${gameId}"
                     data-association="${encodedAssociation}"
                     data-status="${encodedGameStatus}"
+                    data-version="${game.version || game.Version || ''}"
                     aria-label="Select game ${gameId}">
             `;
 
@@ -2661,7 +2662,8 @@ async function updateSelectedStatus(statusOverride = "") {
     // IDs can repeat across associations. The API supplies tenantId from the session.
     const selectedGames = updateableCheckboxes.map(checkbox => ({
         gameId: Number(checkbox.value),
-        association: decodeURIComponent(checkbox.dataset.association || "")
+        association: decodeURIComponent(checkbox.dataset.association || ""),
+        version: checkbox.dataset.version || ""
     }));
     if (selectedGames.some(game =>
         !Number.isSafeInteger(game.gameId) || !game.association.trim())) {
@@ -2721,11 +2723,18 @@ async function updateSelectedStatus(statusOverride = "") {
     }
 }
 
+function displayedGameVersion(association, gameId) {
+    const row = [...document.querySelectorAll('input.game-check')].find(input =>
+        Number(input.value) === Number(gameId) && decodeURIComponent(input.dataset.association || '') === association);
+    return row?.dataset.version || '';
+}
+
 async function markGameCompleted(association, gameId) {
     if (!Number.isSafeInteger(Number(gameId)) || !String(association || "").trim()) {
         showMessage("A valid game ID and association are required.", "error");
         return;
     }
+    const version = displayedGameVersion(association, gameId);
     const confirmed = await confirmGameCompletion(association, gameId);
 
     if (!confirmed) {
@@ -2741,7 +2750,7 @@ async function markGameCompleted(association, gameId) {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    games: [{ gameId: Number(gameId), association }],
+                    games: [{ gameId: Number(gameId), association, version }],
                     status: "Completed"
                 })
             }
@@ -3271,6 +3280,7 @@ async function saveEditedGame(event) {
     }
     const saveButton = document.getElementById("saveEditGameButton");
     const payload = {
+        version: gameBeingEdited.version || gameBeingEdited.Version || "",
         gameId: Number(gameId),
         taxYear,
         notes: document.getElementById("editNotes").value,
@@ -3380,6 +3390,7 @@ document.addEventListener("keydown", event => {
 async function deleteSelectedGames(selectedCheckboxes) {
     const selectedGames = selectedCheckboxes.map(checkbox => ({
         gameId: checkbox.value,
+        version: checkbox.dataset.version || "",
         association: decodeURIComponent(
             checkbox.dataset.association || ""
         ),
@@ -3420,7 +3431,8 @@ async function deleteSelectedGames(selectedCheckboxes) {
                 `${encodeURIComponent(game.association)}/` +
                 `${encodeURIComponent(game.gameId)}`,
                 {
-                    method: "DELETE"
+                    method: "DELETE",
+                    headers: {"If-Match": game.version}
                 }
             );
 
@@ -3481,6 +3493,7 @@ function showBulkDeleteResult(
 }
 
 async function deleteGame(association, gameId) {
+    const version = displayedGameVersion(association, gameId);
     const confirmed = await confirmGameDeletion(
         association,
         gameId
@@ -3496,7 +3509,8 @@ async function deleteGame(association, gameId) {
             `${encodeURIComponent(association)}/` +
             `${encodeURIComponent(gameId)}`,
             {
-                method: "DELETE"
+                method: "DELETE",
+                    headers: {"If-Match": version}
             }
         );
 

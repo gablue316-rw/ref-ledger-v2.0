@@ -241,7 +241,11 @@ func deleteWorker(e *environment, tenant string, jobs <-chan *candidate, stats *
 		c.mu.Lock()
 		game := c.game
 		c.mu.Unlock()
-		err := e.deleteCollection.Delete(game.Association, game.GameId, tenant)
+		fresh, loadErr := database.GetSingleGame(context.Background(), game.GameId, game.Association, tenant)
+		if loadErr == nil {
+			game.Version = fresh.Version
+		}
+		err := e.deleteCollection.Delete(game.Association, game.GameId, tenant, game.Version)
 		c.mu.Lock()
 		if err == nil {
 			c.deleted = true
@@ -264,6 +268,10 @@ func updateWorker(tenant string, jobs <-chan *candidate, stats *totals, wg *sync
 		game := c.game
 		next := c.updates + 1
 		c.mu.Unlock()
+		fresh, loadErr := database.GetSingleGame(context.Background(), game.GameId, game.Association, tenant)
+		if loadErr == nil {
+			game.Version = fresh.Version
+		}
 		game.Notes = fmt.Sprintf("Game Id %s added. This record has been updated %d times.", game.GameId, next)
 		// Uses the existing application update path, including its metrics call.
 		err := database.UpdateOneGameDoc(context.Background(), game, database.Database, "games", tenant)

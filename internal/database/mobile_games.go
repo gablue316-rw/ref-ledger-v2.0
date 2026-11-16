@@ -56,7 +56,7 @@ func WriteMobileGame(ctx context.Context, s MobileGameSnapshot, game *model.Game
 	coll := Client.Database(Database).Collection("games")
 	// Match all original fields, including status, to reject concurrent changes/payments.
 	if game == nil {
-		result, err := coll.DeleteOne(ctx, s.Filter)
+		result, err := coll.DeleteOne(ctx, SnapshotFilter(s.Filter))
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ func WriteMobileGame(ctx context.Context, s MobileGameSnapshot, game *model.Game
 	if err = prepareGameOfficials(ctx, coll.Database(), &doc, &s.Doc); err != nil {
 		return err
 	}
-	result, err := coll.UpdateOne(ctx, s.Filter, bson.M{"$set": doc, "$unset": bson.M{"referee": "", "u1": "", "u2": "", "eco": ""}})
+	result, err := coll.UpdateOne(ctx, SnapshotFilter(s.Filter), bson.M{"$set": doc, "$unset": bson.M{"referee": "", "u1": "", "u2": "", "eco": ""}})
 	if err != nil {
 		return err
 	}

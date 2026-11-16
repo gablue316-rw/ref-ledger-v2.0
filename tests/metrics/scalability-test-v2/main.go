@@ -440,9 +440,9 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 					return errEmpty
 				}
 			}
-			return u.ac.Delete(doc.Id, u.TenantID)
+			return u.ac.Delete(doc.Id, u.TenantID, doc.Version)
 		}
-		a = database.Association{Id: doc.Id, Name: doc.Name, Contact: tag, Phone: doc.Phone, Email: doc.Email, Assignors: doc.Assignors}
+		a = database.Association{Version: doc.Version, Id: doc.Id, Name: doc.Name, Contact: tag, Phone: doc.Phone, Email: doc.Email, Assignors: doc.Assignors}
 		return u.ac.Update(a, u.TenantID)
 	case 4:
 		s := database.Site{Name: fmt.Sprintf("Georgia Park %d", id), Contact: contact, Phone: "770-555-0101", Email: "site@test.com"}
@@ -461,9 +461,9 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 			if n > 0 {
 				return errEmpty
 			}
-			return u.sc.Delete(doc.Name, u.TenantID)
+			return u.sc.Delete(doc.Name, u.TenantID, doc.Version)
 		}
-		s = database.Site{Name: doc.Name, Contact: tag, Phone: doc.Phone, Email: doc.Email}
+		s = database.Site{Version: doc.Version, Name: doc.Name, Contact: tag, Phone: doc.Phone, Email: doc.Email}
 		return u.sc.Update(s, u.TenantID)
 	case 3:
 		o := database.Official{FirstName: strings.Split(contact, " ")[0], LastName: fmt.Sprintf("%s%d", strings.Split(contact, " ")[1], id), Phone: "770-555-0102", Email: tag + "@test.com", Address: "100 Test Street"}
@@ -475,9 +475,9 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 			return err
 		}
 		if action == 2 {
-			return u.oc.Delete(doc.FirstName, doc.LastName, u.TenantID)
+			return u.oc.Delete(doc.FirstName, doc.LastName, u.TenantID, doc.Version)
 		}
-		o = database.Official{FirstName: doc.FirstName, LastName: doc.LastName, Phone: doc.Phone, Email: doc.Email, Address: tag}
+		o = database.Official{Version: doc.Version, FirstName: doc.FirstName, LastName: doc.LastName, Phone: doc.Phone, Email: doc.Email, Address: tag}
 		return u.oc.Update(u.TenantID, o)
 	case 1:
 		if action == 0 {
@@ -498,7 +498,7 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 			return err
 		}
 		if action == 2 {
-			return u.ec.Delete(doc.ExpenseId, doc.Association, u.TenantID)
+			return u.ec.Delete(doc.ExpenseId, doc.Association, u.TenantID, doc.Version)
 		}
 		dt, err := time.Parse("1/2/2006", doc.Date)
 		if err != nil {
@@ -508,8 +508,8 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 		if doc.Type == "Mileage" {
 			amount = money(doc.Mileage)
 		}
-		// Keep type unchanged: current backend Update writes expenseType, not type.
-		return u.ec.Update(database.Expense{Date: dt.Format("2006-01-02"), Type: doc.Type, Amount: amount, Association: doc.Association, Description: tag, TaxYear: doc.TaxYear}, doc.ExpenseId, doc.Association, u.TenantID)
+		// Preserve the sampled type while changing the description.
+		return u.ec.Update(database.Expense{Version: doc.Version, Date: dt.Format("2006-01-02"), Type: doc.Type, Amount: amount, Association: doc.Association, Description: tag, TaxYear: doc.TaxYear}, doc.ExpenseId, doc.Association, u.TenantID)
 	case 2:
 		if action == 0 {
 			var a database.AssociationDoc
@@ -561,7 +561,7 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 			if n > 0 {
 				return errEmpty
 			}
-			return u.gc.Delete(doc.Association, fmt.Sprint(doc.GameId), u.TenantID)
+			return u.gc.Delete(doc.Association, fmt.Sprint(doc.GameId), u.TenantID, doc.Version)
 		}
 		g := u.gc.ConvDocToGame(doc)
 		g.Notes = tag
@@ -599,7 +599,7 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 				if err != nil {
 					return err
 				}
-				err = database.DeletePayment(doc.PaymentId, doc.Association, u.TenantID)
+				err = database.DeletePayment(doc.PaymentId, doc.Association, u.TenantID, doc.Version)
 				if err == nil {
 					u.Stats[5].Deletes++
 					u.Stats[2].Changes += before
@@ -615,7 +615,7 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 				return err
 			}
 			// Advance the date to guarantee a real change; preserve game IDs.
-			p = model.PaymentDescriptor{PaymentId: doc.PaymentId, PaymentDate: date.AddDate(0, 0, 1).Format("1/2/2006"), PaymentAmt: money(doc.PaymentAmt), Association: doc.Association, GameIds: strings.Join(ids, ","), TaxYear: fmt.Sprint(doc.TaxYear)}
+			p = model.PaymentDescriptor{Version: doc.Version, PaymentId: doc.PaymentId, PaymentDate: date.AddDate(0, 0, 1).Format("1/2/2006"), PaymentAmt: money(doc.PaymentAmt), Association: doc.Association, GameIds: strings.Join(ids, ","), TaxYear: fmt.Sprint(doc.TaxYear)}
 		}
 		var success, failures, games int
 		var errs []error

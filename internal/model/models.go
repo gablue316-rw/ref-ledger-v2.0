@@ -25,6 +25,7 @@ type Session struct {
 }
 
 type ExpenseDescriptor struct {
+	Version     string `bson:"-" json:"version"`
 	ExpenseId   string
 	Date        string
 	Type        string
@@ -37,6 +38,7 @@ type ExpenseDescriptor struct {
 }
 
 type ExpenseDoc struct {
+	Version     string `bson:"-" json:"version"`
 	ExpenseId   string `bson:"expenseId,omitempty"`
 	Date        string `bson:"date,omitempty"`
 	Type        string `bson:"type,omitempty"`
@@ -66,6 +68,7 @@ type ExpenseFilter struct {
 }
 
 type PaymentDescriptor struct {
+	Version     string `bson:"-" json:"version"`
 	PaymentId   string
 	PaymentDate string
 	PaymentAmt  string
@@ -75,6 +78,7 @@ type PaymentDescriptor struct {
 }
 
 type PaymentDoc struct {
+	Version     string  `bson:"-" json:"version"`
 	PaymentId   string  `bson:"paymentId,omitempty"`
 	PaymentDate string  `bson:"paymentDate,omitempty"`
 	PaymentAmt  int64   `bson:"paymentAmt,omitempty"`
@@ -143,6 +147,7 @@ type GameOfficialFilter struct {
 }
 
 type GameDescriptor struct {
+	Version     string            `bson:"-" json:"version"`
 	Officials   []GameOfficialDoc `json:"Officials"`
 	GameId      string
 	Date        string
@@ -166,6 +171,7 @@ type GameDescriptor struct {
 }
 
 type GameDoc struct {
+	Version      string            `bson:"-" json:"version"`
 	Officials    []GameOfficialDoc `bson:"officials" json:"officials"`
 	GameId       int64             `bson:"gameId,omitempty"`
 	Date         string            `bson:"date,omitempty"`
@@ -278,6 +284,7 @@ type FeaturesConfig struct {
 }
 
 type HtmlResponse struct {
+	Version     string            `bson:"-" json:"version"`
 	Officials   []GameOfficialDoc `json:"officials" bson:"officials"`
 	GameId      int64             `json:"gameId" bson:"gameId,omitempty"`
 	Date        string            `json:"date" bson:"date,omitempty"`
@@ -316,6 +323,7 @@ type OfficialView struct {
 }
 
 type GameView struct {
+	Version       string         `bson:"-" json:"version"`
 	GameId        int64          `json:"GameId"`
 	Date          string         `json:"Date"`
 	Time          string         `json:"Time"`

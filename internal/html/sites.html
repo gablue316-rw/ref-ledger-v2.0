@@ -860,8 +860,8 @@ function message(text, error = false) {
 }
 
 function normalize(a) {
-    return Object.fromEntries(fields.map(k => [k, String(a[k] ?? a[k[0].toUpperCase() + k.slice(
-        1)] ?? '')]));
+    return Object.assign({version: a.version || a.Version || ""}, Object.fromEntries(fields.map(k => [k, String(a[k] ?? a[k[0].toUpperCase() + k.slice(
+        1)] ?? '')])));
 }
 
 function values(prefix) {
@@ -1065,7 +1065,9 @@ $('clearSelectionBtn').onclick = () => {
     render();
 };
 
+let editingVersion = "";
 function openEditor(a) {
+ editingVersion = a.version;
     if (busy) return;
     editingName = a.name;
     fields.forEach(k => $('edit_' + k).value = a[k]);
@@ -1082,13 +1084,14 @@ $('editForm').onsubmit = async e => {
     if (busy) return;
     const a = values('edit_');
     a.name = editingName;
+ a.version = editingVersion;
     busy = true;
     $('saveEditBtn').disabled = true;
     $('cancelEditBtn').disabled = true;
     try {
         const result = await save(a, true);
         const index = sites.findIndex(x => x.name === editingName);
-        if (index >= 0) sites[index] = a;
+        await refresh(true);
         render();
         $('editModal').close();
         message(result || 'Site updated successfully.');
@@ -1130,7 +1133,7 @@ $('confirmDeleteBtn').onclick = async () => {
     for (const a of pendingDelete) {
         try {
             await request('/api/deleteSite/' + encodeURIComponent(a.name), {
-                method: 'DELETE'
+                method: 'DELETE', headers: {'If-Match': a.version}
             });
             sites = sites.filter(x => x.name !== a.name);
             selected.delete(a.name);

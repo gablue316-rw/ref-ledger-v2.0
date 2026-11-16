@@ -1019,6 +1019,7 @@
 
 <dialog id="editPaymentModal" class="edit-payment-modal" aria-labelledby="editPaymentTitle">
     <form id="editPaymentForm" novalidate>
+        <p id="paymentsEditError" role="alert" style="color:#b42318; white-space:pre-wrap"></p>
         <h2 id="editPaymentTitle">Edit Payment</h2>
         <div class="col">
             <label for="editPaymentId">Payment ID</label>
@@ -1203,6 +1204,7 @@ paymentForm.addEventListener("reset", () => {
 });
 
 function showMessage(message, type = "info") {
+    if (document.getElementById("editPaymentModal").open) document.getElementById("paymentsEditError").textContent = type === "error" ? message : "";
     messageBox.className = `message-box ${type}`;
     messageBox.textContent = message;
 }
@@ -1243,6 +1245,8 @@ const editPaymentModal =
 const editPaymentForm =
     document.getElementById("editPaymentForm");
 
+let originalPaymentVersion = "";
+const paymentVersions = new Map();
 let originalEditAssociation = "";
 let originalEditGameIds = [];
 
@@ -1256,6 +1260,8 @@ function paymentDateForInput(value) {
 }
 
 function openEditPayment(payment) {
+    document.getElementById("paymentsEditError").textContent = "";
+    originalPaymentVersion = payment.version || payment.Version || "";
     try {
         if (!payment) throw new Error("Payment could not be found.");
         const paymentId = String(getPaymentValue(
@@ -1293,7 +1299,6 @@ document.getElementById("cancelEditPaymentBtn").addEventListener("click", () => 
 
 editPaymentForm.addEventListener("submit", async function(event) {
     event.preventDefault();
-    editPaymentModal.close();
     const saveButton = document.getElementById("saveEditPaymentBtn");
     const paymentId = document.getElementById("editPaymentId").value;
     const date = document.getElementById("editPaymentDate").value;
@@ -1317,6 +1322,7 @@ editPaymentForm.addEventListener("submit", async function(event) {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+                version: originalPaymentVersion,
                 paymentid: paymentId,
                 originalAssociation: originalEditAssociation,
                 date, association, amount, taxYear: Number(taxYear),
@@ -1331,6 +1337,7 @@ editPaymentForm.addEventListener("submit", async function(event) {
             const message = (await response.text()).trim();
             throw new Error(message || `HTTP ${response.status}`);
         }
+        editPaymentModal.close();
         await loadCompletedGames(false);
         outcome = `Payment ${paymentId} updated successfully.`;
         outcomeType = "success";
@@ -2027,7 +2034,7 @@ selectAllPayments.addEventListener(
     }
 );
 
-async function deleteRegistryPayment(paymentId, association) {
+async function deleteRegistryPayment(paymentId, association, version = paymentVersions.get(JSON.stringify([String(paymentId), String(association)])) || "") {
     const params = new URLSearchParams();
 
     params.append(
@@ -2043,14 +2050,14 @@ async function deleteRegistryPayment(paymentId, association) {
     return fetch(
         `/api/deletePayment?${params.toString()}`,
         {
-            method: "DELETE"
+            method: "DELETE", headers: {"If-Match": version}
         }
     );
 }
 
-async function deletePaymentAndHandleResponse(paymentId, association) {
+async function deletePaymentAndHandleResponse(paymentId, association, version) {
     const response =
-        await deleteRegistryPayment(paymentId, association);
+        await deleteRegistryPayment(paymentId, association, version);
 
     if (
         response.status === 401 ||
@@ -2127,7 +2134,8 @@ deleteSelectedPaymentsBtn.addEventListener(
             try {
                 const result = await deletePaymentAndHandleResponse(
                     checkbox.dataset.paymentId,
-                    checkbox.dataset.association
+                    checkbox.dataset.association,
+                    checkbox.dataset.version
                 );
 
                 if (result.stopped) {
@@ -2217,6 +2225,10 @@ function countGameIds(gameIds) {
 }
 
 function renderPayments(payments) {
+    paymentVersions.clear();
+    for (const payment of payments) {
+        paymentVersions.set(JSON.stringify([String(getPaymentValue(payment, "PaymentId", "paymentId", "paymentid")), String(getPaymentValue(payment, "Association", "association"))]), payment.version || payment.Version || "");
+    }
     const tbody =
         document.getElementById("paymentsBody");
 
@@ -2311,6 +2323,7 @@ function renderPayments(payments) {
                     <input
                         type="checkbox"
                         class="payment-select"
+                        data-version="${escapeHtml(payment.version || payment.Version || '')}"
                         data-payment-id="${escapeHtml(paymentId)}"
                         data-association="${escapeHtml(association)}"
                         aria-label="Select payment ${escapeHtml(paymentId)}"
@@ -2321,6 +2334,7 @@ function renderPayments(payments) {
                     <button
                         type="button"
                         class="btn-view-games"
+                        data-version="${escapeHtml(payment.version || payment.Version || '')}"
                         data-payment-id="${escapeHtml(paymentId)}"
                         data-association="${escapeHtml(association)}"
                         title="View games associated with this payment"
@@ -2333,6 +2347,7 @@ function renderPayments(payments) {
                 <td class="edit-column">
                     <button type="button" class="btn-row-edit"
                         data-payment-index="${index}"
+                        data-version="${escapeHtml(payment.version || payment.Version || '')}"
                         data-payment-id="${escapeHtml(paymentId)}"
                         data-association="${escapeHtml(association)}"
                         title="Edit payment"
@@ -2345,6 +2360,7 @@ function renderPayments(payments) {
                     <button
                         type="button"
                         class="btn-row-delete"
+                        data-version="${escapeHtml(payment.version || payment.Version || '')}"
                         data-payment-id="${escapeHtml(paymentId)}"
                         data-association="${escapeHtml(association)}"
                         title="Delete payment"
@@ -2445,7 +2461,8 @@ function renderPayments(payments) {
                         const result =
                             await deletePaymentAndHandleResponse(
                                 paymentId,
-                                association
+                                association,
+                                deleteButton.dataset.version
                             );
 
                         if (result.stopped) {

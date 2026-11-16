@@ -266,7 +266,7 @@ func MobileExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodDelete {
-		result, err := coll.DeleteOne(r.Context(), original)
+		result, err := coll.DeleteOne(r.Context(), database.SnapshotFilter(original))
 		if err != nil {
 			http.Error(w, "Unable to delete expense", 500)
 			return
@@ -308,7 +308,7 @@ func MobileExpense(w http.ResponseWriter, r *http.Request) {
 	// Explicit fields ensure changing from monetary to mileage (or back) clears
 	// the old value, even though legacy structs use omitempty.
 	update := bson.M{"date": doc.Date, "type": doc.Type, "amount": doc.Amount, "mileage": doc.Mileage, "association": doc.Association, "gameId": doc.GameId, "description": doc.Description, "taxYear": doc.TaxYear}
-	result, err := coll.UpdateOne(r.Context(), original, bson.M{"$set": update})
+	result, err := coll.UpdateOne(r.Context(), database.SnapshotFilter(original), bson.M{"$set": update})
 	if err != nil {
 		http.Error(w, "Unable to update expense", 500)
 		return
