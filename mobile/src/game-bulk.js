@@ -1,3 +1,4 @@
+import {loadCatalog,bindBulkCatalog} from './catalog.js';
 import {apiRequest} from './auth.js';
 import {config} from './config.js';
 import {gameURL,gameFields,responseError} from './game-data.js';
@@ -32,19 +33,25 @@ export async function bulkGames(games,mode,onChanged){
   const changes=new Map(),officialChanges=new Map();
   const intro=el('p',deleting?'Deletion is permanent. Review the selected assignments before continuing.':'Check each field you want to apply to all selected games. Unchecked fields keep their individual values.');intro.className='wide';form.append(intro);
   if(!deleting){
+   const catalog=await loadCatalog();
+   if(!dialog.isConnected)return;
+   const catalogInputs={};
    const specs=[['Status','Status','select'],...gameFields,['Notes','Notes','textarea']];
    for(const [key,title,type='text'] of specs){
     const row=el('div');row.className='bulk-field';
     const label=el('label'),check=el('input');check.type='checkbox';check.className='apply-field';check.setAttribute('aria-label',`Apply ${title} to selected games`);label.append(check,document.createTextNode(`Change ${title}`));row.append(label);
-    const input=el(type==='select'?'select':type==='textarea'?'textarea':'input');input.name=key;input.setAttribute('aria-label',title);input.disabled=true;
-    if(type==='select')for(const s of ['Pending','Completed','Cancelled'])input.append(new Option(s,s));
+    const catalogField=['Sport','Level','Site','Assignor'].includes(key);
+    const input=el(catalogField?'select':type==='select'?'select':type==='textarea'?'textarea':'input');input.name=key;input.setAttribute('aria-label',title);input.disabled=true;
+    if(catalogField)catalogInputs[key]=input;
+    else if(type==='select')for(const s of ['Pending','Completed','Cancelled'])input.append(new Option(s,s));
     else if(type!=='textarea'){input.type=type;}
     if(type==='number'){input.min=key==='TaxYear'?'2000':key==='NumOfGames'?'1':'0';input.step=['TaxYear','NumOfGames'].includes(key)?'1':'0.01';if(key==='TaxYear')input.max='2100';}
     if(type==='date'){input.min='2000-01-01';input.max='2100-12-31';}
     if(type==='textarea'){input.rows=3;input.maxLength=Math.min(...snapshots.map(s=>s.notesLimit));}
-    check.onchange=()=>{input.disabled=!check.checked;input.required=check.checked&&!['Notes','Field','Home','Visitor','Assignor'].includes(key);if(check.checked)changes.set(key,input);else changes.delete(key);};
+    check.onchange=()=>{input.disabled=!check.checked;input.required=check.checked&&!['Notes','Field','Home','Visitor'].includes(key);if(check.checked)changes.set(key,input);else changes.delete(key);};
     row.append(input);form.append(row);
    }
+   bindBulkCatalog(catalogInputs,catalog,snapshots.map(s=>s.game));
    const sports=new Set(snapshots.map(s=>s.game.Sport));
    if(sports.size===1){
     const sport=[...sports][0],rolesURL=new URL('/api/mobile/roles',config.apiBase);rolesURL.searchParams.set('sport',sport);

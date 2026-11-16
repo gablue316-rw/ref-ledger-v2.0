@@ -1,3 +1,4 @@
+import {loadCatalog,bindGameFilters,clearFilterCatalog} from './catalog.js';
 import {version as appVersion} from '../package.json';
 document.getElementById('app-version').textContent=`Version ${appVersion}`;
 import {createExpenses} from './expenses.js';
@@ -50,6 +51,7 @@ function updateControls() {
 
 function clearDashboard() {
  ++generation;
+ clearFilterCatalog($('filters'),['sport','association','level','site','assignor']);
  expenses.clear();canWrite=false;activePage='games';$('page-title').textContent='Games';$('navigation').hidden=true;$('expenses-page').hidden=true;closeMenu();
  gameActions.reset();
  $('games').replaceChildren();
@@ -174,6 +176,9 @@ async function load(){
   const access=await apiGet(new URL('/api/mobile/access',config.apiBase).href);
   if(current!==generation)return;
   canWrite=access.status===200&&access.data?.canWrite===true;
+  const catalog=await loadCatalog();
+  if(current!==generation)return;
+  bindGameFilters($('filters'),catalog);
   render(r.data);
  }catch(error){
   if(current===generation){
