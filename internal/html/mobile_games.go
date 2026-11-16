@@ -24,8 +24,8 @@ type mobileWriteContextKey struct{}
 func mobileAccountHandler(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
-		if r.Method != http.MethodGet && r.Method != http.MethodPut && r.Method != http.MethodDelete {
-			w.Header().Set("Allow", "GET, PUT, DELETE")
+		if r.Method != http.MethodGet && r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodDelete {
+			w.Header().Set("Allow", "GET, POST, PUT, DELETE")
 			http.Error(w, "Method not allowed", 405)
 			return
 		}
@@ -82,6 +82,10 @@ func validateMobileGame(game model.GameDescriptor, old model.GameDescriptor) err
 	return nil
 }
 func MobileGame(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		MobileCreateGame(w, r)
+		return
+	}
 	id, err := strconv.ParseInt(r.URL.Query().Get("gameId"), 10, 64)
 	association := strings.TrimSpace(r.URL.Query().Get("association"))
 	if err != nil || id <= 0 || association == "" {
@@ -119,6 +123,10 @@ func MobileGame(w http.ResponseWriter, r *http.Request) {
 	}
 	var game *model.GameDescriptor
 	if r.Method == http.MethodPut {
+		if err = normalizeMobileGameMoney(&request.Game); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
 		if err = validateMobileGame(request.Game, snapshot.Game); err != nil {
 			http.Error(w, err.Error(), 400)
 			return

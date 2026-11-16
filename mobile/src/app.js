@@ -1,3 +1,6 @@
+import {version as appVersion} from '../package.json';
+document.getElementById('app-version').textContent=`Version ${appVersion}`;
+import {createExpenses} from './expenses.js';
 import {changeGameStatuses} from './game-status.js';
 import {createGameActions} from './game-actions.js';
 import {bulkGames} from './game-bulk.js';
@@ -13,9 +16,25 @@ const $=id=>document.getElementById(id),
   currency:'USD'
  }).format(n);
 
-let busy=false,authBusy=false,generation=0;
+let busy=false,authBusy=false,generation=0,canWrite=false,activePage='games';
+const expenses=createExpenses();
+const closeMenu=()=>{$('menu-options').hidden=true;$('menu-toggle').setAttribute('aria-expanded','false');};
+function showPage(page){
+ activePage=page;closeMenu();
+ $('page-title').textContent=page==='games'?'Games':'Expenses';
+ $('dashboard').hidden=page!=='games';$('expenses-page').hidden=page!=='expenses';
+ for(const p of ['games','expenses']){if(p===page)$(`nav-${p}`).setAttribute('aria-current','page');else $(`nav-${p}`).removeAttribute('aria-current');}
+ message('');
+ if(page==='expenses')expenses.load();
+}
+$('menu-toggle').onclick=()=>{const open=$('menu-options').hidden;$('menu-options').hidden=!open;$('menu-toggle').setAttribute('aria-expanded',String(open));};
+$('nav-games').onclick=()=>showPage('games');
+$('nav-expenses').onclick=()=>showPage('expenses');
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu();});
+document.addEventListener('click',e=>{if(!$('navigation').contains(e.target))closeMenu();});
+$('add-game').onclick=()=>editGame(null,async()=>{await load();message('Game added successfully. Adjust the filters if it is not shown.');});
 const gameActions=createGameActions({container:$('games'),
- onEdit:g=>editGame(g,load),
+ onEdit:g=>editGame(g,async text=>{await load();message(text);}),
  onDelete:g=>bulkGames([g],'DELETE',load),
  onBulk:(games,method)=>bulkGames(games,method,load),
  onStatus:(games,status)=>changeGameStatuses(games,status,load)
@@ -24,11 +43,14 @@ const gameActions=createGameActions({container:$('games'),
 function updateControls() {
  for (const id of ['login','reauth','logout','refresh']) $(id).disabled=busy||authBusy;
  signupButton.disabled=busy||authBusy;
- gameActions.setDisabled(busy||authBusy);
+ gameActions.setDisabled(busy||authBusy||!canWrite);
+ for(const id of ['menu-toggle','nav-games','nav-expenses'])$(id).disabled=busy||authBusy;
+ $('add-game').disabled=busy||authBusy||!canWrite;
 }
 
 function clearDashboard() {
  ++generation;
+ expenses.clear();canWrite=false;activePage='games';$('page-title').textContent='Games';$('navigation').hidden=true;$('expenses-page').hidden=true;closeMenu();
  gameActions.reset();
  $('games').replaceChildren();
  for (const id of ['assignments','gameCount','earnings']) $(id).textContent='—';
@@ -77,7 +99,8 @@ function render(games){
  }
 
  $('signin').hidden=true;
- $('dashboard').hidden=false;
+ $('dashboard').hidden=activePage!=='games';
+ $('navigation').hidden=false;
  $('logout').hidden=false;
  message(games.length?'':'No games match these filters.');
 }
@@ -133,8 +156,7 @@ async function load(){
   if(current!==generation)return;
 
   if(r.status===404 && r.data?.message === 'No games were found matching your search criteria.'){
-   render([]);
-   return;
+   r={status:200,data:[]};
   }
 
   if(r.status===401){
@@ -149,6 +171,9 @@ async function load(){
    throw new Error('Unable to load games. Check your connection and retry.');
   }
 
+  const access=await apiGet(new URL('/api/mobile/access',config.apiBase).href);
+  if(current!==generation)return;
+  canWrite=access.status===200&&access.data?.canWrite===true;
   render(r.data);
  }catch(error){
   if(current===generation){

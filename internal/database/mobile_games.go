@@ -86,3 +86,35 @@ func WriteMobileGame(ctx context.Context, s MobileGameSnapshot, game *model.Game
 	MetricsUpdated(s.Doc.TenantId, "games", result.ModifiedCount)
 	return nil
 }
+
+// CreateMobileGame returns insert failures to the caller instead of silently
+// counting them as the legacy batch importer does.
+func CreateMobileGame(ctx context.Context, tenant string, game model.GameDescriptor) error {
+	doc := convertGameDescrWithOfficials(game)
+	doc.TenantId = tenant
+	var err error
+	doc.GameDateTime, err = convertDateStringToTime(game.Date, game.Time)
+	if err != nil {
+		return err
+	}
+	coll := Client.Database(Database).Collection("games")
+	if err = prepareGameOfficials(ctx, coll.Database(), &doc, nil); err != nil {
+		return err
+	}
+	raw, err := bson.Marshal(doc)
+	if err != nil {
+		return err
+	}
+	var record bson.M
+	if err = bson.Unmarshal(raw, &record); err != nil {
+		return err
+	}
+	// A stable ID makes simultaneous mobile creates of the same assignment atomic.
+	key, _ := bson.Marshal(bson.D{{Key: "tenant", Value: tenant}, {Key: "association", Value: game.Association}, {Key: "gameId", Value: game.GameId}})
+	record["_id"] = fmt.Sprintf("mobile-%x", sha256.Sum256(key))
+	_, err = coll.InsertOne(ctx, record)
+	if err == nil {
+		MetricsAdded(tenant, "games", 1)
+	}
+	return err
+}
