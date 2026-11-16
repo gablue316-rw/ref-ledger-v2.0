@@ -870,7 +870,7 @@ function message(text, error = false) {
 }
 
 function normalize(value) {
-    const official = {};
+    const official = {version: value.version || value.Version || ""};
     for (const key of fields) {
         const upper = key[0].toUpperCase() + key.slice(1);
         official[key] = String(value[key] ?? value[upper] ?? value[key.toLowerCase()] ?? '');
@@ -1089,6 +1089,7 @@ $('editForm').onsubmit = async event => {
     if (busy || !editingOfficial) return;
     const official = values('edit_');
     // Always submit the original identity, even if a readonly input is modified externally.
+    official.version = editingOfficial.version;
     official.firstName = editingOfficial.firstName;
     official.lastName = editingOfficial.lastName;
     if (editingOfficial.id !== undefined) official.id = editingOfficial.id;
@@ -1099,7 +1100,7 @@ $('editForm').onsubmit = async event => {
         const result = await save(official, true);
         const index = officials.findIndex(value => officialKey(value) === officialKey(
             editingOfficial));
-        if (index >= 0) officials[index] = official;
+        await refresh(true);
         $('editModal').close();
         message(result || 'Official updated successfully.');
     } catch (error) {
@@ -1142,7 +1143,7 @@ $('confirmDeleteBtn').onclick = async () => {
         try {
             await request('/api/deleteOfficial/' + encodeURIComponent(official.firstName) + '/' +
                 encodeURIComponent(official.lastName), {
-                    method: 'DELETE'
+                    method: 'DELETE', headers: {'If-Match': official.version}
                 });
             officials = officials.filter(value => officialKey(value) !== officialKey(official));
             selected.delete(officialKey(official));

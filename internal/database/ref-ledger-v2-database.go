@@ -528,48 +528,8 @@ func GetPaymentRegistry(
 	return paymentRecords, nil
 }
 
-func DeletePayment(paymentId, association, tid string) error {
-
-	doc, err := GetPayment(paymentId, association, tid)
-	if err != nil {
-		return fmt.Errorf(
-			"DeletePayment failure getting payment: %w",
-			err,
-		)
-	}
-
-	err = SetGamesCompleted(
-		doc.TenantId,
-		doc.Association,
-		doc.GameIds,
-	)
-
-	if err != nil {
-		return fmt.Errorf(
-			"DeletePayment failure updating games: %w",
-			err,
-		)
-	}
-
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(Database)
-	coll := db.Collection("payments")
-
-	result, err := coll.DeleteOne(ctx, bson.M{
-		"paymentId":   paymentId,
-		"association": association,
-		"tenantId":    tid,
-	})
-	if err != nil {
-		return fmt.Errorf("DeleteOne failure.  Reason: %s", err)
-	}
-
-	if result.DeletedCount != 1 {
-		return fmt.Errorf("payment not found")
-	}
-	return nil
+func DeletePayment(paymentId, association, tid string, versions ...string) error {
+	return MutatePayment(context.Background(), tid, paymentId, association, firstVersion(versions), nil)
 }
 
 // documentExists stops at the first match and only retrieves its identity.
@@ -1521,227 +1481,26 @@ func InsertPaymentDocs(
 	return recordsInserted, totalErrors, gamesUpdatedToPaid, importErrors
 }
 
-func UpdatePaymentDocs(
-	parentCtx context.Context,
-	payment []model.PaymentDescriptor,
-	dbase, collection, tenantId string,
-) (int, int, int, []error) {
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
-	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-
-	utils.AuditLog.Printf(
-		"UpdatePaymentDocs: Updating %d payment records into collection %s",
-		len(payment), collection,
-	)
-	fmt.Println("Updating records into", collectionName)
-
-	recordsUpdated := 0
-	totalErrors := 0
-	gamesUpdatedToPaid := 0
-	importErrors := make([]error, 0)
-
-	for _, v := range payment {
-		paymentDate, err := time.Parse(
-			"1/2/2006",
-			strings.TrimSpace(v.PaymentDate),
-		)
-		if err != nil {
-			dateErr := fmt.Errorf(
-				"invalid payment date %q for PaymentId %s: expected m/d/yyyy: %w",
-				v.PaymentDate, v.PaymentId, err,
-			)
-			utils.AuditLog.Println(dateErr)
-			fmt.Println(dateErr)
-			totalErrors++
-			importErrors = append(importErrors, dateErr)
-			continue
-		}
-
-		// Preserve the supplied tax year; default only when blank.
-		taxYear := paymentDate.Year()
-		taxYearText := strings.TrimSpace(v.TaxYear)
-
-		if taxYearText != "" {
-			parsedYear, err := strconv.Atoi(taxYearText)
-			if err != nil || parsedYear < 1000 || parsedYear > 9999 {
-				yearErr := fmt.Errorf(
-					"invalid tax year %q for PaymentId %s: expected a year between 1000 and 9999",
-					v.TaxYear, v.PaymentId,
-				)
-				utils.AuditLog.Println(yearErr)
-				fmt.Println(yearErr)
-				totalErrors++
-				importErrors = append(importErrors, yearErr)
-				continue
-			}
-			taxYear = parsedYear
-		}
-
-		v.TaxYear = strconv.Itoa(taxYear)
-		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-		doc.TenantId = tenantId
-		doc.TaxYear = taxYear
-
-		paymentExists, err := PaymentExists(doc, tenantId)
-		if err != nil {
-			totalErrors++
-			fmt.Println(err)
-			importErrors = append(importErrors, err)
-			continue
-		}
-
-		if !paymentExists {
-			totalErrors++
-			fmt.Println("Payment with id does not exist")
-			importErrors = append(
-				importErrors,
-				errors.New("Payment with ID does not exist"),
-			)
-			continue
-		}
-
-		gameIds, err := utils.ConvertGameIdStrToInt(v.GameIds)
-		if err != nil {
-			utils.AuditLog.Printf(
-				"Failed to convert Game Ids string to []int64 for PaymentId %s. Reason: %v",
-				doc.PaymentId, err,
-			)
-			fmt.Println("Failed to convert Game Ids string to []int64. Reason:", err)
-			totalErrors++
-			importErrors = append(importErrors, err)
-			continue
-		}
-
-		fmt.Println("Game Ids:", gameIds)
-
-		gameErrors := VerifyGameMatchesAssociation(
-			gameIds, v.Association, tenantId,
-		)
-		if len(gameErrors) > 0 {
-			totalErrors++
-			importErrors = append(importErrors, gameErrors...)
-			continue
-		}
-
-		//
-		// Comment this out until we allow the user to update game ids
-		//
-
-		// statusErrors := VerifyGameStatus(gameIds, v.Association, tId)
-		// if len(statusErrors) > 0 {
-		// }
-
-		// If game IDs change, removed games need to return to Completed,
-		// and added games need to become Paid. That reconciliation still
-		// needs to be implemented separately.
-
-		totalGameFee, err := GetGameFee(gameIds, tenantId, "", v.Association)
-		if err != nil {
-			utils.AuditLog.Printf(
-				"Failed to get game fee for Game Ids %v. Reason: %v",
-				gameIds, err,
-			)
-			fmt.Println("Failed to get game fee. Reason:", err)
-			totalErrors++
-			importErrors = append(importErrors, err)
-			continue
-		}
-
-		if totalGameFee != doc.PaymentAmt {
-			errStr := fmt.Sprintf(
-				"Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s",
-				doc.PaymentId,
-				utils.ConvertInt64ToAmtStr(totalGameFee),
-				utils.ConvertInt64ToAmtStr(doc.PaymentAmt),
-			)
-			utils.AuditLog.Println(errStr)
-			fmt.Println(errStr)
-			totalErrors++
-			importErrors = append(importErrors, errors.New(errStr))
-			continue
-		}
-
-		filter := bson.M{
-			"paymentId": doc.PaymentId,
-			"tenantId":  tenantId,
-		}
-
-		update := bson.M{
-			"$set": doc,
-		}
-
-		fmt.Println("Update filter:", filter, "update:", update)
-
-		result, err := coll.UpdateOne(ctx, filter, update)
-		if err != nil {
-			MetricsErrors(tenantId, "payments", 1)
-			updateErr := fmt.Errorf(
-				"payment update failed for PaymentId %s: %w",
-				doc.PaymentId, err,
-			)
-			utils.AuditLog.Println(updateErr)
-			fmt.Println(updateErr)
-			totalErrors++
-			importErrors = append(importErrors, updateErr)
-			continue
-		}
-
-		fmt.Println(
-			"Updated Match:", result.MatchedCount,
-			"Updated document:", result.ModifiedCount,
-		)
-
-		if result.MatchedCount == 0 {
-			errStr := "Payment not found"
-			utils.AuditLog.Println(errStr)
-			fmt.Println(errStr)
-			totalErrors++
-			importErrors = append(importErrors, errors.New(errStr))
-			continue
-		}
-
-		if result.ModifiedCount == 0 {
-			errStr := "No changes"
-			utils.AuditLog.Println(errStr)
-			fmt.Println(errStr)
-			totalErrors++
-			importErrors = append(importErrors, errors.New(errStr))
-			continue
-		}
-
-		recordsUpdated++
-		paidCount, paidErr := UpdateGameStatusToPaid(
-			ctx,
-			gameIds,
-			v.Association,
-			tenantId,
-		)
-		gamesUpdatedToPaid += paidCount
-
-		if paidErr != nil {
-			totalErrors++
-			importErrors = append(importErrors, fmt.Errorf(
-				"payment %s was saved, but some game status updates failed: %w",
-				doc.PaymentId,
-				paidErr,
-			))
+func UpdatePaymentDocs(parentCtx context.Context, payments []model.PaymentDescriptor, dbase, collection, tenantId string) (int, int, int, []error) {
+	updated := 0
+	failures := []error{}
+	if dbase != Database || collection != "payments" {
+		return 0, len(payments), 0, []error{fmt.Errorf("invalid payment database or collection")}
+	}
+	for _, payment := range payments {
+		if err := MutatePayment(parentCtx, tenantId, payment.PaymentId, payment.Association, payment.Version, &payment); err != nil {
+			failures = append(failures, err)
+		} else {
+			updated++
 		}
 	}
-
-	fmt.Println(
-		"Total Records updated into", collectionName, ":", recordsUpdated,
-		"Total Errors:", totalErrors,
-		"Games Updated to Paid:", gamesUpdatedToPaid,
-	)
-
-	return recordsUpdated, totalErrors, gamesUpdatedToPaid, importErrors
+	return updated, len(failures), 0, failures
 }
 
 func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbase, collection, tId string) error {
+	if game.Version == "" {
+		return ErrConflict
+	}
 
 	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
@@ -1770,9 +1529,12 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	var previous model.GameDoc
 	if err := coll.FindOne(ctx, filter).Decode(&previous); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return fmt.Errorf("game not found")
+			return ErrConflict
 		}
 		return err
+	}
+	if previous.Version != game.Version {
+		return ErrConflict
 	}
 	if err := prepareGameOfficials(ctx, coll.Database(), &doc, &previous); err != nil {
 		return err
@@ -1783,13 +1545,19 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	}
 
 	fmt.Println("Update filter:", filter, "update:", update)
+	conditional, conflictErr := ConditionalFilter(ctx, coll, filter, game.Version)
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
 	result, err := coll.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
 
 	if result.MatchedCount == 0 {
-		return fmt.Errorf("game not found")
+		return ErrConflict
 	}
 
 	MetricsUpdated(tId, "games", result.ModifiedCount)
@@ -1913,6 +1681,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 
 // Association Colleciton, Documents and API Code
 type AssociationJson struct {
+	Version   string `bson:"-" json:"version"`
 	Id        string `json:"id"`
 	Name      string `json:"name"`
 	Contact   string `json:"contact"`
@@ -1922,6 +1691,7 @@ type AssociationJson struct {
 }
 
 type AssociationDoc struct {
+	Version   string `bson:"-" json:"version"`
 	Id        string `bson:"id,omitempty"`
 	Name      string `bson:"name,omitempty"`
 	Contact   string `bson:"contact,omitempty"`
@@ -1932,6 +1702,7 @@ type AssociationDoc struct {
 }
 
 type Association struct {
+	Version   string `bson:"-" json:"version"`
 	Id        string
 	Name      string
 	Contact   string
@@ -1966,6 +1737,7 @@ func (ac *AssociationCollection) ConvAssocJsonToAssoc(
 	association AssociationJson,
 ) Association {
 	return Association{
+		Version:   association.Version,
 		Id:        association.Id,
 		Name:      association.Name,
 		Contact:   association.Contact,
@@ -1977,6 +1749,7 @@ func (ac *AssociationCollection) ConvAssocJsonToAssoc(
 
 func (ac *AssociationCollection) convAssocToDoc(association Association) AssociationDoc {
 	return AssociationDoc{
+		Version:   association.Version,
 		Id:        association.Id,
 		Name:      association.Name,
 		Contact:   association.Contact,
@@ -1988,6 +1761,7 @@ func (ac *AssociationCollection) convAssocToDoc(association Association) Associa
 
 func (ac *AssociationCollection) convDocToAssociation(doc AssociationDoc) Association {
 	return Association{
+		Version:   doc.Version,
 		Id:        doc.Id,
 		Name:      doc.Name,
 		Contact:   doc.Contact,
@@ -2241,10 +2015,12 @@ func (ac *AssociationCollection) GetAssociationsDirectory(tenantId string) ([]As
 }
 
 func (ac *AssociationCollection) Update(association Association, tenantId string) error {
+	if association.Version == "" {
+		return ErrConflict
+	}
 
 	var filter bson.M
 	var doc AssociationDoc
-	var result *mongo.UpdateResult
 
 	filter = bson.M{
 		"id":       association.Id,
@@ -2254,15 +2030,20 @@ func (ac *AssociationCollection) Update(association Association, tenantId string
 	doc = ac.convAssocToDoc(association)
 	doc.TenantId = tenantId
 
-	result, ac.LastError = ac.Coll.ReplaceOne(context.TODO(), filter, doc)
-	if ac.LastError != nil {
+	conditional, conflictErr := ConditionalFilter(context.TODO(), ac.Coll, filter, association.Version)
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
+	result, writeErr := ac.Coll.ReplaceOne(context.TODO(), filter, doc)
+	if writeErr != nil {
 		MetricsErrors(tenantId, "associations", 1)
-		return fmt.Errorf("Failed to update association.  Reason: %v", ac.LastError)
+		return fmt.Errorf("Failed to update association.  Reason: %v", writeErr)
 	}
 
 	if result.MatchedCount == 0 {
-		MetricsErrors(tenantId, "associations", 1)
-		return fmt.Errorf("association not found")
+		return ErrConflict
 	}
 
 	MetricsUpdated(tenantId, "associations", result.ModifiedCount)
@@ -2270,25 +2051,29 @@ func (ac *AssociationCollection) Update(association Association, tenantId string
 	return nil
 }
 
-func (ac *AssociationCollection) Delete(id string, tenantId string) error {
+func (ac *AssociationCollection) Delete(id string, tenantId string, versions ...string) error {
 
 	var filter bson.M
-	var result *mongo.DeleteResult
 
 	filter = bson.M{
 		"id":       id,
 		"tenantId": tenantId,
 	}
 
-	result, ac.LastError = ac.Coll.DeleteOne(context.TODO(), filter)
-	if ac.LastError != nil {
+	conditional, conflictErr := ConditionalFilter(context.TODO(), ac.Coll, filter, firstVersion(versions))
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
+	result, writeErr := ac.Coll.DeleteOne(context.TODO(), filter)
+	if writeErr != nil {
 		MetricsErrors(tenantId, "associations", 1)
-		return fmt.Errorf("Failed to delete association.  Reason: %v", ac.LastError)
+		return fmt.Errorf("Failed to delete association.  Reason: %v", writeErr)
 	}
 
 	if result.DeletedCount == 0 {
-		MetricsErrors(tenantId, "associations", 1)
-		return fmt.Errorf("association not found")
+		return ErrConflict
 	}
 	MetricsDeleted(tenantId, "associations", result.DeletedCount)
 	fmt.Println("Deleted Record with Association Id of", filter["id"], " in", ac.Coll.Name(), "Records Deleted:", result.DeletedCount)
@@ -2329,6 +2114,7 @@ func (ac *AssociationCollection) GetAssociationIds(tenantId string) ([]Associati
 
 // Site Colleciton, Documents and API Code
 type SiteJson struct {
+	Version  string `bson:"-" json:"version"`
 	Name     string `json:"name"`
 	Contact  string `json:"contact"`
 	Phone    string `json:"phone"`
@@ -2337,6 +2123,7 @@ type SiteJson struct {
 }
 
 type SiteDoc struct {
+	Version  string `bson:"-" json:"version"`
 	Name     string `bson:"name,omitempty"`
 	Contact  string `bson:"contact,omitempty"`
 	Phone    string `bson:"phone,omitempty"`
@@ -2345,6 +2132,7 @@ type SiteDoc struct {
 }
 
 type Site struct {
+	Version string `bson:"-" json:"version"`
 	Name    string
 	Contact string
 	Phone   string
@@ -2359,6 +2147,7 @@ type SiteCollection struct {
 
 func (sc *SiteCollection) ConvJsonToSite(aj SiteJson) Site {
 	return Site{
+		Version: aj.Version,
 		Name:    aj.Name,
 		Contact: aj.Contact,
 		Phone:   aj.Phone,
@@ -2368,6 +2157,7 @@ func (sc *SiteCollection) ConvJsonToSite(aj SiteJson) Site {
 
 func (sc *SiteCollection) convSiteToDoc(site Site) SiteDoc {
 	return SiteDoc{
+		Version: site.Version,
 		Name:    site.Name,
 		Contact: site.Contact,
 		Phone:   site.Phone,
@@ -2377,6 +2167,7 @@ func (sc *SiteCollection) convSiteToDoc(site Site) SiteDoc {
 
 func (sc *SiteCollection) convDocToSite(doc SiteDoc) Site {
 	return Site{
+		Version: doc.Version,
 		Name:    doc.Name,
 		Contact: doc.Contact,
 		Phone:   doc.Phone,
@@ -2656,10 +2447,12 @@ func (sc *SiteCollection) GetSitesDirectory(tenantId, siteName string) ([]Site, 
 }
 
 func (sc *SiteCollection) Update(site Site, tenantId string) error {
+	if site.Version == "" {
+		return ErrConflict
+	}
 
 	var filter bson.M
 	var doc SiteDoc
-	var result *mongo.UpdateResult
 
 	filter = bson.M{
 		"name":     site.Name,
@@ -2669,15 +2462,20 @@ func (sc *SiteCollection) Update(site Site, tenantId string) error {
 	doc = sc.convSiteToDoc(site)
 	doc.TenantId = tenantId
 
-	result, sc.LastError = sc.Coll.ReplaceOne(context.TODO(), filter, doc)
-	if sc.LastError != nil {
+	conditional, conflictErr := ConditionalFilter(context.TODO(), sc.Coll, filter, site.Version)
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
+	result, writeErr := sc.Coll.ReplaceOne(context.TODO(), filter, doc)
+	if writeErr != nil {
 		MetricsErrors(tenantId, "sites", 1)
-		return fmt.Errorf("Failed to update site.  Reason: %v", sc.LastError)
+		return fmt.Errorf("Failed to update site.  Reason: %v", writeErr)
 	}
 
 	if result.MatchedCount == 0 {
-		MetricsErrors(tenantId, "sites", 1)
-		return fmt.Errorf("site not found")
+		return ErrConflict
 	}
 
 	MetricsUpdated(tenantId, "sites", result.ModifiedCount)
@@ -2686,25 +2484,29 @@ func (sc *SiteCollection) Update(site Site, tenantId string) error {
 	return nil
 }
 
-func (sc *SiteCollection) Delete(name, tenantId string) error {
+func (sc *SiteCollection) Delete(name, tenantId string, versions ...string) error {
 
 	var filter bson.M
-	var result *mongo.DeleteResult
 
 	filter = bson.M{
 		"name":     name,
 		"tenantId": tenantId,
 	}
 
-	result, sc.LastError = sc.Coll.DeleteOne(context.TODO(), filter)
-	if sc.LastError != nil {
+	conditional, conflictErr := ConditionalFilter(context.TODO(), sc.Coll, filter, firstVersion(versions))
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
+	result, writeErr := sc.Coll.DeleteOne(context.TODO(), filter)
+	if writeErr != nil {
 		MetricsErrors(tenantId, "sites", 1)
-		return fmt.Errorf("Failed to delete site.  Reason: %v", sc.LastError)
+		return fmt.Errorf("Failed to delete site.  Reason: %v", writeErr)
 	}
 
 	if result.DeletedCount == 0 {
-		MetricsErrors(tenantId, "sites", 1)
-		return fmt.Errorf("site not found")
+		return ErrConflict
 	}
 
 	MetricsDeleted(tenantId, "sites", result.DeletedCount)
@@ -2764,10 +2566,9 @@ func (gc *GameCollection) Get(association string, gameId string, tenantId string
 
 }
 
-func (gc *GameCollection) Delete(association, gameId, tid string) error {
+func (gc *GameCollection) Delete(association, gameId, tid string, versions ...string) error {
 
 	var filter bson.M
-	var result *mongo.DeleteResult
 
 	gameIdInt64, err := utils.ConvertStrToInt64(gameId)
 	if err != nil {
@@ -2778,15 +2579,22 @@ func (gc *GameCollection) Delete(association, gameId, tid string) error {
 		"gameId":      gameIdInt64,
 		"association": association,
 		"tenantId":    tid,
+		"status":      bson.M{"$ne": "Paid"},
 	}
 
-	result, gc.LastError = gc.Coll.DeleteOne(context.TODO(), filter)
-	if gc.LastError != nil {
-		return fmt.Errorf("Failed to delete game.  Reason: %v", gc.LastError)
+	conditional, conflictErr := ConditionalFilter(context.TODO(), gc.Coll, filter, firstVersion(versions))
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
+	result, writeErr := gc.Coll.DeleteOne(context.TODO(), filter)
+	if writeErr != nil {
+		return fmt.Errorf("Failed to delete game.  Reason: %v", writeErr)
 	}
 
 	if result.DeletedCount == 0 {
-		return fmt.Errorf("game not found")
+		return ErrConflict
 	}
 
 	MetricsDeleted(tid, "games", result.DeletedCount)
@@ -3192,6 +3000,7 @@ var officialNameCollation = &options.Collation{
 
 // Official Collection, Documents and API Code
 type OfficialJson struct {
+	Version   string `bson:"-" json:"version"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
 	Phone     string `json:"phone"`
@@ -3201,6 +3010,7 @@ type OfficialJson struct {
 }
 
 type OfficialDoc struct {
+	Version    string `bson:"-" json:"version"`
 	Id         int64  `bson:"id,omitempty"`
 	OfficialId int64  `bson:"officialId,omitempty"`
 	FirstName  string `bson:"firstName,omitempty"`
@@ -3212,6 +3022,7 @@ type OfficialDoc struct {
 }
 
 type Official struct {
+	Version   string `bson:"-" json:"version"`
 	Id        int64
 	FirstName string
 	LastName  string
@@ -3229,6 +3040,7 @@ type OfficialCollection struct {
 
 func (oc *OfficialCollection) ConvJsonToOfficial(oj OfficialJson) Official {
 	return Official{
+		Version:   oj.Version,
 		FirstName: oj.FirstName,
 		LastName:  oj.LastName,
 		Phone:     oj.Phone,
@@ -3298,6 +3110,7 @@ func (oc *OfficialCollection) convDocToOfficial(doc OfficialDoc) Official {
 	}
 
 	return Official{
+		Version:   doc.Version,
 		Id:        officialId,
 		FirstName: doc.FirstName,
 		LastName:  doc.LastName,
@@ -3529,10 +3342,12 @@ func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantI
 }
 
 func (oc *OfficialCollection) Update(tenantId string, official Official) error {
+	if official.Version == "" {
+		return ErrConflict
+	}
 
 	var filter bson.M
 	var doc OfficialDoc
-	var result *mongo.UpdateResult
 
 	filter = bson.M{
 		"firstName": official.FirstName,
@@ -3549,15 +3364,20 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 
 	doc.TenantId = tenantId
 
-	result, oc.LastError = oc.Coll.ReplaceOne(context.TODO(), filter, doc)
-	if oc.LastError != nil {
+	conditional, conflictErr := ConditionalFilter(context.TODO(), oc.Coll, filter, official.Version)
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
+	result, writeErr := oc.Coll.ReplaceOne(context.TODO(), filter, doc)
+	if writeErr != nil {
 		MetricsErrors(tenantId, "officials", 1)
-		return fmt.Errorf("Failed to update official.  Reason: %v", oc.LastError)
+		return fmt.Errorf("Failed to update official.  Reason: %v", writeErr)
 	}
 
 	if result.MatchedCount == 0 {
-		MetricsErrors(tenantId, "officials", 1)
-		return fmt.Errorf("official not found")
+		return ErrConflict
 	}
 
 	MetricsUpdated(tenantId, "officials", result.ModifiedCount)
@@ -3566,7 +3386,7 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 	return nil
 }
 
-func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error {
+func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string, versions ...string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -3580,9 +3400,8 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error
 	err := oc.Coll.FindOne(ctx, filter).Decode(&official)
 	if err != nil {
 		MetricsErrors(tenantId, "officials", 1)
-		oc.LastError = err
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return fmt.Errorf("official not found")
+			return ErrConflict
 		}
 		return fmt.Errorf("failed to retrieve official: %w", err)
 	}
@@ -3597,14 +3416,12 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error
 	err = gamesCollection.FindOne(ctx, gameFilter).Err()
 	if err == nil {
 
-		oc.LastError = fmt.Errorf(
+		return fmt.Errorf(
 			"cannot delete %s %s: official is assigned to a game",
 			firstName, lastName,
 		)
-		return oc.LastError
 	}
 	if !errors.Is(err, mongo.ErrNoDocuments) {
-		oc.LastError = err
 		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("failed to check game assignments: %w", err)
 	}
@@ -3617,15 +3434,19 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string) error
 	// Retain the original name filter if the ID's BSON field differs.
 	deleteFilter = filter
 
+	conditional, conflictErr := ConditionalFilter(ctx, oc.Coll, deleteFilter, firstVersion(versions))
+	if conflictErr != nil {
+		return conflictErr
+	}
+	deleteFilter = conditional
+
 	result, err := oc.Coll.DeleteOne(ctx, deleteFilter)
-	oc.LastError = err
 	if err != nil {
 		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("failed to delete official: %w", err)
 	}
 	if result.DeletedCount == 0 {
-		MetricsErrors(tenantId, "officials", 1)
-		return fmt.Errorf("official not found")
+		return ErrConflict
 	}
 
 	MetricsDeleted(tenantId, "officials", result.DeletedCount)
@@ -3721,6 +3542,7 @@ func (oc *OfficialCollection) Exists(name, tenantId string) (bool, error) {
 
 // Expense Colleciton, Documents and API Code
 type Expense struct {
+	Version     string `bson:"-" json:"version"`
 	Date        string
 	Type        string
 	Amount      string
@@ -3732,6 +3554,7 @@ type Expense struct {
 }
 
 type ExpenseJson struct {
+	Version     string `bson:"-" json:"version"`
 	Date        string `json:"date"`
 	ExpenseType string `json:"expenseType"`
 	Amount      int64  `json:"amount"`
@@ -3743,6 +3566,7 @@ type ExpenseJson struct {
 }
 
 type ExpenseDoc struct {
+	Version     string `bson:"-" json:"version"`
 	ExpenseId   string `bson:"expenseId,omitempty"`
 	Date        string `bson:"date,omitempty"`
 	Type        string `bson:"type,omitempty"`
@@ -3815,6 +3639,7 @@ func (ec *ExpensesCollection) convExpenseToDoc(expense Expense) ExpenseDoc {
 		fmt.Println("Error converting GameId:", err)
 	}
 	return ExpenseDoc{
+		Version:     expense.Version,
 		Date:        expense.Date,
 		Type:        expense.Type,
 		Amount:      amt,
@@ -3833,6 +3658,7 @@ func (ec *ExpensesCollection) ConvJsonToExpense(expenseJson ExpenseJson) Expense
 	mileage := utils.ConvertInt64ToStr(expenseJson.Mileage / 100)
 	gameId := utils.ConvertInt64ToStr(expenseJson.GameId)
 	return Expense{
+		Version:     expenseJson.Version,
 		Date:        expenseJson.Date,
 		Type:        expenseJson.ExpenseType,
 		Amount:      expenseAmt,
@@ -3884,7 +3710,7 @@ func (ec *ExpensesCollection) GenerateExpenseId(expense Expense) string {
 
 }
 
-func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string) error {
+func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string, versions ...string) error {
 
 	fmt.Println("===== Attempting to delete Expense Id", expenseId, "for Association", association, "and tenant id", tenantId, "=====")
 
@@ -3910,6 +3736,12 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string) er
 		"tenantId":    tenantId,
 	}
 
+	conditional, conflictErr := ConditionalFilter(context.Background(), ec.Coll, filter, firstVersion(versions))
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
 	result, err := ec.Coll.DeleteOne(
 		context.Background(),
 		filter,
@@ -3926,12 +3758,7 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string) er
 	}
 
 	if result.DeletedCount == 0 {
-		MetricsErrors(tenantId, "expenses", 1)
-		return fmt.Errorf(
-			"expense %q for association %q was not found",
-			expenseId,
-			association,
-		)
+		return ErrConflict
 	}
 	MetricsDeleted(tenantId, "expenses", result.DeletedCount)
 	return nil
@@ -3943,6 +3770,9 @@ func (ec *ExpensesCollection) Update(
 	association string,
 	tenantId string,
 ) error {
+	if expense.Version == "" {
+		return ErrConflict
+	}
 
 	ctx, cancel := context.WithTimeout(
 		context.Background(),
@@ -4010,10 +3840,16 @@ func (ec *ExpensesCollection) Update(
 			"description": strings.TrimSpace(expense.Description),
 			"amount":      amt,
 			"mileage":     mileage,
-			"expenseType": strings.TrimSpace(expense.Type),
+			"type":        strings.TrimSpace(expense.Type),
 			"taxYear":     strings.TrimSpace(expense.TaxYear),
 		},
 	}
+
+	conditional, conflictErr := ConditionalFilter(ctx, ec.Coll, filter, expense.Version)
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
 
 	result, err := ec.Coll.UpdateOne(
 		ctx,
@@ -4022,7 +3858,6 @@ func (ec *ExpensesCollection) Update(
 	)
 	if err != nil {
 		MetricsErrors(tenantId, "expenses", 1)
-		ec.LastError = err
 
 		return fmt.Errorf(
 			"failed to update expense %q for association %q: %w",
@@ -4033,12 +3868,7 @@ func (ec *ExpensesCollection) Update(
 	}
 
 	if result.MatchedCount == 0 {
-		MetricsErrors(tenantId, "expenses", 1)
-		return fmt.Errorf(
-			"expense %q for association %q was not found",
-			expenseId,
-			association,
-		)
+		return ErrConflict
 	}
 
 	MetricsUpdated(tenantId, "expenses", result.ModifiedCount)
@@ -4350,6 +4180,7 @@ func (uc *UsersCollection) GetNumOfUserAccounts() (int64, error) {
 }
 
 type Level struct {
+	Version  string `bson:"-" json:"version"`
 	Sport    string `bson:"sport" json:"sport"`
 	GameFee  int64  `bson:"gameFee" json:"-"`
 	ID       string `bson:"id" json:"id"`
@@ -4489,6 +4320,9 @@ func normalizeLevelGameFee(value string) (string, error) {
 
 // Update assigns the sport and fee for an existing level owned by this tenant.
 func (lc *LevelsCollection) Update(level Level, tenantId string) error {
+	if level.Version == "" {
+		return ErrConflict
+	}
 	level.ID = strings.TrimSpace(level.ID)
 	level.Name = strings.TrimSpace(level.Name)
 	level.Sport = strings.TrimSpace(level.Sport)
@@ -4523,13 +4357,19 @@ func (lc *LevelsCollection) Update(level Level, tenantId string) error {
 	if !errors.Is(err, mongo.ErrNoDocuments) {
 		return fmt.Errorf("failed to check level: %w", err)
 	}
+	conditional, conflictErr := ConditionalFilter(ctx, lc.Coll, filter, level.Version)
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
 	result, err := lc.Coll.UpdateOne(ctx, filter,
 		bson.M{"$set": bson.M{"name": level.Name, "sport": level.Sport, "gameFee": level.GameFee}})
 	if err != nil {
 		return fmt.Errorf("failed to update level: %w", err)
 	}
 	if result.MatchedCount == 0 {
-		return mongo.ErrNoDocuments
+		return ErrConflict
 	}
 	return nil
 }
@@ -4550,6 +4390,12 @@ func (lc *LevelsCollection) Activate(level Level, tenantId string) error {
 			"active": true,
 		},
 	}
+
+	conditional, conflictErr := ConditionalFilter(context.TODO(), lc.Coll, filter, level.Version)
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
 
 	result, err := lc.Coll.UpdateOne(context.Background(), filter, update)
 	if err != nil {
@@ -4591,6 +4437,12 @@ func (lc *LevelsCollection) Deactivate(level Level, tenantId string) error {
 		},
 	}
 
+	conditional, conflictErr := ConditionalFilter(context.TODO(), lc.Coll, filter, level.Version)
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
 	result, err := lc.Coll.UpdateOne(context.Background(), filter, update)
 	if err != nil {
 		return fmt.Errorf("Attempt to deactivate %s failed.  Reason: %s", level.Name, err)
@@ -4612,7 +4464,7 @@ func (lc *LevelsCollection) Deactivate(level Level, tenantId string) error {
 	return fmt.Errorf("Generic error attempting to deactivate %s", level.Name)
 }
 
-func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
+func (lc *LevelsCollection) Delete(levelID string, tenantID string, versions ...string) error {
 
 	levelID = strings.TrimSpace(levelID)
 	tenantID = strings.TrimSpace(tenantID)
@@ -4629,6 +4481,9 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
 	if err := lc.Coll.FindOne(context.Background(), bson.M{
 		"id": levelID, "tenantId": tenantID,
 	}).Decode(&existing); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return ErrConflict
+		}
 		return err
 	}
 	gamesFilter := bson.M{"tenantId": tenantID, "level": existing.Name}
@@ -4653,6 +4508,12 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
 		"tenantId": tenantID,
 	}
 
+	conditional, conflictErr := ConditionalFilter(context.TODO(), lc.Coll, filter, firstVersion(versions))
+	if conflictErr != nil {
+		return conflictErr
+	}
+	filter = conditional
+
 	result, err := lc.Coll.DeleteOne(
 		context.Background(),
 		filter,
@@ -4666,10 +4527,7 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string) error {
 	}
 
 	if result.DeletedCount == 0 {
-		return fmt.Errorf(
-			"level %q was not found",
-			levelID,
-		)
+		return ErrConflict
 	}
 
 	return nil
@@ -6108,6 +5966,7 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 	for _, r := range results {
 
 		view := model.GameView{
+			Version:     r.Version,
 			GameId:      r.GameId,
 			Time:        r.Time,
 			Sport:       r.Sport,
@@ -6129,6 +5988,7 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 		}
 
 		gameRec := model.GameDescriptor{
+			Version:     r.Version,
 			GameFee:     utils.ConvertInt64ToAmtStr(r.GameFee),
 			NumOfGames:  utils.ConvertInt64ToStr(r.NumOfGames),
 			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),

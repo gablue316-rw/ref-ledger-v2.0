@@ -848,6 +848,7 @@
     aria-labelledby="editExpenseModalTitle"
 >
     <form id="editExpenseForm">
+        <p id="expensesEditError" role="alert" style="color:#b42318; white-space:pre-wrap"></p>
         <div class="edit-modal-header">
             <div class="edit-modal-icon" aria-hidden="true">
                 <i class="fa-solid fa-pen-to-square"></i>
@@ -991,6 +992,7 @@ function setTaxYearFromExpenseDate() {
 }
 document.getElementById("date").addEventListener("change", setTaxYearFromExpenseDate);
 function showMessage(message, type = "info") {
+    if (document.getElementById("editExpenseModal").open) document.getElementById("expensesEditError").textContent = type === "error" ? message : "";
     messageBox.className =
         `message-box ${type}`;
     messageBox.textContent =
@@ -1306,7 +1308,11 @@ function toDateInputValue(value) {
     }
     return `${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
 }
+let editingExpenseVersion = "";
+const expenseVersions = new Map();
 function openExpenseEditor(expense) {
+    editingExpenseVersion = expense.version;
+    document.getElementById("expensesEditError").textContent = "";
     editExpenseId.value = String(expense.expenseId || "");
     editAssociation.value = String(expense.association || "");
     editDate.value = toDateInputValue(expense.date);
@@ -1447,6 +1453,7 @@ function renderExpenses(expenses) {
         const expenseCheckbox =
             row.querySelector(".expense-select");
         expenseCheckbox.expenseRecord = {
+            version: expense.version || expense.Version || "",
             expenseId: String(expenseId),
             association: String(association || "")
         };
@@ -1454,7 +1461,9 @@ function renderExpenses(expenses) {
             "change",
             updateExpenseSelection
         );
+        expenseVersions.set(JSON.stringify([String(expenseId), String(association || "")]), expense.version || expense.Version || "");
         const editableExpense = {
+            version: expense.version || expense.Version || "",
             expenseId: String(expenseId),
             association: String(association || ""),
             date: String(date || ""),
@@ -1624,6 +1633,7 @@ editExpenseForm.addEventListener(
             return;
         }
         const expenseChanges = {
+            version: editingExpenseVersion,
             taxYear: taxYear,
             date: editDate.value,
             description: editDescription.value.trim(),
@@ -1748,6 +1758,7 @@ function confirmExpenseDeletion(message, target) {
     });
 }
 async function deleteExpense(expenseId, association) {
+    const version = expenseVersions.get(JSON.stringify([String(expenseId), String(association || "")])) || "";
     if (String(expenseId).trim() === "") {
         showMessage(
             "This expense does not have an Expense ID and cannot be deleted.",
@@ -1764,7 +1775,8 @@ async function deleteExpense(expenseId, association) {
     }
     const result = await sendDeleteExpenseRequest(
         expenseId,
-        association
+        association,
+        version
     );
     if (result.redirected) {
         return;
@@ -1776,8 +1788,9 @@ async function deleteExpense(expenseId, association) {
     showMessage(result.message, "success");
     await loadExpenseRegistry();
 }
-async function sendDeleteExpenseRequest(expenseId, association) {
+async function sendDeleteExpenseRequest(expenseId, association, version = expenseVersions.get(JSON.stringify([String(expenseId), String(association || "")])) || "") {
     const deleteRequest = {
+        version,
         expenseId: String(expenseId).trim(),
         association: String(association || "").trim()
     };
@@ -1866,7 +1879,8 @@ deleteSelectedExpensesBtn.addEventListener(
         for (const expense of selectedExpenses) {
             const result = await sendDeleteExpenseRequest(
                 expense.expenseId,
-                expense.association
+                expense.association,
+                expense.version
             );
             if (result.redirected) {
                 return;

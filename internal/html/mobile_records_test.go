@@ -116,7 +116,9 @@ func TestMobileExpensesScopeDatesAndConcurrency(t *testing.T) {
 		events := mt.GetAllStartedEvents()
 		values, _ := events[1].Command.Lookup("deletes").Array().Values()
 		predicate := values[0].Document().Lookup("q").Document()
-		if !bytes.Equal(predicate, raw) {
+		parts, _ := predicate.Lookup("$expr").Document().Lookup("$eq").Array().Values()
+		literal := parts[1].Document().Lookup("$literal").Document()
+		if !bytes.Equal(literal, raw) {
 			mt.Fatalf("conditional delete lost original predicate: %s", predicate)
 		}
 	})

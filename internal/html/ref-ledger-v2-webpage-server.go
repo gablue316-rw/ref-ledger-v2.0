@@ -56,6 +56,7 @@ var Client *mongo.Client
 const MaxNotesLength = 150
 
 type Game struct {
+	Version     string                  `json:"version"`
 	Association string                  `json:"association"`
 	GameId      int                     `json:"gameId"`
 	Date        string                  `json:"date"`
@@ -89,6 +90,7 @@ type Expense struct {
 }
 
 type Payment struct {
+	Version     string  `json:"version"`
 	PaymentDate string  `json:"date"`
 	PaymentId   string  `json:"paymentid"`
 	PaymentAmt  float64 `json:"amount"`
@@ -98,6 +100,7 @@ type Payment struct {
 }
 
 type GameStatusTarget struct {
+	Version     string `json:"version"`
 	GameId      int64  `json:"gameId"`
 	Association string `json:"association"`
 }
@@ -223,6 +226,7 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 	}
 
 	return model.GameDescriptor{
+		Version:     g.Version,
 		Association: g.Association,
 		GameId:      strconv.Itoa(g.GameId),
 		Date:        formattedDate,
@@ -264,6 +268,7 @@ func PaymentDocToPaymentDescr(p Payment) model.PaymentDescriptor {
 	}
 
 	return model.PaymentDescriptor{
+		Version:     p.Version,
 		PaymentDate: t.Format("1/2/2006"),
 		PaymentId:   p.PaymentId,
 		PaymentAmt:  strconv.FormatFloat(p.PaymentAmt, 'f', 2, 64),
@@ -402,6 +407,7 @@ func GetSitesDirectoryHandler(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	w.Header().Set("Cache-Control", "no-store")
 	LogVisitor(r)
 
 	tId, err := getTenantId(r)
@@ -428,6 +434,7 @@ func GetSitesDirectoryHandler(
 }
 
 func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	LogVisitor(r)
 
 	tId, err := getTenantId(r)
@@ -447,6 +454,7 @@ func GetAssociationsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetOfficialsDirectoryHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	LogVisitor(r)
 
 	tId, err := getTenantId(r)
@@ -5029,6 +5037,9 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	err = json.NewDecoder(r.Body).Decode(&game)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -5048,10 +5059,8 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		tId,
 	)
 
-	singleGameDesc, err = gc.Get(game.Association, utils.ConvertIntToStr(game.GameId), tId)
-	if err != nil {
-		fmt.Println(err)
-		http.Error(w, "Game Not Found", http.StatusBadRequest)
+	if game.Version == "" {
+		http.Error(w, database.ErrConflict.Error(), http.StatusConflict)
 		return
 	}
 
@@ -5068,7 +5077,12 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	singleGameDesc = GameDocToGameDescr(game)
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
-		api.DelGame(context.TODO(), singleGameDesc.GameId, tId)
+		if err := gc.Delete(singleGameDesc.Association, singleGameDesc.GameId, tId, game.Version); err != nil {
+			if writeConflict(w, err) {
+				return
+			}
+			http.Error(w, "Unable to delete game", 500)
+		}
 		return
 	}
 
@@ -5082,6 +5096,9 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		fmt.Printf(
 			"UpdateGame validation failed: gameId=%d sport=%q level=%q error=%v\n",
 			game.GameId,
@@ -5105,6 +5122,9 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		tId,
 	)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		fmt.Printf(
 			"UpdateGame failed: database=%q gameId=%q association=%q tenantId=%q error=%v\n",
 			database.Database,
@@ -5163,7 +5183,12 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
-		api.DelGame(context.TODO(), singleGameDesc.GameId, tId)
+		if err := gc.Delete(singleGameDesc.Association, singleGameDesc.GameId, tId, game.Version); err != nil {
+			if writeConflict(w, err) {
+				return
+			}
+			http.Error(w, "Unable to delete game", 500)
+		}
 		return
 	}
 
@@ -5261,6 +5286,10 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 	for _, game := range request.Games {
 		game.Association = strings.TrimSpace(game.Association)
 
+		if game.Version == "" {
+			http.Error(w, database.ErrConflict.Error(), http.StatusConflict)
+			return
+		}
 		if game.GameId <= 0 || game.Association == "" {
 			http.Error(
 				w,
@@ -5311,6 +5340,12 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 			fields["deductions"] = int64(0)
 		}
 
+		conditional, err := database.ConditionalFilter(ctx, gc.Coll, filter, game.Version)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s game %d: %v", game.Association, game.GameId, err))
+			continue
+		}
+		filter = conditional
 		result, err := gc.Coll.UpdateOne(
 			ctx,
 			filter,
@@ -5336,7 +5371,7 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
 		if result.MatchedCount == 0 {
 			failures = append(failures, fmt.Sprintf(
-				"%s game %d: game not found or already Paid",
+				"%s game %d: game changed, was removed, or is already Paid; refresh before trying again",
 				game.Association,
 				game.GameId,
 			))
@@ -5474,51 +5509,14 @@ func UpdatePayment(
 	singlePayment := PaymentDocToPaymentDescr(payment)
 	singlePayment.TaxYear = strconv.Itoa(payment.TaxYear)
 
-	paymentDescr := []model.PaymentDescriptor{
-		singlePayment,
+	if err := database.MutatePayment(r.Context(), tId, payment.PaymentId, payment.Association, payment.Version, &singlePayment); err != nil {
+		if writeConflict(w, err) {
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-
-	fmt.Println("Payment Descr:", singlePayment)
-
-	totalUpdated, totalErrors, totalUpdatedToPaid, updateErrors :=
-		database.UpdatePaymentDocs(
-			r.Context(),
-			paymentDescr,
-			database.Database,
-			"payments",
-			tId,
-		)
-
-	errorMessages := make([]string, 0, len(updateErrors))
-
-	for _, updateError := range updateErrors {
-		errorMessages = append(
-			errorMessages,
-			updateError.Error(),
-		)
-	}
-
-	response := map[string]interface{}{
-		"totalUpdated":       totalUpdated,
-		"totalErrors":        totalErrors,
-		"totalUpdatedToPaid": totalUpdatedToPaid,
-		"errors":             errorMessages,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-
-	if totalErrors > 0 {
-		w.WriteHeader(http.StatusInternalServerError)
-	} else {
-		w.WriteHeader(http.StatusOK)
-	}
-
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		fmt.Println(
-			"Unable to encode payment response. Error:",
-			err,
-		)
-	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"totalUpdated": 1, "totalErrors": 0, "errors": []string{}})
 }
 
 func DeletePayment(w http.ResponseWriter, r *http.Request) {
@@ -5559,7 +5557,10 @@ func DeletePayment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = database.DeletePayment(paymentID, association, tid)
+	err = database.MutatePayment(r.Context(), tid, paymentID, association, requestVersion(r), nil)
+	if writeConflict(w, err) {
+		return
+	}
 	if err != nil {
 		http.Error(
 			w,
@@ -5675,6 +5676,7 @@ func ParseGameIds(value string) ([]int64, error) {
 }
 
 func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	tId, err := getTenantId(r)
 	if err != nil {
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
@@ -5790,6 +5792,7 @@ func LoadPaymentRegistry(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoadExpenseRegistry(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	tId, err := getTenantId(r)
 	if err != nil {
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
@@ -5996,6 +5999,9 @@ func createWebSession(w http.ResponseWriter, r *http.Request, user model.User, s
 func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
 	tId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6005,6 +6011,9 @@ func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
 
 	err = json.NewDecoder(r.Body).Decode(&assocJson)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 
 		return
@@ -6012,6 +6021,9 @@ func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
 
 	err = ac.Update(ac.ConvAssocJsonToAssoc(assocJson), tId)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		fmt.Println("Failed to update association")
 		http.Error(w, "Failed to update association", http.StatusInternalServerError)
 		return
@@ -6080,6 +6092,9 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 func UpdateSite(w http.ResponseWriter, r *http.Request) {
 	tId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6089,12 +6104,18 @@ func UpdateSite(w http.ResponseWriter, r *http.Request) {
 
 	err = json.NewDecoder(r.Body).Decode(&siteJson)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
 	err = sc.Update(sc.ConvJsonToSite(siteJson), tId)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		fmt.Println("Failed to update site")
 		http.Error(w, "Failed to update site", http.StatusInternalServerError)
 		return
@@ -6107,6 +6128,9 @@ func UpdateSite(w http.ResponseWriter, r *http.Request) {
 func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 	tId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6117,6 +6141,9 @@ func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 	var officialJson database.OfficialJson
 	err = json.NewDecoder(r.Body).Decode(&officialJson)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -6125,6 +6152,9 @@ func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 
 	err = oc.Update(tId, oc.ConvJsonToOfficial(officialJson))
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		fmt.Println("Failed to update official")
 		http.Error(w, "Failed to update official", http.StatusInternalServerError)
 		return
@@ -6164,6 +6194,7 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 }
 
 type DeleteExpenseRequest struct {
+	Version     string `json:"version"`
 	ExpenseId   string `json:"expenseId"`
 	Association string `json:"association"`
 }
@@ -6171,6 +6202,9 @@ type DeleteExpenseRequest struct {
 func DeleteExpenseHandler(w http.ResponseWriter, r *http.Request) {
 	tId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6241,8 +6275,12 @@ func DeleteExpenseHandler(w http.ResponseWriter, r *http.Request) {
 		request.ExpenseId,
 		request.Association,
 		tId,
+		request.Version,
 	)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(
 			w,
 			"Delete failed: "+err.Error(),
@@ -6263,6 +6301,9 @@ func DeleteExpenseHandler(w http.ResponseWriter, r *http.Request) {
 func UpdateExpense(w http.ResponseWriter, r *http.Request) {
 	tenantId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6336,6 +6377,9 @@ func UpdateExpense(w http.ResponseWriter, r *http.Request) {
 		tenantId,
 	)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		fmt.Println("Failed to update expense:", err)
 
 		// If Update returns a typed or sentinel not-found error,
@@ -6399,6 +6443,9 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 	tId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6413,9 +6460,12 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 	assocId := r.PathValue("assocId")
 
-	err = ac.Delete(assocId, tId)
+	err = ac.Delete(assocId, tId, requestVersion(r))
 
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w,
 			fmt.Sprintf("Delete failed: %v", err),
 			http.StatusNotFound,
@@ -6438,6 +6488,9 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 
 	tId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6447,9 +6500,12 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Game", gameId, "for association", association)
 
-	err = gc.Delete(association, gameId, tId)
+	err = gc.Delete(association, gameId, tId, requestVersion(r))
 
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		fmt.Println("Delete failed", err)
 		http.Error(w,
 			fmt.Sprintf("Delete failed: %v", err),
@@ -6464,6 +6520,9 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 	tId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6479,9 +6538,12 @@ func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Official", firstname, lastname)
 
-	err = oc.Delete(firstname, lastname, tId)
+	err = oc.Delete(firstname, lastname, tId, requestVersion(r))
 
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w,
 			fmt.Sprintf("Delete failed: %v", err),
 			http.StatusNotFound,
@@ -6546,6 +6608,9 @@ func OfficialsDetailHandler(w http.ResponseWriter, r *http.Request) {
 func DeleteSite(w http.ResponseWriter, r *http.Request) {
 	tId, err := getTenantId(r)
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
 		return
 	}
@@ -6560,9 +6625,12 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Site", siteId)
 
-	err = sc.Delete(siteId, tId)
+	err = sc.Delete(siteId, tId, requestVersion(r))
 
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(w,
 			fmt.Sprintf("Delete failed: %v", err),
 			http.StatusNotFound,
@@ -6708,6 +6776,7 @@ func GetSingleSite(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetSingleGame(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 
 	LogVisitor(r)
 
@@ -6851,6 +6920,7 @@ func SortGamesByDateTime(games []model.HtmlResponse) ([]model.HtmlResponse, erro
 }
 
 func GetGames(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
 	LogVisitor(r)
 
 	if r.Method != http.MethodGet {
@@ -7092,6 +7162,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		)
 
 		view := model.GameView{
+			Version:     game.Version,
 			GameId:      game.GameId,
 			Time:        game.Time,
 			Sport:       game.Sport,
@@ -7436,6 +7507,9 @@ func DelLevel(w http.ResponseWriter, r *http.Request) {
 	tenantID, err := getTenantId(r)
 
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(
 			w,
 			"Unable to determine tenant ID",
@@ -7457,7 +7531,10 @@ func DelLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := lc.Delete(levelID, tenantID); err != nil {
+	if err := lc.Delete(levelID, tenantID, requestVersion(r)); err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(
 			w,
 			err.Error(),
@@ -7553,6 +7630,9 @@ func ActivateLevel(w http.ResponseWriter, r *http.Request) {
 	tenantId, err := getTenantId(r)
 
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(
 			w,
 			"Unable to determine tenant ID",
@@ -7573,6 +7653,9 @@ func ActivateLevel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := lc.Activate(level, tenantId); err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(
 			w,
 			err.Error(),
@@ -7604,6 +7687,9 @@ func DeactivateLevel(w http.ResponseWriter, r *http.Request) {
 	tenantId, err := getTenantId(r)
 
 	if err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(
 			w,
 			"Unable to determine tenant ID",
@@ -7624,6 +7710,9 @@ func DeactivateLevel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := lc.Deactivate(level, tenantId); err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		http.Error(
 			w,
 			err.Error(),
@@ -7658,6 +7747,9 @@ func UpdateLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := lc.Update(level, tenantId); err != nil {
+		if writeConflict(w, err) {
+			return
+		}
 		status := http.StatusBadRequest
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			status = http.StatusNotFound
@@ -7892,7 +7984,7 @@ func main() {
 	}))
 
 	mux.HandleFunc("/gameStatus", authRequired(func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./internal/html/gameStatus.html")
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 	}))
 
 	mux.HandleFunc("/reports_v2", authRequired(func(w http.ResponseWriter, r *http.Request) {
@@ -8063,10 +8155,10 @@ func main() {
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/mobile/dashboard", MobileDashboard)
 	mux.HandleFunc("/api/mobile/game", mobileAccountHandler(MobileGame))
- mux.HandleFunc("/api/mobile/catalog", mobileAccountHandler(mobileReadOnly(MobileCatalog)))
+	mux.HandleFunc("/api/mobile/catalog", mobileAccountHandler(mobileReadOnly(MobileCatalog)))
 	mux.HandleFunc("/api/mobile/access", mobileAccountHandler(mobileReadOnly(MobileAccess)))
- mux.HandleFunc("/api/mobile/expenses", mobileAccountHandler(MobileExpenses))
- mux.HandleFunc("/api/mobile/expense", mobileAccountHandler(MobileExpense))
+	mux.HandleFunc("/api/mobile/expenses", mobileAccountHandler(MobileExpenses))
+	mux.HandleFunc("/api/mobile/expense", mobileAccountHandler(MobileExpense))
 	mux.HandleFunc("/api/mobile/officials", mobileAccountHandler(mobileReadOnly(GetOfficialsDirectoryHandler)))
 	mux.HandleFunc("/api/mobile/roles", mobileAccountHandler(mobileReadOnly(OfficialRolesHandler)))
 	mux.HandleFunc("/api/payments", authRequired(readOnlyForbidden(CreatePayment)))

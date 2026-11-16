@@ -799,8 +799,8 @@ function message(text, error = false) {
 }
 
 function normalize(a) {
-    return Object.fromEntries(fields.map(k => [k, String(a[k] ?? a[k[0].toUpperCase() + k.slice(
-        1)] ?? '')]));
+    return Object.assign({version: a.version || a.Version || ""}, Object.fromEntries(fields.map(k => [k, String(a[k] ?? a[k[0].toUpperCase() + k.slice(
+        1)] ?? '')])));
 }
 
 function values(prefix) {
@@ -996,7 +996,9 @@ $('clearSelectionBtn').onclick = () => {
     render();
 };
 
+let editingVersion = "";
 function openEditor(a) {
+ editingVersion = a.version;
     if (busy) return;
     editingId = a.id;
     fields.forEach(k => $('edit_' + k).value = a[k]);
@@ -1013,13 +1015,14 @@ $('editForm').onsubmit = async e => {
     if (busy) return;
     const a = values('edit_');
     a.id = editingId;
+ a.version = editingVersion;
     busy = true;
     $('saveEditBtn').disabled = true;
     $('cancelEditBtn').disabled = true;
     try {
         const result = await save(a, true);
         const index = associations.findIndex(x => x.id === editingId);
-        if (index >= 0) associations[index] = a;
+        await refresh(true);
         render();
         $('editModal').close();
         message(result || 'Association updated successfully.');
@@ -1061,7 +1064,7 @@ $('confirmDeleteBtn').onclick = async () => {
     for (const a of pendingDelete) {
         try {
             await request('/api/deleteAssociation/' + encodeURIComponent(a.id), {
-                method: 'DELETE'
+                method: 'DELETE', headers: {'If-Match': a.version}
             });
             associations = associations.filter(x => x.id !== a.id);
             selected.delete(a.id);

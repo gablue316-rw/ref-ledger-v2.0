@@ -2237,6 +2237,7 @@ async function loadGameForEdit(association, gameId) {
             return;
         }
         const game = await response.json();
+        loadedGameVersion = game.version || game.Version || "";
         if (revision !== formRevision) return;
         if (!await loadLevels()) return;
         if (revision !== formRevision) return;
@@ -2311,6 +2312,7 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         return;
     }
     const game = {
+        version: loadedGameVersion,
         association: document.getElementById("association").value,
         gameId: parseInt(document.getElementById("gameId").value),
         date: document.getElementById("date").value,
@@ -2356,6 +2358,7 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         if (!response.ok) {
             document.getElementById("message").innerText =
                 message || "Error saving game.";
+            document.getElementById("editorMessage").textContent = message || "Error saving game.";
             return;
         }
         document.getElementById("message").innerText =
@@ -2461,6 +2464,7 @@ let selectedGames = new Set();
 let directoryVersion = 0;
 let directoryBusy = false;
 let pendingGamesDelete = [];
+let loadedGameVersion = "";
 let editingGameIdentity = null;
 let gamePreviewToken = '';
 let preview = [];
@@ -2673,7 +2677,7 @@ $('confirmDeleteBtn').onclick = async () => {
         try {
             const response = await fetch('/api/deleteGame/' + encodeURIComponent(gameValue(game,
                 'association')) + '/' + encodeURIComponent(gameValue(game, 'gameId')), {
-                method: 'DELETE'
+                method: 'DELETE', headers: {'If-Match': gameValue(game, 'version')}
             });
             if (!response.ok || response.redirected) throw new Error(await response.text() ||
                 'Unable to delete game.');

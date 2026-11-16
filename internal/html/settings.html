@@ -944,6 +944,7 @@
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
+                        version: item.version,
                         id: item.id,
                         name: item.name
                     })
@@ -974,7 +975,7 @@
                 if (type === "sport") {
                     renderSports(sports);
                 } else {
-                    renderLevels(levels);
+                    await loadLevels();
                 }
                 showMessage(
                     responseData.message ||
@@ -1265,11 +1266,13 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
                 levelsBody.appendChild(row);
             });
         }
+        let editedLevelVersion = "";
         let editedLevelId = null;
         let levelEditBusy = false;
         function editLevel(levelId) {
             const level = levels.find(item => item.id === levelId);
             if (!level) return;
+            editedLevelVersion = level.version;
             editedLevelId = level.id;
             const sportSelect = document.getElementById("editLevelSport");
             sportSelect.replaceChildren(new Option("Select Sport", ""));
@@ -1298,7 +1301,7 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
             try {
                 const response = await fetch("/api/levels", {
                     method: "PUT", headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({id: editedLevelId, name,
+                    body: JSON.stringify({version: editedLevelVersion, id: editedLevelId, name,
                         sport: document.getElementById("editLevelSport").value,
                         gameFee: formatGameFee(document.getElementById("editLevelFee").value)})
                 });
@@ -1352,7 +1355,7 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
             `;
             try {
                 const params = new URLSearchParams({
-                    id: level.id
+                    id: level.id, version: level.version
                 });
                 const response = await fetch(
                     `/api/levels?${params.toString()}`,

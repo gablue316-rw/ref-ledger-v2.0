@@ -368,6 +368,7 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 	deductions := ConvertInt64ToAmtStr(doc.Deductions)
 
 	gameDescr := model.GameDescriptor{
+		Version:     doc.Version,
 		GameId:      gameId,
 		Date:        doc.Date,
 		Time:        doc.Time,
@@ -403,6 +404,7 @@ func ConvertPaymentDocToPaymentDescr(doc model.PaymentDoc) model.PaymentDescript
 	}
 
 	return model.PaymentDescriptor{
+		Version:     doc.Version,
 		PaymentId:   doc.PaymentId,
 		PaymentDate: doc.PaymentDate,
 		PaymentAmt:  paymentAmt,
@@ -466,6 +468,7 @@ func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescript
 	gameId := ConvertInt64ToStr(doc.GameId)
 	mileage := ConvertMilesToStr(doc.Mileage)
 	descr := model.ExpenseDescriptor{
+		Version:     doc.Version,
 		ExpenseId:   doc.ExpenseId,
 		Date:        doc.Date,
 		Type:        doc.Type,
