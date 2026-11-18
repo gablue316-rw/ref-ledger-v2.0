@@ -33,9 +33,11 @@ export function createExpenses(){
    for(const record of data.items){
     const e=record.expense,card=el('article');card.className='game';
     for(const [tag,text] of [['small',`${e.Type} · ${e.Association}`],['h2',e.Date],['strong',expenseValue(e)],['p',e.Description||'No description'],['p',`Tax year ${e.TaxYear} · Game ${e.GameId||'—'}`],['small',e.ExpenseId]])card.append(el(tag,text));
+    const payroll=e.Source==='Payroll Deduction'||Boolean(e.PaymentRef);
+    if(payroll)card.append(el('strong','Payroll Deduction'));
     const actions=el('div');actions.className='expense-actions';
-    const edit=el('button',canWrite?'Edit':'View');edit.type='button';edit.onclick=()=>editor(record);actions.append(edit);
-    if(canWrite){const remove=el('button','Delete');remove.type='button';remove.className='danger';remove.onclick=()=>removeExpense(record,remove);actions.append(remove);}
+    const edit=el('button',canWrite&&!payroll?'Edit':'View');edit.type='button';edit.onclick=()=>editor(record);actions.append(edit);
+    if(canWrite&&!payroll){const remove=el('button','Delete');remove.type='button';remove.className='danger';remove.onclick=()=>removeExpense(record,remove);actions.append(remove);}
     card.append(actions);$('expense-list').append(card);
    }
    tell([success,`${data.items.length} expense${data.items.length===1?'':'s'} found.`].filter(Boolean).join(' '));
@@ -65,7 +67,8 @@ export function createExpenses(){
    const e=snapshot?.expense;
    const now=new Date();const localDate=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
    const values=e?expenseInput(e):{date:localDate,type:types[0],value:'0.00',association:'',gameId:'',description:'',taxYear:String(now.getFullYear())};
-   const writable=snapshot?snapshot.canWrite:canWrite;
+   const payroll=e?.Source==='Payroll Deduction'||Boolean(e?.PaymentRef);
+   const writable=snapshot?snapshot.canWrite&&!payroll:canWrite;
    const form=el('form'),inputs={};
    for(const [key,label,type] of [['date','Date','date'],['type','Type','select'],['value','Amount ($)','number'],['association','Association','select'],['gameId','Game ID (optional)','number'],['taxYear','Tax year','number'],['description','Description','textarea']]){
     const field=el('label',label);const input=el(type==='select'?'select':type==='textarea'?'textarea':'input');input.name=key;
@@ -84,7 +87,7 @@ export function createExpenses(){
    inputs.type.onchange=valueMode;valueMode();
    const hint=el('p','Mileage records store miles; other types store dollars.');hint.className='wide';form.append(hint);
    const save=el('button',record?'Save changes':'Add expense');save.type='submit';save.disabled=!writable;form.append(save);
-   modal.insertBefore(form,close);note.textContent=writable?'':'This account has read-only access.';
+   modal.insertBefore(form,close);note.textContent=writable?'':payroll?'Payroll deductions must be changed through their payment.':'This account has read-only access.';
    form.onsubmit=async event=>{
     event.preventDefault();if(working||!writable||!form.reportValidity())return;
     const expense=Object.fromEntries(new FormData(form));

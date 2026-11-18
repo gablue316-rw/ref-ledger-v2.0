@@ -650,7 +650,7 @@
 <div class="card-body">
 <form id="paymentsExportForm" autocomplete="off">
 <div class="form-group"><label for="paymentsExportPrefix">File name prefix</label><input class="form-control" id="paymentsExportPrefix" value="ref-ledger" maxlength="80" pattern="[A-Za-z0-9][A-Za-z0-9_-]{0,79}" required aria-describedby="paymentsExportHelp"></div>
-<p id="paymentsExportHelp" style="margin-bottom:16px;line-height:1.5">Exports all payments for your account, regardless of the payment registry filters. Includes payment ID, payment date, tax year, amount, association, and game IDs. Amounts include a dollar sign. Your browser chooses the download directory.</p>
+<p id="paymentsExportHelp" style="margin-bottom:16px;line-height:1.5">Exports all payments for your account, regardless of the payment registry filters. Includes payment ID, payment date, tax year, deposited amount, association, game IDs, deduction amount, and deduction type. Amounts include a dollar sign. Your browser chooses the download directory.</p>
 <p id="paymentsExportFilename" style="margin-bottom:16px"></p>
 <button type="submit" class="btn" id="paymentsExportButton"><i class="fa-solid fa-file-export" aria-hidden="true"></i> Export Payments</button>
 </form>
@@ -672,7 +672,7 @@
 <button type="button" class="btn" id="paymentForgetFile" hidden>Forget Last File</button>
 <p id="paymentSelectedFile">No file selected.</p>
 </div>
-<p id="importRecordsHelp" style="margin-bottom:16px;line-height:1.5">CSV columns: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated). Amounts may be 92.00 or $92.00. Quote multiple game IDs, for example "1,2,3". Files must be no larger than 5 MB. All referenced games must be Completed, belong to the selected association, and total the payment amount.</p>
+<p id="importRecordsHelp" style="margin-bottom:16px;line-height:1.5">CSV columns: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated),deductionAmount,deductionType. Legacy six-column files remain supported and import without deductions. Amounts may be 92.00 or $92.00. Quote multiple game IDs, for example "1,2,3". Files must be no larger than 5 MB. The deposited amount must equal selected-game earnings minus the deduction.</p>
 <button class="btn btn-primary" type="submit" id="previewRecordsImport" disabled><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Preview Payments</button>
 <button class="btn btn-secondary" type="button" id="clearRecordsImport">Clear</button>
 </form>
@@ -756,7 +756,7 @@
 
                 <div class="col">
                     <label for="amount">
-                        Payment Amount
+                        Payment Amount (actual deposit)
                     </label>
 
                     <input
@@ -769,6 +769,20 @@
                 </div>
 
             </div>
+
+            <div class="row">
+                <div class="col">
+                    <label for="deductionAmount">Deduction Amount</label>
+                    <input type="number" id="deductionAmount" step="0.01" min="0" value="0.00">
+                </div>
+                <div class="col">
+                    <label for="deductionType">Deduction Type</label>
+                    <select id="deductionType">
+                        <option value="">Select type when deduction is positive</option>
+                    </select>
+                </div>
+            </div>
+            <p class="field-help">Selected-game earnings are calculated before payroll deductions. Expected deposit: <strong id="expectedPaymentDeposit">$0.00</strong></p>
 
             <div class="button-row">
 
@@ -1005,7 +1019,9 @@
                         <th>Date</th>
                         <th>Tax Year</th>
                         <th>Association</th>
-                        <th>Amount</th>
+                        <th>Deposit</th>
+                        <th>Deduction</th>
+                        <th>Deduction Type</th>
                         <th>Game IDs</th>
                     </tr>
                 </thead>
@@ -1039,9 +1055,18 @@
             <input id="editPaymentAssociation" type="text" readonly>
         </div>
         <div class="col">
-            <label for="editPaymentAmount">Payment Amount</label>
-            <input id="editPaymentAmount" type="number" min="0.01" step="0.01" required>
+            <label for="editPaymentAmount">Payment Amount (actual deposit)</label>
+            <input id="editPaymentAmount" type="number" min="0" step="0.01" required>
         </div>
+        <div class="col">
+            <label for="editPaymentDeductionAmount">Deduction Amount</label>
+            <input id="editPaymentDeductionAmount" type="number" min="0" step="0.01" value="0.00">
+        </div>
+        <div class="col">
+            <label for="editPaymentDeductionType">Deduction Type</label>
+            <select id="editPaymentDeductionType"><option value="">Select type when deduction is positive</option></select>
+        </div>
+        <p class="field-help">Expected deposit: <strong id="editExpectedPaymentDeposit">$0.00</strong></p>
         <div class="col">
             <label for="editPaymentGameIds">Game IDs</label>
             <input id="editPaymentGameIds" type="text" readonly>
@@ -1107,6 +1132,7 @@ document.addEventListener(
     "DOMContentLoaded",
     function() {
         loadAssociations();
+        loadPaymentExpenseTypes().catch(error => showMessage(error.message, "error"));
         loadCompletedGames();
     }
 );
@@ -1152,6 +1178,17 @@ async function loadAssociations() {
 
             filterAssociationSelect.innerHTML =
                 '<option value="">No associations found</option>';
+        }
+
+        async function loadPaymentExpenseTypes() {
+            const response = await fetch("/api/loadExpenseTypes");
+            if (!response.ok) throw new Error("Failed to load expense types");
+            const types = await response.json();
+            for (const id of ["deductionType", "editPaymentDeductionType"]) {
+                const select = document.getElementById(id);
+                select.replaceChildren(new Option("Select type when deduction is positive", ""));
+                for (const type of types) select.appendChild(new Option(type.expenseType, type.expenseType));
+            }
         }
 
     } catch (error) {
@@ -1249,6 +1286,7 @@ let originalPaymentVersion = "";
 const paymentVersions = new Map();
 let originalEditAssociation = "";
 let originalEditGameIds = [];
+let originalEditDeductionAmount = 0;
 
 function paymentDateForInput(value) {
     const text = String(value ?? "").trim();
@@ -1283,6 +1321,13 @@ function openEditPayment(payment) {
         const amount = getPaymentValue(payment, "PaymentAmt", "paymentAmt", "Amount", "amount");
         document.getElementById("editPaymentAmount").value =
             Number.isFinite(Number(amount)) ? Number(amount).toFixed(2) : "";
+        const deductionAmount = getPaymentValue(payment, "DeductionAmount", "deductionAmount");
+        const numericDeduction = Number(String(deductionAmount).replace(/[$,\s]/g, "")) || 0;
+        originalEditDeductionAmount = numericDeduction;
+        document.getElementById("editPaymentDeductionAmount").value = numericDeduction.toFixed(2);
+        document.getElementById("editPaymentDeductionType").value =
+            getPaymentValue(payment, "DeductionType", "deductionType") || "";
+        updateEditExpectedDeposit();
         originalEditGameIds = normalizeGameIds(getPaymentGameIds(payment));
         document.getElementById("editPaymentGameIds").value =
             originalEditGameIds.join(", ");
@@ -1305,9 +1350,16 @@ editPaymentForm.addEventListener("submit", async function(event) {
     const taxYear = document.getElementById("editPaymentTaxYear").value.trim();
     const association = originalEditAssociation;
     const amount = Number(document.getElementById("editPaymentAmount").value);
+    const deductionAmount = Number(document.getElementById("editPaymentDeductionAmount").value || 0);
+    const deductionType = document.getElementById("editPaymentDeductionType").value;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !association ||
-        !Number.isFinite(amount) || amount <= 0) {
-        showMessage("Enter a date and positive amount.", "error");
+        !Number.isFinite(amount) || amount < 0 ||
+        !Number.isFinite(deductionAmount) || deductionAmount < 0) {
+        showMessage("Enter a date and nonnegative payment and deduction amounts.", "error");
+        return;
+    }
+    if (deductionAmount > 0 && !deductionType) {
+        showMessage("Select a deduction type for a positive deduction.", "error");
         return;
     }
     if (!isValidTaxYear(taxYear)) {
@@ -1326,9 +1378,20 @@ editPaymentForm.addEventListener("submit", async function(event) {
                 paymentid: paymentId,
                 originalAssociation: originalEditAssociation,
                 date, association, amount, taxYear: Number(taxYear),
+                deductionAmount, deductionType,
                 gameids: originalEditGameIds.map(Number)
             })
         });
+
+        function updateEditExpectedDeposit() {
+            const deposit = Number(document.getElementById("editPaymentAmount").value || 0);
+            const deduction = Number(document.getElementById("editPaymentDeductionAmount").value || 0);
+            const earnings = deposit + originalEditDeductionAmount;
+            document.getElementById("editExpectedPaymentDeposit").textContent =
+                formatCurrency(earnings - deduction);
+        }
+        document.getElementById("editPaymentAmount").addEventListener("input", updateEditExpectedDeposit);
+        document.getElementById("editPaymentDeductionAmount").addEventListener("input", updateEditExpectedDeposit);
         if (response.status === 401 || response.redirected) {
             window.location.href = "/login";
             return;
@@ -1380,6 +1443,7 @@ function updateCompletedGamesSelectionSummary() {
 
     if (completedGamesTotalCount === 0 || gameCheckboxes.length === 0) {
         document.getElementById("amount").value = "";
+        document.getElementById("expectedPaymentDeposit").textContent = "$0.00";
 
         showMessage(
             "Ready to enter payments.",
@@ -1394,21 +1458,27 @@ function updateCompletedGamesSelectionSummary() {
 
     const selectedGameFees = selectedCheckboxes.reduce(
         (total, checkbox) =>
-            total + Number(checkbox.dataset.gameFee || 0),
+            total + Number(checkbox.dataset.gameEarnings || 0),
         0
     );
-
-    document.getElementById("amount").value =
-        selectedGameFees.toFixed(2);
+    const deduction = Number(document.getElementById("deductionAmount").value || 0);
+    const expectedDeposit = selectedGameFees - deduction;
+    document.getElementById("amount").value = expectedDeposit >= 0
+        ? expectedDeposit.toFixed(2) : "";
+    document.getElementById("expectedPaymentDeposit").textContent = formatCurrency(expectedDeposit);
 
     showMessage(
         `${completedGamesTotalCount} completed game id(s) available for payment. ` +
-        `Total game fees: ${formatCurrency(completedGamesTotalFees)}.  ` +
+        `Total game earnings before deductions: ${formatCurrency(completedGamesTotalFees)}.  ` +
         `${selectedCheckboxes.length} Games selected. ` +
-        `Total Game Fees selected: ${formatCurrency(selectedGameFees)}.`,
+        `Selected-game earnings: ${formatCurrency(selectedGameFees)}. ` +
+        `Expected deposit: ${formatCurrency(expectedDeposit)}.`,
         "info"
     );
 }
+
+document.getElementById("deductionAmount").addEventListener("input", updateCompletedGamesSelectionSummary);
+document.getElementById("deductionType").addEventListener("change", updateCompletedGamesSelectionSummary);
 
 registryBtn.addEventListener(
     "click",
@@ -1575,11 +1645,21 @@ paymentForm.addEventListener(
             return;
         }
 
-        if (Number.isNaN(amount) || amount <= 0) {
+        if (Number.isNaN(amount) || amount < 0) {
             showMessage(
-                "Enter a valid payment amount greater than zero.",
+                "Enter a valid nonnegative payment amount.",
                 "error"
             );
+            return;
+        }
+        const deductionAmount = Number(document.getElementById("deductionAmount").value || 0);
+        const deductionType = document.getElementById("deductionType").value;
+        if (!Number.isFinite(deductionAmount) || deductionAmount < 0) {
+            showMessage("Enter a nonnegative deduction amount.", "error");
+            return;
+        }
+        if (deductionAmount > 0 && !deductionType) {
+            showMessage("Select a deduction type for a positive deduction.", "error");
             return;
         }
 
@@ -1594,6 +1674,8 @@ paymentForm.addEventListener(
             taxYear: Number(taxYear),
             paymentid: paymentId,
             amount: amount,
+            deductionAmount,
+            deductionType,
             association: association,
             gameids: selectedGameIds
         };
@@ -2246,7 +2328,7 @@ function renderPayments(payments) {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="10">
+                <td colspan="12">
                     No payments are currently in the registry.
                 </td>
             </tr>
@@ -2316,6 +2398,10 @@ function renderPayments(payments) {
         const displayGameIds = Array.isArray(gameIds)
             ? gameIds.join(", ")
             : gameIds;
+        const rawDeduction = getPaymentValue(payment, "DeductionAmount", "deductionAmount");
+        const numericDeduction = Number(String(rawDeduction).replace(/[$,\s]/g, "")) || 0;
+        const displayDeduction = formatCurrency(numericDeduction);
+        const deductionType = getPaymentValue(payment, "DeductionType", "deductionType");
 
         return `
             <tr data-payment-row>
@@ -2374,6 +2460,8 @@ function renderPayments(payments) {
                 <td>${escapeHtml(getPaymentValue(payment, "TaxYear", "taxYear", "Taxyear"))}</td>
                 <td>${escapeHtml(association)}</td>
                 <td>${escapeHtml(displayAmount)}</td>
+                <td>${escapeHtml(displayDeduction)}</td>
+                <td>${escapeHtml(deductionType)}</td>
 
                 <td class="payment-games">
                     ${escapeHtml(displayGameIds)}
@@ -2724,13 +2812,9 @@ function renderGames(
         const statusClass =
             getStatusClass(game.Status);
 
-        const numericGameFee = Number(
-            String(
-                game.GameFee ??
-                game.gameFee ??
-                0
-            ).replace(/[$,\s]/g, "")
-        ) || 0;
+        const gameEarnings = game.TotalEarnings ?? game.totalEarnings ??
+            game.GameFee ?? game.gameFee ?? 0;
+        const numericGameEarnings = Number(String(gameEarnings).replace(/[$,\s]/g, "")) || 0;
 
         const officialsHtml = renderPaymentOfficialAssignments(game);
 
@@ -2743,7 +2827,7 @@ function renderGames(
                                 type="checkbox"
                                 class="game-check"
                                 value="${game.GameId}"
-                                data-game-fee="${numericGameFee}"
+                                data-game-earnings="${numericGameEarnings}"
                                 data-association="${escapeHtml(game.Association)}"
                             >
                         `
@@ -3156,16 +3240,10 @@ async function loadCompletedGames(
 
         const totalGameFees = Array.isArray(games)
             ? games.reduce((total, game) => {
-                const feeValue =
-                    game.GameFee ??
-                    game.gameFee ??
-                    0;
-
-                const gameFee = Number(
-                    String(feeValue).replace(/[$,\s]/g, "")
-                ) || 0;
-
-                return total + gameFee;
+                const earningsValue = game.TotalEarnings ?? game.totalEarnings ??
+                    game.GameFee ?? game.gameFee ?? 0;
+                const earnings = Number(String(earningsValue).replace(/[$,\s]/g, "")) || 0;
+                return total + earnings;
             }, 0)
             : 0;        
 
@@ -3652,13 +3730,13 @@ async function getUploadSnapshot() {
 }
 
     const columns = {
-        payments: [["Payment ID", "paymentId"], ["Payment Date", "paymentDate"], ["Tax Year", "taxYear"], ["Payment Amount", "paymentAmt"], ["Association", "association"], ["Game IDs", "gameIds"]],
+        payments: [["Payment ID", "paymentId"], ["Payment Date", "paymentDate"], ["Tax Year", "taxYear"], ["Payment Amount", "paymentAmt"], ["Association", "association"], ["Game IDs", "gameIds"], ["Deduction Amount", "deductionAmount"], ["Deduction Type", "deductionType"]],
         levels: [["Sport", "sport"], ["Level Name", "name"], ["Game Fee", "gameFee"], ["Active", "active"]],
         expenses: [["Date", "date"], ["Tax Year", "taxYear"], ["Type", "type"], ["Amount / Mileage", "amount"], ["Association", "association"], ["Description", "description"]],
         associations: [["Association ID", "associationId"], ["Association Name", "associationName"], ["Contact Name", "contactName"], ["Contact Number", "contactNumber"], ["Contact Email", "contactEmail"], ["Assignors", "assignors"]],
         officials: [["First Name", "firstName"], ["Last Name", "lastName"], ["Phone", "phone"], ["Email", "email"], ["Address", "address"]],
         sites: [["Site Name", "siteName"], ["Contact Name", "contactName"], ["Contact Number", "contactNumber"], ["Contact Email", "contactEmail"]],
-        games: [["Game Id", "gameId"], ["Date", "date"], ["Tax Year", "taxYear"], ["Time", "time"], ["Sport", "sport"], ["Site", "site"], ["Field", "field"], ["Num of Games", "numOfGames"], ["Level", "level"], ["Home", "home"], ["Visitor", "visitor"], ["Game Fee", "gameFee"], ["Travel Pay", "travelPay"], ["Assignor Fee", "assignorFee"], ["Deductions", "deductions"], ["Association", "association"], ["Status", "status"]]
+        games: [["Game Id", "gameId"], ["Date", "date"], ["Tax Year", "taxYear"], ["Time", "time"], ["Sport", "sport"], ["Site", "site"], ["Field", "field"], ["Num of Games", "numOfGames"], ["Level", "level"], ["Home", "home"], ["Visitor", "visitor"], ["Game Fee", "gameFee"], ["Travel Pay", "travelPay"], ["Assignor Fee", "assignorFee"], ["Association", "association"], ["Status", "status"]]
     };
     function rawImportValue(data, key) {
         return data[key] ?? data[key.charAt(0).toUpperCase() + key.slice(1)] ?? "";
@@ -3864,7 +3942,7 @@ async function getUploadSnapshot() {
 </script>
 <script>
 document.getElementById("downloadPaymentsTemplate").addEventListener("click", () => {
-    const csv = 'paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated)\r\n';
+    const csv = 'paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated),deductionAmount,deductionType\r\n';
     const url = URL.createObjectURL(new Blob([csv], {type:"text/csv;charset=utf-8"}));
     const link = document.createElement("a");
     link.href = url; link.download = "payments-template.csv";

@@ -35,6 +35,8 @@ type ExpenseDescriptor struct {
 	GameId      string
 	Description string
 	TaxYear     string
+	Source      string
+	PaymentRef  string
 }
 
 type ExpenseDoc struct {
@@ -48,6 +50,9 @@ type ExpenseDoc struct {
 	GameId      int64  `bson:"gameId,omitempty"`
 	Description string `bson:"description,omitempty"`
 	TaxYear     string `bson:"taxYear,omitempty"`
+	TenantId    string `bson:"tenantId,omitempty"`
+	Source      string `bson:"source,omitempty"`
+	PaymentRef  string `bson:"paymentRef,omitempty"`
 }
 
 type EFilters struct {
@@ -68,24 +73,28 @@ type ExpenseFilter struct {
 }
 
 type PaymentDescriptor struct {
-	Version     string `bson:"-" json:"version"`
-	PaymentId   string
-	PaymentDate string
-	PaymentAmt  string
-	Association string
-	GameIds     string
-	TaxYear     string
+	Version         string `bson:"-" json:"version"`
+	PaymentId       string
+	PaymentDate     string
+	PaymentAmt      string
+	Association     string
+	GameIds         string
+	TaxYear         string
+	DeductionAmount string
+	DeductionType   string
 }
 
 type PaymentDoc struct {
-	Version     string  `bson:"-" json:"version"`
-	PaymentId   string  `bson:"paymentId,omitempty"`
-	PaymentDate string  `bson:"paymentDate,omitempty"`
-	PaymentAmt  int64   `bson:"paymentAmt,omitempty"`
-	Association string  `bson:"association,omitempty"`
-	GameIds     []int64 `bson:"gameIds,omitempty"`
-	TenantId    string  `bson:"tenantId,omitempty"`
-	TaxYear     int     `bson:"taxYear,omitempty"`
+	Version         string  `bson:"-" json:"version"`
+	PaymentId       string  `bson:"paymentId,omitempty"`
+	PaymentDate     string  `bson:"paymentDate,omitempty"`
+	PaymentAmt      int64   `bson:"paymentAmt,omitempty"`
+	Association     string  `bson:"association,omitempty"`
+	GameIds         []int64 `bson:"gameIds,omitempty"`
+	TenantId        string  `bson:"tenantId,omitempty"`
+	TaxYear         int     `bson:"taxYear,omitempty"`
+	DeductionAmount int64   `bson:"deductionAmount,omitempty"`
+	DeductionType   string  `bson:"deductionType,omitempty"`
 }
 
 type PaymentRegistryFilter struct {
@@ -162,7 +171,6 @@ type GameDescriptor struct {
 	GameFee     string
 	TravelPay   string
 	AssignorFee string
-	Deductions  string
 	Association string
 	Status      string
 	Assignor    string
@@ -212,7 +220,6 @@ type JsonDoc struct {
 	GameFee     string            `json:"gameFee"`
 	TravelPay   string            `json:"travelPay"`
 	AssignorFee string            `json:"assignorFee"`
-	Deductions  string            `json:"deductions"`
 	Association string            `json:"association"`
 	Status      string            `json:"status"`
 	Assignor    string            `json:"assignor"`
@@ -299,7 +306,6 @@ type HtmlResponse struct {
 	GameFee     int64             `json:"gameFee" bson:"gameFee,omitempty"`
 	TravelPay   int64             `json:"travelPay" bson:"travelPay,omitempty"`
 	AssignorFee int64             `json:"assignorFee" bson:"assignorFee,omitempty"`
-	Deductions  int64             `json:"deductions" bson:"deductions,omitempty"`
 	Association string            `json:"association" bson:"association,omitempty"`
 	Status      string            `json:"status" bson:"status,omitempty"`
 	Assignor    string            `json:"assignor" bson:"assignor,omitempty"`
@@ -342,7 +348,6 @@ type GameView struct {
 	Assignor      string         `json:"Assignor"`
 	TravelPay     string         `json:"TravelPay"`
 	AssignorFee   string         `json:"AssignorFee"`
-	Deductions    string         `json:"Deductions"`
 	TotalEarnings string         `json:"TotalEarnings"`
 	TaxYear       string         `json:"TaxYear"`
 	Notes         string         `json:"Notes"`
@@ -392,49 +397,51 @@ type FinancialReportResponse struct {
 }
 
 type RevenueReport struct {
-	Association     string `json:"association"`
-	NumOfGames      int64  `json:"numOfGames"`
-	TotGameFees     int64  `json:"totGameFees"`
-	TotTravelPay    int64  `json:"totTravelPay"`
-	GrossRevenue    int64  `json:"grossRevenue"`
-	TotAssignorFees int64  `json:"totAssignorFees"`
-	TotDeductions   int64  `json:"totDeductions"`
-	NetRevenue      int64  `json:"netRevenue"`
-	TaxYear         string `json:"taxYear"`
+	Association       string `json:"association"`
+	NumOfGames        int64  `json:"numOfGames"`
+	TotGameFees       int64  `json:"totGameFees"`
+	TotTravelPay      int64  `json:"totTravelPay"`
+	GrossRevenue      int64  `json:"grossRevenue"`
+	TotAssignorFees   int64  `json:"totAssignorFees"`
+	PayrollDeductions int64  `json:"payrollDeductions"`
+	NetRevenue        int64  `json:"netRevenue"`
+	TaxYear           string `json:"taxYear"`
 }
 
 type RevenueReportResponse struct {
-	Association     string `json:"association"`
-	NumOfGames      string `json:"numOfGames"`
-	TotGameFees     string `json:"totGameFees"`
-	TotTravelPay    string `json:"totTravelPay"`
-	GrossRevenue    string `json:"grossRevenue"`
-	TotAssignorFees string `json:"totAssignorFees"`
-	TotDeductions   string `json:"totDeductions"`
-	NetRevenue      string `json:"netRevenue"`
-	TaxYear         string `json:"taxYear"`
+	Association       string `json:"association"`
+	NumOfGames        string `json:"numOfGames"`
+	TotGameFees       string `json:"totGameFees"`
+	TotTravelPay      string `json:"totTravelPay"`
+	GrossRevenue      string `json:"grossRevenue"`
+	TotAssignorFees   string `json:"totAssignorFees"`
+	PayrollDeductions string `json:"payrollDeductions"`
+	NetRevenue        string `json:"netRevenue"`
+	TaxYear           string `json:"taxYear"`
 }
 
 type ExpenseReport struct {
-	Association string `json:"association"`
-	Food        int64  `json:"food"`
-	Dues        int64  `json:"dues"`
-	CampFees    int64  `json:"campFees"`
-	Equipment   int64  `json:"equipment"`
-	Mileage     int64  `json:"mileage"`
-	Deductions  int64  `json:"deductions"`
-	TaxYear     string `json:"taxYear"`
+	Association       string `json:"association"`
+	Food              int64  `json:"food"`
+	Dues              int64  `json:"dues"`
+	CampFees          int64  `json:"campFees"`
+	Equipment         int64  `json:"equipment"`
+	Mileage           int64  `json:"mileage"`
+	PayrollDeductions int64  `json:"payrollDeductions"`
+	TotalExpenses     int64  `json:"totalExpenses"`
+	TaxYear           string `json:"taxYear"`
 }
 
 type ExpenseReportResponse struct {
-	Association string `json:"association"`
-	Food        string `json:"food"`
-	Dues        string `json:"dues"`
-	CampFees    string `json:"campFees"`
-	Equipment   string `json:"equipment"`
-	Mileage     string `json:"mileage"`
-	Deductions  string `json:"deductions"`
-	TaxYear     string `json:"taxYear"`
+	Association       string `json:"association"`
+	Food              string `json:"food"`
+	Dues              string `json:"dues"`
+	CampFees          string `json:"campFees"`
+	Equipment         string `json:"equipment"`
+	Mileage           string `json:"mileage"`
+	PayrollDeductions string `json:"payrollDeductions"`
+	TotalExpenses     string `json:"totalExpenses"`
+	TaxYear           string `json:"taxYear"`
 }
 
 type AccountsReceivableReport struct {

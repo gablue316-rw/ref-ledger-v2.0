@@ -787,6 +787,7 @@
                         <th>Date</th>
                         <th>Association</th>
                         <th>Expense Type</th>
+                        <th>Source</th>
                         <th>Amount / Miles</th>
                         <th>Description</th>
                     </tr>
@@ -1357,7 +1358,7 @@ function renderExpenses(expenses) {
     if (expenses.length === 0) {
         expensesBody.innerHTML = `
             <tr>
-                <td colspan="10" class="empty-row">
+                <td colspan="11" class="empty-row">
                     No expenses found.
                 </td>
             </tr>
@@ -1403,6 +1404,9 @@ function renderExpenses(expenses) {
             "description",
             "Description"
         );
+        const source = getExpenseValue(expense, "source", "Source");
+        const payrollDeduction = source === "Payroll Deduction" ||
+            Boolean(getExpenseValue(expense, "paymentRef", "PaymentRef"));
         const numericAmount = Number(amount);
         if (Number.isFinite(numericAmount)) {
             if (String(expenseType).toLowerCase() === "mileage") {
@@ -1418,14 +1422,16 @@ function renderExpenses(expenses) {
                     type="checkbox"
                     class="expense-select"
                     aria-label="Select expense ${escapeHtml(expenseId)}"
+                    ${payrollDeduction ? "disabled" : ""}
                 >
             </td>
             <td>
                 <button
                     type="button"
                     class="row-action-btn edit-expense-btn"
-                    title="Edit expense ${escapeHtml(expenseId)}"
+                    title="${payrollDeduction ? "Change this deduction through its payment" : `Edit expense ${escapeHtml(expenseId)}`}"
                     aria-label="Edit expense ${escapeHtml(expenseId)}"
+                    ${payrollDeduction ? "disabled" : ""}
                 >
                     <i class="fa-solid fa-pen-to-square"></i>
                 </button>
@@ -1434,8 +1440,9 @@ function renderExpenses(expenses) {
                 <button
                     type="button"
                     class="row-action-btn delete-expense-btn"
-                    title="Delete expense ${escapeHtml(expenseId)}"
+                    title="${payrollDeduction ? "Delete this deduction through its payment" : `Delete expense ${escapeHtml(expenseId)}`}"
                     aria-label="Delete expense ${escapeHtml(expenseId)}"
+                    ${payrollDeduction ? "disabled" : ""}
                 >
                     <i class="fa-solid fa-trash-can"></i>
                 </button>
@@ -1445,6 +1452,7 @@ function renderExpenses(expenses) {
             <td>${escapeHtml(date)}</td>
             <td>${escapeHtml(association)}</td>
             <td>${escapeHtml(expenseType)}</td>
+            <td>${escapeHtml(source || "Expense")}</td>
             <td>${escapeHtml(
                 formatExpenseAmount(amount, expenseType)
             )}</td>
@@ -1469,6 +1477,7 @@ function renderExpenses(expenses) {
             date: String(date || ""),
             taxYear: String(getExpenseValue(expense, "taxYear", "TaxYear", "Taxyear") || ""),
             expenseType: String(expenseType || ""),
+            source: String(source || ""),
             amount: amount,
             description: String(description || "")
         };

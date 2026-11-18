@@ -936,7 +936,7 @@ body {
                         No file selected.
                     </p>
                     <p class="csv-help">
-                        Use the Games template or a Settings Games export. CSV includes gameid,date,taxyear,time,sport,site,field,numofgames,level,gamefee,travelpay,assignorfee,deductions,association,status,official1 through official10,assignor,home,visitor,notes. Files must be no larger than 5 MB. Notes are limited to 150 characters.
+                        Use the Games template or a Settings Games export. CSV includes gameid,date,taxyear,time,sport,site,field,numofgames,level,gamefee,travelpay,assignorfee,association,status,official1 through official10,assignor,home,visitor,notes. Older templates that include a deductions column are also accepted, and that legacy value is ignored. Files must be no larger than 5 MB. Notes are limited to 150 characters.
                     </p>
                     <div class="buttons">
                         <button class="btn blue" disabled="" id="previewBtn">
@@ -1194,12 +1194,6 @@ body {
                                             Assignor Fee
                                         </label>
                                         <input id="assignorFee" step="0.01" type="number" value="0.00"/>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="deductions">
-                                            Deductions
-                                        </label>
-                                        <input id="deductions" step="0.01" type="number" value="0.00"/>
                                     </div>
                                 </div>
                             </div>
@@ -2266,7 +2260,6 @@ async function loadGameForEdit(association, gameId) {
         document.getElementById("gameFee").value = game.GameFee;
         document.getElementById("travelPay").value = game.TravelPay;
         document.getElementById("assignorFee").value = game.AssignorFee;
-        document.getElementById("deductions").value = game.Deductions;
         document.getElementById("status").value = game.Status;
         resetOfficialFields();
         setUpdateMode(true);
@@ -2329,7 +2322,6 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         gameFee: parseFloat(document.getElementById("gameFee").value),
         travelPay: parseFloat(document.getElementById("travelPay").value),
         assignorFee: parseFloat(document.getElementById("assignorFee").value),
-        deductions: parseFloat(document.getElementById("deductions").value),
         status: document.getElementById("status").value,
         officials: assignments,
         assignor: document.getElementById("assignor").value
@@ -2342,7 +2334,6 @@ document.getElementById("updateGameBtn").addEventListener("click", async functio
         game.gameFee = 0;
         game.travelPay = 0;
         game.assignorFee = 0;
-        game.deductions = 0;
         document.getElementById("message").innerText =
             "Clearing Game Financials";
     }
@@ -2414,7 +2405,6 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         gameFee: parseFloat(document.getElementById("gameFee").value),
         travelPay: parseFloat(document.getElementById("travelPay").value),
         assignorFee: parseFloat(document.getElementById("assignorFee").value),
-        deductions: parseFloat(document.getElementById("deductions").value),
         status: document.getElementById("status").value,
         officials: assignments,
         assignor: document.getElementById("assignor").value
@@ -2423,7 +2413,6 @@ document.getElementById("addGameBtn").addEventListener("click", async function(e
         game.gameFee = 0;
         game.travelPay = 0;
         game.assignorFee = 0;
-        game.deductions = 0;
         document.getElementById("message").innerText =
             "Clearing Game Financials";
     }
@@ -2907,7 +2896,6 @@ function renderGameImport(result, committed = false) {
         ['Game Fee', 'gameFee'],
         ['Travel Pay', 'travelPay'],
         ['Assignor Fee', 'assignorFee'],
-        ['Deductions', 'deductions'],
         ['Association', 'association'],
         ['Status', 'status']
     ];

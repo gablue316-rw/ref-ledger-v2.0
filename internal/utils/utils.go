@@ -358,6 +358,46 @@ func ConvertAmtStrToInt64(s string) (int64, error) {
 
 }
 
+func ParseAmountCents(value string) (int64, error) {
+	value = strings.TrimSpace(strings.TrimPrefix(value, "$"))
+	if value == "" {
+		return 0, nil
+	}
+	if strings.HasPrefix(value, "-") || strings.HasPrefix(value, "+") {
+		return 0, fmt.Errorf("amount must be nonnegative")
+	}
+	parts := strings.Split(value, ".")
+	if len(parts) > 2 || parts[0] == "" {
+		return 0, fmt.Errorf("amount must be a number with at most two decimal places")
+	}
+	for _, part := range parts {
+		if part == "" {
+			return 0, fmt.Errorf("amount must be a number with at most two decimal places")
+		}
+		for _, digit := range part {
+			if digit < '0' || digit > '9' {
+				return 0, fmt.Errorf("amount must be a number with at most two decimal places")
+			}
+		}
+	}
+	if len(parts) == 2 && len(parts[1]) > 2 {
+		return 0, fmt.Errorf("amount must be a number with at most two decimal places")
+	}
+	dollars, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("amount is too large")
+	}
+	fraction := "00"
+	if len(parts) == 2 {
+		fraction = (parts[1] + "00")[:2]
+	}
+	cents, err := strconv.ParseInt(fraction, 10, 64)
+	if err != nil || dollars > (int64(^uint64(0)>>1)-cents)/100 {
+		return 0, fmt.Errorf("amount is too large")
+	}
+	return dollars*100 + cents, nil
+}
+
 func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 
 	gameId := ConvertInt64ToStr(doc.GameId)
@@ -365,8 +405,6 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 	gameFee := ConvertInt64ToAmtStr(doc.GameFee)
 	assignorFee := ConvertInt64ToAmtStr(doc.AssignorFee)
 	travelPay := ConvertInt64ToAmtStr(doc.TravelPay)
-	deductions := ConvertInt64ToAmtStr(doc.Deductions)
-
 	gameDescr := model.GameDescriptor{
 		Version:     doc.Version,
 		GameId:      gameId,
@@ -382,7 +420,6 @@ func ConvertGameDocToGameDescr(doc model.GameDoc) model.GameDescriptor {
 		GameFee:     gameFee,
 		TravelPay:   travelPay,
 		AssignorFee: assignorFee,
-		Deductions:  deductions,
 		Association: doc.Association,
 		Status:      doc.Status,
 		Officials:   copyGameOfficials(doc.Officials),
@@ -404,13 +441,15 @@ func ConvertPaymentDocToPaymentDescr(doc model.PaymentDoc) model.PaymentDescript
 	}
 
 	return model.PaymentDescriptor{
-		Version:     doc.Version,
-		PaymentId:   doc.PaymentId,
-		PaymentDate: doc.PaymentDate,
-		PaymentAmt:  paymentAmt,
-		Association: doc.Association,
-		GameIds:     gameIds,
-		TaxYear:     taxYear,
+		Version:         doc.Version,
+		PaymentId:       doc.PaymentId,
+		PaymentDate:     doc.PaymentDate,
+		PaymentAmt:      paymentAmt,
+		Association:     doc.Association,
+		GameIds:         gameIds,
+		TaxYear:         taxYear,
+		DeductionAmount: ConvertInt64ToAmtStr(doc.DeductionAmount),
+		DeductionType:   doc.DeductionType,
 	}
 }
 
@@ -422,6 +461,7 @@ func ConvertPaymentDescrToPaymentDoc(paymentDescr model.PaymentDescriptor) model
 	}
 
 	paymentAmt, _ := ConvertAmtStrToInt64(paymentDescr.PaymentAmt)
+	deductionAmount, _ := ParseAmountCents(paymentDescr.DeductionAmount)
 
 	var taxYear int
 	if paymentDescr.TaxYear != "" {
@@ -433,12 +473,14 @@ func ConvertPaymentDescrToPaymentDoc(paymentDescr model.PaymentDescriptor) model
 	}
 
 	return model.PaymentDoc{
-		PaymentId:   paymentDescr.PaymentId,
-		PaymentDate: paymentDescr.PaymentDate,
-		PaymentAmt:  paymentAmt,
-		Association: paymentDescr.Association,
-		GameIds:     gameIds,
-		TaxYear:     taxYear,
+		PaymentId:       paymentDescr.PaymentId,
+		PaymentDate:     paymentDescr.PaymentDate,
+		PaymentAmt:      paymentAmt,
+		Association:     paymentDescr.Association,
+		GameIds:         gameIds,
+		TaxYear:         taxYear,
+		DeductionAmount: deductionAmount,
+		DeductionType:   paymentDescr.DeductionType,
 	}
 }
 
@@ -448,16 +490,14 @@ func CalculateGameFee(gameRec model.GameDescriptor) int64 {
 	var gFee int64
 	var numOfGames int64
 	var travelPay int64
-	var deductions int64
 	var assignorFee int64
 
 	gFee, _ = ConvertAmtStrToInt64(gameRec.GameFee)
 	numOfGames, _ = ConvertStrToInt64(gameRec.NumOfGames)
 	travelPay, _ = ConvertAmtStrToInt64(gameRec.TravelPay)
-	deductions, _ = ConvertAmtStrToInt64(gameRec.Deductions)
 	assignorFee, _ = ConvertAmtStrToInt64(gameRec.AssignorFee)
 
-	gameFee = gFee*numOfGames + travelPay - deductions - assignorFee
+	gameFee = gFee*numOfGames + travelPay - assignorFee
 
 	return gameFee
 }
@@ -478,6 +518,8 @@ func ConvertExpenseDocToExpenseDescr(doc model.ExpenseDoc) model.ExpenseDescript
 		GameId:      gameId,
 		Description: doc.Description,
 		TaxYear:     doc.TaxYear,
+		Source:      doc.Source,
+		PaymentRef:  doc.PaymentRef,
 	}
 	return descr
 }
@@ -489,8 +531,6 @@ func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
 	gameFee, _ := ConvertAmtStrToInt64(gameDescr.GameFee)
 	assignorFee, _ := ConvertAmtStrToInt64(gameDescr.AssignorFee)
 	travelPay, _ := ConvertAmtStrToInt64(gameDescr.TravelPay)
-	deductions, _ := ConvertAmtStrToInt64(gameDescr.Deductions)
-
 	doc := model.GameDoc{
 		GameId:      gameId,
 		Date:        gameDescr.Date,
@@ -505,7 +545,6 @@ func ConvertGameDescrToGameDoc(gameDescr model.GameDescriptor) model.GameDoc {
 		GameFee:     gameFee,
 		TravelPay:   travelPay,
 		AssignorFee: assignorFee,
-		Deductions:  deductions,
 		Association: gameDescr.Association,
 		Status:      gameDescr.Status,
 		Officials:   copyGameOfficials(gameDescr.Officials),

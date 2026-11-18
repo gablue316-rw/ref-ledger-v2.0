@@ -196,11 +196,6 @@
             <input type="number" id="assignorFee" step="0.01">
         </div>   
 
-        <div class="col">
-            <label for="deductions">Deductions</label>
-            <input type="number" id="deductions" step="0.01">
-        </div>                 
-
     </div>
 
     <div class="row">     
@@ -279,7 +274,6 @@ document.getElementById("gameForm").addEventListener("submit", async function(e)
         gameFee: parseFloat(document.getElementById("gameFee").value),
         travelPay: parseFloat(document.getElementById("travelPay").value),
         assignorFee: parseFloat(document.getElementById("assignorFee").value),
-        deductions: parseFloat(document.getElementById("deductions").value),
         status: document.getElementById("status").value,    
         referee: document.getElementById("referee").value,
         u1: document.getElementById("u1").value,      
