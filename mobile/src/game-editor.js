@@ -11,7 +11,7 @@ export async function editGame(summary,onSaved){
  const creating=!summary;
  if(creating){
   const now=new Date(),date=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  summary={GameId:'',Association:'',Date:date,Time:'6:00 PM',Sport:'',Level:'',Site:'',NumOfGames:'1',GameFee:'0.00',TravelPay:'0.00',AssignorFee:'0.00',Deductions:'0.00',TaxYear:String(now.getFullYear()),Status:'Pending',Assignor:'Unassigned',Officials:[]};
+  summary={GameId:'',Association:'',Date:date,Time:'6:00 PM',Sport:'',Level:'',Site:'',NumOfGames:'1',GameFee:'0.00',TravelPay:'0.00',AssignorFee:'0.00',TaxYear:String(now.getFullYear()),Status:'Pending',Assignor:'Unassigned',Officials:[]};
  }
  const dialog=element('dialog');dialog.className='game-editor';
  const title=element('h2',creating?'Add game':`Game ${summary.GameId} · ${summary.Association}`);dialog.append(title);
@@ -34,8 +34,8 @@ export async function editGame(summary,onSaved){
   for(const [key,text,type='text'] of (creating?[['GameId','Game ID','number'],['Association','Association'],...gameFields]:[['Association','Association'],...gameFields])){
    const label=element('label',text),input=element(['Sport','Association','Assignor','Level','Site'].includes(key)?'select':'input');input.name=key;if(input.tagName==='INPUT')input.type=type;
    input.value=key==='Date'?inputDate(game[key]):key==='Time'?inputTime(game[key]):game[key]??'';
-   if(['GameFee','TravelPay','AssignorFee','Deductions'].includes(key))input.value=String(game[key]??'0').replace(/[$,]/g,'');
-   input.required=['GameId','Association','Date','Time','Sport','Level','Site','NumOfGames','TaxYear','GameFee','TravelPay','AssignorFee','Deductions'].includes(key);
+   if(['GameFee','TravelPay','AssignorFee'].includes(key))input.value=String(game[key]??'0').replace(/[$,]/g,'');
+   input.required=['GameId','Association','Date','Time','Sport','Level','Site','NumOfGames','TaxYear','GameFee','TravelPay','AssignorFee'].includes(key);
    if(type==='number'){input.min=['GameId','NumOfGames'].includes(key)?'1':key==='TaxYear'?'2000':'0';input.step=['GameId','NumOfGames','TaxYear'].includes(key)?'1':'0.01';}
    if(key==='TaxYear')input.max='2100';
    if(key==='Date'){input.min='2000-01-01';input.max='2100-12-31';}

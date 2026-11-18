@@ -546,7 +546,7 @@ func (h *harness) modify(ctx context.Context, u *actor, index, action int) error
 				assignments = append(assignments, assignment)
 			}
 			date := time.Now().AddDate(0, 0, 1+u.rng.Intn(90))
-			g := model.GameDescriptor{GameId: fmt.Sprint(id), Date: date.Format("1/2/2006"), Time: fmt.Sprintf("%d:%02d PM", 1+u.rng.Intn(10), u.rng.Intn(60)), Sport: sport, Site: site.Name, Field: "1", NumOfGames: "1", Level: "Varsity", Home: "Home School", Visitor: "Visitor School", GameFee: money(int64(4500 + u.rng.Intn(5001))), TravelPay: "0.00", AssignorFee: "0.00", Deductions: "0.00", Association: a.Id, Status: "Pending", Assignor: strings.TrimSpace(strings.Split(a.Assignors, ",")[0]), TaxYear: date.Format("2006"), Notes: tag, Officials: assignments}
+			g := model.GameDescriptor{GameId: fmt.Sprint(id), Date: date.Format("1/2/2006"), Time: fmt.Sprintf("%d:%02d PM", 1+u.rng.Intn(10), u.rng.Intn(60)), Sport: sport, Site: site.Name, Field: "1", NumOfGames: "1", Level: "Varsity", Home: "Home School", Visitor: "Visitor School", GameFee: money(int64(4500 + u.rng.Intn(5001))), TravelPay: "0.00", AssignorFee: "0.00", Association: a.Id, Status: "Pending", Assignor: strings.TrimSpace(strings.Split(a.Assignors, ",")[0]), TaxYear: date.Format("2006"), Notes: tag, Officials: assignments}
 			return u.gc.Add(u.TenantID, g)
 		}
 		var doc model.GameDoc

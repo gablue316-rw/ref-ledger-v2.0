@@ -242,14 +242,14 @@ func emailReportTable(req EmailReportRequest, data interface{}) (emailPDFTable, 
 	switch req.ReportType {
 	case "financial":
 		table.title = "Financial Report"
-		table.note = "Deductions are already subtracted from Net Earnings and excluded from this report's expenses. They appear in the Expense Report."
-		table.columns = []emailPDFColumn{c("Association", "association", "", 45), c("Net Earnings", "grossIncome", "money", 48), c("Expenses Excluding Deductions", "totalExpenses", "money", 66), c("Net Income Before Taxes", "netIncome", "money", 60), c("Total Mileage", "totalMileage", "number", 48)}
+		table.note = "Payroll deductions are recorded when payments are entered and are included in Total Expenses. Net Income Before Taxes reflects those deductions."
+		table.columns = []emailPDFColumn{c("Association", "association", "", 45), c("Earnings Before Payroll Deductions", "grossIncome", "money", 62), c("Total Expenses", "totalExpenses", "money", 48), c("Net Income Before Taxes", "netIncome", "money", 60), c("Total Mileage", "totalMileage", "number", 48)}
 	case "revenue":
 		table.title = "Revenue Report"
-		table.columns = []emailPDFColumn{c("Association", "association", "", 35), c("Number of Games", "numOfGames", "number", 26), c("Total Game Fees", "totGameFees", "money", 36), c("Total Travel Pay", "totTravelPay", "money", 33), c("Gross Earnings", "grossRevenue", "money", 36), c("Total Assignor Fees", "totAssignorFees", "money", 35), c("Total Deductions", "totDeductions", "money", 32), c("Net Earnings", "netRevenue", "money", 34)}
+		table.columns = []emailPDFColumn{c("Association", "association", "", 35), c("Number of Games", "numOfGames", "number", 26), c("Total Game Fees", "totGameFees", "money", 36), c("Total Travel Pay", "totTravelPay", "money", 33), c("Gross Earnings", "grossRevenue", "money", 36), c("Total Assignor Fees", "totAssignorFees", "money", 35), c("Payroll Deductions", "payrollDeductions", "money", 38), c("Net Revenue", "netRevenue", "money", 34)}
 	case "expense":
 		table.title = "Expense Report"
-		table.columns = []emailPDFColumn{c("Association", "association", "", 35), c("Food", "food", "money", 30), c("Dues", "dues", "money", 28), c("Camp Fees", "campFees", "money", 33), c("Equipment", "equipment", "money", 34), c("Deductions", "deductions", "money", 34), c("Total Expenses", "totalExpenses", "money", 40), c("Mileage", "mileage", "number", 33)}
+		table.columns = []emailPDFColumn{c("Association", "association", "", 35), c("Food", "food", "money", 30), c("Dues", "dues", "money", 28), c("Camp Fees", "campFees", "money", 33), c("Equipment", "equipment", "money", 34), c("Payroll Deductions", "payrollDeductions", "money", 40), c("Total Expenses", "totalExpenses", "money", 40), c("Mileage", "mileage", "number", 33)}
 	case "accounts-receivable":
 		table.title = "Accounts Receivable Report"
 		table.columns = []emailPDFColumn{c("Association", "association", "", 50), c("Game IDs", "gameIds", "", 155), c("Accounts Receivable", "accountsReceivable", "money", 62)}
@@ -305,17 +305,6 @@ func emailReportTable(req EmailReportRequest, data interface{}) (emailPDFTable, 
 	})
 	totals := make([]int64, len(table.columns))
 	for _, record := range records {
-		if req.ReportType == "expense" {
-			var cents int64
-			for _, field := range []string{"food", "dues", "campFees", "equipment", "deductions"} {
-				n, err := emailPDFCents(emailPDFValue(record[field]))
-				if err != nil {
-					return table, err
-				}
-				cents += n
-			}
-			record["totalExpenses"] = emailPDFMoney(cents)
-		}
 		row := make([]string, len(table.columns))
 		for i, column := range table.columns {
 			value := emailPDFValue(record[column.field])
@@ -501,7 +490,7 @@ func buildEmailReportPDF(req EmailReportRequest, data interface{}) ([]byte, erro
 				return nil, err
 			}
 			totalEarnings += cents
-			for _, field := range []*string{&game.GameFee, &game.TravelPay, &game.AssignorFee, &game.Deductions, &game.TotalEarnings} {
+			for _, field := range []*string{&game.GameFee, &game.TravelPay, &game.AssignorFee, &game.TotalEarnings} {
 				amount, err := emailPDFCents(*field)
 				if err != nil {
 					return nil, err
@@ -524,7 +513,7 @@ func buildEmailReportPDF(req EmailReportRequest, data interface{}) ([]byte, erro
 				"Home: " + game.Home + " | Visitor: " + game.Visitor,
 				"Assignor: " + game.Assignor,
 				fmt.Sprintf("Number of Games: %d | Game Fee: %s | Travel Pay: %s", game.NumOfGames, game.GameFee, game.TravelPay),
-				"Assignor Fee: " + game.AssignorFee + " | Deductions: " + game.Deductions + " | Earnings: " + game.TotalEarnings,
+				"Assignor Fee: " + game.AssignorFee + " | Assignment Earnings: " + game.TotalEarnings,
 			} {
 				line(text)
 			}

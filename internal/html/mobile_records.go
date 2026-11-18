@@ -81,7 +81,6 @@ func MobileCreateGame(w http.ResponseWriter, r *http.Request) {
 		g.GameFee = "0.00"
 		g.TravelPay = "0.00"
 		g.AssignorFee = "0.00"
-		g.Deductions = "0.00"
 	}
 	if err = database.CreateMobileGame(r.Context(), tenant, g); err != nil {
 		if mongo.IsDuplicateKeyError(err) {
@@ -253,6 +252,17 @@ func MobileExpense(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, record)
 			return
 		}
+		if r.Method != http.MethodPost {
+			var currentExpense model.ExpenseDoc
+			if err := bson.Unmarshal(original, &currentExpense); err != nil {
+				http.Error(w, "Unable to read expense", 500)
+				return
+			}
+			if currentExpense.Source == database.PayrollDeductionSource || currentExpense.PaymentRef != "" {
+				http.Error(w, "Payroll deduction expenses must be changed through their payment", 400)
+				return
+			}
+		}
 	}
 	var request struct {
 		Expense MobileExpenseInput `json:"expense"`
@@ -326,10 +336,10 @@ func MobileAccess(w http.ResponseWriter, r *http.Request) {
 }
 
 func normalizeMobileGameMoney(game *model.GameDescriptor) error {
-	for _, field := range []*string{&game.GameFee, &game.TravelPay, &game.AssignorFee, &game.Deductions} {
+	for _, field := range []*string{&game.GameFee, &game.TravelPay, &game.AssignorFee} {
 		value, err := expenseImportValue(*field)
 		if err != nil {
-			return fmt.Errorf("invalid game fee or deduction: %w", err)
+			return fmt.Errorf("invalid game fee: %w", err)
 		}
 		*field = value
 	}

@@ -3,13 +3,14 @@ package database
 import (
 	"context"
 	"fmt"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"ref-ledger-v2/internal/model"
 	"ref-ledger-v2/internal/utils"
 	"strconv"
 	"strings"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Payment and assignment status changes commit together. A stale payment must
@@ -28,8 +29,10 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 	payments := Client.Database(Database).Collection("payments")
 	games := Client.Database(Database).Collection("games")
 	var gameChanges int64
+	var expenseChange int64
 	_, err = session.WithTransaction(ctx, func(tx mongo.SessionContext) (interface{}, error) {
 		gameChanges = 0
+		expenseChange = 0
 		filter, err := ConditionalFilter(tx, payments, bson.M{"tenantId": tenant, "paymentId": id, "association": association}, version)
 		if err != nil {
 			return nil, err
@@ -69,7 +72,7 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 			} else if game.Status != "Paid" && game.Status != "Completed" && game.Status != "Pending" {
 				return nil, ErrConflict
 			}
-			total += utils.CalculateGameFee(utils.ConvertGameDocToGameDescr(game))
+			total += gameEarningsCents(game)
 			result, err := games.UpdateOne(tx, identity, bson.M{"$set": bson.M{"status": next}})
 			if err != nil {
 				return nil, err
@@ -80,6 +83,11 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 			gameChanges += result.ModifiedCount
 		}
 		if change == nil {
+			if err := syncPaymentDeduction(tx, tenant, model.PaymentDoc{
+				PaymentId: id, Association: association,
+			}); err != nil {
+				return nil, fmt.Errorf("remove payroll deduction expense: %w", err)
+			}
 			result, err := payments.DeleteOne(tx, filter)
 			if err != nil {
 				return nil, err
@@ -87,9 +95,11 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 			if result.DeletedCount != 1 {
 				return nil, ErrConflict
 			}
+			if old.DeductionAmount > 0 {
+				expenseChange = 1
+			}
 			return nil, nil
 		}
-		// Editing a payment retains its original association and assignment membership.
 		ids, err := utils.ConvertGameIdStrToInt(change.GameIds)
 		if err != nil {
 			return nil, err
@@ -98,18 +108,26 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 			return nil, fmt.Errorf("payment association and game IDs cannot be changed")
 		}
 		submitted := map[int64]bool{}
-		for _, id := range ids {
-			if !seen[id] || submitted[id] {
+		for _, gameID := range ids {
+			if !seen[gameID] || submitted[gameID] {
 				return nil, fmt.Errorf("payment game IDs cannot be changed")
 			}
-			submitted[id] = true
+			submitted[gameID] = true
 		}
-		amount, err := utils.ConvertAmtStrToInt64(change.PaymentAmt)
+		amount, err := utils.ParseAmountCents(change.PaymentAmt)
 		if err != nil {
 			return nil, err
 		}
-		if amount != total {
-			return nil, fmt.Errorf("payment amount must equal selected game earnings")
+		deduction, deductionType, err := NormalizePaymentDeduction(change.DeductionAmount, change.DeductionType)
+		if err != nil {
+			return nil, err
+		}
+		if deduction > total {
+			return nil, fmt.Errorf("payment deduction exceeds selected-game earnings")
+		}
+		expectedDeposit := total - deduction
+		if expectedDeposit < 0 || amount != expectedDeposit {
+			return nil, fmt.Errorf("payment amount must equal selected-game earnings minus the deduction")
 		}
 		if _, err := time.Parse("1/2/2006", change.PaymentDate); err != nil {
 			return nil, err
@@ -118,12 +136,30 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 		if err != nil || year < utils.MinTaxYear || year > utils.MaxTaxYear {
 			return nil, fmt.Errorf("invalid tax year")
 		}
-		result, err := payments.UpdateOne(tx, filter, bson.M{"$set": bson.M{"paymentDate": change.PaymentDate, "paymentAmt": amount, "taxYear": year}})
+		updatedPayment := old
+		updatedPayment.PaymentDate = change.PaymentDate
+		updatedPayment.PaymentAmt = amount
+		updatedPayment.TaxYear = year
+		updatedPayment.DeductionAmount = deduction
+		updatedPayment.DeductionType = deductionType
+		result, err := payments.UpdateOne(tx, filter, bson.M{"$set": bson.M{
+			"paymentDate":     change.PaymentDate,
+			"paymentAmt":      amount,
+			"taxYear":         year,
+			"deductionAmount": deduction,
+			"deductionType":   deductionType,
+		}})
 		if err != nil {
 			return nil, err
 		}
 		if result.MatchedCount != 1 {
 			return nil, ErrConflict
+		}
+		if err := syncPaymentDeduction(tx, tenant, updatedPayment); err != nil {
+			return nil, fmt.Errorf("save payroll deduction expense: %w", err)
+		}
+		if old.DeductionAmount != deduction || old.DeductionType != deductionType {
+			expenseChange = 1
 		}
 		return nil, nil
 	})
@@ -133,8 +169,14 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 		}
 		if change == nil {
 			MetricsDeleted(tenant, "payments", 1)
+			if expenseChange > 0 {
+				MetricsDeleted(tenant, "expenses", expenseChange)
+			}
 		} else {
 			MetricsUpdated(tenant, "payments", 1)
+			if expenseChange > 0 {
+				MetricsUpdated(tenant, "expenses", expenseChange)
+			}
 		}
 	}
 	return err

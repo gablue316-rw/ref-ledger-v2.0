@@ -1795,7 +1795,6 @@ function renderGameReport(report) {
         { label: "Game Fee", value: row => formatCurrency(parseGameFee(gameField(row, "gameFee", "GameFee"))) },
         { label: "Travel Pay", value: row => formatCurrency(parseGameFee(gameField(row, "travelPay", "TravelPay"))) },
         { label: "Assignor Fee", value: row => formatCurrency(parseGameFee(gameField(row, "assignorFee", "AssignorFee"))) },
-        { label: "Deductions", value: row => formatCurrency(parseGameFee(gameField(row, "deductions", "Deductions"))) },
         { label: "Assignment Earnings", value: row => formatCurrency(parseReportNumber(gameField(row, "totalEarnings", "TotalEarnings"))) },
         { label: "Assoc", value: row => gameField(row, "association", "Association") },
         { label: "Status", value: row => gameField(row, "status", "Status") },
@@ -1879,8 +1878,8 @@ function renderFinancialReport(report) {
     const columns = [
         { label: "Association", field: "association" },
         { label: "Tax Year", field: "taxYear" },
-        { label: "Net Earnings", field: "grossIncome" },
-        { label: "Expenses Excluding Deductions", field: "totalExpenses" },
+        { label: "Earnings Before Payroll Deductions", field: "grossIncome" },
+        { label: "Total Expenses", field: "totalExpenses" },
         { label: "Net Income Before Taxes", field: "netIncome" },
         { label: "Total Mileage", field: "totalMileage" }
     ];
@@ -1936,9 +1935,8 @@ function renderFinancialReport(report) {
     note.style.marginTop = "15px";
     note.style.color = "#64748b";
     note.textContent =
-        "Note: Deductions have already been subtracted to calculate Net Earnings " +
-        "and are excluded from expenses in this Financial Report. " +
-        "They appear as an expense in the Expense Report.";
+        "Payroll deductions are recorded when payments are entered and are included in Total Expenses. " +
+        "Net Income Before Taxes reflects those deductions.";
 
     const container = document.getElementById("reportContainer");
     container.className = "";
@@ -1971,8 +1969,8 @@ function renderRevenueReport(report) {
         { label: "Total Travel Pay", field: "totTravelPay" },
         { label: "Gross Earnings", field: "grossRevenue" },
         { label: "Total Assignor Fees", field: "totAssignorFees" },
-        { label: "Total Deductions", field: "totDeductions" },
-        { label: "Net Earnings", field: "netRevenue" }
+        { label: "Payroll Deductions", field: "payrollDeductions" },
+        { label: "Net Revenue", field: "netRevenue" }
     ];
 
     const totalFields = columns.slice(2).map(column => column.field);
@@ -2051,7 +2049,7 @@ function renderExpenseReport(report) {
         { label: "Dues", field: "dues" },
         { label: "Camp Fees", field: "campFees" },
         { label: "Equipment", field: "equipment" },
-        { label: "Deductions", field: "deductions" },
+        { label: "Payroll Deductions", field: "payrollDeductions" },
         { label: "Total Expenses", field: "totalExpenses" },
         { label: "Mileage", field: "mileage" }
     ];
@@ -2083,13 +2081,7 @@ function renderExpenseReport(report) {
                 return;
             }
 
-            const value = column.field === "totalExpenses"
-                ? parseReportNumber(row.food) +
-                    parseReportNumber(row.dues) +
-                    parseReportNumber(row.campFees) +
-                    parseReportNumber(row.equipment) +
-                    parseReportNumber(row.deductions)
-                : parseReportNumber(row[column.field]);
+            const value = parseReportNumber(row[column.field]);
             totals[column.field] += value;
 
             cell.textContent = column.field === "mileage"

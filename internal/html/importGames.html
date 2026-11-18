@@ -99,7 +99,8 @@ tr:nth-child(even) { background-color: #f9fafb; }
     <li>Select the file below and preview it before importing.</li>
     <li>After making corrections, save the CSV and preview again. Follow the browser instructions below about selecting the file again.</li>
    </ol>
-   <div class="template-format"><code>gameId,date,taxYear,time,sport,site,field,numOfGames,level,gameFee,travelPay,assignorFee,deductions,association,status,official1,official2,official3,official4,official5,official6,official7,official8,official9,official10,assignor,home,visitor,notes</code></div>
+   <div class="template-format"><code>gameId,date,taxYear,time,sport,site,field,numOfGames,level,gameFee,travelPay,assignorFee,association,status,official1,official2,official3,official4,official5,official6,official7,official8,official9,official10,assignor,home,visitor,notes</code></div>
+   <p class="file-help">Legacy templates with a deductions column are accepted; that historical value is ignored.</p>
   </div>
   <div class="button-row"><a href="/api/import/games/template" class="btn btn-template"><i class="fa-solid fa-download"></i> Download Games Template</a></div>
   <form id="importGamesForm" novalidate>
@@ -550,7 +551,7 @@ function displayPreview(result) {
             ["time", "Time"], ["sport", "Sport"], ["site", "Site"], ["field", "Field"],
             ["numOfGames", "NumOfGames"], ["level", "Level"], ["home", "Home"],
             ["visitor", "Visitor"], ["gameFee", "GameFee"], ["travelPay", "TravelPay"],
-            ["assignorFee", "AssignorFee"], ["deductions", "Deductions"],
+            ["assignorFee", "AssignorFee"],
             ["association", "Association"], ["status", "Status"]
         ].forEach(function (keys) { appendCell(tableRow, getValue(data, keys[0], keys[1])); });
         const officials = getOfficials(data);
@@ -583,7 +584,7 @@ function getOfficials(data) {
 function buildPreviewTableHeader(previewRoles) {
     const headerRow = document.getElementById("previewTableHeaderRow");
     headerRow.innerHTML = "";
-    ["CSV Row", "Status", "Game Id", "Date", "Tax Year", "Time", "Sport", "Site", "Field", "Num of Games", "Level", "Home", "Visitor", "Game Fee", "Travel Pay", "Assignor Fee", "Deductions", "Association", "Status"].forEach(function (text) { appendHeaderCell(headerRow, text); });
+    ["CSV Row", "Status", "Game Id", "Date", "Tax Year", "Time", "Sport", "Site", "Field", "Num of Games", "Level", "Home", "Visitor", "Game Fee", "Travel Pay", "Assignor Fee", "Association", "Status"].forEach(function (text) { appendHeaderCell(headerRow, text); });
     previewRoles.forEach(function (role) { appendHeaderCell(headerRow, role.title); });
     ["Assignor", "Notes", "Errors"].forEach(function (text) { appendHeaderCell(headerRow, text); });
 }

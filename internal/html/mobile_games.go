@@ -135,7 +135,6 @@ func MobileGame(w http.ResponseWriter, r *http.Request) {
 			request.Game.GameFee = "0.00"
 			request.Game.TravelPay = "0.00"
 			request.Game.AssignorFee = "0.00"
-			request.Game.Deductions = "0.00"
 		}
 		if err = api.ValidateGameDescriptor(r.Context(), request.Game, false, tenant); err != nil {
 			http.Error(w, err.Error(), 400)
