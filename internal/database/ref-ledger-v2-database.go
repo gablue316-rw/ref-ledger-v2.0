@@ -260,7 +260,7 @@ func GetGameFee(gameIds []int64, tId, status, association string) (int64, error)
 
 	var total int64
 	for _, game := range results {
-		total += game.GameFee*game.NumOfGames + game.TravelPay - game.Deductions - game.AssignorFee
+		total += gameEarningsCents(game)
 	}
 	return total, nil
 }
@@ -1306,177 +1306,157 @@ func InsertPaymentDocs(
 	payment []model.PaymentDescriptor,
 	dbase, collection, tenantId string,
 ) (int, int, int, []error) {
-	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	if dbase != Database || collection != "payments" {
+		err := fmt.Errorf("invalid payment database or collection")
+		return 0, len(payment), 0, []error{err}
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, 30*time.Second)
 	defer cancel()
-
-	db := Client.Database(dbase)
-	coll := db.Collection(collection)
-	collectionName := coll.Name()
-
-	utils.AuditLog.Printf(
-		"InsertPaymentDocs: Inserting %d payment records into collection %s",
-		len(payment), collection,
-	)
-	fmt.Println("Inserting records into", collectionName)
 
 	recordsInserted := 0
 	totalErrors := 0
 	gamesUpdatedToPaid := 0
 	importErrors := make([]error, 0)
 
-	for _, v := range payment {
-		paymentDate, err := time.Parse(
-			"1/2/2006",
-			strings.TrimSpace(v.PaymentDate),
-		)
+	for _, row := range payment {
+		paymentDate, err := time.Parse("1/2/2006", strings.TrimSpace(row.PaymentDate))
 		if err != nil {
-			dateErr := fmt.Errorf(
-				"invalid payment date %q for PaymentId %s: expected m/d/yyyy: %w",
-				v.PaymentDate, v.PaymentId, err,
-			)
-			utils.AuditLog.Println(dateErr)
-			fmt.Println(dateErr)
+			importErrors = append(importErrors, fmt.Errorf("invalid payment date %q: %w", row.PaymentDate, err))
 			totalErrors++
-			importErrors = append(importErrors, dateErr)
 			continue
 		}
-
-		// Preserve the supplied tax year; default only when blank.
 		taxYear := paymentDate.Year()
-		taxYearText := strings.TrimSpace(v.TaxYear)
-
-		if taxYearText != "" {
-			parsedYear, err := strconv.Atoi(taxYearText)
-			if err != nil || parsedYear < 1000 || parsedYear > 9999 {
-				yearErr := fmt.Errorf(
-					"invalid tax year %q for PaymentId %s: expected a year between 1000 and 9999",
-					v.TaxYear, v.PaymentId,
-				)
-				utils.AuditLog.Println(yearErr)
-				fmt.Println(yearErr)
+		if yearText := strings.TrimSpace(row.TaxYear); yearText != "" {
+			taxYear, err = strconv.Atoi(yearText)
+			if err != nil || taxYear < utils.MinTaxYear || taxYear > utils.MaxTaxYear {
+				importErrors = append(importErrors, fmt.Errorf("invalid tax year %q", row.TaxYear))
 				totalErrors++
-				importErrors = append(importErrors, yearErr)
 				continue
 			}
-			taxYear = parsedYear
 		}
-
-		v.TaxYear = strconv.Itoa(taxYear)
-		doc := utils.ConvertPaymentDescrToPaymentDoc(v)
-		doc.TenantId = tenantId
-		doc.TaxYear = taxYear
-
-		paymentExists, err := PaymentExists(doc, tenantId)
+		amount, err := utils.ParseAmountCents(row.PaymentAmt)
 		if err != nil {
+			importErrors = append(importErrors, fmt.Errorf("invalid payment amount: %w", err))
 			totalErrors++
-			fmt.Println(err)
-			importErrors = append(importErrors, err)
 			continue
 		}
-
-		if paymentExists {
-			totalErrors++
-			fmt.Println("Payment with id already exists")
-			importErrors = append(
-				importErrors,
-				errors.New("Payment with ID already exists"),
-			)
-			continue
-		}
-
-		gameIds, err := utils.ConvertGameIdStrToInt(v.GameIds)
+		deduction, deductionType, err := NormalizePaymentDeduction(row.DeductionAmount, row.DeductionType)
 		if err != nil {
-			utils.AuditLog.Printf(
-				"Failed to convert Game Ids string to []int64 for PaymentId %s. Reason: %v",
-				doc.PaymentId, err,
-			)
-			fmt.Println("Failed to convert Game Ids string to []int64. Reason:", err)
-			totalErrors++
 			importErrors = append(importErrors, err)
-			continue
-		}
-
-		gameErrors := VerifyGameMatchesAssociation(
-			gameIds, v.Association, tenantId,
-		)
-		if len(gameErrors) > 0 {
 			totalErrors++
-			importErrors = append(importErrors, gameErrors...)
 			continue
 		}
-
-		statusErrors := VerifyGameStatus(gameIds, v.Association, tenantId)
-		if len(statusErrors) > 0 {
+		gameIDs, err := utils.ConvertGameIdStrToInt(row.GameIds)
+		if err != nil || len(gameIDs) == 0 {
+			if err == nil {
+				err = fmt.Errorf("payment must include at least one game")
+			}
+			importErrors = append(importErrors, err)
 			totalErrors++
-			importErrors = append(importErrors, statusErrors...)
 			continue
 		}
+		row.PaymentId = strings.TrimSpace(row.PaymentId)
+		row.Association = strings.TrimSpace(row.Association)
+		if row.PaymentId == "" || row.Association == "" {
+			importErrors = append(importErrors, fmt.Errorf("payment ID and association are required"))
+			totalErrors++
+			continue
+		}
+		doc := model.PaymentDoc{
+			PaymentId:       row.PaymentId,
+			PaymentDate:     paymentDate.Format("1/2/2006"),
+			PaymentAmt:      amount,
+			Association:     row.Association,
+			GameIds:         gameIDs,
+			TenantId:        tenantId,
+			TaxYear:         taxYear,
+			DeductionAmount: deduction,
+			DeductionType:   deductionType,
+		}
 
-		totalGameFee, err := GetGameFee(gameIds, tenantId, "", v.Association)
+		session, err := Client.StartSession()
+		if err == nil {
+			var changedGames int64
+			_, err = session.WithTransaction(ctx, func(tx mongo.SessionContext) (interface{}, error) {
+				changedGames = 0
+				payments := Client.Database(Database).Collection("payments")
+				games := Client.Database(Database).Collection("games")
+				count, err := payments.CountDocuments(tx, bson.M{
+					"tenantId": tenantId, "association": doc.Association, "paymentId": doc.PaymentId,
+				})
+				if err != nil {
+					return nil, err
+				}
+				if count != 0 {
+					return nil, fmt.Errorf("payment with ID already exists")
+				}
+
+				seen := make(map[int64]bool, len(gameIDs))
+				var gameEarnings int64
+				for _, gameID := range gameIDs {
+					if gameID <= 0 || seen[gameID] {
+						return nil, fmt.Errorf("payment game IDs must be distinct positive integers")
+					}
+					seen[gameID] = true
+					var game model.GameDoc
+					filter := bson.M{"tenantId": tenantId, "association": doc.Association, "gameId": gameID}
+					if err := games.FindOne(tx, filter).Decode(&game); err != nil {
+						return nil, fmt.Errorf("load selected game %d: %w", gameID, err)
+					}
+					if game.Status != "Completed" {
+						return nil, fmt.Errorf("game %d must be Completed before payment", gameID)
+					}
+					gameEarnings += gameEarningsCents(game)
+				}
+				if deduction > gameEarnings {
+					return nil, fmt.Errorf("payment deduction exceeds selected-game earnings")
+				}
+				expectedDeposit := gameEarnings - deduction
+				if expectedDeposit < 0 || amount != expectedDeposit {
+					return nil, fmt.Errorf(
+						"payment amount mismatch: expected deposit %s, got %s",
+						utils.ConvertInt64ToAmtStr(expectedDeposit),
+						utils.ConvertInt64ToAmtStr(amount),
+					)
+				}
+
+				if _, err := payments.InsertOne(tx, doc); err != nil {
+					return nil, err
+				}
+				for _, gameID := range gameIDs {
+					result, err := games.UpdateOne(
+						tx,
+						bson.M{"tenantId": tenantId, "association": doc.Association, "gameId": gameID, "status": "Completed"},
+						bson.M{"$set": bson.M{"status": "Paid"}},
+					)
+					if err != nil {
+						return nil, err
+					}
+					if result.MatchedCount != 1 {
+						return nil, ErrConflict
+					}
+					changedGames += result.ModifiedCount
+				}
+				if err := syncPaymentDeduction(tx, tenantId, doc); err != nil {
+					return nil, fmt.Errorf("save payroll deduction expense: %w", err)
+				}
+				return nil, nil
+			})
+			session.EndSession(ctx)
+			gamesUpdatedToPaid += int(changedGames)
+		}
 		if err != nil {
-			utils.AuditLog.Printf(
-				"Failed to get game fee for Game Ids %v. Reason: %v",
-				gameIds, err,
-			)
-			fmt.Println("Failed to get game fee. Reason:", err)
+			importErrors = append(importErrors, fmt.Errorf("payment %s: %w", doc.PaymentId, err))
 			totalErrors++
-			importErrors = append(importErrors, err)
-			continue
-		}
-
-		if totalGameFee != doc.PaymentAmt {
-			errStr := fmt.Sprintf(
-				"Payment amount mismatch for PaymentId %s. Expected: %s, Got: %s",
-				doc.PaymentId,
-				utils.ConvertInt64ToAmtStr(totalGameFee),
-				utils.ConvertInt64ToAmtStr(doc.PaymentAmt),
-			)
-			utils.AuditLog.Println(errStr)
-			fmt.Println(errStr)
-			totalErrors++
-			importErrors = append(importErrors, errors.New(errStr))
-			continue
-		}
-
-		_, err = coll.InsertOne(ctx, doc)
-		if err != nil {
-			utils.AuditLog.Printf(
-				"Failed to insert payment record for PaymentId %s. Reason: %v",
-				doc.PaymentId, err,
-			)
-			fmt.Println("Insert failed. Reason:", err)
-			totalErrors++
-			importErrors = append(importErrors, err)
 			MetricsErrors(tenantId, "payments", 1)
 			continue
 		}
-
-		MetricsAdded(tenantId, "payments", 1)
-
 		recordsInserted++
-		paidCount, paidErr := UpdateGameStatusToPaid(
-			ctx,
-			gameIds,
-			v.Association,
-			tenantId,
-		)
-		gamesUpdatedToPaid += paidCount
-
-		if paidErr != nil {
-			totalErrors++
-			importErrors = append(importErrors, fmt.Errorf(
-				"payment %s was saved, but some game status updates failed: %w",
-				doc.PaymentId,
-				paidErr,
-			))
+		MetricsAdded(tenantId, "payments", 1)
+		if deduction > 0 {
+			MetricsAdded(tenantId, "expenses", 1)
 		}
 	}
-
-	fmt.Println(
-		"Total Records inserted into", collectionName, ":", recordsInserted,
-		"Total Errors:", totalErrors,
-		"Games Updated to Paid:", gamesUpdatedToPaid,
-	)
 
 	return recordsInserted, totalErrors, gamesUpdatedToPaid, importErrors
 }
@@ -1536,6 +1516,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	if previous.Version != game.Version {
 		return ErrConflict
 	}
+	doc.Deductions = previous.Deductions
 	if err := prepareGameOfficials(ctx, coll.Database(), &doc, &previous); err != nil {
 		return err
 	}
@@ -3577,6 +3558,8 @@ type ExpenseDoc struct {
 	Description string `bson:"description,omitempty"`
 	TaxYear     string `bson:"taxYear,omitempty"`
 	TenantId    string `bson:"tenantId"`
+	Source      string `bson:"source,omitempty"`
+	PaymentRef  string `bson:"paymentRef,omitempty"`
 }
 
 type ExpensesCollection struct {
@@ -3735,6 +3718,16 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string, ve
 		"association": association,
 		"tenantId":    tenantId,
 	}
+	var existing ExpenseDoc
+	if err := ec.Coll.FindOne(context.Background(), filter).Decode(&existing); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return ErrConflict
+		}
+		return fmt.Errorf("failed to load expense %q: %w", expenseId, err)
+	}
+	if existing.Source == "Payroll Deduction" || existing.PaymentRef != "" {
+		return fmt.Errorf("payroll deduction expenses must be changed through their payment")
+	}
 
 	conditional, conflictErr := ConditionalFilter(context.Background(), ec.Coll, filter, firstVersion(versions))
 	if conflictErr != nil {
@@ -3811,6 +3804,16 @@ func (ec *ExpensesCollection) Update(
 		"expenseId":   expenseId,
 		"association": association,
 		"tenantId":    tenantId,
+	}
+	var existing ExpenseDoc
+	if err := ec.Coll.FindOne(ctx, filter).Decode(&existing); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return ErrConflict
+		}
+		return fmt.Errorf("failed to load expense %q: %w", expenseId, err)
+	}
+	if existing.Source == "Payroll Deduction" || existing.PaymentRef != "" {
+		return fmt.Errorf("payroll deduction expenses must be changed through their payment")
 	}
 
 	var amt int64 = 0
@@ -4952,9 +4955,9 @@ func GetReconciliationReports(
 			record.CalculatedAmt +=
 				game.NumOfGames*game.GameFee +
 					game.TravelPay -
-					game.Deductions -
 					game.AssignorFee
 		}
+		record.CalculatedAmt -= payment.DeductionAmount
 
 		switch {
 		case record.CalculatedAmt == record.PaymentAmt:
@@ -5140,15 +5143,13 @@ func GetRevenueReports(
 
 		gameFees := game.NumOfGames * game.GameFee
 		revenue := gameFees + game.TravelPay
-		expenses := game.AssignorFee + game.Deductions
 
 		record.NumOfGames += game.NumOfGames
 		record.TotGameFees += gameFees
 		record.TotTravelPay += game.TravelPay
 		record.TotAssignorFees += game.AssignorFee
-		record.TotDeductions += game.Deductions
 		record.GrossRevenue += revenue
-		record.NetRevenue += revenue - expenses
+		record.NetRevenue += revenue - game.AssignorFee
 
 		revenueRecords[key] = record
 	}
@@ -5158,6 +5159,43 @@ func GetRevenueReports(
 			"GetRevenueReports games cursor failed: %w",
 			err,
 		)
+	}
+
+	expenseFilter := bson.M{
+		"tenantId":   tId,
+		"source":     PayrollDeductionSource,
+		"paymentRef": bson.M{"$exists": true, "$ne": ""},
+	}
+	if len(selectedAssociations) > 0 {
+		expenseFilter["association"] = bson.M{"$in": selectedAssociations}
+	}
+	if taxYear != "" {
+		expenseFilter["taxYear"] = taxYear
+	}
+	payrollCursor, err := Client.Database(Database).Collection("expenses").Find(ctx, expenseFilter)
+	if err != nil {
+		return nil, fmt.Errorf("GetRevenueReports payroll expenses query failed: %w", err)
+	}
+	defer payrollCursor.Close(ctx)
+	for payrollCursor.Next(ctx) {
+		var expense model.ExpenseDoc
+		if err := payrollCursor.Decode(&expense); err != nil {
+			return nil, fmt.Errorf("GetRevenueReports payroll expense decode failed: %w", err)
+		}
+		associationName := strings.TrimSpace(expense.Association)
+		if _, allowed := allowedAssociations[associationName]; !allowed {
+			continue
+		}
+		key := reportKey{Association: associationName, TaxYear: strings.TrimSpace(expense.TaxYear)}
+		record := revenueRecords[key]
+		record.Association = key.Association
+		record.TaxYear = key.TaxYear
+		record.PayrollDeductions += expense.Amount
+		record.NetRevenue -= expense.Amount
+		revenueRecords[key] = record
+	}
+	if err := payrollCursor.Err(); err != nil {
+		return nil, fmt.Errorf("GetRevenueReports payroll expenses cursor failed: %w", err)
 	}
 
 	response := make(
@@ -5174,15 +5212,15 @@ func GetRevenueReports(
 		)
 
 		response[responseKey] = model.RevenueReportResponse{
-			Association:     record.Association,
-			TaxYear:         record.TaxYear,
-			NumOfGames:      strconv.FormatInt(record.NumOfGames, 10),
-			TotGameFees:     formatCurrency(record.TotGameFees),
-			TotTravelPay:    formatCurrency(record.TotTravelPay),
-			GrossRevenue:    formatCurrency(record.GrossRevenue),
-			TotAssignorFees: formatCurrency(record.TotAssignorFees),
-			TotDeductions:   formatCurrency(record.TotDeductions),
-			NetRevenue:      formatCurrency(record.NetRevenue),
+			Association:       record.Association,
+			TaxYear:           record.TaxYear,
+			NumOfGames:        strconv.FormatInt(record.NumOfGames, 10),
+			TotGameFees:       formatCurrency(record.TotGameFees),
+			TotTravelPay:      formatCurrency(record.TotTravelPay),
+			GrossRevenue:      formatCurrency(record.GrossRevenue),
+			TotAssignorFees:   formatCurrency(record.TotAssignorFees),
+			PayrollDeductions: formatCurrency(record.PayrollDeductions),
+			NetRevenue:        formatCurrency(record.NetRevenue),
 		}
 	}
 
@@ -5321,7 +5359,6 @@ func GetFinancialReports(
 			GameFee     int64  `bson:"gameFee"`
 			TravelPay   int64  `bson:"travelPay"`
 			AssignorFee int64  `bson:"assignorFee"`
-			Deductions  int64  `bson:"deductions"`
 		}
 
 		if err := gameCursor.Decode(&game); err != nil {
@@ -5349,8 +5386,7 @@ func GetFinancialReports(
 		record.GrossIncome +=
 			game.NumOfGames*game.GameFee +
 				game.TravelPay -
-				game.AssignorFee -
-				game.Deductions
+				game.AssignorFee
 
 		financialRecords[key] = record
 	}
@@ -5382,6 +5418,7 @@ func GetFinancialReports(
 			Type        string `bson:"type"`
 			Amount      int64  `bson:"amount"`
 			Mileage     int64  `bson:"mileage"`
+			Source      string `bson:"source"`
 		}
 
 		if err := expenseCursor.Decode(&expense); err != nil {
@@ -5406,7 +5443,9 @@ func GetFinancialReports(
 		record.Association = key.Association
 		record.TaxYear = key.TaxYear
 
-		if strings.EqualFold(strings.TrimSpace(expense.Type), "Mileage") {
+		if expense.Source == PayrollDeductionSource {
+			record.TotalExpenses += expense.Amount
+		} else if strings.EqualFold(strings.TrimSpace(expense.Type), "Mileage") {
 			record.TotalMileage += expense.Mileage
 		} else {
 			record.TotalExpenses += expense.Amount
@@ -5571,65 +5610,6 @@ func GetExpenseReports(
 		return filter
 	}
 
-	// Group paid-game deductions by association and tax year.
-	gameFilter := buildFilter()
-	gameFilter["status"] = "Paid"
-	gameFilter["deductions"] = bson.M{
-		"$ne":     int64(0),
-		"$exists": true,
-	}
-
-	gamesColl := Client.Database(Database).Collection("games")
-
-	gameCursor, err := gamesColl.Find(ctx, gameFilter)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"GetExpenseReports games query failed: %w",
-			err,
-		)
-	}
-	defer gameCursor.Close(ctx)
-
-	for gameCursor.Next(ctx) {
-		var game struct {
-			Association string `bson:"association"`
-			TaxYear     string `bson:"taxYear"`
-			Deductions  int64  `bson:"deductions"`
-		}
-
-		if err := gameCursor.Decode(&game); err != nil {
-			return nil, fmt.Errorf(
-				"GetExpenseReports game decode failed: %w",
-				err,
-			)
-		}
-
-		associationName := strings.TrimSpace(game.Association)
-
-		if _, allowed := allowedAssociations[associationName]; !allowed {
-			continue
-		}
-
-		key := reportKey{
-			Association: associationName,
-			TaxYear:     strings.TrimSpace(game.TaxYear),
-		}
-
-		record := expenseRecords[key]
-		record.Association = key.Association
-		record.TaxYear = key.TaxYear
-		record.Deductions += game.Deductions
-
-		expenseRecords[key] = record
-	}
-
-	if err := gameCursor.Err(); err != nil {
-		return nil, fmt.Errorf(
-			"GetExpenseReports games cursor failed: %w",
-			err,
-		)
-	}
-
 	// Group expenses by association and tax year.
 	expensesColl :=
 		Client.Database(Database).Collection("expenses")
@@ -5650,6 +5630,7 @@ func GetExpenseReports(
 			Type        string `bson:"type"`
 			Amount      int64  `bson:"amount"`
 			Mileage     int64  `bson:"mileage"`
+			Source      string `bson:"source"`
 		}
 
 		if err := expenseCursor.Decode(&expense); err != nil {
@@ -5674,21 +5655,25 @@ func GetExpenseReports(
 		record.Association = key.Association
 		record.TaxYear = key.TaxYear
 
-		switch strings.ToLower(strings.TrimSpace(expense.Type)) {
-		case "food":
-			record.Food += expense.Amount
-
-		case "dues", "association dues":
-			record.Dues += expense.Amount
-
-		case "camp fees", "camp fee", "campfees":
-			record.CampFees += expense.Amount
-
-		case "equipment":
-			record.Equipment += expense.Amount
-
-		case "mileage":
-			record.Mileage += expense.Mileage
+		if expense.Source == PayrollDeductionSource {
+			record.PayrollDeductions += expense.Amount
+			record.TotalExpenses += expense.Amount
+		} else {
+			switch strings.ToLower(strings.TrimSpace(expense.Type)) {
+			case "food":
+				record.Food += expense.Amount
+			case "dues", "association dues":
+				record.Dues += expense.Amount
+			case "camp fees", "camp fee", "campfees":
+				record.CampFees += expense.Amount
+			case "equipment":
+				record.Equipment += expense.Amount
+			case "mileage":
+				record.Mileage += expense.Mileage
+			}
+			if !strings.EqualFold(strings.TrimSpace(expense.Type), "Mileage") {
+				record.TotalExpenses += expense.Amount
+			}
 		}
 
 		expenseRecords[key] = record
@@ -5716,14 +5701,15 @@ func GetExpenseReports(
 		)
 
 		response[responseKey] = model.ExpenseReportResponse{
-			Association: record.Association,
-			TaxYear:     record.TaxYear,
-			Food:        formatCurrency(record.Food),
-			Dues:        formatCurrency(record.Dues),
-			CampFees:    formatCurrency(record.CampFees),
-			Equipment:   formatCurrency(record.Equipment),
-			Mileage:     formatInt64Hundredths(record.Mileage),
-			Deductions:  formatCurrency(record.Deductions),
+			Association:       record.Association,
+			TaxYear:           record.TaxYear,
+			Food:              formatCurrency(record.Food),
+			Dues:              formatCurrency(record.Dues),
+			CampFees:          formatCurrency(record.CampFees),
+			Equipment:         formatCurrency(record.Equipment),
+			Mileage:           formatInt64Hundredths(record.Mileage),
+			PayrollDeductions: formatCurrency(record.PayrollDeductions),
+			TotalExpenses:     formatCurrency(record.TotalExpenses),
 		}
 	}
 
@@ -5884,8 +5870,7 @@ func GetAccountsReceivableReport(
 		record.AccountsReceivable +=
 			game.NumOfGames*game.GameFee +
 				game.TravelPay -
-				game.AssignorFee -
-				game.Deductions
+				game.AssignorFee
 
 		record.GameIds = append(
 			record.GameIds,
@@ -5982,7 +5967,6 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 			GameFee:     utils.ConvertInt64ToAmtStr(r.GameFee),
 			AssignorFee: utils.ConvertInt64ToAmtStr(r.AssignorFee),
 			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),
-			Deductions:  utils.ConvertInt64ToAmtStr(r.Deductions),
 			TaxYear:     r.TaxYear,
 			Notes:       r.Notes,
 		}
@@ -5992,7 +5976,6 @@ func GetGameReport(filter model.GameFilter) ([]model.GameView, error) {
 			GameFee:     utils.ConvertInt64ToAmtStr(r.GameFee),
 			NumOfGames:  utils.ConvertInt64ToStr(r.NumOfGames),
 			TravelPay:   utils.ConvertInt64ToAmtStr(r.TravelPay),
-			Deductions:  utils.ConvertInt64ToAmtStr(r.Deductions),
 			AssignorFee: utils.ConvertInt64ToAmtStr(r.AssignorFee),
 		}
 

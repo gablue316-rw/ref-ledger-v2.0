@@ -71,7 +71,6 @@ type Game struct {
 	GameFee     float64                 `json:"gameFee"`
 	TravelPay   float64                 `json:"travelPay"`
 	AssignorFee float64                 `json:"assignorFee"`
-	Deductions  float64                 `json:"deductions"`
 	Status      string                  `json:"status"`
 	Assignor    string                  `json:"assignor"`
 	Officials   []model.GameOfficialDoc `json:"officials"`
@@ -90,13 +89,15 @@ type Expense struct {
 }
 
 type Payment struct {
-	Version     string  `json:"version"`
-	PaymentDate string  `json:"date"`
-	PaymentId   string  `json:"paymentid"`
-	PaymentAmt  float64 `json:"amount"`
-	Association string  `json:"association"`
-	GameID      []int64 `json:"gameids"`
-	TaxYear     int     `json:"taxYear"`
+	Version         string      `json:"version"`
+	PaymentDate     string      `json:"date"`
+	PaymentId       string      `json:"paymentid"`
+	PaymentAmt      json.Number `json:"amount"`
+	DeductionAmount json.Number `json:"deductionAmount"`
+	DeductionType   string      `json:"deductionType"`
+	Association     string      `json:"association"`
+	GameID          []int64     `json:"gameids"`
+	TaxYear         int         `json:"taxYear"`
 }
 
 type GameStatusTarget struct {
@@ -241,7 +242,6 @@ func GameDocToGameDescr(g Game) model.GameDescriptor {
 		GameFee:     strconv.FormatFloat(g.GameFee, 'f', 2, 64),
 		TravelPay:   strconv.FormatFloat(g.TravelPay, 'f', 2, 64),
 		AssignorFee: strconv.FormatFloat(g.AssignorFee, 'f', 2, 64),
-		Deductions:  strconv.FormatFloat(g.Deductions, 'f', 2, 64),
 		Status:      g.Status,
 		Assignor:    g.Assignor,
 		Officials:   officials,
@@ -268,13 +268,15 @@ func PaymentDocToPaymentDescr(p Payment) model.PaymentDescriptor {
 	}
 
 	return model.PaymentDescriptor{
-		Version:     p.Version,
-		PaymentDate: t.Format("1/2/2006"),
-		PaymentId:   p.PaymentId,
-		PaymentAmt:  strconv.FormatFloat(p.PaymentAmt, 'f', 2, 64),
-		Association: p.Association,
-		TaxYear:     strconv.Itoa(taxYear),
-		GameIds:     strings.Join(gameIds, ";"),
+		Version:         p.Version,
+		PaymentDate:     t.Format("1/2/2006"),
+		PaymentId:       p.PaymentId,
+		PaymentAmt:      p.PaymentAmt.String(),
+		DeductionAmount: p.DeductionAmount.String(),
+		DeductionType:   p.DeductionType,
+		Association:     p.Association,
+		TaxYear:         strconv.Itoa(taxYear),
+		GameIds:         strings.Join(gameIds, ";"),
 	}
 }
 
@@ -887,7 +889,6 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"gameFee",
 		"travelPay",
 		"assignorFee",
-		"deductions",
 		"association",
 		"status",
 		"official1",
@@ -938,7 +939,6 @@ func DownloadGamesTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		"$50.00",
 		"$25.00",
 		"$10.00",
-		"$5.00",
 		"MSO",
 		"Pending",
 		"John Doe",
@@ -1063,7 +1063,6 @@ type GameImportData struct {
 	GameFee     string                  `json:"gameFee"`
 	TravelPay   string                  `json:"travelPay"`
 	AssignorFee string                  `json:"assignorFee"`
-	Deductions  string                  `json:"deductions"`
 	Association string                  `json:"association"`
 	Status      string                  `json:"status"`
 	Officials   []model.GameOfficialDoc `json:"officials"`
@@ -1391,7 +1390,6 @@ func validateSitesCSVHeader(header []string) error {
 }
 
 func validateGamesCSVHeader(header []string) error {
-
 	expected := []string{
 		"gameid",
 		"date",
@@ -1405,7 +1403,6 @@ func validateGamesCSVHeader(header []string) error {
 		"gamefee",
 		"travelpay",
 		"assignorfee",
-		"deductions",
 		"association",
 		"status",
 		"official1",
@@ -1423,27 +1420,23 @@ func validateGamesCSVHeader(header []string) error {
 		"visitor",
 		"notes",
 	}
-
-	if len(header) != len(expected) {
-		return fmt.Errorf(
-			"invalid CSV header: expected %d columns but found %d",
-			len(expected),
-			len(header),
-		)
-	}
-
-	for i := range header {
-		actualName := normalizeHeaderName(header[i])
-		if actualName != expected[i] {
-			return fmt.Errorf(
-				"invalid CSV header in column %d: expected %q but found %q",
-				i+1,
-				expected[i],
-				strings.TrimSpace(header[i]),
-			)
+	legacy := append([]string(nil), expected[:12]...)
+	legacy = append(legacy, "deductions")
+	legacy = append(legacy, expected[12:]...)
+	matches := func(columns []string) bool {
+		if len(header) != len(columns) {
+			return false
 		}
+		for i, name := range columns {
+			if normalizeHeaderName(header[i]) != name {
+				return false
+			}
+		}
+		return true
 	}
-
+	if !matches(expected) && !matches(legacy) {
+		return fmt.Errorf("invalid CSV header: use the current game format without deductions or the supported legacy format with deductions")
+	}
 	return nil
 }
 
@@ -1508,6 +1501,13 @@ func normalizeOfficialName(firstName string, lastName string) string {
 	return strings.ToLower(strings.TrimSpace(firstName)) + "|" + strings.ToLower(strings.TrimSpace(lastName))
 }
 
+func normalizeGameCSVRecord(record []string) []string {
+	if len(record) == 29 {
+		return append(append([]string(nil), record[:12]...), record[13:]...)
+	}
+	return record
+}
+
 func buildGamePreviewRow(
 	rowNumber int,
 	record []string,
@@ -1515,13 +1515,14 @@ func buildGamePreviewRow(
 	seenDateTimes map[string]bool,
 ) GamePreviewRow {
 
-	const expectedColumns = 29
-	const firstOfficialColumn = 15
+	record = normalizeGameCSVRecord(record)
+	const expectedColumns = 28
+	const firstOfficialColumn = 14
 	const maxOfficialColumns = 10
-	const assignorColumn = 25
-	const homeColumn = 26
-	const visitorColumn = 27
-	const notesColumn = 28
+	const assignorColumn = 24
+	const homeColumn = 25
+	const visitorColumn = 26
+	const notesColumn = 27
 
 	var dateValid bool
 	var timeValid bool
@@ -1557,9 +1558,8 @@ func buildGamePreviewRow(
 		GameFee:     csvColumn(record, 9),
 		TravelPay:   csvColumn(record, 10),
 		AssignorFee: csvColumn(record, 11),
-		Deductions:  csvColumn(record, 12),
-		Association: csvColumn(record, 13),
-		Status:      csvColumn(record, 14),
+		Association: csvColumn(record, 12),
+		Status:      csvColumn(record, 13),
 		Officials:   make([]model.GameOfficialDoc, 0),
 		Assignor:    csvColumn(record, assignorColumn),
 		Home:        csvColumn(record, homeColumn),
@@ -1684,15 +1684,6 @@ func buildGamePreviewRow(
 			fmt.Sprintf(
 				"Invalid Assignor Fee: %q",
 				row.Data.AssignorFee,
-			),
-		)
-	}
-	if !dollarAmountPattern.MatchString(row.Data.Deductions) {
-		row.Errors = append(
-			row.Errors,
-			fmt.Sprintf(
-				"Invalid Deductions: %q",
-				row.Data.Deductions,
 			),
 		)
 	}
@@ -3246,7 +3237,6 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			GameFee:     data.GameFee,
 			TravelPay:   data.TravelPay,
 			AssignorFee: data.AssignorFee,
-			Deductions:  data.Deductions,
 			Association: data.Association,
 			Status:      data.Status,
 			Officials:   data.Officials,
@@ -5071,7 +5061,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		game.GameFee = float64(0)
 		game.TravelPay = float64(0)
 		game.AssignorFee = float64(0)
-		game.Deductions = float64(0)
 	}
 
 	singleGameDesc = GameDocToGameDescr(game)
@@ -5176,7 +5165,6 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 		game.GameFee = float64(0)
 		game.TravelPay = float64(0)
 		game.AssignorFee = float64(0)
-		game.Deductions = float64(0)
 	}
 
 	singleGameDesc = GameDocToGameDescr(game)
@@ -5337,7 +5325,6 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 			fields["gameFee"] = int64(0)
 			fields["travelPay"] = int64(0)
 			fields["assignorFee"] = int64(0)
-			fields["deductions"] = int64(0)
 		}
 
 		conditional, err := database.ConditionalFilter(ctx, gc.Coll, filter, game.Version)
@@ -7148,7 +7135,6 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 			GameFee:     utils.ConvertInt64ToAmtStr(game.GameFee),
 			NumOfGames:  utils.ConvertInt64ToStr(game.NumOfGames),
 			TravelPay:   utils.ConvertInt64ToAmtStr(game.TravelPay),
-			Deductions:  utils.ConvertInt64ToAmtStr(game.Deductions),
 			AssignorFee: utils.ConvertInt64ToAmtStr(game.AssignorFee),
 		}
 
@@ -7180,6 +7166,7 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 		}
 
 		view.GameFee = fmt.Sprintf("$%.2f", float64(gameFee)/100)
+		view.TotalEarnings = utils.ConvertInt64ToAmtStr(gameFee)
 		view.Date = fmt.Sprintf(
 			"%s (%s)",
 			game.Date,
@@ -7922,6 +7909,11 @@ func main() {
 		utils.AuditLog.Println("Failed to initialize expenses collection.")
 		return
 	}
+	if err = database.CreatePayrollDeductionIndexes(context.Background()); err != nil {
+		fmt.Println("Failed to create payroll deduction expense index:", err)
+		utils.AuditLog.Println("Failed to create payroll deduction expense index:", err)
+		return
+	}
 
 	err = se.Init(database.Client)
 	if err != nil {
@@ -8378,13 +8370,13 @@ func dataExportHeader(name string) []string {
 	case "sites":
 		return []string{"sitename", "contactname", "contactnumber", "contactemail"}
 	case "games":
-		return []string{"gameid", "date", "taxyear", "time", "sport", "site", "field", "numofgames", "level", "gamefee", "travelpay", "assignorfee", "deductions", "association", "status", "official1", "official2", "official3", "official4", "official5", "official6", "official7", "official8", "official9", "official10", "assignor", "home", "visitor", "notes"}
+		return []string{"gameid", "date", "taxyear", "time", "sport", "site", "field", "numofgames", "level", "gamefee", "travelpay", "assignorfee", "association", "status", "official1", "official2", "official3", "official4", "official5", "official6", "official7", "official8", "official9", "official10", "assignor", "home", "visitor", "notes"}
 	case "levels":
 		return []string{"sport", "name", "gameFee", "active"}
 	case "expenses":
 		return []string{"date", "taxYear", "type", "amount", "association", "description"}
 	case "payments":
-		return []string{"paymentId", "paymentDate", "taxYear", "paymentAmt", "association", "gameIds(comma-separated)"}
+		return []string{"paymentId", "paymentDate", "taxYear", "paymentAmt", "association", "gameIds(comma-separated)", "deductionAmount", "deductionType"}
 	}
 	return nil
 }
@@ -8408,11 +8400,11 @@ func dataExportRow(name string, doc bson.M) ([]string, error) {
 		}
 		row = []string{get("date"), get("taxYear"), get("type"), value, get("association"), get("description")}
 	case "payments":
-		row = []string{get("paymentId"), get("paymentDate"), get("taxYear"), get("paymentAmt"), get("association"), get("gameIds")}
+		row = []string{get("paymentId"), get("paymentDate"), get("taxYear"), get("paymentAmt"), get("association"), get("gameIds"), get("deductionAmount"), get("deductionType")}
 	case "games":
-		row = make([]string, 29)
+		row = make([]string, 28)
 		for i, field := range dataExportHeader(name) {
-			if i < 15 || i > 24 {
+			if i < 14 || i > 23 {
 				row[i] = get(field)
 			}
 		}
@@ -8442,7 +8434,7 @@ func dataExportRow(name string, doc bson.M) ([]string, error) {
 			if position == 10 {
 				return nil, fmt.Errorf("sport %s has more than ten active roles", get("sport"))
 			}
-			row[15+position] = "Unassigned"
+			row[14+position] = "Unassigned"
 			found := false
 			for i, official := range stored.Officials {
 				if official.RoleId == role.RoleId {
@@ -8450,7 +8442,7 @@ func dataExportRow(name string, doc bson.M) ([]string, error) {
 						return nil, fmt.Errorf("duplicate stored assignment for %s", role.Title)
 					}
 					found = true
-					row[15+position] = official.Name
+					row[14+position] = official.Name
 					matched[i] = true
 				}
 			}
@@ -8458,7 +8450,7 @@ func dataExportRow(name string, doc bson.M) ([]string, error) {
 			if len(stored.Officials) == 0 {
 				legacy := get(strings.ToLower(role.Title))
 				if legacy != "" {
-					row[15+position] = legacy
+					row[14+position] = legacy
 				}
 			}
 			position++
@@ -8470,7 +8462,7 @@ func dataExportRow(name string, doc bson.M) ([]string, error) {
 		}
 	}
 	// Amounts and legacy expense mileage are stored in hundredths; export both divided by 100.
-	money := map[string][]int{"games": {9, 10, 11, 12}, "levels": {2}, "expenses": {3}, "payments": {3}}
+	money := map[string][]int{"games": {9, 10, 11}, "levels": {2}, "expenses": {3}, "payments": {3, 6}}
 	for _, index := range money[name] {
 		value, err := exportCents(row[index])
 		if err != nil {
@@ -8480,6 +8472,7 @@ func dataExportRow(name string, doc bson.M) ([]string, error) {
 	}
 	if name == "payments" {
 		row[3] = "$" + row[3]
+		row[6] = "$" + row[6]
 	}
 	if name == "expenses" {
 		if strings.EqualFold(strings.TrimSpace(get("type")), "Mileage") {
@@ -9365,12 +9358,14 @@ func CommitLevelsImportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type PaymentImportData struct {
-	PaymentID   string `json:"paymentId"`
-	PaymentDate string `json:"paymentDate"`
-	TaxYear     string `json:"taxYear"`
-	PaymentAmt  string `json:"paymentAmt"`
-	Association string `json:"association"`
-	GameIDs     string `json:"gameIds"`
+	PaymentID       string `json:"paymentId"`
+	PaymentDate     string `json:"paymentDate"`
+	TaxYear         string `json:"taxYear"`
+	PaymentAmt      string `json:"paymentAmt"`
+	Association     string `json:"association"`
+	GameIDs         string `json:"gameIds"`
+	DeductionAmount string `json:"deductionAmount"`
+	DeductionType   string `json:"deductionType"`
 }
 type PaymentPreviewRow struct {
 	RowNumber int               `json:"rowNumber"`
@@ -9414,7 +9409,8 @@ func paymentImportValue(value string) (string, error) {
 }
 func paymentImportDescriptor(data PaymentImportData) model.PaymentDescriptor {
 	return model.PaymentDescriptor{PaymentId: data.PaymentID, PaymentDate: data.PaymentDate, TaxYear: data.TaxYear,
-		PaymentAmt: strings.TrimPrefix(data.PaymentAmt, "$"), Association: data.Association, GameIds: strings.ReplaceAll(data.GameIDs, ",", ";")}
+		PaymentAmt: strings.TrimPrefix(data.PaymentAmt, "$"), Association: data.Association, GameIds: strings.ReplaceAll(data.GameIDs, ",", ";"),
+		DeductionAmount: strings.TrimPrefix(data.DeductionAmount, "$"), DeductionType: data.DeductionType}
 }
 func paymentImportID(data PaymentImportData) string {
 	encoded, _ := json.Marshal([]string{data.Association, data.PaymentID})
@@ -9435,11 +9431,15 @@ func paymentImportGameIDs(value string) ([]int64, error) {
 }
 func validatePaymentImportRow(rowNumber int, record []string) PaymentPreviewRow {
 	row := PaymentPreviewRow{RowNumber: rowNumber, Errors: []string{}}
-	if len(record) != 6 {
-		row.Errors = append(row.Errors, "Expected 6 columns: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated). Quote multiple game IDs, for example \"1,2,3\".")
+	if len(record) != 6 && len(record) != 8 {
+		row.Errors = append(row.Errors, "Expected 6 legacy columns or 8 columns including deductionAmount and deductionType.")
 		return row
 	}
 	d := PaymentImportData{PaymentID: strings.TrimSpace(record[0]), PaymentDate: strings.TrimSpace(record[1]), TaxYear: strings.TrimSpace(record[2]), PaymentAmt: strings.TrimSpace(record[3]), Association: strings.TrimSpace(record[4]), GameIDs: strings.TrimSpace(record[5])}
+	if len(record) == 8 {
+		d.DeductionAmount = strings.TrimSpace(record[6])
+		d.DeductionType = strings.TrimSpace(record[7])
+	}
 	if d.PaymentID == "" {
 		row.Errors = append(row.Errors, "Payment ID is required.")
 	}
@@ -9462,6 +9462,22 @@ func validatePaymentImportRow(rowNumber int, record []string) PaymentPreviewRow 
 		row.Errors = append(row.Errors, "Payment amount "+e.Error()+".")
 	} else {
 		d.PaymentAmt = "$" + amount
+	}
+	if d.DeductionAmount != "" {
+		if amount, e := paymentImportValue(d.DeductionAmount); e != nil {
+			row.Errors = append(row.Errors, "Deduction amount "+e.Error()+".")
+		} else {
+			d.DeductionAmount = amount
+		}
+	}
+	if cents, expenseType, e := database.NormalizePaymentDeduction(d.DeductionAmount, d.DeductionType); e != nil {
+		row.Errors = append(row.Errors, e.Error()+".")
+	} else if cents > 0 {
+		d.DeductionAmount = utils.ConvertInt64ToAmtStr(cents)
+		d.DeductionType = expenseType
+	} else {
+		d.DeductionAmount = ""
+		d.DeductionType = ""
 	}
 	if d.Association == "" {
 		row.Errors = append(row.Errors, "Association is required.")
@@ -9522,8 +9538,16 @@ func paymentImportReference(ctx context.Context, tId string, data PaymentImportD
 	if err != nil {
 		return err
 	}
-	if total != cents {
-		return fmt.Errorf("Payment amount does not match game total: expected %s.", utils.ConvertInt64ToAmtStr(total))
+	deduction, _, err := database.NormalizePaymentDeduction(data.DeductionAmount, data.DeductionType)
+	if err != nil {
+		return err
+	}
+	if deduction > total {
+		return fmt.Errorf("Payment deduction exceeds selected-game earnings.")
+	}
+	expectedDeposit := total - deduction
+	if expectedDeposit < 0 || expectedDeposit != cents {
+		return fmt.Errorf("Payment amount does not match expected deposit: expected %s.", utils.ConvertInt64ToAmtStr(expectedDeposit))
 	}
 	return nil
 }
@@ -9565,14 +9589,17 @@ func PreviewPaymentsImportHandler(w http.ResponseWriter, r *http.Request) {
 	reader := csv.NewReader(file)
 	reader.FieldsPerRecord = -1
 	columns, err := reader.Read()
-	if err != nil || len(columns) != 6 {
-		writeJSONError(w, 400, "Expected header: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated).")
+	if err != nil || (len(columns) != 6 && len(columns) != 8) {
+		writeJSONError(w, 400, "Expected the legacy six-column payment header or the eight-column header including deductionAmount and deductionType.")
 		return
 	}
 	expected := []string{"paymentId", "paymentDate", "taxYear", "paymentAmt", "association", "gameIds(comma-separated)"}
+	if len(columns) == 8 {
+		expected = append(expected, "deductionAmount", "deductionType")
+	}
 	for i, name := range expected {
 		if normalizeHeaderName(columns[i]) != normalizeHeaderName(name) {
-			writeJSONError(w, 400, "Expected header: paymentId,paymentDate,taxYear,paymentAmt,association,gameIds(comma-separated).")
+			writeJSONError(w, 400, "Payment CSV headers must match the six-column legacy format or the eight-column format including deductionAmount and deductionType.")
 			return
 		}
 	}

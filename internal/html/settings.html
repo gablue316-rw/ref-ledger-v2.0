@@ -1722,7 +1722,7 @@ document.addEventListener('keydown', event => {
         associations: [["Association ID", "associationId"], ["Association Name", "associationName"], ["Contact Name", "contactName"], ["Contact Number", "contactNumber"], ["Contact Email", "contactEmail"], ["Assignors", "assignors"]],
         officials: [["First Name", "firstName"], ["Last Name", "lastName"], ["Phone", "phone"], ["Email", "email"], ["Address", "address"]],
         sites: [["Site Name", "siteName"], ["Contact Name", "contactName"], ["Contact Number", "contactNumber"], ["Contact Email", "contactEmail"]],
-        games: [["Game Id", "gameId"], ["Date", "date"], ["Tax Year", "taxYear"], ["Time", "time"], ["Sport", "sport"], ["Site", "site"], ["Field", "field"], ["Num of Games", "numOfGames"], ["Level", "level"], ["Home", "home"], ["Visitor", "visitor"], ["Game Fee", "gameFee"], ["Travel Pay", "travelPay"], ["Assignor Fee", "assignorFee"], ["Deductions", "deductions"], ["Association", "association"], ["Status", "status"]]
+        games: [["Game Id", "gameId"], ["Date", "date"], ["Tax Year", "taxYear"], ["Time", "time"], ["Sport", "sport"], ["Site", "site"], ["Field", "field"], ["Num of Games", "numOfGames"], ["Level", "level"], ["Home", "home"], ["Visitor", "visitor"], ["Game Fee", "gameFee"], ["Travel Pay", "travelPay"], ["Assignor Fee", "assignorFee"], ["Association", "association"], ["Status", "status"]]
     };
     function rawImportValue(data, key) {
         return data[key] ?? data[key.charAt(0).toUpperCase() + key.slice(1)] ?? "";

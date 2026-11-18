@@ -143,11 +143,11 @@ func TestMobileExpensesScopeDatesAndConcurrency(t *testing.T) {
 }
 
 func TestMobileGameDecimalFeesAreStoredAsCents(t *testing.T) {
-	game := model.GameDescriptor{GameFee: "65.5", TravelPay: "1", AssignorFee: "$2.05", Deductions: "0"}
+	game := model.GameDescriptor{GameFee: "65.5", TravelPay: "1", AssignorFee: "$2.05"}
 	if err := normalizeMobileGameMoney(&game); err != nil {
 		t.Fatal(err)
 	}
-	for value, want := range map[string]int64{game.GameFee: 6550, game.TravelPay: 100, game.AssignorFee: 205, game.Deductions: 0} {
+	for value, want := range map[string]int64{game.GameFee: 6550, game.TravelPay: 100, game.AssignorFee: 205} {
 		got, err := utils.ConvertAmtStrToInt64(value)
 		if err != nil || got != want {
 			t.Fatalf("%s: %d != %d (%v)", value, got, want, err)

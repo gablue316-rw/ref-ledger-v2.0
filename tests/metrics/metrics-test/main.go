@@ -201,7 +201,7 @@ func (e *environment) generate(rng *rand.Rand, id int64, sport string, year int)
 		Site: e.sites[rng.Intn(len(e.sites))].Name, Field: "1",
 		Home: schools[home], Visitor: schools[visitor], Status: "Pending",
 		Level: e.levels[rng.Intn(len(e.levels))].Name, NumOfGames: "1",
-		GameFee: "95.00", TravelPay: "20.00", AssignorFee: "0.00", Deductions: "0.00",
+		GameFee: "95.00", TravelPay: "20.00", AssignorFee: "0.00",
 		Association: association.Id, Assignor: assignor, TaxYear: strconv.Itoa(year),
 		Notes: fmt.Sprintf("Game Id %s added.", gameID),
 	}

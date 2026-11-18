@@ -1064,7 +1064,6 @@ body {
                     <div class="edit-game-field"><label for="editGameFee">Game Fee</label><input type="number" min="0" step="0.01" id="editGameFee" required></div>
                     <div class="edit-game-field"><label for="editTravelPay">Travel Pay</label><input type="number" min="0" step="0.01" id="editTravelPay"></div>
                     <div class="edit-game-field"><label for="editAssignorFee">Assignor Fee</label><input type="number" min="0" step="0.01" id="editAssignorFee"></div>
-                    <div class="edit-game-field"><label for="editDeductions">Deductions</label><input type="number" min="0" step="0.01" id="editDeductions"></div>
                     <div class="edit-game-field"><label for="editAssignor">Assignor</label><select id="editAssignor"><option value="">Select Assignor</option></select></div>
                 </div>
 
@@ -3202,7 +3201,6 @@ async function openEditGame(gameId, association, notesOnly = false) {
     document.getElementById("editGameFee").value = gameValue(gameBeingEdited, "GameFee");
     document.getElementById("editTravelPay").value = gameValue(gameBeingEdited, "TravelPay");
     document.getElementById("editAssignorFee").value = gameValue(gameBeingEdited, "AssignorFee");
-    document.getElementById("editDeductions").value = gameValue(gameBeingEdited, "Deductions");
     document.getElementById("editGameError").style.display = "none";
     if (!dashboardUserSportsReady) {
         showEditGameError(dashboardUserSportsError + " You can still save with the game's existing sport.");
@@ -3297,7 +3295,6 @@ async function saveEditedGame(event) {
         gameFee: Number.parseFloat(document.getElementById("editGameFee").value),
         travelPay: Number.parseFloat(document.getElementById("editTravelPay").value || 0),
         assignorFee: Number.parseFloat(document.getElementById("editAssignorFee").value || 0),
-        deductions: Number.parseFloat(document.getElementById("editDeductions").value || 0),
         status: document.getElementById("editStatus").value,
         officials: collectEditOfficials(),
         assignor: document.getElementById("editAssignor").value.trim()
@@ -3307,7 +3304,6 @@ async function saveEditedGame(event) {
         payload.gameFee = 0;
         payload.travelPay = 0;
         payload.assignorFee = 0;
-        payload.deductions = 0;
     }
 
     saveButton.disabled = true;

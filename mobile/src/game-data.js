@@ -29,4 +29,4 @@ export function responseError(r){
  return typeof r.data==='string'?r.data.trim():r.data?.error||r.data?.message||'Unable to complete the request. Please retry.';
 }
 
-export const gameFields=[['Date','Date','date'],['Time','Time (Eastern)','time'],['Sport','Sport'],['Level','Level'],['Site','Site'],['Field','Field / court'],['Home','Home'],['Visitor','Visitor'],['NumOfGames','Number of games','number'],['GameFee','Game fee per game','number'],['TravelPay','Travel pay','number'],['AssignorFee','Assignor fee','number'],['Deductions','Deductions','number'],['Assignor','Assignor'],['TaxYear','Tax year','number']];
+export const gameFields=[['Date','Date','date'],['Time','Time (Eastern)','time'],['Sport','Sport'],['Level','Level'],['Site','Site'],['Field','Field / court'],['Home','Home'],['Visitor','Visitor'],['NumOfGames','Number of games','number'],['GameFee','Game fee per game','number'],['TravelPay','Travel pay','number'],['AssignorFee','Assignor fee','number'],['Assignor','Assignor'],['TaxYear','Tax year','number']];

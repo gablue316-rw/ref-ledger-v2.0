@@ -68,6 +68,7 @@ func WriteMobileGame(ctx context.Context, s MobileGameSnapshot, game *model.Game
 	}
 	doc := convertGameDescrWithOfficials(*game)
 	doc.TenantId = s.Doc.TenantId
+	doc.Deductions = s.Doc.Deductions
 	var err error
 	doc.GameDateTime, err = convertDateStringToTime(game.Date, game.Time)
 	if err != nil {

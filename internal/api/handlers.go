@@ -150,12 +150,6 @@ func ValidateGameDescriptor(
 		)
 	}
 
-	if !dollarAmountPattern.MatchString(g.Deductions) {
-		return fmt.Errorf(
-			"invalid Deductions amount %q: use numbers with an optional $ and up to two decimal places",
-			g.Deductions,
-		)
-	}
 
 	assignor := strings.TrimSpace(g.Assignor)
 	gameIDText := strings.TrimSpace(g.GameId)
