@@ -1076,6 +1076,7 @@
                     : result.levels || result.Levels || [];
                 levels = loadedLevels.map(level => ({
                     id: level.id ?? level.ID ?? "",
+                    version: level.version ?? level.Version ?? "",
                     name: level.name ?? level.Name ?? "",
                     sport: level.sport ?? level.Sport ?? "",
                     gameFee: formatGameFee(level.gameFee ?? level.GameFee ?? 0),
@@ -1488,7 +1489,7 @@ function renderSports(sports) { renderActiveSports(sports); populateLevelSports(
                     resetLevelForm();
                     document.getElementById("levelName").focus();
                     showMessage(
-                        responseData.message || "Level added successfully",
+                        responseData.message || "Level added inactive. Activate it before selecting it on a game.",
                         "success"
                     );
                 } catch (error) {

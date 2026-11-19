@@ -44,7 +44,7 @@ func TestMobileExpenseValidationAndStorageUnits(t *testing.T) {
 	}
 }
 func TestMobileNewRoutesRequireBearerAndMaintenanceAdmission(t *testing.T) {
-	for _, path := range []string{"/api/mobile/game", "/api/mobile/expense", "/api/mobile/expenses", "/api/mobile/access"} {
+	for _, path := range []string{"/api/mobile/game", "/api/mobile/expense", "/api/mobile/expenses", "/api/mobile/access", "/api/mobile/catalog/create/site", "/api/mobile/catalog/activate/level"} {
 		for _, method := range []string{"GET", "POST", "PUT", "DELETE"} {
 			next := mobileAccountHandler(func(http.ResponseWriter, *http.Request) { t.Fatal("cookie authorized mobile action") })
 			req := httptest.NewRequest(method, path+"?tenantId=other", nil)

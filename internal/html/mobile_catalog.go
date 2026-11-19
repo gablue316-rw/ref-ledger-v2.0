@@ -31,6 +31,46 @@ func MobileCatalog(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unable to load selected sports", 500)
 		return
 	}
+	activeSportCursor, err := db.Collection("sports").Find(r.Context(), bson.M{"active": true})
+	if err != nil {
+		http.Error(w, "Unable to load active sports", 500)
+		return
+	}
+	activeSportRecords := []database.Sport{}
+	if err = activeSportCursor.All(r.Context(), &activeSportRecords); err != nil {
+		activeSportCursor.Close(r.Context())
+		http.Error(w, "Unable to read active sports", 500)
+		return
+	}
+	if err = activeSportCursor.Close(r.Context()); err != nil {
+		http.Error(w, "Unable to close active sports", 500)
+		return
+	}
+	activeSportNames := []string{}
+	activeSportSet := map[string]bool{}
+	for _, sport := range activeSportRecords {
+		name := strings.TrimSpace(sport.Name)
+		if name != "" {
+			activeSportSet[name] = true
+			activeSportNames = append(activeSportNames, name)
+		}
+	}
+	supportedSportSet := map[string]bool{}
+	for _, sport := range user.Sports {
+		name := strings.TrimSpace(sport)
+		if name != "" {
+			supportedSportSet[name] = true
+		}
+	}
+	supportedSports := []string{}
+	availableSports := []string{}
+	for _, sport := range mobileUniqueNames(activeSportNames) {
+		if supportedSportSet[sport] {
+			supportedSports = append(supportedSports, sport)
+		} else {
+			availableSports = append(availableSports, sport)
+		}
+	}
 	associations := []database.AssociationDoc{}
 	sites := []database.SiteDoc{}
 	levels := []database.Level{}
@@ -63,13 +103,19 @@ func MobileCatalog(w http.ResponseWriter, r *http.Request) {
 	for _, site := range sites {
 		names = append(names, site.Name)
 	}
-	sort.Slice(levels, func(i, j int) bool {
-		if levels[i].Sport == levels[j].Sport {
-			return levels[i].Name < levels[j].Name
+	eligibleLevels := make([]database.Level, 0, len(levels))
+	for _, level := range levels {
+		if activeSportSet[level.Sport] && supportedSportSet[level.Sport] {
+			eligibleLevels = append(eligibleLevels, level)
 		}
-		return levels[i].Sport < levels[j].Sport
+	}
+	sort.Slice(eligibleLevels, func(i, j int) bool {
+		if eligibleLevels[i].Sport == eligibleLevels[j].Sport {
+			return eligibleLevels[i].Name < eligibleLevels[j].Name
+		}
+		return eligibleLevels[i].Sport < eligibleLevels[j].Sport
 	})
-	writeJSON(w, 200, map[string]interface{}{"sports": mobileUniqueNames(user.Sports), "associations": choices, "sites": mobileUniqueNames(names), "levels": levels})
+	writeJSON(w, 200, map[string]interface{}{"sports": supportedSports, "availableSports": availableSports, "associations": choices, "sites": mobileUniqueNames(names), "levels": eligibleLevels})
 }
 func mobileUniqueNames(names []string) []string {
 	result := []string{}

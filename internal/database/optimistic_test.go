@@ -67,6 +67,33 @@ func TestConditionalFilterRejectsMissingStaleAndRemoved(t *testing.T) {
 	}
 }
 
+func TestLevelReadsIncludeRecordVersion(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("level versions match stored document", func(mt *mtest.T) {
+		doc := bson.D{
+			{Key: "_id", Value: "level-row"},
+			{Key: "id", Value: "level-1"},
+			{Key: "tenantId", Value: "account-a"},
+			{Key: "sport", Value: "Softball"},
+			{Key: "name", Value: "Varsity"},
+			{Key: "gameFee", Value: int64(6500)},
+			{Key: "active", Value: false},
+		}
+		raw, err := bson.Marshal(doc)
+		if err != nil {
+			mt.Fatal(err)
+		}
+		mt.AddMockResponses(mtest.CreateCursorResponse(0, mt.DB.Name()+"."+mt.Coll.Name(), mtest.FirstBatch, doc))
+		levels, err := (&LevelsCollection{Coll: mt.Coll}).GetLevels("account-a", false, "Softball")
+		if err != nil {
+			mt.Fatal(err)
+		}
+		if len(levels) != 1 || levels[0].Version != RecordVersion(raw) {
+			mt.Fatalf("unexpected level version: %+v", levels)
+		}
+	})
+}
+
 // Opt-in integration suite: run only against a disposable local replica set.
 // A uniquely named database is created and dropped; no application data is used.
 func TestOptimisticConcurrencyIntegration(t *testing.T) {

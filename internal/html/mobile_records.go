@@ -65,6 +65,10 @@ func MobileCreateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tenant, _ := getTenantId(r)
+	if err = validateMobileGameCatalogSelections(tenant, g, nil); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
 	if err = expenseImportReference(r.Context(), tenant, g.Association); err != nil {
 		http.Error(w, err.Error(), 400)
 		return
