@@ -4376,7 +4376,7 @@ func (lc *LevelsCollection) CreateIndices() error {
 			{Key: "sport", Value: 1},
 			{Key: "name", Value: 1},
 		},
-		Options: options.Index().SetName("tenant_sport_level_name").SetUnique(true),
+		Options: options.Index().SetName("unique_tenant_sport_level").SetUnique(true),
 	})
 	return err
 }
