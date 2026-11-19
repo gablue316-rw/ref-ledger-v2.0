@@ -1180,17 +1180,6 @@ async function loadAssociations() {
                 '<option value="">No associations found</option>';
         }
 
-        async function loadPaymentExpenseTypes() {
-            const response = await fetch("/api/loadExpenseTypes");
-            if (!response.ok) throw new Error("Failed to load expense types");
-            const types = await response.json();
-            for (const id of ["deductionType", "editPaymentDeductionType"]) {
-                const select = document.getElementById(id);
-                select.replaceChildren(new Option("Select type when deduction is positive", ""));
-                for (const type of types) select.appendChild(new Option(type.expenseType, type.expenseType));
-            }
-        }
-
     } catch (error) {
         console.error("Error loading associations:", error);
 
@@ -1199,6 +1188,17 @@ async function loadAssociations() {
 
         filterAssociationSelect.innerHTML =
             '<option value="">Unable to load associations</option>';
+    }
+}
+
+async function loadPaymentExpenseTypes() {
+    const response = await fetch("/api/loadExpenseTypes");
+    if (!response.ok) throw new Error("Failed to load expense types");
+    const types = await response.json();
+    for (const id of ["deductionType", "editPaymentDeductionType"]) {
+        const select = document.getElementById(id);
+        select.replaceChildren(new Option("Select type when deduction is positive", ""));
+        for (const type of types) select.appendChild(new Option(type.expenseType, type.expenseType));
     }
 }
 
@@ -3215,9 +3215,15 @@ async function loadCompletedGames(
         );
 
         if (response.status === 404) {
+            const result = await response.json();
+            if (result.message !== "No games were found matching your search criteria.") {
+                throw new Error("HTTP 404");
+            }
             completedGamesTotalCount = 0;
             completedGamesTotalFees = 0;
             renderGames([]);
+            document.getElementById("amount").value = "";
+            document.getElementById("expectedPaymentDeposit").textContent = "$0.00";
 
             if (displayCountMessage) {
                 showMessage(
@@ -3238,20 +3244,27 @@ async function loadCompletedGames(
         const games =
             await response.json();
 
-        const totalGameFees = Array.isArray(games)
-            ? games.reduce((total, game) => {
-                const earningsValue = game.TotalEarnings ?? game.totalEarnings ??
-                    game.GameFee ?? game.gameFee ?? 0;
-                const earnings = Number(String(earningsValue).replace(/[$,\s]/g, "")) || 0;
-                return total + earnings;
-            }, 0)
-            : 0;        
+        if (!Array.isArray(games)) {
+            throw new Error("Unexpected dashboard response");
+        }
+
+        const totalGameFees = games.reduce((total, game) => {
+            const earningsValue = game.TotalEarnings ?? game.totalEarnings ??
+                game.GameFee ?? game.gameFee ?? 0;
+            const earnings = Number(String(earningsValue).replace(/[$,\s]/g, "")) || 0;
+            return total + earnings;
+        }, 0);
 
         completedGamesTotalCount = games.length;
         completedGamesTotalFees = totalGameFees;
 
         renderGames(games);
-        
+
+        if (games.length === 0) {
+            document.getElementById("amount").value = "";
+            document.getElementById("expectedPaymentDeposit").textContent = "$0.00";
+        }
+
         if (displayCountMessage) {
             if (games.length > 0) {
                 updateCompletedGamesSelectionSummary();
@@ -3265,11 +3278,12 @@ async function loadCompletedGames(
 
     } catch (error) {
         console.error(error);
-
-        if (displayCountMessage) {
-            messageBox.innerText =
-                "Unable to load completed games.";
-        }
+        completedGamesTotalCount = 0;
+        completedGamesTotalFees = 0;
+        renderGames([], { emptyMessage: "Unable to load completed games." });
+        document.getElementById("amount").value = "";
+        document.getElementById("expectedPaymentDeposit").textContent = "$0.00";
+        showMessage("Unable to load completed games.", "error");
     }
 }
 
