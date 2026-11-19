@@ -23,19 +23,29 @@ export function asSelect(input){
  input.replaceWith(select);return select;
 }
 export function bindGameCatalog(inputs,catalog,saved={},creating=false){
+ let currentCatalog=catalog;
  const preserve=!creating;
- fillOptions(inputs.Sport,catalog.sports,{placeholder:'Select sport',selected:saved.Sport||'',preserve});
- fillOptions(inputs.Site,catalog.sites,{placeholder:'Select site',selected:saved.Site||'',preserve});
- fillOptions(inputs.Association,catalog.associations.map(a=>a.id),{placeholder:'Select association',selected:saved.Association||'',preserve});
- const levels=(selected='',keep=false)=>fillOptions(inputs.Level,levelOptions(catalog,inputs.Sport.value).filter(l=>inputs.Sport.value&&l.sport===inputs.Sport.value).map(l=>l.name),{placeholder:inputs.Sport.value?'Select level':'Select sport first',selected,preserve:keep});
- const assignors=(selected='Unassigned',keep=false)=>fillOptions(inputs.Assignor,assignorOptions(catalog,inputs.Association.value),{placeholder:'Select assignor',selected,preserve:keep});
- levels(saved.Level||'',preserve);assignors(saved.Assignor||'Unassigned',preserve);
+ const levels=(selected='',keep=false)=>fillOptions(inputs.Level,levelOptions(currentCatalog,inputs.Sport.value).filter(l=>inputs.Sport.value&&l.sport===inputs.Sport.value).map(l=>l.name),{placeholder:inputs.Sport.value?'Select level':'Select sport first',selected,preserve:keep});
+ const assignors=(selected='Unassigned',keep=false)=>fillOptions(inputs.Assignor,assignorOptions(currentCatalog,inputs.Association.value),{placeholder:'Select assignor',selected,preserve:keep});
+ const refresh=(nextCatalog,current={})=>{
+  currentCatalog=nextCatalog;
+  const sport=current.Sport??(inputs.Sport.value||saved.Sport||'');
+  const site=current.Site??(inputs.Site.value||saved.Site||'');
+  const association=current.Association??(inputs.Association.value||saved.Association||'');
+  fillOptions(inputs.Sport,currentCatalog.sports,{placeholder:'Select sport',selected:sport,preserve});
+  fillOptions(inputs.Site,currentCatalog.sites,{placeholder:'Select site',selected:site,preserve});
+  fillOptions(inputs.Association,currentCatalog.associations.map(a=>a.id),{placeholder:'Select association',selected:association,preserve});
+  levels(current.Level??(inputs.Level.value||saved.Level||''),preserve);
+  assignors(current.Assignor??(inputs.Assignor.value||saved.Assignor||'Unassigned'),preserve);
+ };
+ refresh(catalog,{Sport:saved.Sport||'',Site:saved.Site||'',Association:saved.Association||'',Level:saved.Level||'',Assignor:saved.Assignor||'Unassigned'});
  inputs.Sport.addEventListener('change',()=>{const same=preserve&&inputs.Sport.value===saved.Sport;levels(same?saved.Level:'',same);inputs.GameFee.value=same?String(saved.GameFee).replace(/[$,]/g,''):'0.00';});
  inputs.Association.addEventListener('change',()=>assignors());
  inputs.Level.addEventListener('change',()=>{
-  const level=levelOptions(catalog,inputs.Sport.value).find(l=>l.name===inputs.Level.value);
+  const level=levelOptions(currentCatalog,inputs.Sport.value).find(l=>l.name===inputs.Level.value);
   if(level)inputs.GameFee.value=String(level.gameFee).replace(/[$,]/g,'');
  });
+ return refresh;
 }
 export function bindGameFilters(form,catalog){
  const keys=['sport','association','level','site','assignor'];

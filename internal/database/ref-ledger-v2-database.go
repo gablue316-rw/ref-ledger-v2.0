@@ -9,6 +9,7 @@ import (
 	"net/mail"
 	"net/url"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -1714,6 +1715,17 @@ func (ac *AssociationCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
+func (ac *AssociationCollection) CreateIndices() error {
+	_, err := ac.Coll.Indexes().CreateOne(context.Background(), mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "tenantId", Value: 1},
+			{Key: "id", Value: 1},
+		},
+		Options: options.Index().SetName("tenant_association_id").SetUnique(true),
+	})
+	return err
+}
+
 func (ac *AssociationCollection) ConvAssocJsonToAssoc(
 	association AssociationJson,
 ) Association {
@@ -1775,8 +1787,17 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 
 	var result *mongo.InsertOneResult
 
-	if tenantId == "na" {
-		fmt.Println("Invalid Tenant ID")
+	tenantId = strings.TrimSpace(tenantId)
+	association.Id = strings.TrimSpace(association.Id)
+	if tenantId == "" || tenantId == "na" || association.Id == "" {
+		return fmt.Errorf("association ID and valid tenant ID are required")
+	}
+	association.Name = strings.TrimSpace(association.Name)
+	association.Contact = strings.TrimSpace(association.Contact)
+	association.Phone = strings.TrimSpace(association.Phone)
+	association.Email = strings.TrimSpace(association.Email)
+	if association.Email != "" && !validEmail(association.Email) {
+		return fmt.Errorf("association email address is invalid")
 	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
@@ -1800,6 +1821,9 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 
 	if ac.LastError != nil {
 		MetricsErrors(tenantId, "associations", 1)
+		if mongo.IsDuplicateKeyError(ac.LastError) {
+			return fmt.Errorf("association with ID %q already exists", association.Id)
+		}
 		return fmt.Errorf("Insert failed.  Reason: %v", ac.LastError)
 	}
 
@@ -1808,6 +1832,55 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 	fmt.Println("Inserted ID:", result.InsertedID)
 
 	return nil
+}
+
+func (ac *AssociationCollection) AddAssignor(name, tenantId, associationId string) error {
+	name = strings.TrimSpace(name)
+	tenantId = strings.TrimSpace(tenantId)
+	associationId = strings.TrimSpace(associationId)
+	if name == "" || strings.Contains(name, ",") || tenantId == "" || tenantId == "na" || associationId == "" {
+		return fmt.Errorf("assignor name and association are required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Match a complete comma-separated identity; the conditional update makes
+	// concurrent attempts to add the same assignor serialize on the association.
+	identityPattern := `(?:^|,)\s*` + regexp.QuoteMeta(name) + `\s*(?:,|$)`
+	filter := bson.M{
+		"id":       associationId,
+		"tenantId": tenantId,
+		"assignors": bson.M{
+			"$not": primitive.Regex{Pattern: identityPattern, Options: "i"},
+		},
+	}
+	literalName := bson.M{"$literal": name}
+	update := mongo.Pipeline{
+		{{Key: "$set", Value: bson.M{
+			"assignors": bson.M{"$cond": bson.A{
+				bson.M{"$eq": bson.A{bson.M{"$ifNull": bson.A{"$assignors", ""}}, ""}},
+				literalName,
+				bson.M{"$concat": bson.A{"$assignors", ", ", literalName}},
+			}},
+		}}},
+	}
+	result, err := ac.Coll.UpdateOne(ctx, filter, update)
+	if err != nil {
+		return fmt.Errorf("failed to add assignor: %w", err)
+	}
+	if result.MatchedCount == 1 {
+		return nil
+	}
+
+	var association AssociationDoc
+	if err := ac.Coll.FindOne(ctx, bson.M{"id": associationId, "tenantId": tenantId}).Decode(&association); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("association %q not found in this account", associationId)
+		}
+		return fmt.Errorf("failed to verify association assignors: %w", err)
+	}
+	return fmt.Errorf("assignor %q already exists for association %q", name, associationId)
 }
 
 func (ac *AssociationCollection) Get(id string, tenantId string) (*Association, error) {
@@ -2219,6 +2292,17 @@ func (sc *SiteCollection) Add(site Site, tenantId string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	site.Name = strings.TrimSpace(site.Name)
+	tenantId = strings.TrimSpace(tenantId)
+	if site.Name == "" || tenantId == "" || tenantId == "na" {
+		return fmt.Errorf("site name and valid tenant ID are required")
+	}
+	site.Contact = strings.TrimSpace(site.Contact)
+	site.Phone = strings.TrimSpace(site.Phone)
+	site.Email = strings.TrimSpace(site.Email)
+	if site.Email != "" && !validEmail(site.Email) {
+		return fmt.Errorf("site email address is invalid")
+	}
 	fmt.Println("Adding site:", site, "for tenant ID:", tenantId)
 
 	doc := sc.convSiteToDoc(site)
@@ -3112,8 +3196,9 @@ func (oc *OfficialCollection) CreateIndices() error {
 			{Key: "firstName", Value: 1},
 		},
 		Options: options.Index().
-			SetName("tenant_last_first").
-			SetUnique(true),
+			SetName("tenant_last_first_ci").
+			SetUnique(true).
+			SetCollation(officialNameCollation),
 	}
 
 	name, err := oc.Coll.Indexes().CreateOne(ctx, index)
@@ -3138,6 +3223,19 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
 	defer cancel()
 
+	official.FirstName = strings.TrimSpace(official.FirstName)
+	official.LastName = strings.TrimSpace(official.LastName)
+	tenantId = strings.TrimSpace(tenantId)
+	if official.FirstName == "" || official.LastName == "" || tenantId == "" || tenantId == "na" {
+		return fmt.Errorf("official first name, last name, and valid tenant ID are required")
+	}
+	official.Phone = strings.TrimSpace(official.Phone)
+	official.Email = strings.TrimSpace(official.Email)
+	official.Address = strings.TrimSpace(official.Address)
+	if official.Email != "" && !validEmail(official.Email) {
+		return fmt.Errorf("official email address is invalid")
+	}
+
 	doc, err := oc.convOfficialToDoc(official, tenantId, true)
 	if err != nil {
 		MetricsErrors(tenantId, "officials", 1)
@@ -3150,7 +3248,7 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 	if err != nil {
 		MetricsErrors(tenantId, "officials", 1)
 		if mongo.IsDuplicateKeyError(err) {
-			return fmt.Errorf("Official already exists.")
+			return fmt.Errorf("official %s %s already exists", official.FirstName, official.LastName)
 		}
 
 		return fmt.Errorf("failed to insert official: %w", err)
@@ -4018,6 +4116,36 @@ func (uc *UsersCollection) SetSportsSupported(
 	return nil
 }
 
+func (uc *UsersCollection) EnableSportSupported(tenantId, sport string) error {
+	tenantId = strings.TrimSpace(tenantId)
+	sport = strings.TrimSpace(sport)
+	if tenantId == "" || tenantId == "na" || sport == "" {
+		return fmt.Errorf("sport and valid tenant ID are required")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var catalogSport Sport
+	if err := uc.DB.Collection("sports").FindOne(ctx, bson.M{
+		"name": sport, "active": true,
+	}).Decode(&catalogSport); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return fmt.Errorf("sport %q is not active in the shared catalog", sport)
+		}
+		return fmt.Errorf("failed to validate sport: %w", err)
+	}
+
+	result, err := uc.Coll.UpdateOne(ctx, bson.M{"tenantId": tenantId},
+		bson.M{"$addToSet": bson.M{"sports": sport}})
+	if err != nil {
+		return fmt.Errorf("failed to enable sport for this account: %w", err)
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("account not found for tenant ID %q", tenantId)
+	}
+	return nil
+}
+
 func (uc *UsersCollection) IsSportSupported(
 	tenantId string,
 	sport string,
@@ -4241,12 +4369,27 @@ func (lc *LevelsCollection) Init(client *mongo.Client) error {
 	return nil
 }
 
+func (lc *LevelsCollection) CreateIndices() error {
+	_, err := lc.Coll.Indexes().CreateOne(context.Background(), mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "tenantId", Value: 1},
+			{Key: "sport", Value: 1},
+			{Key: "name", Value: 1},
+		},
+		Options: options.Index().SetName("tenant_sport_level_name").SetUnique(true),
+	})
+	return err
+}
+
 func (lc *LevelsCollection) Add(level Level, tenantId string) error {
 	level.Name = strings.TrimSpace(level.Name)
 	level.Sport = strings.TrimSpace(level.Sport)
 	level.TenantID = strings.TrimSpace(tenantId)
 	if level.Name == "" || level.Sport == "" || level.TenantID == "" || level.TenantID == "na" {
 		return fmt.Errorf("level name, sport, and valid tenant ID are required")
+	}
+	if len([]rune(level.Name)) > 50 {
+		return fmt.Errorf("level name must contain 1 to 50 characters")
 	}
 	if level.GameFee < 0 {
 		return fmt.Errorf("game fee cannot be negative")
@@ -4267,10 +4410,10 @@ func (lc *LevelsCollection) Add(level Level, tenantId string) error {
 	}
 	// Independent IDs allow the same level name in different sports.
 	level.ID = primitive.NewObjectID().Hex()
-	level.Active = true
+	level.Active = false
 	if _, err := lc.Coll.InsertOne(ctx, level); err != nil {
 		if mongo.IsDuplicateKeyError(err) {
-			return fmt.Errorf("duplicate level; check sport-level indexes: %w", err)
+			return fmt.Errorf("level %q already exists for %s", level.Name, level.Sport)
 		}
 		return fmt.Errorf("failed to add level: %w", err)
 	}
@@ -4278,9 +4421,9 @@ func (lc *LevelsCollection) Add(level Level, tenantId string) error {
 }
 
 func (lc *LevelsCollection) validateLevelSport(ctx context.Context, sport string) error {
-	err := lc.DB.Collection("sports").FindOne(ctx, bson.M{"name": sport}).Err()
+	err := lc.DB.Collection("sports").FindOne(ctx, bson.M{"name": sport, "active": true}).Err()
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		return fmt.Errorf("unknown sport %q", sport)
+		return fmt.Errorf("sport %q is not active in the shared catalog", sport)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to validate sport: %w", err)
@@ -4571,13 +4714,18 @@ func (lc *LevelsCollection) GetLevels(tenantId string, activeOnly bool, sports .
 	defer cursor.Close(ctx)
 
 	levels := []Level{}
-
-	if err := cursor.All(ctx, &levels); err != nil {
-		fmt.Println("failed to decode levels. err=[", err, "]")
-		return nil, fmt.Errorf(
-			"failed to decode levels: %w",
-			err,
-		)
+	for cursor.Next(ctx) {
+		raw := cursor.Current
+		var level Level
+		if err := bson.Unmarshal(raw, &level); err != nil {
+			fmt.Println("failed to decode levels. err=[", err, "]")
+			return nil, fmt.Errorf("failed to decode levels: %w", err)
+		}
+		level.Version = RecordVersion(raw)
+		levels = append(levels, level)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, fmt.Errorf("failed to decode levels: %w", err)
 	}
 
 	fmt.Println("Total levels found for tenant", tenantId, ":", len(levels))

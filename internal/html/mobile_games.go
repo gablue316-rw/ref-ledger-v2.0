@@ -81,6 +81,14 @@ func validateMobileGame(game model.GameDescriptor, old model.GameDescriptor) err
 	}
 	return nil
 }
+func validateMobileGameCatalogSelections(tenant string, game model.GameDescriptor, existing *model.GameDescriptor) error {
+	return validateGameCatalogSelections(tenant, Game{
+		Association: game.Association,
+		Site:        game.Site,
+		Sport:       game.Sport,
+		Level:       game.Level,
+	}, existing)
+}
 func MobileGame(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		MobileCreateGame(w, r)
@@ -128,6 +136,10 @@ func MobileGame(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err = validateMobileGame(request.Game, snapshot.Game); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		if err = validateMobileGameCatalogSelections(tenant, request.Game, &snapshot.Game); err != nil {
 			http.Error(w, err.Error(), 400)
 			return
 		}

@@ -5077,6 +5077,16 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
 
+	existingGame, err := gc.Get(game.Association, strconv.Itoa(game.GameId), tId)
+	if err != nil {
+		http.Error(w, "Unable to validate the existing game's catalog selections", http.StatusBadRequest)
+		return
+	}
+	if err := validateGameCatalogSelections(tId, game, &existingGame); err != nil {
+		http.Error(w, "Invalid Game: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	err = api.ValidateGameDescriptor(
 		r.Context(),
 		singleGameDesc,
@@ -5188,6 +5198,10 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	gDoc.TenantId = tId
 
 	checkForDup := true
+	if err := validateGameCatalogSelections(tId, game, nil); err != nil {
+		http.Error(w, "Invalid Game: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	err = api.ValidateGameDescriptor(context.TODO(), singleGameDesc, checkForDup, tId)
 	if err != nil {
 		fmt.Println(err)
@@ -6076,6 +6090,37 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Site saved successfully.")
 }
 
+type CreateAssignorRequest struct {
+	Association string `json:"association"`
+	Name        string `json:"name"`
+}
+
+func CreateAssignor(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	tenantID, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+
+	var request CreateAssignorRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if err := ac.AddAssignor(request.Name, tenantID, request.Association); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Assignor added successfully."})
+}
+
 func UpdateSite(w http.ResponseWriter, r *http.Request) {
 	tId, err := getTenantId(r)
 	if err != nil {
@@ -6693,9 +6738,24 @@ func LoadSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to retrieve sports supported", http.StatusInternalServerError)
 		return
 	}
+	activeSports, err := spc.GetSports(true)
+	if err != nil {
+		http.Error(w, "Failed to validate the active sport catalog", http.StatusInternalServerError)
+		return
+	}
+	active := make(map[string]struct{}, len(activeSports))
+	for _, sport := range activeSports {
+		active[sport.Name] = struct{}{}
+	}
+	eligible := make([]string, 0, len(sports))
+	for _, sport := range sports {
+		if _, ok := active[sport]; ok {
+			eligible = append(eligible, sport)
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sports)
+	json.NewEncoder(w).Encode(eligible)
 }
 
 func SaveSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
@@ -6724,6 +6784,33 @@ func SaveSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	activeSports, err := spc.GetSports(true)
+	if err != nil {
+		http.Error(w, "Unable to validate active sports", http.StatusInternalServerError)
+		return
+	}
+	active := make(map[string]struct{}, len(activeSports))
+	for _, sport := range activeSports {
+		active[sport.Name] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(sports))
+	for i := range sports {
+		sports[i] = strings.TrimSpace(sports[i])
+		if sports[i] == "" {
+			http.Error(w, "Sport names cannot be empty", http.StatusBadRequest)
+			return
+		}
+		if _, ok := active[sports[i]]; !ok {
+			http.Error(w, fmt.Sprintf("Sport %q is not active in the shared catalog", sports[i]), http.StatusBadRequest)
+			return
+		}
+		if _, duplicate := seen[sports[i]]; duplicate {
+			http.Error(w, fmt.Sprintf("Sport %q was selected more than once", sports[i]), http.StatusBadRequest)
+			return
+		}
+		seen[sports[i]] = struct{}{}
+	}
+
 	if err := uc.SetSportsSupported(tId, sports); err != nil {
 		http.Error(
 			w,
@@ -6737,6 +6824,32 @@ func SaveSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Supported sports saved.",
 	})
+}
+
+func ActivateSupportedSportHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	tenantID, err := getTenantId(r)
+	if err != nil {
+		http.Error(w, "Invalid tenant ID", http.StatusBadRequest)
+		return
+	}
+	var request struct {
+		Sport string `json:"sport"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid sport data", http.StatusBadRequest)
+		return
+	}
+	if err := uc.EnableSportSupported(tenantID, request.Sport); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Sport activated for this account."})
 }
 
 func GetSingleSite(w http.ResponseWriter, r *http.Request) {
@@ -7585,6 +7698,16 @@ func AddLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	supported, err := uc.IsSportSupported(tenantId, strings.TrimSpace(level.Sport))
+	if err != nil {
+		http.Error(w, "Unable to validate the selected sport", http.StatusInternalServerError)
+		return
+	}
+	if !supported {
+		http.Error(w, "Select a sport activated for this account before adding a level", http.StatusBadRequest)
+		return
+	}
+
 	if err := lc.Add(level, tenantId); err != nil {
 		http.Error(
 			w,
@@ -7594,13 +7717,23 @@ func AddLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	levels, err := lc.GetLevels(tenantId, false, level.Sport)
+	if err != nil {
+		http.Error(w, "Level was added but could not be reloaded for activation", http.StatusInternalServerError)
+		return
+	}
+	for _, created := range levels {
+		if created.Name == strings.TrimSpace(level.Name) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			if err := json.NewEncoder(w).Encode(created); err != nil {
+				fmt.Printf("Unable to encode created level: %v\n", err)
+			}
+			return
+		}
+	}
 
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Level added successfully",
-	})
-
+	http.Error(w, "Level was added but could not be found for activation", http.StatusInternalServerError)
 }
 
 func ActivateLevel(w http.ResponseWriter, r *http.Request) {
@@ -7639,7 +7772,50 @@ func ActivateLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := lc.Activate(level, tenantId); err != nil {
+	levels, err := lc.GetLevels(tenantId, false)
+	if err != nil {
+		http.Error(w, "Unable to validate the level", http.StatusInternalServerError)
+		return
+	}
+	var ownedLevel *database.Level
+	for i := range levels {
+		if levels[i].ID == strings.TrimSpace(level.ID) {
+			ownedLevel = &levels[i]
+			break
+		}
+	}
+	if ownedLevel == nil {
+		http.Error(w, "Level not found in this account", http.StatusNotFound)
+		return
+	}
+	supported, err := uc.IsSportSupported(tenantId, ownedLevel.Sport)
+	if err != nil {
+		http.Error(w, "Unable to validate the selected sport", http.StatusInternalServerError)
+		return
+	}
+	if !supported {
+		http.Error(w, "Activate this level's sport for the account before activating the level", http.StatusBadRequest)
+		return
+	}
+	activeSports, err := spc.GetSports(true)
+	if err != nil {
+		http.Error(w, "Unable to validate the active sport catalog", http.StatusInternalServerError)
+		return
+	}
+	sportActive := false
+	for _, sport := range activeSports {
+		if sport.Name == ownedLevel.Sport {
+			sportActive = true
+			break
+		}
+	}
+	if !sportActive {
+		http.Error(w, fmt.Sprintf("Sport %q is inactive; activate it before activating this level", ownedLevel.Sport), http.StatusBadRequest)
+		return
+	}
+	ownedLevel.Version = level.Version
+
+	if err := lc.Activate(*ownedLevel, tenantId); err != nil {
 		if writeConflict(w, err) {
 			return
 		}
@@ -7777,6 +7953,88 @@ func LevelsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func validateGameCatalogSelections(tenantID string, game Game, existing *model.GameDescriptor) error {
+	association := strings.TrimSpace(game.Association)
+	if association == "" {
+		return fmt.Errorf("association is required")
+	}
+	associationExists, err := ac.Exists(association, tenantID)
+	if err != nil {
+		return fmt.Errorf("failed to validate association: %w", err)
+	}
+	if !associationExists {
+		return fmt.Errorf("association %q does not belong to this account", association)
+	}
+
+	site := strings.TrimSpace(game.Site)
+	if site != "" {
+		siteExists, err := sc.Exists(site, tenantID)
+		if err != nil {
+			return fmt.Errorf("failed to validate site: %w", err)
+		}
+		if !siteExists {
+			return fmt.Errorf("site %q does not belong to this account", site)
+		}
+	}
+
+	sport := strings.TrimSpace(game.Sport)
+	levelName := strings.TrimSpace(game.Level)
+	retainingSport := existing != nil && sport == strings.TrimSpace(existing.Sport)
+	if sport == "" {
+		return fmt.Errorf("sport is required")
+	}
+	if sport != "" && !retainingSport {
+		supported, err := uc.IsSportSupported(tenantID, sport)
+		if err != nil {
+			return fmt.Errorf("failed to validate supported sport: %w", err)
+		}
+		if !supported {
+			return fmt.Errorf("sport %q is not activated for this account", sport)
+		}
+		activeSports, err := spc.GetSports(true)
+		if err != nil {
+			return fmt.Errorf("failed to validate active sports: %w", err)
+		}
+		active := false
+		for _, candidate := range activeSports {
+			if candidate.Name == sport {
+				active = true
+				break
+			}
+		}
+		if !active {
+			return fmt.Errorf("sport %q is inactive in the shared catalog", sport)
+		}
+	}
+
+	if levelName == "" {
+		return fmt.Errorf("level is required")
+	}
+	levels, err := lc.GetLevels(tenantID, false, sport)
+	if err != nil {
+		return fmt.Errorf("failed to validate level: %w", err)
+	}
+	levelFound := false
+	levelActive := false
+	for _, level := range levels {
+		if level.Name == levelName {
+			levelFound = true
+			levelActive = level.Active
+			break
+		}
+	}
+	if !levelFound {
+		return fmt.Errorf("level %q is not configured for sport %q in this account", levelName, sport)
+	}
+	retainingLevel := existing != nil &&
+		sport == strings.TrimSpace(existing.Sport) &&
+		levelName == strings.TrimSpace(existing.Level)
+	if !levelActive && !retainingLevel {
+		return fmt.Errorf("level %q is inactive; activate it before selecting it for a game", levelName)
+	}
+	return nil
+}
+
 func main() {
 	webAuth, err := configureWebAuth0()
 	if err != nil {
@@ -7839,6 +8097,11 @@ func main() {
 		utils.AuditLog.Println("Failed to initialize levels collection.")
 		return
 	}
+	if err := lc.CreateIndices(); err != nil {
+		fmt.Println("Failed to create unique index for Levels Collection. Reason:", err)
+		utils.AuditLog.Println("Failed to create unique index for Levels Collection.")
+		return
+	}
 
 	err = spc.Init(database.Client)
 	if err != nil {
@@ -7851,6 +8114,11 @@ func main() {
 	if err != nil {
 		fmt.Println("Failed to initialize associations collection.")
 		utils.AuditLog.Println("Failed to initialize associations collection.")
+		return
+	}
+	if err := ac.CreateIndices(); err != nil {
+		fmt.Println("Failed to create unique index for Associations Collection. Reason:", err)
+		utils.AuditLog.Println("Failed to create unique index for Associations Collection.")
 		return
 	}
 
@@ -7874,6 +8142,8 @@ func main() {
 
 	if err != nil {
 		fmt.Println("Failed to create indices for Sites Collection.  Reason:", err)
+		utils.AuditLog.Println("Failed to create indices for Sites Collection.")
+		return
 	} else {
 		fmt.Println("Sites Collection successfully indexed")
 	}
@@ -7896,6 +8166,8 @@ func main() {
 
 	if err != nil {
 		fmt.Println("Failed to create indices for Officials Collection.  Reason:", err)
+		utils.AuditLog.Println("Failed to create indices for Officials Collection.")
+		return
 	} else {
 		fmt.Println("Officials Collection successfully indexed")
 	}
@@ -8073,8 +8345,8 @@ func main() {
 	mux.HandleFunc("/api/game/{association}/{gameid}", GetSingleGame)
 	mux.HandleFunc("/api/association/{assocId}", GetSingleAssociation)
 	mux.HandleFunc("/api/officials/{firstName}/{lastName}", GetOfficial)
-	mux.HandleFunc("/api/level-active", ActivateLevel)
-	mux.HandleFunc("/api/level-inactive", DeactivateLevel)
+	mux.HandleFunc("/api/level-active", authRequired(readOnlyForbidden(ActivateLevel)))
+	mux.HandleFunc("/api/level-inactive", authRequired(readOnlyForbidden(DeactivateLevel)))
 	mux.HandleFunc("/api/updateExpense", authRequired(readOnlyForbidden(UpdateExpense)))
 
 	mux.HandleFunc("/api/import/officials/template", authRequired(readOnlyForbidden(DownloadOfficialsTemplateHandler)))
@@ -8083,7 +8355,9 @@ func main() {
 	mux.HandleFunc("/api/import/games/template", authRequired(readOnlyForbidden(DownloadGamesTemplateHandler)))
 	mux.HandleFunc("/api/deleteExpense", authRequired(readOnlyForbidden(DeleteExpenseHandler)))
 
-	mux.HandleFunc("/api/sports_supported", SaveSportsSupportedHandler)
+	mux.HandleFunc("/api/sports_supported", authRequired(readOnlyForbidden(SaveSportsSupportedHandler)))
+	mux.HandleFunc("/api/sports_supported/activate", authRequired(readOnlyForbidden(ActivateSupportedSportHandler)))
+	mux.HandleFunc("/api/assignors", authRequired(readOnlyForbidden(CreateAssignor)))
 	mux.HandleFunc("/api/deleteAssociation/{assocId}",
 		authRequired(readOnlyForbidden(DeleteAssociation)))
 
@@ -8148,6 +8422,8 @@ func main() {
 	mux.HandleFunc("/api/mobile/dashboard", MobileDashboard)
 	mux.HandleFunc("/api/mobile/game", mobileAccountHandler(MobileGame))
 	mux.HandleFunc("/api/mobile/catalog", mobileAccountHandler(mobileReadOnly(MobileCatalog)))
+	mux.HandleFunc("/api/mobile/catalog/create/{type}", mobileAccountHandler(MobileCatalogCreate))
+	mux.HandleFunc("/api/mobile/catalog/activate/level", mobileAccountHandler(MobileCatalogActivateLevel))
 	mux.HandleFunc("/api/mobile/access", mobileAccountHandler(mobileReadOnly(MobileAccess)))
 	mux.HandleFunc("/api/mobile/expenses", mobileAccountHandler(MobileExpenses))
 	mux.HandleFunc("/api/mobile/expense", mobileAccountHandler(MobileExpense))

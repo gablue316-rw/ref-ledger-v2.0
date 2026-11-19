@@ -20,6 +20,7 @@ func TestMobileCatalogUsesAccountCollections(t *testing.T) {
 		defer func() { database.Client, database.Database = old, db }()
 		mt.AddMockResponses(
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".users", mtest.FirstBatch, bson.D{{Key: "sports", Value: bson.A{"Softball", "Basketball", "Softball"}}, {Key: "passwordHash", Value: "not-for-response"}}),
+			mtest.CreateCursorResponse(0, mt.DB.Name()+".sports", mtest.FirstBatch, bson.D{{Key: "name", Value: "Softball"}, {Key: "active", Value: true}}, bson.D{{Key: "name", Value: "Basketball"}, {Key: "active", Value: true}}, bson.D{{Key: "name", Value: "Volleyball"}, {Key: "active", Value: true}}),
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".associations", mtest.FirstBatch, bson.D{{Key: "id", Value: "MSO"}, {Key: "name", Value: "Softball Association"}, {Key: "assignors", Value: " Jane Smith, John Doe,Jane Smith "}, {Key: "phone", Value: "private-contact"}}),
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".sites", mtest.FirstBatch, bson.D{{Key: "name", Value: "Central"}}),
 			mtest.CreateCursorResponse(0, mt.DB.Name()+".levels", mtest.FirstBatch, bson.D{{Key: "name", Value: "Varsity"}, {Key: "sport", Value: "Softball"}, {Key: "active", Value: true}, {Key: "gameFee", Value: int64(6550)}}),
@@ -31,6 +32,7 @@ func TestMobileCatalogUsesAccountCollections(t *testing.T) {
 		}
 		var result struct {
 			Sports       []string                  `json:"sports"`
+			Available    []string                  `json:"availableSports"`
 			Associations []mobileAssociationOption `json:"associations"`
 			Sites        []string                  `json:"sites"`
 			Levels       []struct {
@@ -41,16 +43,22 @@ func TestMobileCatalogUsesAccountCollections(t *testing.T) {
 		if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 			mt.Fatal(err)
 		}
-		if !reflect.DeepEqual(result.Sports, []string{"Basketball", "Softball"}) || !reflect.DeepEqual(result.Associations[0].Assignors, []string{"Jane Smith", "John Doe"}) || result.Levels[0].GameFee != "65.50" {
+		if !reflect.DeepEqual(result.Sports, []string{"Basketball", "Softball"}) || !reflect.DeepEqual(result.Available, []string{"Volleyball"}) || !reflect.DeepEqual(result.Associations[0].Assignors, []string{"Jane Smith", "John Doe"}) || result.Levels[0].GameFee != "65.50" {
 			mt.Fatalf("unexpected catalog: %s", w.Body)
 		}
-		for _, event := range mt.GetAllStartedEvents() {
+		events := mt.GetAllStartedEvents()
+		for i, event := range events {
+			if i == 1 {
+				if !event.Command.Lookup("filter").Document().Lookup("active").Boolean() {
+					mt.Fatalf("inactive global sport query %s", event.Command)
+				}
+				continue
+			}
 			if event.Command.Lookup("filter").Document().Lookup("tenantId").StringValue() != "account-a" {
 				mt.Fatalf("unscoped query %s", event.Command)
 			}
 		}
-		events := mt.GetAllStartedEvents()
-		if !events[3].Command.Lookup("filter").Document().Lookup("active").Boolean() {
+		if !events[4].Command.Lookup("filter").Document().Lookup("active").Boolean() {
 			mt.Fatal("inactive levels offered")
 		}
 	})
