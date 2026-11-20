@@ -10,18 +10,60 @@ const reportTypes=[
 ];
 const gameFilters=['status','sport','assignor','site','level','official','eco'];
 
+function optionName(record){
+ if(typeof record==='string')return record.trim();
+ const first=record?.firstName??record?.FirstName??'';
+ const last=record?.lastName??record?.LastName??'';
+ return String(record?.name??record?.Name??`${first} ${last}`).trim();
+}
 function optionNames(records){
- return (Array.isArray(records)?records:[]).map(record=>{
-  if(typeof record==='string')return record;
-  const first=record.firstName??record.FirstName??'';
-  const last=record.lastName??record.LastName??'';
-  return String(record.name??record.Name??`${first} ${last}`).trim();
- }).filter(Boolean);
+ return (Array.isArray(records)?records:[]).map(optionName).filter(Boolean);
+}
+export function officialNameComparator(records){
+ const names=new Map((Array.isArray(records)?records:[]).map(record=>{
+  const name=optionName(record);
+  const first=String(record?.firstName??record?.FirstName??'').trim();
+  const last=String(record?.lastName??record?.LastName??'').trim();
+  const parts=name.split(/\s+/);
+  return [name,{first:first||parts.slice(0,-1).join(' '),last:last||parts[parts.length-1]||''}];
+ }));
+ return (a,b)=>{
+  const left=names.get(a)||{first:'',last:a};
+  const right=names.get(b)||{first:'',last:b};
+  return left.last.localeCompare(right.last,undefined,{sensitivity:'base'})||
+   left.first.localeCompare(right.first,undefined,{sensitivity:'base'})||
+   a.localeCompare(b);
+ };
 }
 function displayValue(value){
  if(value===null||value===undefined)return '—';
  if(typeof value==='object')return JSON.stringify(value);
  return String(value);
+}
+export function isVisibleReportField(type,key){
+ const field=String(key).toLowerCase();
+ return !(type==='game'&&field==='version')&&
+  !(type==='reconciliation'&&(field==='linkedgames'||field==='unlinkedgames'));
+}
+export function appendAssociationParams(params,associations){
+ for(const association of associations)params.append('association',association);
+}
+export function reportFieldValue(type,key,value){
+ if(type==='game'&&String(key).toLowerCase()==='officials'){
+  if(Array.isArray(value)){
+   const names=value.map(official=>{
+    if(typeof official==='string')return official.trim();
+    if(!official||typeof official!=='object')return '';
+    const name=official.Name??official.name;
+    if(name)return String(name).trim();
+    return `${official.FirstName??official.firstName??''} ${official.LastName??official.lastName??''}`.trim();
+   }).filter(Boolean);
+   return names.join(', ')||'Unassigned';
+  }
+  return value?String(value):'Unassigned';
+ }
+ if(type==='1099'&&String(key).toLowerCase()==='amount')return currency(reportNumber(value));
+ return displayValue(value);
 }
 function reportNumber(value){
  if(typeof value==='number')return Number.isFinite(value)?value:0;
@@ -109,14 +151,16 @@ export function createReports(root){
  const output=root.querySelector('#mobile-report-results');
  const runButton=root.querySelector('#run-mobile-report');
  for(const [value,title] of reportTypes)typeInput.add(new Option(title,value));
+ let catalogLoaded=false,busy=false;
+ let compareOfficialOptions=(a,b)=>a.localeCompare(b);
  const controls={};
  const create=(name,values,label)=>controls[name]=createMultiSelect(root.querySelector(`[data-report-filter="${name}"]`),{
-  name,label,values,allLabel:name==='status'?'All statuses':`All ${label.toLowerCase()}`
+  name,label,values,allLabel:name==='status'?'All statuses':`All ${label.toLowerCase()}`,
+  sortValues:name==='official'||name==='eco'?(a,b)=>compareOfficialOptions(a,b):undefined
  });
  create('association',[],'Associations');
  for(const name of gameFilters)create(name,[],name==='eco'?'ECO':name==='status'?'Status':labelFor(name));
  controls.status.setOptions(['Pending','Completed','Paid','Cancelled']);
- let catalogLoaded=false,busy=false;
 
  function updateSections(){
   const game=typeInput.value==='game';
@@ -159,8 +203,9 @@ export function createReports(root){
    if(row&&typeof row==='object'){
     const list=document.createElement('dl');
     for(const [key,value] of Object.entries(row)){
+     if(!isVisibleReportField(type,key))continue;
      const term=document.createElement('dt');term.textContent=labelFor(key);
-     const detail=document.createElement('dd');detail.textContent=displayValue(value);
+     const detail=document.createElement('dd');detail.textContent=reportFieldValue(type,key,value);
      list.append(term,detail);
     }
     card.append(list);
@@ -189,6 +234,7 @@ export function createReports(root){
    controls.site.setOptions(catalog.sites);
    controls.level.setOptions(catalog.levels.map(item=>item.name));
    const officials=optionNames(officialResponse.data);
+   compareOfficialOptions=officialNameComparator(officialResponse.data);
    controls.official.setOptions(officials);
    controls.eco.setOptions(officials);
    catalogLoaded=true;
@@ -203,7 +249,7 @@ export function createReports(root){
   const taxYear=String(formData.get('taxYear')||'').trim();
   if(type!=='accounts-receivable'&&taxYear&&!/^[1-9][0-9]{3}$/.test(taxYear))throw new Error('Tax Year must be a four-digit year from 1000 to 9999.');
   if(type!=='accounts-receivable'&&taxYear)params.set('taxYear',taxYear);
-  for(const association of controls.association.getValues())params.append('association',association);
+  appendAssociationParams(params,controls.association.getValues());
   if(type==='game'){
    const beginDate=String(formData.get('begindate')||'');
    const endDate=String(formData.get('enddate')||'');
