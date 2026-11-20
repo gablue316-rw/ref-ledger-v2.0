@@ -62,13 +62,13 @@ export async function registerAccount(){
  return response;
 }
 
-export async function apiRequest(url, method='GET', data) {
+export async function apiRequest(url, method='GET', data, extraHeaders={}, readTimeout=25000) {
  configured();
  const target=new URL(url),base=new URL(c.apiBase);
  if(target.protocol!=='https:'||target.origin!==base.origin)throw new Error('Invalid API address.');
  const request=async()=>CapacitorHttp.request({url:target.href,method,
-  headers:{Authorization:`Bearer ${await token()}`,Accept:'application/json','Content-Type':'application/json'},
-  ...(data===undefined?{}:{data}),connectTimeout:10000,readTimeout:25000});
+  headers:{Authorization:`Bearer ${await token()}`,Accept:'application/json','Content-Type':'application/json',...extraHeaders},
+  ...(data===undefined?{}:{data}),connectTimeout:Math.min(10000,readTimeout),readTimeout});
  let response=await request();
  if(response.status===401){expireAccess();response=await request();}
  return response;

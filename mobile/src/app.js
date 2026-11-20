@@ -1,4 +1,4 @@
-import {loadCatalog,bindGameFilters,clearFilterCatalog} from './catalog.js';
+import {loadCatalog,bindGameFilters} from './catalog.js';
 import {version as appVersion} from '../package.json';
 document.getElementById('app-version').textContent=`Version ${appVersion}`;
 import {createExpenses} from './expenses.js';
@@ -10,6 +10,9 @@ import { Browser } from '@capacitor/browser';
 import {login, logout, apiGet, registerAccount} from './auth.js';
 import {config} from './config.js';
 import {summarize,dashboardURL,assignmentEarnings} from './data.js';
+import {createReports} from './reports.js';
+import {createPayments} from './payments.js';
+import {createSettings} from './settings.js';
 
 const $=id=>document.getElementById(id),
  currency=n=>new Intl.NumberFormat('en-US',{
@@ -19,18 +22,34 @@ const $=id=>document.getElementById(id),
 
 let busy=false,authBusy=false,generation=0,canWrite=false,activePage='games';
 const expenses=createExpenses();
+let gameFilters=bindGameFilters($('filters'),{sports:[],associations:[],sites:[],levels:[]});
+const reports=createReports($('reports-root'));
+const payments=createPayments($('payments-root'));
+const settings=createSettings($('settings-root'));
 const closeMenu=()=>{$('menu-options').hidden=true;$('menu-toggle').setAttribute('aria-expanded','false');};
 function showPage(page){
  activePage=page;closeMenu();
- $('page-title').textContent=page==='games'?'Games':'Expenses';
- $('dashboard').hidden=page!=='games';$('expenses-page').hidden=page!=='expenses';
- for(const p of ['games','expenses']){if(p===page)$(`nav-${p}`).setAttribute('aria-current','page');else $(`nav-${p}`).removeAttribute('aria-current');}
+ const titles={games:'Games',expenses:'Expenses',reports:'Reports',payments:'Payments',settings:'Settings'};
+ $('page-title').textContent=titles[page];
+ $('dashboard').hidden=page!=='games';
+ for(const p of Object.keys(titles)){
+  const section=$(`${p}-page`);
+  if(section)section.hidden=page!==p;
+  const nav=$(`nav-${p}`);
+  if(nav){if(p===page)nav.setAttribute('aria-current','page');else nav.removeAttribute('aria-current');}
+ }
  message('');
  if(page==='expenses')expenses.load();
+ if(page==='reports')reports.load();
+ if(page==='payments')payments.load();
+ if(page==='settings')settings.load();
 }
 $('menu-toggle').onclick=()=>{const open=$('menu-options').hidden;$('menu-options').hidden=!open;$('menu-toggle').setAttribute('aria-expanded',String(open));};
 $('nav-games').onclick=()=>showPage('games');
 $('nav-expenses').onclick=()=>showPage('expenses');
+$('nav-reports').onclick=()=>showPage('reports');
+$('nav-payments').onclick=()=>showPage('payments');
+$('nav-settings').onclick=()=>showPage('settings');
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu();});
 document.addEventListener('click',e=>{if(!$('navigation').contains(e.target))closeMenu();});
 $('add-game').onclick=()=>editGame(null,async()=>{await load();message('Game added successfully. Adjust the filters if it is not shown.');});
@@ -45,14 +64,18 @@ function updateControls() {
  for (const id of ['login','reauth','logout','refresh']) $(id).disabled=busy||authBusy;
  signupButton.disabled=busy||authBusy;
  gameActions.setDisabled(busy||authBusy||!canWrite);
- for(const id of ['menu-toggle','nav-games','nav-expenses'])$(id).disabled=busy||authBusy;
+ for(const id of ['menu-toggle','nav-games','nav-expenses','nav-reports','nav-payments','nav-settings','clear-game-filters'])$(id).disabled=busy||authBusy;
  $('add-game').disabled=busy||authBusy||!canWrite;
+ reports.setCanWrite(canWrite);
+ payments.setCanWrite(canWrite);
+ settings.setCanWrite(canWrite);
 }
 
 function clearDashboard() {
  ++generation;
- clearFilterCatalog($('filters'),['sport','association','level','site','assignor']);
- expenses.clear();canWrite=false;activePage='games';$('page-title').textContent='Games';$('navigation').hidden=true;$('expenses-page').hidden=true;closeMenu();
+ $('filters').reset();gameFilters.clearAll();gameFilters.setValues('status',['Pending']);
+ expenses.clear();reports.clear();payments.clear();settings.clear();canWrite=false;activePage='games';$('page-title').textContent='Games';$('navigation').hidden=true;$('expenses-page').hidden=true;closeMenu();
+ $('reports-page').hidden=true;$('payments-page').hidden=true;$('settings-page').hidden=true;
  gameActions.reset();
  $('games').replaceChildren();
  for (const id of ['assignments','gameCount','earnings']) $(id).textContent='—';
@@ -80,6 +103,7 @@ function render(games){
   for(const [tag,text] of [
    ['small',`${g.Status} · ${g.Sport} · ${g.Level}`],
    ['h2',`${g.Date} · ${g.Time}`],
+   ['p',(()=>{const count=Number(g.NumOfGames??g.numOfGames??0);return Number.isFinite(count)&&count>=0?`${count} ${count===1?'game':'games'}`:'Game count unavailable';})()],
    ['p',`${g.Site || '—'} · Field: ${g.Field || '—'}`],
    ['p',`${g.Home||'—'} vs ${g.Visitor||'—'}`],
    ['p',`${g.Association} · Game ${g.GameId}`],
@@ -115,7 +139,9 @@ async function load(){
  updateControls();
 
  try{
-  const filters=Object.fromEntries(new FormData($('filters')));
+  const formData=new FormData($('filters'));
+  const filters=Object.fromEntries(formData.entries());
+  for(const key of ['status','sport','association','assignor','site','level'])filters[key]=formData.getAll(key);
 
   if(filters.begindate && filters.enddate &&
      filters.begindate>filters.enddate){
@@ -178,7 +204,7 @@ async function load(){
   canWrite=access.status===200&&access.data?.canWrite===true;
   const catalog=await loadCatalog();
   if(current!==generation)return;
-  bindGameFilters($('filters'),catalog);
+  gameFilters.updateCatalog(catalog);
   render(r.data);
  }catch(error){
   if(current===generation){
@@ -246,6 +272,11 @@ $('refresh').onclick=load;
 
 $('filters').onsubmit=e=>{
  e.preventDefault();
+ load();
+};
+$('clear-game-filters').onclick=()=>{
+ $('filters').reset();
+ gameFilters.clearAll();
  load();
 };
 
