@@ -9,11 +9,14 @@ export function assignmentEarnings(game) {
  return money(total != null && String(total).trim() !== '' ? total : game.GameFee);
 }
 export function summarize(games) {
- const totals = games.reduce((sum, game) => ({
-  assignments: sum.assignments + 1,
-  games: sum.games + Number(game.NumOfGames || 0),
-  cents: sum.cents + Math.round(assignmentEarnings(game) * 100)
- }), {assignments: 0, games: 0, cents: 0});
+ const totals = games.reduce((sum, game) => {
+  const gameCount=Number(game.NumOfGames??game.numOfGames??0);
+  return {
+   assignments: sum.assignments + 1,
+   games: sum.games + (Number.isFinite(gameCount)?gameCount:0),
+   cents: sum.cents + Math.round(assignmentEarnings(game) * 100)
+  };
+ }, {assignments: 0, games: 0, cents: 0});
  return {assignments: totals.assignments, games: totals.games, earnings: totals.cents / 100};
 }
 
@@ -31,7 +34,8 @@ export function dashboardURL(base,filters) {
  const url=new URL('/api/mobile/dashboard',base);
  if(url.protocol!=='https:')throw new Error('HTTPS is required.');
  for(const key of ['status','sport','association','begindate','enddate','taxYear','gameId','site','level','home','visitor','assignor']) {
-  if(filters[key])url.searchParams.set(key,filters[key]);
+  const values=Array.isArray(filters[key])?filters[key]:[filters[key]];
+  for(const value of values)if(value)url.searchParams.append(key,value);
  }
  return url.href;
 }
