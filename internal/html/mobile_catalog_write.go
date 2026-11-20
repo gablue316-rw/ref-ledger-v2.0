@@ -29,7 +29,7 @@ func MobileCatalogCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		official := oc.ConvJsonToOfficial(input)
-		if err = oc.Add(official, tenant); err != nil {
+		if err = oc.AddWithContext(r.Context(), official, tenant); err != nil {
 			mobileCatalogWriteError(w, err)
 			return
 		}
@@ -51,7 +51,7 @@ func MobileCatalogCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		site := sc.ConvJsonToSite(input)
-		if err = sc.Add(site, tenant); err != nil {
+		if err = sc.AddWithContext(r.Context(), site, tenant); err != nil {
 			mobileCatalogWriteError(w, err)
 			return
 		}
@@ -62,7 +62,7 @@ func MobileCatalogCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		association := ac.ConvAssocJsonToAssoc(input)
-		if err = ac.Add(association, tenant); err != nil {
+		if err = ac.AddWithContext(r.Context(), association, tenant); err != nil {
 			mobileCatalogWriteError(w, err)
 			return
 		}
@@ -77,7 +77,7 @@ func MobileCatalogCreate(w http.ResponseWriter, r *http.Request) {
 		if !mobileDecode(w, r, &input) {
 			return
 		}
-		if err = ac.AddAssignor(input.Name, tenant, input.Association); err != nil {
+		if err = ac.AddAssignorWithContext(r.Context(), input.Name, tenant, input.Association); err != nil {
 			mobileCatalogWriteError(w, err)
 			return
 		}
@@ -99,7 +99,7 @@ func MobileCatalogCreate(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Activate this level's sport for the account before adding a level", http.StatusBadRequest)
 			return
 		}
-		if err = lc.Add(input, tenant); err != nil {
+		if err = lc.AddWithContext(r.Context(), input, tenant); err != nil {
 			if isMobileCatalogDuplicate(err) {
 				mobileLevelDuplicate(w, tenant, input)
 				return
@@ -126,7 +126,7 @@ func MobileCatalogCreate(w http.ResponseWriter, r *http.Request) {
 		if !mobileDecode(w, r, &input) {
 			return
 		}
-		if err = uc.EnableSportSupported(tenant, input.Sport); err != nil {
+		if err = uc.EnableSportSupportedWithContext(r.Context(), tenant, input.Sport); err != nil {
 			mobileCatalogWriteError(w, err)
 			return
 		}
@@ -197,7 +197,7 @@ func MobileCatalogActivateLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	owned.Version = input.Version
-	if err = lc.Activate(*owned, tenant); err != nil {
+	if err = lc.ActivateWithContext(r.Context(), *owned, tenant); err != nil {
 		if errors.Is(err, database.ErrConflict) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
