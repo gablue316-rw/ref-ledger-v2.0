@@ -22,6 +22,10 @@ type mobileWriteContextKey struct{}
 // Mobile routes use live linked-account roles; cookies and supplied tenant IDs
 // cannot authorize access. Existing native tokens continue to work.
 func mobileAccountHandler(next http.HandlerFunc) http.HandlerFunc {
+	return mobileAccountHandlerWithTimeout(next, 20*time.Second)
+}
+
+func mobileAccountHandlerWithTimeout(next http.HandlerFunc, timeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if r.Method != http.MethodGet && r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodDelete {
@@ -30,7 +34,7 @@ func mobileAccountHandler(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		// The shared maintenance middleware admits and releases all data writes.
-		ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
 		identity, _, ok := authenticateMobile(w, r.WithContext(ctx))
 		if !ok {

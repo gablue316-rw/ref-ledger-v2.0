@@ -2,6 +2,7 @@ import {levelOptions,assignorOptions} from './catalog-data.js';
 import {apiRequest} from './auth.js';
 import {config} from './config.js';
 import {responseError} from './game-data.js';
+import {createMultiSelect} from './multi-select.js';
 
 export async function loadCatalog(){
  const response=await apiRequest(new URL('/api/mobile/catalog',config.apiBase).href);
@@ -48,16 +49,37 @@ export function bindGameCatalog(inputs,catalog,saved={},creating=false){
  return refresh;
 }
 export function bindGameFilters(form,catalog){
- const keys=['sport','association','level','site','assignor'];
- const selected=Object.fromEntries(keys.map(key=>[key,form.elements.namedItem(key).value]));
- const inputs={};for(const key of keys)inputs[key]=asSelect(form.elements.namedItem(key));
- fillOptions(inputs.sport,catalog.sports,{placeholder:'All sports',selected:selected.sport,preserve:true});
- fillOptions(inputs.association,catalog.associations.map(a=>a.id),{placeholder:'All associations',selected:selected.association,preserve:true});
- fillOptions(inputs.site,catalog.sites,{placeholder:'All sites',selected:selected.site,preserve:true});
- const levels=(value='',preserve=false)=>fillOptions(inputs.level,levelOptions(catalog,inputs.sport.value).map(l=>l.name),{placeholder:'All levels',selected:value,preserve});
- levels(selected.level,true);inputs.sport.onchange=()=>levels();
- const assignors=(value='',preserve=false)=>fillOptions(inputs.assignor,inputs.association.value?assignorOptions(catalog,inputs.association.value):['Unassigned',...catalog.associations.flatMap(a=>a.assignors)],{placeholder:'All assignors',selected:value,preserve});
- assignors(selected.assignor,true);inputs.association.onchange=()=>assignors();
+ const keys=['status','sport','association','assignor','site','level'];
+ const labels={status:'Status',sport:'Sport',association:'Association',assignor:'Assignor',site:'Site',level:'Level'};
+ const allLabels={status:'All statuses',sport:'All sports',association:'All associations',assignor:'All assignors',site:'All sites',level:'All levels'};
+ const initial=new FormData(form);
+ const options={
+  status:['Pending','Completed','Paid','Cancelled'],
+  sport:catalog.sports||[],
+  association:(catalog.associations||[]).map(item=>item.id),
+  assignor:[...new Set((catalog.associations||[]).flatMap(item=>['Unassigned',...(item.assignors||[])]))],
+  site:catalog.sites||[],
+  level:(catalog.levels||[]).map(item=>item.name)
+ };
+ const controls={};
+ for(const key of keys){
+  controls[key]=createMultiSelect(form.querySelector(`[data-filter="${key}"]`),{
+   name:key,label:labels[key],allLabel:allLabels[key],values:options[key],
+   selected:initial.getAll(key).length?initial.getAll(key):(key==='status'?['Pending']:[])
+  });
+ }
+ return {
+  clearAll(){for(const key of keys)controls[key].clear();},
+  setValues(key,values){controls[key].setValues(values);},
+  updateCatalog(next){
+   options.sport=next.sports||[];
+   options.association=(next.associations||[]).map(item=>item.id);
+   options.assignor=[...new Set((next.associations||[]).flatMap(item=>['Unassigned',...(item.assignors||[])]))];
+   options.site=next.sites||[];
+   options.level=(next.levels||[]).map(item=>item.name);
+   for(const key of keys)controls[key].setOptions(options[key]);
+  }
+ };
 }
 export function bindExpenseAssociation(input,catalog,value='',preserve=false){
  const select=asSelect(input);fillOptions(select,catalog.associations.map(a=>a.id),{placeholder:select.required?'Select association':'All associations',selected:value,preserve});return select;
@@ -72,5 +94,5 @@ export function bindBulkCatalog(inputs,catalog,games){
 }
 
 export function clearFilterCatalog(form,names){
- for(const name of names){const input=form.elements.namedItem(name);if(input?.tagName==='SELECT')fillOptions(input,[],{placeholder:`All ${name==='association'?'associations':name==='sport'?'sports':name==='site'?'sites':name==='assignor'?'assignors':'levels'}`});}
+ for(const name of names){const input=form.querySelector(`[data-filter="${name}"]`);if(input)input.replaceChildren();}
 }
