@@ -32,7 +32,7 @@ export function createExpenses(){
    data.items.sort((a,b)=>inputDate(b.expense.Date).localeCompare(inputDate(a.expense.Date))||a.expense.ExpenseId.localeCompare(b.expense.ExpenseId));
    for(const record of data.items){
     const e=record.expense,card=el('article');card.className='game';
-    for(const [tag,text] of [['small',`${e.Type} · ${e.Association}`],['h2',e.Date],['strong',expenseValue(e)],['p',e.Description||'No description'],['p',`Tax year ${e.TaxYear} · Game ${e.GameId||'—'}`],['small',e.ExpenseId]])card.append(el(tag,text));
+    for(const [tag,text] of [['small',`${e.Type} · ${e.Association}`],['h2',e.Date],['strong',expenseValue(e)],['p',e.Description||'No description'],['p',`Tax year ${e.TaxYear}`],['small',e.ExpenseId]])card.append(el(tag,text));
     const payroll=e.Source==='Payroll Deduction'||Boolean(e.PaymentRef);
     if(payroll)card.append(el('strong','Payroll Deduction'));
     const actions=el('div');actions.className='expense-actions';
@@ -66,11 +66,11 @@ export function createExpenses(){
    if(!modal.isConnected||current!==generation)return;
    const e=snapshot?.expense;
    const now=new Date();const localDate=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-   const values=e?expenseInput(e):{date:localDate,type:types[0],value:'0.00',association:'',gameId:'',description:'',taxYear:String(now.getFullYear())};
+   const values=e?expenseInput(e):{date:localDate,type:types[0],value:'0.00',association:'',description:'',taxYear:String(now.getFullYear())};
    const payroll=e?.Source==='Payroll Deduction'||Boolean(e?.PaymentRef);
    const writable=snapshot?snapshot.canWrite&&!payroll:canWrite;
    const form=el('form'),inputs={};
-   for(const [key,label,type] of [['date','Date','date'],['type','Type','select'],['value','Amount ($)','number'],['association','Association','select'],['gameId','Game ID (optional)','number'],['taxYear','Tax year','number'],['description','Description','textarea']]){
+   for(const [key,label,type] of [['date','Date','date'],['type','Type','select'],['value','Amount ($)','number'],['association','Association','select'],['taxYear','Tax year','number'],['description','Description','textarea']]){
     const field=el('label',label);const input=el(type==='select'?'select':type==='textarea'?'textarea':'input');input.name=key;
     if(key==='association'){input.required=true;bindExpenseAssociation(input,catalog,values.association,Boolean(record));}
     else if(type==='select'){for(const t of new Set([...types,...(e?[e.Type]:[])]))input.append(new Option(t,t));}

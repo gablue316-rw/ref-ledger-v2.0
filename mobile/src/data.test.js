@@ -1,6 +1,7 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {summarize,dashboardURL} from './data.js';
 test('summary uses net TotalEarnings and counts multiple games',()=>assert.deepEqual(summarize([{NumOfGames:2,TotalEarnings:'$125.50',GameFee:'$150.00'},{NumOfGames:1,TotalEarnings:'$75.00'}]),{assignments:2,games:3,earnings:200.5}));
 test('dashboard query excludes client account identifiers',()=>{const u=new URL(dashboardURL('https://example.com',{status:'Pending',tenantId:'other',association:'A&B'}));assert.equal(u.searchParams.get('association'),'A&B');assert.equal(u.searchParams.has('tenantId'),false);});
+test('dashboard query repeats multi-select values for server-side OR filtering',()=>{const u=new URL(dashboardURL('https://example.com',{status:['Pending','Completed'],sport:['Softball','Baseball']}));assert.deepEqual(u.searchParams.getAll('status'),['Pending','Completed']);assert.deepEqual(u.searchParams.getAll('sport'),['Softball','Baseball']);});
 test('reject insecure API origin',()=>assert.throws(()=>dashboardURL('http://example.com',{})));
 
 import {normalizeTokens} from './data.js';
