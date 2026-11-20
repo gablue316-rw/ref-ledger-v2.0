@@ -465,8 +465,6 @@ type ReconciliationReport struct {
 	CalculatedAmt  int64   `json:"calculatedAmt"`
 	Status         string  `json:"status"`
 	PaymentGameIds []int64 `json:"paymentGameIds"`
-	LinkedGames    []int64 `json:"linkedGames"`
-	UnlinkeGames   []int64 `json:"unlinkedGames"`
 }
 
 type ReconciliationReportResponse struct {
@@ -478,8 +476,6 @@ type ReconciliationReportResponse struct {
 	CalculatedAmt  string  `json:"calculatedAmt"`
 	Status         string  `json:"status"`
 	PaymentGameIds []int64 `json:"paymentGameIds"`
-	LinkedGames    []int64 `json:"linkedGames"`
-	UnlinkeGames   []int64 `json:"unlinkedGames"`
 }
 
 type OfficialRole struct {
