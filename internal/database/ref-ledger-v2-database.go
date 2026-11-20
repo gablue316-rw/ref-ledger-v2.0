@@ -5223,7 +5223,7 @@ func GetRevenueReports(
 				)
 			}
 
-			associationName := strings.TrimSpace(associationDoc.Name)
+			associationName := strings.TrimSpace(associationDoc.Id)
 
 			if associationName != "" {
 				allowedAssociations[associationName] = struct{}{}
@@ -5451,7 +5451,7 @@ func GetFinancialReports(
 				)
 			}
 
-			associationName := strings.TrimSpace(associationDoc.Name)
+			associationName := strings.TrimSpace(associationDoc.Id)
 
 			if associationName != "" {
 				allowedAssociations[associationName] = struct{}{}
@@ -5710,7 +5710,7 @@ func GetExpenseReports(
 				)
 			}
 
-			associationName := strings.TrimSpace(associationDoc.Name)
+			associationName := strings.TrimSpace(associationDoc.Id)
 
 			if associationName != "" {
 				allowedAssociations[associationName] = struct{}{}
@@ -5939,7 +5939,7 @@ func GetAccountsReceivableReport(
 			}
 
 			associationName :=
-				strings.TrimSpace(associationDoc.Name)
+				strings.TrimSpace(associationDoc.Id)
 
 			if associationName == "" {
 				continue

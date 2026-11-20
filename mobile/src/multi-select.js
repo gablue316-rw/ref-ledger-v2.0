@@ -8,7 +8,7 @@ export function updateSelection(values,value,checked,selectAll=false){
  return [...next];
 }
 
-export function createMultiSelect(root,{name,label,values=[],selected=[],allLabel='All'}){
+export function createMultiSelect(root,{name,label,values=[],selected=[],allLabel='All',sortValues}){
  const details=document.createElement('details');
  details.className='multi-select';
  const summary=document.createElement('summary');
@@ -33,7 +33,7 @@ export function createMultiSelect(root,{name,label,values=[],selected=[],allLabe
  }
  function render(){
   for(const value of selectedValues)if(!choices.includes(value))choices.push(value);
-  choices.sort((a,b)=>a.localeCompare(b));
+  choices.sort(sortValues||((a,b)=>a.localeCompare(b)));
   options.replaceChildren();
   const all=document.createElement('label');
   const allInput=document.createElement('input');
