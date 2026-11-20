@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -20,6 +21,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	jose "gopkg.in/go-jose/go-jose.v2"
+	"gopkg.in/go-jose/go-jose.v2/jwt"
 
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/mobileauth"
@@ -29,6 +32,8 @@ const webAuthCookie = "__Host-rl_auth0"
 const webAuthCallback = "/auth/auth0/callback"
 const mobileSignupPath = "/mobile/create-account"
 const mobileSetupPath = "/mobile/setup"
+
+var errWebAuthJWKS = errors.New("Auth0 JWKS retrieval failed")
 
 type webAuth0 struct {
 	registration *auth0Registration
@@ -87,12 +92,61 @@ func configureWebAuth0() (*webAuth0, error) {
 	keys.Path = "/.well-known/jwks.json"
 	provider := jwks.NewCachingProvider(issuer, 5*time.Minute,
 		jwks.WithCustomJWKSURI(&keys), jwks.WithCustomClient(auth.httpClient))
-	auth.tokens, err = validator.New(provider.KeyFunc, validator.RS256, auth.issuer, []string{auth.clientID},
+	auth.tokens, err = validator.New(webAuthKeyFunc(provider.KeyFunc), validator.RS256, auth.issuer, []string{auth.clientID},
 		validator.WithCustomClaims(func() validator.CustomClaims { return &webAuthClaims{} }))
 	if err != nil {
 		return nil, err
 	}
 	return auth, nil
+}
+
+func webAuthKeyFunc(keyFunc func(context.Context) (interface{}, error)) func(context.Context) (interface{}, error) {
+	return func(ctx context.Context) (interface{}, error) {
+		key, err := keyFunc(ctx)
+		if err != nil {
+			return nil, errors.Join(errWebAuthJWKS, err)
+		}
+		return key, nil
+	}
+}
+
+func webAuthValidationFailure(validated interface{}, err error, now time.Time) string {
+	if err != nil {
+		switch {
+		case errors.Is(err, errWebAuthJWKS):
+			return "validate_token_jwks"
+		case errors.Is(err, jose.ErrCryptoFailure), strings.HasPrefix(err.Error(), "signing method is invalid:"):
+			return "validate_token_signature"
+		case errors.Is(err, jwt.ErrInvalidIssuer):
+			return "validate_token_issuer"
+		case errors.Is(err, jwt.ErrInvalidAudience):
+			return "validate_token_audience"
+		case errors.Is(err, jwt.ErrExpired), errors.Is(err, jwt.ErrNotValidYet), errors.Is(err, jwt.ErrIssuedInTheFuture):
+			return "validate_token_timing"
+		default:
+			return "validate_token_other"
+		}
+	}
+	claims, ok := validated.(*validator.ValidatedClaims)
+	if !ok || claims == nil {
+		return "validated_claims_unexpected_or_nil"
+	}
+	if claims.RegisteredClaims.Subject == "" {
+		return "subject_missing"
+	}
+	if claims.RegisteredClaims.Expiry <= now.Unix() {
+		return "token_expired"
+	}
+	if len(claims.RegisteredClaims.Audience) != 1 {
+		return "audience_count_unexpected"
+	}
+	return ""
+}
+
+func logWebAuthValidationFailure(reason string) {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "development") {
+		log.Printf("Auth0 callback invalid sign-in response: check=%s", reason)
+	}
 }
 
 func ensureWebAuthIdentityIndex(ctx context.Context) error {
@@ -246,15 +300,20 @@ func (auth *webAuth0) callback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	validated, err := auth.tokens.ValidateToken(ctx, token)
-	claims, ok := validated.(*validator.ValidatedClaims)
-	if err != nil || !ok || claims.RegisteredClaims.Subject == "" ||
-		claims.RegisteredClaims.Expiry <= time.Now().Unix() ||
-		len(claims.RegisteredClaims.Audience) != 1 {
+	if reason := webAuthValidationFailure(validated, err, time.Now()); reason != "" {
+		logWebAuthValidationFailure(reason)
 		http.Error(w, "Invalid sign-in response.", http.StatusUnauthorized)
 		return
 	}
+	claims := validated.(*validator.ValidatedClaims)
 	profile, ok := claims.CustomClaims.(*webAuthClaims)
-	if !ok || subtle.ConstantTimeCompare([]byte(profile.Nonce), []byte(flow[1])) != 1 {
+	if !ok || profile == nil {
+		logWebAuthValidationFailure("custom_claims_unexpected_or_nil")
+		http.Error(w, "Invalid sign-in response.", http.StatusUnauthorized)
+		return
+	}
+	if subtle.ConstantTimeCompare([]byte(profile.Nonce), []byte(flow[1])) != 1 {
+		logWebAuthValidationFailure("nonce_mismatch")
 		http.Error(w, "Invalid sign-in response.", http.StatusUnauthorized)
 		return
 	}

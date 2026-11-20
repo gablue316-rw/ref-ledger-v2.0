@@ -21,8 +21,13 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	trace := NewWriteTrace(ctx, "payment.mutate", "payments", tenant, "", "", map[string]any{
+		"paymentId": id, "association": association,
+		"affectedCollections": []string{"payments", "games", "expenses"},
+	})
 	session, err := Client.StartSession()
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 	defer session.EndSession(ctx)
@@ -163,6 +168,24 @@ func MutatePayment(ctx context.Context, tenant, id, association, version string,
 		}
 		return nil, nil
 	})
+	if err != nil {
+		trace.Failure(err, nil, "")
+	} else {
+		trace.EventForCollection("games", LogLevelInfo, "payment.games_updated", "Selected game statuses updated", map[string]any{
+			"modifiedCount": gameChanges,
+		})
+		if change == nil {
+			trace.EventForCollection("payments", LogLevelInfo, "payment.deleted", "Payment record deleted", nil)
+		} else {
+			trace.EventForCollection("payments", LogLevelInfo, "payment.updated", "Payment record updated", map[string]any{
+				"matchedCount": int64(1),
+			})
+		}
+		trace.EventForCollection("expenses", LogLevelInfo, "payment.deduction_synced", "Payroll deduction synchronized", nil)
+		trace.Success(map[string]any{
+			"affectedCollections": []string{"payments", "games", "expenses"},
+		}, nil)
+	}
 	if err == nil {
 		if gameChanges > 0 {
 			MetricsUpdated(tenant, "games", gameChanges)

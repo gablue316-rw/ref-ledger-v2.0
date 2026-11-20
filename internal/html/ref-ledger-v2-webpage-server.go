@@ -15,6 +15,7 @@ import (
 	"net/http/httputil"
 	"net/mail"
 	"net/url"
+	"os/signal"
 
 	"crypto/rand"
 	"encoding/hex"
@@ -25,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -123,9 +125,14 @@ var spc database.SportsCollection
 
 var AuditLog *log.Logger = nil
 
+type authenticatedTenantContextKey struct{}
+
 func getTenantId(r *http.Request) (string, error) {
 	if account, ok := r.Context().Value(mobileAccountContextKey{}).(string); ok && account != "" {
 		return account, nil
+	}
+	if tenantID, ok := r.Context().Value(authenticatedTenantContextKey{}).(string); ok && tenantID != "" {
+		return tenantID, nil
 	}
 
 	cookie, err := r.Cookie("rl_session")
@@ -2657,7 +2664,7 @@ func CommitAssociationsImportHandler(w http.ResponseWriter, r *http.Request) {
 			Assignors: data.Assignors,
 		}
 
-		err = ac.Add(association, tId)
+		err = ac.AddWithContext(r.Context(), association, tId)
 
 		if err != nil {
 			if mongo.IsDuplicateKeyError(err) {
@@ -2927,7 +2934,7 @@ func CommitOfficialsImportHandler(w http.ResponseWriter, r *http.Request) {
 			Address:   data.Address,
 		}
 
-		err = oc.Add(official, tId)
+		err = oc.AddWithContext(r.Context(), official, tId)
 
 		if err != nil {
 			if mongo.IsDuplicateKeyError(err) {
@@ -3244,7 +3251,7 @@ func CommitGamesImportHandler(w http.ResponseWriter, r *http.Request) {
 			Notes:       data.Notes,
 		}
 
-		err = gc.Add(tId, game)
+		err = gc.AddWithContext(r.Context(), tId, game)
 		if err != nil {
 
 			if mongo.IsDuplicateKeyError(err) {
@@ -3497,7 +3504,7 @@ func CommitSitesImportHandler(w http.ResponseWriter, r *http.Request) {
 			Email:   data.ContactEmail,
 		}
 
-		if err := sc.Add(site, tId); err != nil {
+		if err := sc.AddWithContext(r.Context(), site, tId); err != nil {
 			if mongo.IsDuplicateKeyError(err) {
 				if handleDuplicate(previewRow.RowNumber, data.SiteId) {
 					return
@@ -5034,27 +5041,15 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Updating game with game id", utils.ConvertIntToStr(game.GameId), "for association", game.Association)
-
 	if utf8.RuneCountInString(game.Notes) > MaxNotesLength {
 		http.Error(w, fmt.Sprintf("Notes cannot exceed %d characters.", MaxNotesLength), http.StatusBadRequest)
 		return
 	}
 
-	fmt.Printf(
-		"UpdateGame lookup: database=%q gameId=%d association=%q tenantId=%q\n",
-		database.Database,
-		game.GameId,
-		game.Association,
-		tId,
-	)
-
 	if game.Version == "" {
 		http.Error(w, database.ErrConflict.Error(), http.StatusConflict)
 		return
 	}
-
-	fmt.Println("UpdateGame: Game Fee:", game.GameFee)
 
 	if game.Status == "Cancelled" {
 		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
@@ -5066,7 +5061,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 	singleGameDesc = GameDocToGameDescr(game)
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
-		if err := gc.Delete(singleGameDesc.Association, singleGameDesc.GameId, tId, game.Version); err != nil {
+		if err := gc.DeleteWithContext(r.Context(), singleGameDesc.Association, singleGameDesc.GameId, tId, game.Version); err != nil {
 			if writeConflict(w, err) {
 				return
 			}
@@ -5074,8 +5069,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-
-	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
 
 	existingGame, err := gc.Get(game.Association, strconv.Itoa(game.GameId), tId)
 	if err != nil {
@@ -5098,13 +5091,6 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		if writeConflict(w, err) {
 			return
 		}
-		fmt.Printf(
-			"UpdateGame validation failed: gameId=%d sport=%q level=%q error=%v\n",
-			game.GameId,
-			game.Sport,
-			game.Level,
-			err,
-		)
 		http.Error(
 			w,
 			"Invalid Game: "+err.Error(),
@@ -5124,14 +5110,7 @@ func UpdateGame(w http.ResponseWriter, r *http.Request) {
 		if writeConflict(w, err) {
 			return
 		}
-		fmt.Printf(
-			"UpdateGame failed: database=%q gameId=%q association=%q tenantId=%q error=%v\n",
-			database.Database,
-			singleGameDesc.GameId,
-			singleGameDesc.Association,
-			tId,
-			err,
-		)
+		log.Printf("game update failed: category=%s", database.SafeErrorCategory(err))
 		http.Error(
 			w,
 			"Unable to update game",
@@ -5168,8 +5147,6 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("UpdateGame: Game Fee:", game.GameFee)
-
 	if game.Status == "Cancelled" {
 		fmt.Println("UpdateGame: Game Status Cancelled.  Setting fees to zero.")
 		game.GameFee = float64(0)
@@ -5181,7 +5158,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 
 	if game.Status == "Delete" {
 		fmt.Println("UpdateGame: Game Status Delete.  Deleting game.")
-		if err := gc.Delete(singleGameDesc.Association, singleGameDesc.GameId, tId, game.Version); err != nil {
+		if err := gc.DeleteWithContext(r.Context(), singleGameDesc.Association, singleGameDesc.GameId, tId, game.Version); err != nil {
 			if writeConflict(w, err) {
 				return
 			}
@@ -5190,7 +5167,6 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("SaveGame: Single Game Descriptor:", singleGameDesc)
 	var gDoc model.GameDoc = model.GameDoc{}
 
 	gDoc.GameId = int64(game.GameId)
@@ -5226,7 +5202,7 @@ func SaveGame(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gameDesc = append(gameDesc, singleGameDesc)
-	database.InsertGameDocs(context.TODO(), gameDesc, database.Database, "games", tId)
+	database.InsertGameDocs(r.Context(), gameDesc, database.Database, "games", tId)
 
 }
 
@@ -5319,8 +5295,12 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
+	trace := database.NewWriteTrace(ctx, "games.status.update", gc.Coll.Name(), tId, "", "", map[string]any{
+		"status": request.Status, "gameCount": int64(len(uniqueGames)),
+	})
 	updated := 0
 	failures := make([]string, 0)
+	writeErrors := make([]error, 0)
 
 	for _, game := range uniqueGames {
 		filter := bson.M{
@@ -5343,6 +5323,7 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
 		conditional, err := database.ConditionalFilter(ctx, gc.Coll, filter, game.Version)
 		if err != nil {
+			writeErrors = append(writeErrors, err)
 			failures = append(failures, fmt.Sprintf("%s game %d: %v", game.Association, game.GameId, err))
 			continue
 		}
@@ -5354,13 +5335,8 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		)
 
 		if err != nil {
-			log.Printf(
-				"UpdateGameStatus failed: tenantId=%q association=%q gameId=%d error=%v",
-				tId,
-				game.Association,
-				game.GameId,
-				err,
-			)
+			log.Printf("game status update failed: category=%s", database.SafeErrorCategory(err))
+			writeErrors = append(writeErrors, err)
 
 			failures = append(failures, fmt.Sprintf(
 				"%s game %d: database update failed",
@@ -5371,6 +5347,7 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if result.MatchedCount == 0 {
+			writeErrors = append(writeErrors, database.ErrConflict)
 			failures = append(failures, fmt.Sprintf(
 				"%s game %d: game changed, was removed, or is already Paid; refresh before trying again",
 				game.Association,
@@ -5381,9 +5358,19 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 
 		// An already-matching status is also a successful request.
 		updated++
+		trace.Event(database.LogLevelInfo, "game.status.updated", "Game status updated", map[string]any{
+			"gameId": game.GameId, "association": game.Association, "status": request.Status,
+		})
 	}
 
 	if len(failures) > 0 {
+		outcome := "failed"
+		if updated > 0 {
+			outcome = "partial"
+		}
+		trace.Failure(errors.Join(writeErrors...), map[string]any{
+			"matchedCount": int64(updated), "partial": updated > 0,
+		}, outcome)
 		http.Error(
 			w,
 			fmt.Sprintf(
@@ -5397,6 +5384,7 @@ func UpdateGameStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	trace.Success(map[string]any{"matchedCount": int64(updated)}, nil)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	fmt.Fprintf(w, "%d game statuses updated successfully.", updated)
 }
@@ -5975,14 +5963,15 @@ func createWebSession(w http.ResponseWriter, r *http.Request, user model.User, s
 		Role:      user.Role,
 	}
 
-	_, err := database.Client.
-		Database(database.GetMongoDbName()).
-		Collection("sessions").
-		InsertOne(r.Context(), session)
+	sessions := database.Client.Database(database.GetMongoDbName()).Collection("sessions")
+	trace := database.NewWriteTrace(r.Context(), "session.create", sessions.Name(), user.TenantID, "", sessionID, nil)
+	result, err := sessions.InsertOne(r.Context(), session)
 
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
+	trace.Success(nil, result.InsertedID)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "rl_session",
@@ -6020,7 +6009,7 @@ func UpdateAssociation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ac.Update(ac.ConvAssocJsonToAssoc(assocJson), tId)
+	err = ac.UpdateWithContext(r.Context(), ac.ConvAssocJsonToAssoc(assocJson), tId)
 	if err != nil {
 		if writeConflict(w, err) {
 			return
@@ -6052,7 +6041,7 @@ func CreateAssociation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ac.Add(ac.ConvAssocJsonToAssoc(assocJson), tId)
+	err = ac.AddWithContext(r.Context(), ac.ConvAssocJsonToAssoc(assocJson), tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -6079,7 +6068,7 @@ func CreateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = sc.Add(sc.ConvJsonToSite(siteJson), tId)
+	err = sc.AddWithContext(r.Context(), sc.ConvJsonToSite(siteJson), tId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -6111,7 +6100,7 @@ func CreateAssignor(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if err := ac.AddAssignor(request.Name, tenantID, request.Association); err != nil {
+	if err := ac.AddAssignorWithContext(r.Context(), request.Name, tenantID, request.Association); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -6143,7 +6132,7 @@ func UpdateSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = sc.Update(sc.ConvJsonToSite(siteJson), tId)
+	err = sc.UpdateWithContext(r.Context(), sc.ConvJsonToSite(siteJson), tId)
 	if err != nil {
 		if writeConflict(w, err) {
 			return
@@ -6182,7 +6171,7 @@ func UpdateOfficial(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Official JSON:", officialJson)
 
-	err = oc.Update(tId, oc.ConvJsonToOfficial(officialJson))
+	err = oc.UpdateWithContext(r.Context(), tId, oc.ConvJsonToOfficial(officialJson))
 	if err != nil {
 		if writeConflict(w, err) {
 			return
@@ -6213,7 +6202,7 @@ func CreateOfficial(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = oc.Add(oc.ConvJsonToOfficial(officialJson), tId)
+	err = oc.AddWithContext(r.Context(), oc.ConvJsonToOfficial(officialJson), tId)
 	if err != nil {
 		fmt.Println("Failed to create official:", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -6303,7 +6292,8 @@ func DeleteExpenseHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ec.Delete(
+	err = ec.DeleteWithContext(
+		r.Context(),
 		request.ExpenseId,
 		request.Association,
 		tId,
@@ -6402,7 +6392,8 @@ func UpdateExpense(w http.ResponseWriter, r *http.Request) {
 
 	expense := ec.ConvJsonToExpense(expenseJSON)
 
-	err = ec.Update(
+	err = ec.UpdateWithContext(
+		r.Context(),
 		expense,
 		expenseId,
 		association,
@@ -6461,7 +6452,7 @@ func CreateExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ec.Add(ec.ConvJsonToExpense(expenseJson), tId)
+	err = ec.AddWithContext(r.Context(), ec.ConvJsonToExpense(expenseJson), tId)
 	if err != nil {
 		fmt.Println("Failed to create expense")
 		http.Error(w, "Failed to create expense", http.StatusInternalServerError)
@@ -6492,7 +6483,7 @@ func DeleteAssociation(w http.ResponseWriter, r *http.Request) {
 
 	assocId := r.PathValue("assocId")
 
-	err = ac.Delete(assocId, tId, requestVersion(r))
+	err = ac.DeleteWithContext(r.Context(), assocId, tId, requestVersion(r))
 
 	if err != nil {
 		if writeConflict(w, err) {
@@ -6532,7 +6523,7 @@ func DeleteGame(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Game", gameId, "for association", association)
 
-	err = gc.Delete(association, gameId, tId, requestVersion(r))
+	err = gc.DeleteWithContext(r.Context(), association, gameId, tId, requestVersion(r))
 
 	if err != nil {
 		if writeConflict(w, err) {
@@ -6570,7 +6561,7 @@ func DeleteOfficial(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Official", firstname, lastname)
 
-	err = oc.Delete(firstname, lastname, tId, requestVersion(r))
+	err = oc.DeleteWithContext(r.Context(), firstname, lastname, tId, requestVersion(r))
 
 	if err != nil {
 		if writeConflict(w, err) {
@@ -6657,7 +6648,7 @@ func DeleteSite(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Deleting Site", siteId)
 
-	err = sc.Delete(siteId, tId, requestVersion(r))
+	err = sc.DeleteWithContext(r.Context(), siteId, tId, requestVersion(r))
 
 	if err != nil {
 		if writeConflict(w, err) {
@@ -6811,7 +6802,7 @@ func SaveSportsSupportedHandler(w http.ResponseWriter, r *http.Request) {
 		seen[sports[i]] = struct{}{}
 	}
 
-	if err := uc.SetSportsSupported(tId, sports); err != nil {
+	if err := uc.SetSportsSupportedWithContext(r.Context(), tId, sports); err != nil {
 		http.Error(
 			w,
 			"Failed to save supported sports",
@@ -6843,7 +6834,7 @@ func ActivateSupportedSportHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid sport data", http.StatusBadRequest)
 		return
 	}
-	if err := uc.EnableSportSupported(tenantID, request.Sport); err != nil {
+	if err := uc.EnableSportSupportedWithContext(r.Context(), tenantID, request.Sport); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -7323,10 +7314,14 @@ func GetGames(w http.ResponseWriter, r *http.Request) {
 }
 
 func isAuthenticated(r *http.Request) bool {
+	_, authenticated := authenticatedSession(r)
+	return authenticated
+}
 
+func authenticatedSession(r *http.Request) (model.Session, bool) {
 	cookie, err := r.Cookie("rl_session")
 	if err != nil {
-		return false
+		return model.Session{}, false
 	}
 
 	sessionID := cookie.Value
@@ -7344,7 +7339,7 @@ func isAuthenticated(r *http.Request) bool {
 		}).
 		Decode(&session)
 
-	return err == nil
+	return session, err == nil
 }
 
 func authRequired(next http.HandlerFunc) http.HandlerFunc {
@@ -7355,7 +7350,8 @@ func authRequired(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if !isAuthenticated(r) {
+		session, authenticated := authenticatedSession(r)
+		if !authenticated {
 			if strings.HasPrefix(r.URL.Path, "/api/") {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
@@ -7365,7 +7361,9 @@ func authRequired(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		next(w, r)
+		ctx := database.WithStructuredLogContext(r.Context(), "", session.SessionID)
+		ctx = context.WithValue(ctx, authenticatedTenantContextKey{}, session.TenantID)
+		next(w, r.WithContext(ctx))
 	}
 }
 
@@ -7373,12 +7371,17 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 	cookie, err := r.Cookie("rl_session")
 	if err == nil {
-
-		database.Client.
-			Database(database.GetMongoDbName()).
-			Collection("sessions").
-			DeleteOne(r.Context(),
-				bson.M{"sessionId": cookie.Value})
+		sessions := database.Client.Database(database.GetMongoDbName()).Collection("sessions")
+		tenantID, _ := getTenantId(r)
+		trace := database.NewWriteTrace(r.Context(), "session.logout", sessions.Name(), tenantID, "", cookie.Value, nil)
+		result, deleteErr := sessions.DeleteOne(r.Context(), bson.M{"sessionId": cookie.Value})
+		if deleteErr != nil {
+			trace.Failure(deleteErr, nil, "failed")
+		} else if result.DeletedCount == 0 {
+			trace.Complete(map[string]any{"deletedCount": result.DeletedCount}, nil, "unmatched")
+		} else {
+			trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
+		}
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -7631,7 +7634,7 @@ func DelLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := lc.Delete(levelID, tenantID, requestVersion(r)); err != nil {
+	if err := lc.DeleteWithContext(r.Context(), levelID, tenantID, requestVersion(r)); err != nil {
 		if writeConflict(w, err) {
 			return
 		}
@@ -7708,7 +7711,7 @@ func AddLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := lc.Add(level, tenantId); err != nil {
+	if err := lc.AddWithContext(r.Context(), level, tenantId); err != nil {
 		http.Error(
 			w,
 			err.Error(),
@@ -7815,7 +7818,7 @@ func ActivateLevel(w http.ResponseWriter, r *http.Request) {
 	}
 	ownedLevel.Version = level.Version
 
-	if err := lc.Activate(*ownedLevel, tenantId); err != nil {
+	if err := lc.ActivateWithContext(r.Context(), *ownedLevel, tenantId); err != nil {
 		if writeConflict(w, err) {
 			return
 		}
@@ -7872,7 +7875,7 @@ func DeactivateLevel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := lc.Deactivate(level, tenantId); err != nil {
+	if err := lc.DeactivateWithContext(r.Context(), level, tenantId); err != nil {
 		if writeConflict(w, err) {
 			return
 		}
@@ -7909,7 +7912,7 @@ func UpdateLevel(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid level data", http.StatusBadRequest)
 		return
 	}
-	if err := lc.Update(level, tenantId); err != nil {
+	if err := lc.UpdateWithContext(r.Context(), level, tenantId); err != nil {
 		if writeConflict(w, err) {
 			return
 		}
@@ -8069,15 +8072,9 @@ func main() {
 	err = database.Connect()
 
 	if err != nil {
-		fmt.Println(
-			"Failed to init database. Terminating web page server. Reason:",
-			err,
-		)
-
-		utils.AuditLog.Println(
-			"Failed to init database. Terminating web page server. Reason:",
-			err,
-		)
+		category := database.SafeErrorCategory(err)
+		log.Printf("database initialization failed: category=%s", category)
+		utils.AuditLog.Printf("database initialization failed: category=%s", category)
 
 		return
 	}
@@ -8087,7 +8084,31 @@ func main() {
 		fmt.Println(message)
 		utils.AuditLog.Println(message)
 		utils.AuditLog.Println("Database connection established successfully")
+		startupCtx, cancelStartup := context.WithTimeout(context.Background(), 15*time.Second)
+		if initErr := database.InitializeStructuredLogging(startupCtx); initErr != nil {
+			log.Printf("structured log store initialization failed: category=%s", database.SafeErrorCategory(initErr))
+		} else {
+			threshold, thresholdErr := database.CaptureThreshold(startupCtx)
+			if thresholdErr != nil {
+				log.Printf("structured log threshold unavailable during startup: category=%s", database.SafeErrorCategory(thresholdErr))
+			} else {
+				database.RecordStructuredLog(database.LogLevelInfo, "server.startup", "Ref Ledger startup", map[string]any{
+					"environment":  environMentInfo.Environment,
+					"appVersion":   environMentInfo.Release,
+					"release":      database.DatabaseVersion,
+					"databaseName": environMentInfo.Database,
+					"threshold":    threshold,
+					"port":         os.Getenv("PORT"),
+				})
+				database.RecordStructuredLog(database.LogLevelInfo, "database.connected", "MongoDB connection verified", map[string]any{
+					"environment":  environMentInfo.Environment,
+					"databaseName": environMentInfo.Database,
+				})
+			}
+		}
+		cancelStartup()
 	} else {
+		log.Printf("MongoDB connection verification failed: category=%s", database.SafeErrorCategory(err))
 		return
 	}
 
@@ -8230,6 +8251,8 @@ func main() {
 
 	mux := http.NewServeMux()
 
+	mux.HandleFunc(logsAdminPrefix, logsAdminAPI)
+	mux.HandleFunc(logsAdminPrefix+"/", logsAdminAPI)
 	mux.Handle("/images/", http.StripPrefix("/images/",
 		http.FileServer(http.Dir("./internal/html/images"))))
 
@@ -8552,11 +8575,52 @@ func main() {
 
 	address := ":" + port
 
-	fmt.Printf("Ref Ledger listening on %s\n", address)
 	loggedMux := LogRequest(HTTPBytesMiddleware(maintenanceMiddleware(mux)))
 
-	if err := http.ListenAndServe(address, loggedMux); err != nil {
-		log.Fatal(err)
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		category := database.SafeErrorCategory(err)
+		log.Printf("Ref Ledger HTTP server failed to bind: category=%s", category)
+		database.RecordStructuredLog(database.LogLevelError, "server.failure", "Ref Ledger HTTP server failed to bind", map[string]any{
+			"failureCategory": category,
+		})
+		return
+	}
+	server := &http.Server{
+		Addr:              address,
+		Handler:           loggedMux,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	database.RecordStructuredLog(database.LogLevelInfo, "server.ready", "Required dependencies and routes are ready", nil)
+	serverErrors := make(chan error, 1)
+	go func() {
+		serverErrors <- server.Serve(listener)
+	}()
+	shutdownContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	select {
+	case err := <-serverErrors:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			category := database.SafeErrorCategory(err)
+			log.Printf("Ref Ledger HTTP server stopped: category=%s", category)
+			database.RecordStructuredLog(database.LogLevelError, "server.failure", "Ref Ledger HTTP server stopped unexpectedly", map[string]any{
+				"failureCategory": category,
+			})
+		}
+	case <-shutdownContext.Done():
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := server.Shutdown(ctx); err != nil {
+			_ = server.Close()
+			category := database.SafeErrorCategory(err)
+			log.Printf("Ref Ledger HTTP server shutdown failed: category=%s", category)
+			database.RecordStructuredLog(database.LogLevelError, "server.shutdown.failed", "Ref Ledger HTTP server shutdown failed", map[string]any{
+				"failureCategory": category,
+			})
+			return
+		}
+		database.RecordStructuredLog(database.LogLevelInfo, "server.shutdown", "Ref Ledger shut down cleanly", nil)
 	}
 
 }
@@ -8935,8 +8999,12 @@ func DeleteRecordsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
+	trace := database.NewWriteTrace(ctx, "tenant.records.delete", "", tId, "", "", map[string]any{
+		"affectedCollections": names,
+	})
 	session, err := database.Client.StartSession()
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		writeJSONError(w, 500, "Unable to start deletion.")
 		return
 	}
@@ -8991,13 +9059,28 @@ func DeleteRecordsHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, levelInUse) {
+			trace.Failure(err, nil, "failed")
 			writeJSONError(w, http.StatusConflict, levelInUse.Error())
 			return
 		}
-		log.Printf("DeleteRecordsHandler: tenant=%s error=%v", tId, err)
+		trace.Failure(err, nil, "")
+		log.Printf("tenant record deletion failed: category=%s", database.SafeErrorCategory(err))
 		writeJSONError(w, 500, "Deletion was not confirmed. MongoDB transactions require a replica set or sharded cluster. Check your records before retrying.")
 		return
 	}
+	var deletedCount int64
+	if counts, ok := result.(map[string]int64); ok {
+		for _, name := range names {
+			count := counts[name]
+			deletedCount += count
+			trace.EventForCollection(name, database.LogLevelInfo, "tenant.records.deleted", "Tenant records deleted", map[string]any{
+				"deletedCount": count,
+			})
+		}
+	}
+	trace.Success(map[string]any{
+		"deletedCount": deletedCount, "affectedCollections": names,
+	}, nil)
 	writeJSON(w, 200, map[string]any{"success": true, "deletedCounts": result})
 }
 
@@ -9287,11 +9370,18 @@ func CommitExpensesImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	added, skipped, failed := 0, 0, 0
+	trace := database.NewWriteTrace(r.Context(), "expenses.import", "expenses", tId, "", "", map[string]any{
+		"expenseCount": int64(len(preview.Rows)), "affectedCollections": []string{"expenses"},
+	})
+	var writeErrors []error
 	results := []map[string]any{}
 	for _, row := range preview.Rows {
 		state, message := "skipped", "Row contains validation errors."
 		if !row.Valid {
 			skipped++
+			trace.EventForCollection("expenses", database.LogLevelInfo, "expense.import.item_skipped", "Expense import item skipped validation", map[string]any{
+				"expenseId": expenseImportID(row.Data), "association": row.Data.Association, "date": row.Data.Date,
+			})
 		} else {
 			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 			err = expenseImportReference(ctx, tId, row.Data.Association)
@@ -9301,18 +9391,28 @@ func CommitExpensesImportHandler(w http.ResponseWriter, r *http.Request) {
 					skipped++
 					message = "Expense already exists."
 					if request.DuplicateAction == "stop" {
+						outcome := "no_op"
+						if added > 0 {
+							outcome = "partial"
+						}
+						trace.Complete(map[string]any{
+							"insertedCount": int64(added), "skippedCount": int64(skipped + 1),
+						}, nil, outcome)
 						results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
 						cancel()
 						writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Import stopped at a duplicate. Earlier rows may have been added.", "rows": results})
 						return
 					}
+					trace.EventForCollection("expenses", database.LogLevelInfo, "expense.import.item_skipped", "Duplicate expense import item skipped", map[string]any{
+						"expenseId": expenseImportID(row.Data), "association": row.Data.Association, "date": row.Data.Date,
+					})
 				} else if !errors.Is(lookup, mongo.ErrNoDocuments) {
-					err = fmt.Errorf("Unable to check existing expenses.")
+					err = lookup
 				} else {
 					var expense database.Expense
 					expense, err = expenseImportExpense(row.Data)
 					if err == nil {
-						err = collection.Add(expense, tId)
+						err = collection.AddWithTrace(ctx, expense, tId, trace)
 					}
 					if err == nil {
 						added++
@@ -9324,12 +9424,36 @@ func CommitExpensesImportHandler(w http.ResponseWriter, r *http.Request) {
 			cancel()
 			if err != nil {
 				failed++
+				writeErrors = append(writeErrors, err)
+				trace.DiagnosticForCollection("expenses", "expense.import.item_failed", "Expense import item failed", err, map[string]any{
+					"expenseId": expenseImportID(row.Data), "association": row.Data.Association, "date": row.Data.Date,
+				})
 				state = "failed"
 				message = "Unable to import expense."
-				log.Printf("expense import row %d: %v", row.RowNumber, err)
+				log.Printf("expense import row %d failed: category=%s", row.RowNumber, database.SafeErrorCategory(err))
 			}
 		}
 		results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
+	}
+	attributes := map[string]any{
+		"insertedCount": int64(added), "skippedCount": int64(skipped), "failedCount": int64(failed),
+	}
+	if failed > 0 {
+		outcome := "failed"
+		if added > 0 {
+			outcome = "partial"
+		}
+		trace.Failure(errors.Join(writeErrors...), attributes, outcome)
+	} else if skipped > 0 {
+		outcome := "no_op"
+		if added > 0 {
+			outcome = "partial"
+		}
+		trace.Complete(attributes, nil, outcome)
+	} else if added == 0 {
+		trace.Complete(attributes, nil, "no_op")
+	} else {
+		trace.Success(attributes, nil)
 	}
 	writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Expenses import completed.", "rows": results})
 }
@@ -9595,11 +9719,18 @@ func CommitLevelsImportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	added, skipped, failed := 0, 0, 0
+	trace := database.NewWriteTrace(r.Context(), "levels.import", "levels", tId, "", "", map[string]any{
+		"recordCount": int64(len(preview.Rows)), "affectedCollections": []string{"levels"},
+	})
+	var writeErrors []error
 	results := []map[string]any{}
 	for _, row := range preview.Rows {
 		state, message := "skipped", "Row contains validation errors."
 		if !row.Valid {
 			skipped++
+			trace.EventForCollection("levels", database.LogLevelInfo, "level.import.item_skipped", "Level import item skipped validation", map[string]any{
+				"sport": row.Data.Sport, "level": row.Data.Name,
+			})
 		} else {
 			ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 			err = levelImportReference(ctx, tId, row.Data.Sport)
@@ -9609,18 +9740,34 @@ func CommitLevelsImportHandler(w http.ResponseWriter, r *http.Request) {
 					skipped++
 					message = "Level already exists."
 					if request.DuplicateAction == "stop" {
+						outcome := "no_op"
+						if added > 0 {
+							outcome = "partial"
+						}
+						trace.Complete(map[string]any{
+							"insertedCount": int64(added), "skippedCount": int64(skipped + 1),
+						}, nil, outcome)
 						results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
 						cancel()
 						writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Import stopped at a duplicate. Earlier rows may have been added.", "rows": results})
 						return
 					}
+					trace.EventForCollection("levels", database.LogLevelInfo, "level.import.item_skipped", "Duplicate level import item skipped", map[string]any{
+						"sport": row.Data.Sport, "level": row.Data.Name,
+					})
 				} else if !errors.Is(lookup, mongo.ErrNoDocuments) {
-					err = fmt.Errorf("Unable to check existing levels.")
+					err = lookup
 				} else {
 					var level database.Level
 					level, err = levelImportLevel(row.Data, tId)
 					if err == nil {
-						_, err = collection.Coll.InsertOne(ctx, level) // Preserve exported active=false; Add forces active=true.
+						var result *mongo.InsertOneResult
+						result, err = collection.Coll.InsertOne(ctx, level) // Preserve exported active=false; Add forces active=true.
+						if err == nil {
+							trace.EventForCollectionWithMongoID("levels", database.LogLevelInfo, "level.import.item_inserted", "Level import item inserted", map[string]any{
+								"sport": level.Sport, "level": level.Name,
+							}, result.InsertedID)
+						}
 					}
 					if err == nil {
 						added++
@@ -9632,12 +9779,36 @@ func CommitLevelsImportHandler(w http.ResponseWriter, r *http.Request) {
 			cancel()
 			if err != nil {
 				failed++
+				writeErrors = append(writeErrors, err)
+				trace.DiagnosticForCollection("levels", "level.import.item_failed", "Level import item failed", err, map[string]any{
+					"sport": row.Data.Sport, "level": row.Data.Name,
+				})
 				state = "failed"
 				message = "Unable to import level."
-				log.Printf("level import row %d: %v", row.RowNumber, err)
+				log.Printf("level import row %d failed: category=%s", row.RowNumber, database.SafeErrorCategory(err))
 			}
 		}
 		results = append(results, map[string]any{"rowNumber": row.RowNumber, "status": state, "message": message})
+	}
+	attributes := map[string]any{
+		"insertedCount": int64(added), "skippedCount": int64(skipped), "failedCount": int64(failed),
+	}
+	if failed > 0 {
+		outcome := "failed"
+		if added > 0 {
+			outcome = "partial"
+		}
+		trace.Failure(errors.Join(writeErrors...), attributes, outcome)
+	} else if skipped > 0 {
+		outcome := "no_op"
+		if added > 0 {
+			outcome = "partial"
+		}
+		trace.Complete(attributes, nil, outcome)
+	} else if added == 0 {
+		trace.Complete(attributes, nil, "no_op")
+	} else {
+		trace.Success(attributes, nil)
 	}
 	writeJSON(w, 200, map[string]any{"added": added, "skipped": skipped, "failed": failed, "message": "Levels import completed.", "rows": results})
 }

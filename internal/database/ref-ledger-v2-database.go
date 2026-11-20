@@ -179,7 +179,7 @@ func convertDateStringToTime(date, gameTime string) (time.Time, error) {
 
 func GetEnvironment() EnvironmentInfo {
 	envInfo := EnvironmentInfo{
-		Environment: os.Getenv("APP_ENV"),
+		Environment: LogEnvironment(),
 		HostLabel:   os.Getenv("MONGODB_ENV"),
 		Database:    os.Getenv("MONGODB_NAME"),
 		Release:     os.Getenv("APP_RELEASE"),
@@ -201,19 +201,15 @@ func GetEnvironment() EnvironmentInfo {
 		envInfo.Release = "unknown"
 	}
 
-	fmt.Printf("Returning environment info: %+v\n", envInfo)
 	return envInfo
 }
 
 func GetMongoDbName() string {
-
-	fmt.Println("Getting MongoDB Name from environment variable MONGODB_NAME...")
 	dbName := os.Getenv("MONGODB_NAME")
 	if dbName == "" {
 		dbName = "refLedger_v2_dev"
 	}
 
-	fmt.Println("MongoDB Name:", dbName)
 	return dbName
 
 }
@@ -1016,11 +1012,10 @@ func Connect() error {
 	uri, _, err := BuildMongoURI()
 
 	if err != nil {
-		fmt.Println("Failed to Build URI.  Reason:", err)
 		return err
 	}
 
-	fmt.Println("Connecting to URI", uri)
+	fmt.Println("Connecting to configured MongoDB endpoint")
 
 	Database = GetMongoDbName()
 	URI = uri
@@ -1050,7 +1045,7 @@ func Connect() error {
 	).Decode(&result)
 
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("MongoDB build information check failed: %w", err)
 	}
 
 	fmt.Println("MongoDB Version:", result["version"])
@@ -1131,17 +1126,25 @@ func DeleteOneDoc(parentCtx context.Context, filter bson.M, dbase, collection st
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 	collectionName := coll.Name()
-	fmt.Println("Deleting one document from", collectionName)
+	tenantId, _ := filter["tenantId"].(string)
+	trace := NewWriteTrace(ctx, "document.delete", collectionName, tenantId, "", "", map[string]any{
+		"gameId": filter["gameId"],
+	})
 
 	result, err := coll.DeleteOne(ctx, filter)
 	if err != nil {
-		fmt.Println("Delete failed.  Reason:", err)
+		trace.Failure(err, nil, "failed")
 		return
 	}
 
-	MetricsDeleted(filter["tenantId"].(string), collection, result.DeletedCount)
-
-	fmt.Println("Deleted Record with GameId of", filter["gameId"], " Records Deleted:", result.DeletedCount)
+	if tenantId != "" {
+		MetricsDeleted(tenantId, collection, result.DeletedCount)
+	}
+	if result.DeletedCount == 0 {
+		trace.Complete(map[string]any{"deletedCount": result.DeletedCount}, nil, "unmatched")
+		return
+	}
+	trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 }
 
 func UpdateGameStatusToPaid(
@@ -1173,6 +1176,9 @@ func UpdateGameStatusToPaid(
 	defer cancel()
 
 	coll := Client.Database(Database).Collection("games")
+	trace := NewWriteTrace(ctx, "games.mark_paid", coll.Name(), tenantId, "", "", map[string]any{
+		"association": association, "gameCount": int64(len(uniqueIDs)),
+	})
 	updated := 0
 	var updateErrors []error
 
@@ -1230,9 +1236,27 @@ func UpdateGameStatusToPaid(
 		}
 
 		updated += int(result.ModifiedCount)
+		trace.Event(LogLevelInfo, "game.status.updated", "Game status updated", map[string]any{
+			"gameId": id, "association": association, "status": "Paid",
+		})
 	}
 
-	return updated, errors.Join(updateErrors...)
+	if err := errors.Join(updateErrors...); err != nil {
+		outcome := "failed"
+		if updated > 0 {
+			outcome = "partial"
+		}
+		trace.Failure(err, map[string]any{
+			"modifiedCount": int64(updated), "partial": updated > 0,
+		}, outcome)
+		return updated, err
+	}
+	if updated == 0 {
+		trace.Complete(map[string]any{"modifiedCount": int64(updated)}, nil, "no_op")
+	} else {
+		trace.Success(map[string]any{"modifiedCount": int64(updated)}, nil)
+	}
+	return updated, nil
 }
 
 func VerifyGameStatus(gameIds []int64, association, tenantId string) []error {
@@ -1375,11 +1399,18 @@ func InsertPaymentDocs(
 			DeductionType:   deductionType,
 		}
 
+		trace := NewWriteTrace(ctx, "payment.import", "payments", tenantId, "", "", map[string]any{
+			"paymentId": doc.PaymentId, "association": doc.Association,
+			"gameCount": int64(len(gameIDs)), "taxYear": strconv.Itoa(doc.TaxYear),
+			"affectedCollections": []string{"payments", "games", "expenses"},
+		})
+		var insertedPaymentID any
+		var changedGames int64
 		session, err := Client.StartSession()
 		if err == nil {
-			var changedGames int64
 			_, err = session.WithTransaction(ctx, func(tx mongo.SessionContext) (interface{}, error) {
 				changedGames = 0
+				insertedPaymentID = nil
 				payments := Client.Database(Database).Collection("payments")
 				games := Client.Database(Database).Collection("games")
 				count, err := payments.CountDocuments(tx, bson.M{
@@ -1421,9 +1452,11 @@ func InsertPaymentDocs(
 					)
 				}
 
-				if _, err := payments.InsertOne(tx, doc); err != nil {
+				inserted, err := payments.InsertOne(tx, doc)
+				if err != nil {
 					return nil, err
 				}
+				insertedPaymentID = inserted.InsertedID
 				for _, gameID := range gameIDs {
 					result, err := games.UpdateOne(
 						tx,
@@ -1447,11 +1480,25 @@ func InsertPaymentDocs(
 			gamesUpdatedToPaid += int(changedGames)
 		}
 		if err != nil {
+			category, _ := classifyWriteError(err)
+			trace.Failure(err, map[string]any{
+				"modifiedCount": changedGames, "partial": false,
+			}, writeFailureOutcome(category))
 			importErrors = append(importErrors, fmt.Errorf("payment %s: %w", doc.PaymentId, err))
 			totalErrors++
 			MetricsErrors(tenantId, "payments", 1)
 			continue
 		}
+		trace.EventForCollection("payments", LogLevelInfo, "payment.import.inserted", "Payment record inserted", map[string]any{
+			"mongoId": fmt.Sprint(insertedPaymentID), "insertedCount": int64(1),
+		})
+		trace.EventForCollection("games", LogLevelInfo, "payment.import.games_updated", "Selected game statuses updated", map[string]any{
+			"modifiedCount": changedGames,
+		})
+		trace.EventForCollection("expenses", LogLevelInfo, "payment.import.deduction_synced", "Payroll deduction synchronized", nil)
+		trace.Success(map[string]any{
+			"modifiedCount": changedGames, "affectedCollections": []string{"payments", "games", "expenses"},
+		}, insertedPaymentID)
 		recordsInserted++
 		MetricsAdded(tenantId, "payments", 1)
 		if deduction > 0 {
@@ -1487,8 +1534,6 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 	defer cancel()
 	var err error
 
-	fmt.Println("UpdateOneGameDoc:  Updating game with ID:", game.GameId, "Game Description:", game)
-
 	db := Client.Database(dbase)
 	coll := db.Collection(collection)
 
@@ -1500,7 +1545,6 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		return err
 	}
 
-	fmt.Println("UpdateOneGameDoc:  Updated game document:", doc)
 	filter := bson.M{
 		"gameId":      doc.GameId,
 		"association": doc.Association,
@@ -1526,22 +1570,29 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		"$unset": bson.M{"referee": "", "u1": "", "u2": "", "eco": ""},
 	}
 
-	fmt.Println("Update filter:", filter, "update:", update)
 	conditional, conflictErr := ConditionalFilter(ctx, coll, filter, game.Version)
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
+	trace := NewWriteTrace(ctx, "game.update", coll.Name(), tId, "", "", map[string]any{
+		"gameId": doc.GameId, "association": doc.Association, "sport": doc.Sport,
+		"level": doc.Level, "site": doc.Site, "field": doc.Field,
+		"gameCount": doc.NumOfGames, "status": doc.Status, "date": game.Date,
+	})
 	result, err := coll.UpdateOne(ctx, filter, update)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 
 	if result.MatchedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	MetricsUpdated(tId, "games", result.ModifiedCount)
 
 	fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
@@ -1561,7 +1612,13 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 	fmt.Println("Inserting records into", collectionName)
 
 	recordsInserted := 0
+	var singleInsertedID any
 	totalErrors := 0
+	var failureErr error
+	trace := NewWriteTrace(ctx, "games.import", collectionName, tId, "", "", map[string]any{
+		"insertedCount": int64(0),
+		"gameCount":     int64(len(game)),
+	})
 
 	for _, v := range game {
 
@@ -1570,7 +1627,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 		doc.GameDateTime, err = convertDateStringToTime(v.Date, v.Time)
 		if err != nil {
 			totalErrors++
-			fmt.Println(err)
+			failureErr = errors.Join(failureErr, ErrStructuredLogValidation)
 			MetricsErrors(tId, "games", 1)
 			continue
 		}
@@ -1579,6 +1636,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 			doc.GameDateTime.Year() > utils.MaxTaxYear {
 
 			totalErrors++
+			failureErr = errors.Join(failureErr, ErrStructuredLogValidation)
 			fmt.Printf(
 				"Game %s: invalid game date; expected a date between 1/1/%d and 12/31/%d\n",
 				v.GameId,
@@ -1604,6 +1662,7 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 			taxYear > utils.MaxTaxYear {
 
 			totalErrors++
+			failureErr = errors.Join(failureErr, ErrStructuredLogValidation)
 			fmt.Printf("Game %s: %v\n", v.GameId, utils.ErrInvalidTaxYear)
 
 			MetricsErrors(tId, "games", 1)
@@ -1614,7 +1673,8 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 
 		if err := prepareGameOfficials(ctx, coll.Database(), &doc, nil); err != nil {
 			totalErrors++
-			fmt.Println(err) // Default a blank tax year to the game date's year.
+			failureErr = errors.Join(failureErr, err)
+			fmt.Printf("Game import officials preparation failed: category=%s\n", SafeErrorCategory(err))
 			taxYearText := strings.TrimSpace(v.TaxYear)
 			if taxYearText == "" {
 				taxYearText = strconv.Itoa(doc.GameDateTime.Year())
@@ -1641,24 +1701,48 @@ func InsertGameDocs(parentCtx context.Context, game []model.GameDescriptor, dbas
 		if gameExists || err != nil {
 			totalErrors++
 			if err != nil {
-				fmt.Println(err)
+				failureErr = errors.Join(failureErr, err)
+				fmt.Printf("Game import duplicate check failed: category=%s\n", SafeErrorCategory(err))
+			} else {
+				failureErr = errors.Join(failureErr, ErrConflict)
 			}
 			MetricsErrors(tId, "games", 1)
 			continue
 		}
-		_, err = coll.InsertOne(ctx, doc)
+		result, err := coll.InsertOne(ctx, doc)
 		if err != nil {
-			fmt.Println("Insert failed.  Reason:", err)
+			trace.Failure(err, map[string]any{
+				"insertedCount": int64(recordsInserted), "partial": recordsInserted > 0,
+			}, map[bool]string{true: "partial", false: "failed"}[recordsInserted > 0])
+			fmt.Printf("Game import insert failed: category=%s\n", SafeErrorCategory(err))
 			MetricsErrors(tId, "games", 1)
 			return
 		}
 
+		trace.EventWithMongoID(LogLevelInfo, "game.import.item_inserted", "Game import item inserted", map[string]any{
+			"gameId": v.GameId, "association": doc.Association, "sport": doc.Sport,
+			"level": doc.Level, "site": doc.Site, "field": doc.Field,
+			"gameCount": doc.NumOfGames, "status": doc.Status, "date": v.Date,
+		}, result.InsertedID)
+		if len(game) == 1 {
+			singleInsertedID = result.InsertedID
+		}
 		MetricsAdded(tId, "games", 1)
 		recordsInserted++
-
 	}
 	fmt.Println("Total Records inserted into", collectionName, ":", recordsInserted)
 	fmt.Println("Total Errors:", totalErrors)
+	if len(game) == 0 {
+		trace.Complete(nil, nil, "no_op")
+		return
+	}
+	if totalErrors > 0 {
+		trace.Failure(failureErr, map[string]any{
+			"insertedCount": int64(recordsInserted), "partial": recordsInserted > 0,
+		}, map[bool]string{true: "partial", false: "failed"}[recordsInserted > 0])
+		return
+	}
+	trace.Success(map[string]any{"insertedCount": int64(recordsInserted)}, singleInsertedID)
 }
 
 // Association Colleciton, Documents and API Code
@@ -1784,7 +1868,10 @@ func (ac *AssociationCollection) Exists(id string, tenantId string) (bool, error
 }
 
 func (ac *AssociationCollection) Add(association Association, tenantId string) error {
+	return ac.AddWithContext(context.TODO(), association, tenantId)
+}
 
+func (ac *AssociationCollection) AddWithContext(parentCtx context.Context, association Association, tenantId string) error {
 	var result *mongo.InsertOneResult
 
 	tenantId = strings.TrimSpace(tenantId)
@@ -1800,7 +1887,7 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 		return fmt.Errorf("association email address is invalid")
 	}
 
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	assocExists, err := ac.Exists(association.Id, tenantId)
@@ -1817,16 +1904,21 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 	doc := ac.convAssocToDoc(association)
 	doc.TenantId = tenantId
 
+	trace := NewWriteTrace(ctx, "association.insert", ac.Coll.Name(), tenantId, "", "", map[string]any{
+		"associationId": association.Id,
+	})
 	result, ac.LastError = ac.Coll.InsertOne(ctx, doc)
 
 	if ac.LastError != nil {
+		trace.Failure(ac.LastError, nil, "failed")
 		MetricsErrors(tenantId, "associations", 1)
 		if mongo.IsDuplicateKeyError(ac.LastError) {
 			return fmt.Errorf("association with ID %q already exists", association.Id)
 		}
-		return fmt.Errorf("Insert failed.  Reason: %v", ac.LastError)
+		return fmt.Errorf("Insert failed.  Reason: %w", ac.LastError)
 	}
 
+	trace.Success(nil, result.InsertedID)
 	MetricsAdded(tenantId, "associations", 1)
 
 	fmt.Println("Inserted ID:", result.InsertedID)
@@ -1835,6 +1927,10 @@ func (ac *AssociationCollection) Add(association Association, tenantId string) e
 }
 
 func (ac *AssociationCollection) AddAssignor(name, tenantId, associationId string) error {
+	return ac.AddAssignorWithContext(context.Background(), name, tenantId, associationId)
+}
+
+func (ac *AssociationCollection) AddAssignorWithContext(parentCtx context.Context, name, tenantId, associationId string) error {
 	name = strings.TrimSpace(name)
 	tenantId = strings.TrimSpace(tenantId)
 	associationId = strings.TrimSpace(associationId)
@@ -1842,7 +1938,7 @@ func (ac *AssociationCollection) AddAssignor(name, tenantId, associationId strin
 		return fmt.Errorf("assignor name and association are required")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	// Match a complete comma-separated identity; the conditional update makes
@@ -1865,22 +1961,32 @@ func (ac *AssociationCollection) AddAssignor(name, tenantId, associationId strin
 			}},
 		}}},
 	}
+	trace := NewWriteTrace(ctx, "association.assignor.add", ac.Coll.Name(), tenantId, "", "", map[string]any{
+		"associationId": associationId,
+	})
 	result, err := ac.Coll.UpdateOne(ctx, filter, update)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf("failed to add assignor: %w", err)
 	}
 	if result.MatchedCount == 1 {
+		trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 		return nil
 	}
 
 	var association AssociationDoc
 	if err := ac.Coll.FindOne(ctx, bson.M{"id": associationId, "tenantId": tenantId}).Decode(&association); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			return fmt.Errorf("association %q not found in this account", associationId)
+			err := fmt.Errorf("association %q not found in this account", associationId)
+			trace.Failure(err, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
+			return err
 		}
+		trace.Failure(err, map[string]any{"matchedCount": result.MatchedCount}, "failed")
 		return fmt.Errorf("failed to verify association assignors: %w", err)
 	}
-	return fmt.Errorf("assignor %q already exists for association %q", name, associationId)
+	err = fmt.Errorf("assignor %q already exists for association %q", name, associationId)
+	trace.Failure(err, map[string]any{"matchedCount": result.MatchedCount}, "no_change")
+	return err
 }
 
 func (ac *AssociationCollection) Get(id string, tenantId string) (*Association, error) {
@@ -2069,6 +2175,10 @@ func (ac *AssociationCollection) GetAssociationsDirectory(tenantId string) ([]As
 }
 
 func (ac *AssociationCollection) Update(association Association, tenantId string) error {
+	return ac.UpdateWithContext(context.Background(), association, tenantId)
+}
+
+func (ac *AssociationCollection) UpdateWithContext(parentCtx context.Context, association Association, tenantId string) error {
 	if association.Version == "" {
 		return ErrConflict
 	}
@@ -2084,28 +2194,40 @@ func (ac *AssociationCollection) Update(association Association, tenantId string
 	doc = ac.convAssocToDoc(association)
 	doc.TenantId = tenantId
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), ac.Coll, filter, association.Version)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	conditional, conflictErr := ConditionalFilter(ctx, ac.Coll, filter, association.Version)
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
-	result, writeErr := ac.Coll.ReplaceOne(context.TODO(), filter, doc)
+	trace := NewWriteTrace(ctx, "association.update", ac.Coll.Name(), tenantId, "", "", map[string]any{
+		"associationId": association.Id,
+	})
+	result, writeErr := ac.Coll.ReplaceOne(ctx, filter, doc)
 	if writeErr != nil {
+		trace.Failure(writeErr, nil, "failed")
 		MetricsErrors(tenantId, "associations", 1)
-		return fmt.Errorf("Failed to update association.  Reason: %v", writeErr)
+		return fmt.Errorf("Failed to update association.  Reason: %w", writeErr)
 	}
 
 	if result.MatchedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	MetricsUpdated(tenantId, "associations", result.ModifiedCount)
 	fmt.Println("Record updated in", ac.Coll.Name())
 	return nil
 }
 
 func (ac *AssociationCollection) Delete(id string, tenantId string, versions ...string) error {
+	return ac.DeleteWithContext(context.Background(), id, tenantId, versions...)
+}
+
+func (ac *AssociationCollection) DeleteWithContext(parentCtx context.Context, id string, tenantId string, versions ...string) error {
 
 	var filter bson.M
 
@@ -2114,21 +2236,29 @@ func (ac *AssociationCollection) Delete(id string, tenantId string, versions ...
 		"tenantId": tenantId,
 	}
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), ac.Coll, filter, firstVersion(versions))
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	conditional, conflictErr := ConditionalFilter(ctx, ac.Coll, filter, firstVersion(versions))
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
-	result, writeErr := ac.Coll.DeleteOne(context.TODO(), filter)
+	trace := NewWriteTrace(ctx, "association.delete", ac.Coll.Name(), tenantId, "", "", map[string]any{
+		"associationId": id,
+	})
+	result, writeErr := ac.Coll.DeleteOne(ctx, filter)
 	if writeErr != nil {
+		trace.Failure(writeErr, nil, "failed")
 		MetricsErrors(tenantId, "associations", 1)
-		return fmt.Errorf("Failed to delete association.  Reason: %v", writeErr)
+		return fmt.Errorf("Failed to delete association.  Reason: %w", writeErr)
 	}
 
 	if result.DeletedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"deletedCount": result.DeletedCount}, "unmatched")
 		return ErrConflict
 	}
+	trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 	MetricsDeleted(tenantId, "associations", result.DeletedCount)
 	fmt.Println("Deleted Record with Association Id of", filter["id"], " in", ac.Coll.Name(), "Records Deleted:", result.DeletedCount)
 
@@ -2289,7 +2419,11 @@ func (sc *SiteCollection) Init(client *mongo.Client) error {
 }
 
 func (sc *SiteCollection) Add(site Site, tenantId string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	return sc.AddWithContext(context.Background(), site, tenantId)
+}
+
+func (sc *SiteCollection) AddWithContext(parentCtx context.Context, site Site, tenantId string) error {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	site.Name = strings.TrimSpace(site.Name)
@@ -2303,13 +2437,15 @@ func (sc *SiteCollection) Add(site Site, tenantId string) error {
 	if site.Email != "" && !validEmail(site.Email) {
 		return fmt.Errorf("site email address is invalid")
 	}
-	fmt.Println("Adding site:", site, "for tenant ID:", tenantId)
-
 	doc := sc.convSiteToDoc(site)
 	doc.TenantId = tenantId
 
+	trace := NewWriteTrace(ctx, "site.insert", sc.Coll.Name(), tenantId, "", "", map[string]any{
+		"siteName": site.Name,
+	})
 	result, err := sc.Coll.InsertOne(ctx, doc)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		MetricsErrors(tenantId, "sites", 1)
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("site %q already exists", doc.Name)
@@ -2318,6 +2454,7 @@ func (sc *SiteCollection) Add(site Site, tenantId string) error {
 		return fmt.Errorf("failed to insert site: %w", err)
 	}
 
+	trace.Success(nil, result.InsertedID)
 	MetricsAdded(tenantId, "sites", 1)
 
 	fmt.Println("Inserted ID:", result.InsertedID)
@@ -2512,6 +2649,10 @@ func (sc *SiteCollection) GetSitesDirectory(tenantId, siteName string) ([]Site, 
 }
 
 func (sc *SiteCollection) Update(site Site, tenantId string) error {
+	return sc.UpdateWithContext(context.Background(), site, tenantId)
+}
+
+func (sc *SiteCollection) UpdateWithContext(parentCtx context.Context, site Site, tenantId string) error {
 	if site.Version == "" {
 		return ErrConflict
 	}
@@ -2527,22 +2668,30 @@ func (sc *SiteCollection) Update(site Site, tenantId string) error {
 	doc = sc.convSiteToDoc(site)
 	doc.TenantId = tenantId
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), sc.Coll, filter, site.Version)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	conditional, conflictErr := ConditionalFilter(ctx, sc.Coll, filter, site.Version)
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
-	result, writeErr := sc.Coll.ReplaceOne(context.TODO(), filter, doc)
+	trace := NewWriteTrace(ctx, "site.update", sc.Coll.Name(), tenantId, "", "", map[string]any{
+		"siteName": site.Name,
+	})
+	result, writeErr := sc.Coll.ReplaceOne(ctx, filter, doc)
 	if writeErr != nil {
+		trace.Failure(writeErr, nil, "failed")
 		MetricsErrors(tenantId, "sites", 1)
-		return fmt.Errorf("Failed to update site.  Reason: %v", writeErr)
+		return fmt.Errorf("Failed to update site.  Reason: %w", writeErr)
 	}
 
 	if result.MatchedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	MetricsUpdated(tenantId, "sites", result.ModifiedCount)
 
 	fmt.Println("Record updated in", sc.Coll.Name())
@@ -2550,6 +2699,10 @@ func (sc *SiteCollection) Update(site Site, tenantId string) error {
 }
 
 func (sc *SiteCollection) Delete(name, tenantId string, versions ...string) error {
+	return sc.DeleteWithContext(context.Background(), name, tenantId, versions...)
+}
+
+func (sc *SiteCollection) DeleteWithContext(parentCtx context.Context, name, tenantId string, versions ...string) error {
 
 	var filter bson.M
 
@@ -2558,22 +2711,30 @@ func (sc *SiteCollection) Delete(name, tenantId string, versions ...string) erro
 		"tenantId": tenantId,
 	}
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), sc.Coll, filter, firstVersion(versions))
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	conditional, conflictErr := ConditionalFilter(ctx, sc.Coll, filter, firstVersion(versions))
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
-	result, writeErr := sc.Coll.DeleteOne(context.TODO(), filter)
+	trace := NewWriteTrace(ctx, "site.delete", sc.Coll.Name(), tenantId, "", "", map[string]any{
+		"siteName": name,
+	})
+	result, writeErr := sc.Coll.DeleteOne(ctx, filter)
 	if writeErr != nil {
+		trace.Failure(writeErr, nil, "failed")
 		MetricsErrors(tenantId, "sites", 1)
-		return fmt.Errorf("Failed to delete site.  Reason: %v", writeErr)
+		return fmt.Errorf("Failed to delete site.  Reason: %w", writeErr)
 	}
 
 	if result.DeletedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"deletedCount": result.DeletedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 	MetricsDeleted(tenantId, "sites", result.DeletedCount)
 
 	fmt.Println("Deleted Record with Site Name of", filter["name"], " in", sc.Coll.Name(), "Records Deleted:", result.DeletedCount)
@@ -2632,6 +2793,10 @@ func (gc *GameCollection) Get(association string, gameId string, tenantId string
 }
 
 func (gc *GameCollection) Delete(association, gameId, tid string, versions ...string) error {
+	return gc.DeleteWithContext(context.Background(), association, gameId, tid, versions...)
+}
+
+func (gc *GameCollection) DeleteWithContext(parentCtx context.Context, association, gameId, tid string, versions ...string) error {
 
 	var filter bson.M
 
@@ -2639,6 +2804,8 @@ func (gc *GameCollection) Delete(association, gameId, tid string, versions ...st
 	if err != nil {
 		return fmt.Errorf("Failed to convert game ID.  Reason: %v", err)
 	}
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
 
 	filter = bson.M{
 		"gameId":      gameIdInt64,
@@ -2647,21 +2814,27 @@ func (gc *GameCollection) Delete(association, gameId, tid string, versions ...st
 		"status":      bson.M{"$ne": "Paid"},
 	}
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), gc.Coll, filter, firstVersion(versions))
+	conditional, conflictErr := ConditionalFilter(ctx, gc.Coll, filter, firstVersion(versions))
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
-	result, writeErr := gc.Coll.DeleteOne(context.TODO(), filter)
+	trace := NewWriteTrace(ctx, "game.delete", gc.Coll.Name(), tid, "", "", map[string]any{
+		"gameId": gameId, "association": association,
+	})
+	result, writeErr := gc.Coll.DeleteOne(ctx, filter)
 	if writeErr != nil {
-		return fmt.Errorf("Failed to delete game.  Reason: %v", writeErr)
+		trace.Failure(writeErr, nil, "failed")
+		return fmt.Errorf("Failed to delete game.  Reason: %w", writeErr)
 	}
 
 	if result.DeletedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"deletedCount": result.DeletedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 	MetricsDeleted(tid, "games", result.DeletedCount)
 
 	fmt.Println("Deleted Record with Game Id of", filter["gameId"], " in", gc.Coll.Name(), "Records Deleted:", result.DeletedCount)
@@ -2702,11 +2875,11 @@ func (gc *GameCollection) Add(
 	tenantId string,
 	game model.GameDescriptor,
 ) error {
+	return gc.AddWithContext(context.TODO(), tenantId, game)
+}
 
-	ctx, cancel := context.WithTimeout(
-		context.TODO(),
-		10*time.Second,
-	)
+func (gc *GameCollection) AddWithContext(parentCtx context.Context, tenantId string, game model.GameDescriptor) error {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	doc := convertGameDescrWithOfficials(game)
@@ -2727,16 +2900,24 @@ func (gc *GameCollection) Add(
 
 	doc.GameDateTime = gameDateTime
 
+	trace := NewWriteTrace(ctx, "game.insert", gc.Coll.Name(), tenantId, "", "", map[string]any{
+		"gameId": doc.GameId, "association": doc.Association, "sport": doc.Sport,
+		"level": doc.Level, "site": doc.Site, "field": doc.Field,
+		"gameCount": doc.NumOfGames, "status": doc.Status, "date": game.Date,
+	})
 	if err := prepareGameOfficials(ctx, gc.Coll.Database(), &doc, nil); err != nil {
 		gc.LastError = err
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 	result, err := gc.Coll.InsertOne(ctx, doc)
 	if err != nil {
 		gc.LastError = err
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf("insert failed: %w", err)
 	}
 
+	trace.Success(nil, result.InsertedID)
 	MetricsAdded(tenantId, "games", 1)
 
 	gc.LastError = nil
@@ -3005,16 +3186,22 @@ func SetGamesCompleted(
 	defer cancel()
 
 	coll := Client.Database(Database).Collection("games")
+	trace := NewWriteTrace(ctx, "games.mark_completed", coll.Name(), tenantId, "", "", map[string]any{
+		"association": association, "gameCount": int64(len(uniqueIDs)),
+	})
 
 	session, err := Client.StartSession()
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf("failed to start MongoDB session: %w", err)
 	}
 	defer session.EndSession(ctx)
 
+	var modifiedGames int64
 	_, err = session.WithTransaction(
 		ctx,
 		func(tx mongo.SessionContext) (interface{}, error) {
+			modifiedGames = 0
 			for _, id := range uniqueIDs {
 				filter := bson.M{
 					"gameId":      id,
@@ -3046,15 +3233,27 @@ func SetGamesCompleted(
 				if result.MatchedCount != 1 {
 					return nil, fmt.Errorf("game %d was not found", id)
 				}
+				modifiedGames += result.ModifiedCount
 			}
 
 			return nil, nil
 		},
 	)
 	if err != nil {
+		trace.Failure(err, nil, "")
 		return fmt.Errorf("game status transaction was rolled back: %w", err)
 	}
 
+	for _, id := range uniqueIDs {
+		trace.EventForCollection("games", LogLevelInfo, "game.status.completed", "Game status set to Completed", map[string]any{
+			"gameId": id, "association": association, "status": "Completed",
+		})
+	}
+	if modifiedGames == 0 {
+		trace.Complete(map[string]any{"modifiedCount": modifiedGames}, nil, "no_op")
+	} else {
+		trace.Success(map[string]any{"modifiedCount": modifiedGames}, nil)
+	}
 	return nil
 }
 
@@ -3220,7 +3419,11 @@ func (oc *OfficialCollection) Init(client *mongo.Client) error {
 }
 
 func (oc *OfficialCollection) Add(official Official, tenantId string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	return oc.AddWithContext(context.Background(), official, tenantId)
+}
+
+func (oc *OfficialCollection) AddWithContext(parentCtx context.Context, official Official, tenantId string) error {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	official.FirstName = strings.TrimSpace(official.FirstName)
@@ -3244,8 +3447,12 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 
 	doc.TenantId = tenantId
 
+	trace := NewWriteTrace(ctx, "official.insert", oc.Coll.Name(), tenantId, "", "", map[string]any{
+		"officialId": doc.Id,
+	})
 	result, err := oc.Coll.InsertOne(ctx, doc)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		MetricsErrors(tenantId, "officials", 1)
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("official %s %s already exists", official.FirstName, official.LastName)
@@ -3254,6 +3461,7 @@ func (oc *OfficialCollection) Add(official Official, tenantId string) error {
 		return fmt.Errorf("failed to insert official: %w", err)
 	}
 
+	trace.Success(nil, result.InsertedID)
 	MetricsAdded(tenantId, "officials", 1)
 
 	fmt.Println("Inserted ID:", result.InsertedID)
@@ -3421,6 +3629,10 @@ func (oc *OfficialCollection) GetOfficialsDirectory(firstName, lastName, tenantI
 }
 
 func (oc *OfficialCollection) Update(tenantId string, official Official) error {
+	return oc.UpdateWithContext(context.Background(), tenantId, official)
+}
+
+func (oc *OfficialCollection) UpdateWithContext(parentCtx context.Context, tenantId string, official Official) error {
 	if official.Version == "" {
 		return ErrConflict
 	}
@@ -3443,22 +3655,28 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 
 	doc.TenantId = tenantId
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), oc.Coll, filter, official.Version)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	conditional, conflictErr := ConditionalFilter(ctx, oc.Coll, filter, official.Version)
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
-	result, writeErr := oc.Coll.ReplaceOne(context.TODO(), filter, doc)
+	trace := NewWriteTrace(ctx, "official.update", oc.Coll.Name(), tenantId, "", "", nil)
+	result, writeErr := oc.Coll.ReplaceOne(ctx, filter, doc)
 	if writeErr != nil {
+		trace.Failure(writeErr, nil, "failed")
 		MetricsErrors(tenantId, "officials", 1)
-		return fmt.Errorf("Failed to update official.  Reason: %v", writeErr)
+		return fmt.Errorf("Failed to update official.  Reason: %w", writeErr)
 	}
 
 	if result.MatchedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	MetricsUpdated(tenantId, "officials", result.ModifiedCount)
 
 	fmt.Println("Record updated in", oc.Coll.Name())
@@ -3466,7 +3684,11 @@ func (oc *OfficialCollection) Update(tenantId string, official Official) error {
 }
 
 func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string, versions ...string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	return oc.DeleteWithContext(context.Background(), firstName, lastName, tenantId, versions...)
+}
+
+func (oc *OfficialCollection) DeleteWithContext(parentCtx context.Context, firstName, lastName, tenantId string, versions ...string) error {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	filter := bson.M{
@@ -3519,15 +3741,19 @@ func (oc *OfficialCollection) Delete(firstName, lastName, tenantId string, versi
 	}
 	deleteFilter = conditional
 
+	trace := NewWriteTrace(ctx, "official.delete", oc.Coll.Name(), tenantId, "", "", nil)
 	result, err := oc.Coll.DeleteOne(ctx, deleteFilter)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		MetricsErrors(tenantId, "officials", 1)
 		return fmt.Errorf("failed to delete official: %w", err)
 	}
 	if result.DeletedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"deletedCount": result.DeletedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 	MetricsDeleted(tenantId, "officials", result.DeletedCount)
 	fmt.Println("Deleted official:", firstName, lastName)
 	return nil
@@ -3689,36 +3915,17 @@ func (ec *ExpensesCollection) Init(client *mongo.Client) error {
 }
 
 func (ec *ExpensesCollection) convExpenseToDoc(expense Expense) ExpenseDoc {
-
-	fmt.Println("convExpenseToDoc expense:", expense)
 	var mileage int64 = 0
 	var amt int64 = 0
-	var err error
 
 	if expense.Type == "Mileage" {
-		fmt.Println("convExpenseToDoc converting mileage:", expense.Amount)
-		mileage, err = utils.ConvertStrMilesToInt64(expense.Amount)
-		if err != nil {
-			fmt.Println("Error converting Mileage:", err)
-		}
+		mileage, _ = utils.ConvertStrMilesToInt64(expense.Amount)
 		amt = 0
-		fmt.Println("convExpenseToDoc converted mileage to :", mileage)
 	} else {
-		fmt.Println("convExpenseToDoc converting amount:", expense.Amount)
-		amt, err = utils.ConvertAmtStrToInt64(expense.Amount)
-
-		if err != nil {
-			fmt.Println("Error converting Amount:", err)
-		}
-		fmt.Println("convExpenseToDoc converted amount to :", amt)
+		amt, _ = utils.ConvertAmtStrToInt64(expense.Amount)
 	}
 
-	fmt.Println("Amt:", amt, "Mileage:", mileage)
-
-	gameId, err := utils.ConvertStrToInt64(expense.GameId)
-	if err != nil {
-		fmt.Println("Error converting GameId:", err)
-	}
+	gameId, _ := utils.ConvertStrToInt64(expense.GameId)
 	return ExpenseDoc{
 		Version:     expense.Version,
 		Date:        expense.Date,
@@ -3792,7 +3999,12 @@ func (ec *ExpensesCollection) GenerateExpenseId(expense Expense) string {
 }
 
 func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string, versions ...string) error {
+	return ec.DeleteWithContext(context.Background(), expenseId, association, tenantId, versions...)
+}
 
+func (ec *ExpensesCollection) DeleteWithContext(parentCtx context.Context, expenseId, association, tenantId string, versions ...string) error {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
 	fmt.Println("===== Attempting to delete Expense Id", expenseId, "for Association", association, "and tenant id", tenantId, "=====")
 
 	expenseId = strings.TrimSpace(expenseId)
@@ -3817,7 +4029,7 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string, ve
 		"tenantId":    tenantId,
 	}
 	var existing ExpenseDoc
-	if err := ec.Coll.FindOne(context.Background(), filter).Decode(&existing); err != nil {
+	if err := ec.Coll.FindOne(ctx, filter).Decode(&existing); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return ErrConflict
 		}
@@ -3827,18 +4039,23 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string, ve
 		return fmt.Errorf("payroll deduction expenses must be changed through their payment")
 	}
 
-	conditional, conflictErr := ConditionalFilter(context.Background(), ec.Coll, filter, firstVersion(versions))
+	conditional, conflictErr := ConditionalFilter(ctx, ec.Coll, filter, firstVersion(versions))
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
+	trace := NewWriteTrace(ctx, "expense.delete", ec.Coll.Name(), tenantId, "", "", map[string]any{
+		"expenseId": expenseId, "association": association, "date": existing.Date,
+		"taxYear": existing.TaxYear, "gameId": existing.GameId,
+	})
 	result, err := ec.Coll.DeleteOne(
-		context.Background(),
+		ctx,
 		filter,
 	)
 
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		MetricsErrors(tenantId, "expenses", 1)
 		return fmt.Errorf(
 			"failed to delete expense %q for association %q: %w",
@@ -3849,8 +4066,10 @@ func (ec *ExpensesCollection) Delete(expenseId, association, tenantId string, ve
 	}
 
 	if result.DeletedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"deletedCount": result.DeletedCount}, "unmatched")
 		return ErrConflict
 	}
+	trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 	MetricsDeleted(tenantId, "expenses", result.DeletedCount)
 	return nil
 }
@@ -3861,12 +4080,16 @@ func (ec *ExpensesCollection) Update(
 	association string,
 	tenantId string,
 ) error {
+	return ec.UpdateWithContext(context.Background(), expense, expenseId, association, tenantId)
+}
+
+func (ec *ExpensesCollection) UpdateWithContext(parentCtx context.Context, expense Expense, expenseId string, association string, tenantId string) error {
 	if expense.Version == "" {
 		return ErrConflict
 	}
 
 	ctx, cancel := context.WithTimeout(
-		context.Background(),
+		parentCtx,
 		10*time.Second,
 	)
 	defer cancel()
@@ -3952,12 +4175,17 @@ func (ec *ExpensesCollection) Update(
 	}
 	filter = conditional
 
+	trace := NewWriteTrace(ctx, "expense.update", ec.Coll.Name(), tenantId, "", "", map[string]any{
+		"expenseId": expenseId, "association": association, "gameId": existing.GameId,
+		"date": formattedDate, "taxYear": expense.TaxYear,
+	})
 	result, err := ec.Coll.UpdateOne(
 		ctx,
 		filter,
 		update,
 	)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		MetricsErrors(tenantId, "expenses", 1)
 
 		return fmt.Errorf(
@@ -3969,9 +4197,11 @@ func (ec *ExpensesCollection) Update(
 	}
 
 	if result.MatchedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	MetricsUpdated(tenantId, "expenses", result.ModifiedCount)
 
 	fmt.Printf(
@@ -3985,10 +4215,15 @@ func (ec *ExpensesCollection) Update(
 }
 
 func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
+	return ec.AddWithTrace(context.TODO(), expense, tenantId, nil)
+}
 
-	fmt.Println("Adding expense:", expense)
-	var result *mongo.InsertOneResult
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+func (ec *ExpensesCollection) AddWithContext(parentCtx context.Context, expense Expense, tenantId string) error {
+	return ec.AddWithTrace(parentCtx, expense, tenantId, nil)
+}
+
+func (ec *ExpensesCollection) AddWithTrace(parentCtx context.Context, expense Expense, tenantId string, parentTrace *WriteTrace) error {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 
 	dt, err := time.Parse("2006-01-02", expense.Date)
@@ -4003,12 +4238,31 @@ func (ec *ExpensesCollection) Add(expense Expense, tenantId string) error {
 
 	doc.TenantId = tenantId
 	doc.ExpenseId = ec.GenerateExpenseId(expense)
-	fmt.Println("Adding Expense Doc:", doc)
 
+	trace := parentTrace
+	ownsTrace := trace == nil
+	if ownsTrace {
+		trace = NewWriteTrace(ctx, "expense.insert", ec.Coll.Name(), tenantId, "", "", map[string]any{
+			"expenseId": doc.ExpenseId, "association": doc.Association, "gameId": doc.GameId,
+			"date": doc.Date, "taxYear": doc.TaxYear,
+		})
+	}
+	var result *mongo.InsertOneResult
 	result, ec.LastError = ec.Coll.InsertOne(ctx, doc)
 	if ec.LastError != nil {
+		if ownsTrace {
+			trace.Failure(ec.LastError, nil, "failed")
+		}
 		MetricsErrors(tenantId, "expenses", 1)
-		return fmt.Errorf("Insert failed.  Reason: %v", ec.LastError)
+		return fmt.Errorf("Insert failed.  Reason: %w", ec.LastError)
+	}
+	if ownsTrace {
+		trace.Success(nil, result.InsertedID)
+	} else {
+		trace.EventWithMongoID(LogLevelInfo, "expense.import.item_inserted", "Expense import item inserted", map[string]any{
+			"expenseId": doc.ExpenseId, "association": doc.Association, "gameId": doc.GameId,
+			"date": doc.Date, "taxYear": doc.TaxYear,
+		}, result.InsertedID)
 	}
 	fmt.Println("Inserted ID:", result.InsertedID)
 
@@ -4082,6 +4336,14 @@ func (uc *UsersCollection) SetSportsSupported(
 	tenantId string,
 	sports []string,
 ) error {
+	return uc.SetSportsSupportedWithContext(context.Background(), tenantId, sports)
+}
+
+func (uc *UsersCollection) SetSportsSupportedWithContext(
+	parentCtx context.Context,
+	tenantId string,
+	sports []string,
+) error {
 	if tenantId == "" {
 		return fmt.Errorf("tenant ID is empty")
 	}
@@ -4100,30 +4362,40 @@ func (uc *UsersCollection) SetSportsSupported(
 		},
 	}
 
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	trace := NewWriteTrace(ctx, "user.sports.update", uc.Coll.Name(), tenantId, "", "", nil)
 	result, err := uc.Coll.UpdateOne(
-		context.TODO(),
+		ctx,
 		filter,
 		update,
 	)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf("failed to save supported sports: %w", err)
 	}
 
 	if result.MatchedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return fmt.Errorf("user not found for tenant ID %q", tenantId)
 	}
 
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	return nil
 }
 
 func (uc *UsersCollection) EnableSportSupported(tenantId, sport string) error {
+	return uc.EnableSportSupportedWithContext(context.Background(), tenantId, sport)
+}
+
+func (uc *UsersCollection) EnableSportSupportedWithContext(parentCtx context.Context, tenantId, sport string) error {
 	tenantId = strings.TrimSpace(tenantId)
 	sport = strings.TrimSpace(sport)
 	if tenantId == "" || tenantId == "na" || sport == "" {
 		return fmt.Errorf("sport and valid tenant ID are required")
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	var catalogSport Sport
 	if err := uc.DB.Collection("sports").FindOne(ctx, bson.M{
@@ -4135,14 +4407,20 @@ func (uc *UsersCollection) EnableSportSupported(tenantId, sport string) error {
 		return fmt.Errorf("failed to validate sport: %w", err)
 	}
 
+	trace := NewWriteTrace(ctx, "user.sports.enable", uc.Coll.Name(), tenantId, "", "", map[string]any{
+		"sport": sport,
+	})
 	result, err := uc.Coll.UpdateOne(ctx, bson.M{"tenantId": tenantId},
 		bson.M{"$addToSet": bson.M{"sports": sport}})
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf("failed to enable sport for this account: %w", err)
 	}
 	if result.MatchedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return fmt.Errorf("account not found for tenant ID %q", tenantId)
 	}
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	return nil
 }
 
@@ -4277,14 +4555,17 @@ func (uc *UsersCollection) Add(
 		Name:          req.Name,
 	}
 
-	_, err = uc.Coll.InsertOne(ctx, user)
+	trace := NewWriteTrace(ctx, "user.account.insert", uc.Coll.Name(), tenantID, "", "", nil)
+	result, err := uc.Coll.InsertOne(ctx, user)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		if mongo.IsDuplicateKeyError(err) {
 			return "", ErrUserAlreadyExists
 		}
 		return "", fmt.Errorf("failed to save user account: %w", err)
 	}
 
+	trace.Success(nil, result.InsertedID)
 	return tenantID, nil
 }
 
@@ -4382,6 +4663,10 @@ func (lc *LevelsCollection) CreateIndices() error {
 }
 
 func (lc *LevelsCollection) Add(level Level, tenantId string) error {
+	return lc.AddWithContext(context.Background(), level, tenantId)
+}
+
+func (lc *LevelsCollection) AddWithContext(parentCtx context.Context, level Level, tenantId string) error {
 	level.Name = strings.TrimSpace(level.Name)
 	level.Sport = strings.TrimSpace(level.Sport)
 	level.TenantID = strings.TrimSpace(tenantId)
@@ -4394,7 +4679,7 @@ func (lc *LevelsCollection) Add(level Level, tenantId string) error {
 	if level.GameFee < 0 {
 		return fmt.Errorf("game fee cannot be negative")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	if err := lc.validateLevelSport(ctx, level.Sport); err != nil {
 		return err
@@ -4411,12 +4696,18 @@ func (lc *LevelsCollection) Add(level Level, tenantId string) error {
 	// Independent IDs allow the same level name in different sports.
 	level.ID = primitive.NewObjectID().Hex()
 	level.Active = false
-	if _, err := lc.Coll.InsertOne(ctx, level); err != nil {
+	trace := NewWriteTrace(ctx, "level.insert", lc.Coll.Name(), tenantId, "", "", map[string]any{
+		"levelId": level.ID, "sport": level.Sport, "level": level.Name,
+	})
+	result, err := lc.Coll.InsertOne(ctx, level)
+	if err != nil {
+		trace.Failure(err, nil, "failed")
 		if mongo.IsDuplicateKeyError(err) {
 			return fmt.Errorf("level %q already exists for %s", level.Name, level.Sport)
 		}
 		return fmt.Errorf("failed to add level: %w", err)
 	}
+	trace.Success(nil, result.InsertedID)
 	return nil
 }
 
@@ -4466,6 +4757,10 @@ func normalizeLevelGameFee(value string) (string, error) {
 
 // Update assigns the sport and fee for an existing level owned by this tenant.
 func (lc *LevelsCollection) Update(level Level, tenantId string) error {
+	return lc.UpdateWithContext(context.Background(), level, tenantId)
+}
+
+func (lc *LevelsCollection) UpdateWithContext(parentCtx context.Context, level Level, tenantId string) error {
 	if level.Version == "" {
 		return ErrConflict
 	}
@@ -4482,7 +4777,7 @@ func (lc *LevelsCollection) Update(level Level, tenantId string) error {
 	if level.GameFee < 0 {
 		return fmt.Errorf("game fee cannot be negative")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
 	defer cancel()
 	filter := bson.M{"id": level.ID, "tenantId": tenantId}
 	var existing Level
@@ -4509,19 +4804,28 @@ func (lc *LevelsCollection) Update(level Level, tenantId string) error {
 	}
 	filter = conditional
 
+	trace := NewWriteTrace(ctx, "level.update", lc.Coll.Name(), tenantId, "", "", map[string]any{
+		"levelId": level.ID, "sport": level.Sport, "level": level.Name,
+	})
 	result, err := lc.Coll.UpdateOne(ctx, filter,
 		bson.M{"$set": bson.M{"name": level.Name, "sport": level.Sport, "gameFee": level.GameFee}})
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf("failed to update level: %w", err)
 	}
 	if result.MatchedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return ErrConflict
 	}
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	return nil
 }
 
 func (lc *LevelsCollection) Activate(level Level, tenantId string) error {
+	return lc.ActivateWithContext(context.Background(), level, tenantId)
+}
 
+func (lc *LevelsCollection) ActivateWithContext(parentCtx context.Context, level Level, tenantId string) error {
 	level.ID = strings.TrimSpace(level.ID)
 	level.Name = strings.TrimSpace(level.Name)
 
@@ -4537,28 +4841,37 @@ func (lc *LevelsCollection) Activate(level Level, tenantId string) error {
 		},
 	}
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), lc.Coll, filter, level.Version)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	conditional, conflictErr := ConditionalFilter(ctx, lc.Coll, filter, level.Version)
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
-	result, err := lc.Coll.UpdateOne(context.Background(), filter, update)
+	trace := NewWriteTrace(ctx, "level.activate", lc.Coll.Name(), tenantId, "", "", map[string]any{
+		"levelId": level.ID, "sport": level.Sport, "level": level.Name,
+	})
+	result, err := lc.Coll.UpdateOne(ctx, filter, update)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf("Attempt to activate %s failed.  Reason: %s", level.Name, err)
 	}
 
 	fmt.Println("Activate Results: ", result)
 
 	if result.ModifiedCount == 1 {
+		trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 		return nil
 	}
 
 	if result.MatchedCount != 1 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return fmt.Errorf("%s not found.", level.Name)
 	}
 
 	if result.MatchedCount == 1 && result.ModifiedCount == 0 {
+		trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 		return nil
 	}
 
@@ -4567,7 +4880,10 @@ func (lc *LevelsCollection) Activate(level Level, tenantId string) error {
 }
 
 func (lc *LevelsCollection) Deactivate(level Level, tenantId string) error {
+	return lc.DeactivateWithContext(context.Background(), level, tenantId)
+}
 
+func (lc *LevelsCollection) DeactivateWithContext(parentCtx context.Context, level Level, tenantId string) error {
 	level.ID = strings.TrimSpace(level.ID)
 	level.Name = strings.TrimSpace(level.Name)
 
@@ -4583,27 +4899,36 @@ func (lc *LevelsCollection) Deactivate(level Level, tenantId string) error {
 		},
 	}
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), lc.Coll, filter, level.Version)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	conditional, conflictErr := ConditionalFilter(ctx, lc.Coll, filter, level.Version)
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
-	result, err := lc.Coll.UpdateOne(context.Background(), filter, update)
+	trace := NewWriteTrace(ctx, "level.deactivate", lc.Coll.Name(), tenantId, "", "", map[string]any{
+		"levelId": level.ID, "sport": level.Sport, "level": level.Name,
+	})
+	result, err := lc.Coll.UpdateOne(ctx, filter, update)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf("Attempt to deactivate %s failed.  Reason: %s", level.Name, err)
 	}
 
 	fmt.Println("Deactivate Results: ", result)
 	if result.ModifiedCount == 1 {
+		trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 		return nil
 	}
 
 	if result.MatchedCount != 1 {
+		trace.Failure(ErrConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return fmt.Errorf("%s not found.", level.Name)
 	}
 
 	if result.MatchedCount == 1 && result.ModifiedCount == 0 {
+		trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 		return nil
 	}
 
@@ -4611,7 +4936,12 @@ func (lc *LevelsCollection) Deactivate(level Level, tenantId string) error {
 }
 
 func (lc *LevelsCollection) Delete(levelID string, tenantID string, versions ...string) error {
+	return lc.DeleteWithContext(context.Background(), levelID, tenantID, versions...)
+}
 
+func (lc *LevelsCollection) DeleteWithContext(parentCtx context.Context, levelID string, tenantID string, versions ...string) error {
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
 	levelID = strings.TrimSpace(levelID)
 	tenantID = strings.TrimSpace(tenantID)
 
@@ -4624,7 +4954,7 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string, versions ...
 	}
 
 	var existing Level
-	if err := lc.Coll.FindOne(context.Background(), bson.M{
+	if err := lc.Coll.FindOne(ctx, bson.M{
 		"id": levelID, "tenantId": tenantID,
 	}).Decode(&existing); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -4640,7 +4970,7 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string, versions ...
 
 	gamesCollection := Client.Database(Database).Collection("games")
 
-	count, err := gamesCollection.CountDocuments(context.Background(), gamesFilter)
+	count, err := gamesCollection.CountDocuments(ctx, gamesFilter)
 	if err != nil {
 		return fmt.Errorf("failed to query games collection: %w", err)
 	}
@@ -4654,17 +4984,21 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string, versions ...
 		"tenantId": tenantID,
 	}
 
-	conditional, conflictErr := ConditionalFilter(context.TODO(), lc.Coll, filter, firstVersion(versions))
+	conditional, conflictErr := ConditionalFilter(ctx, lc.Coll, filter, firstVersion(versions))
 	if conflictErr != nil {
 		return conflictErr
 	}
 	filter = conditional
 
+	trace := NewWriteTrace(ctx, "level.delete", lc.Coll.Name(), tenantID, "", "", map[string]any{
+		"levelId": levelID, "sport": existing.Sport, "level": existing.Name,
+	})
 	result, err := lc.Coll.DeleteOne(
-		context.Background(),
+		ctx,
 		filter,
 	)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return fmt.Errorf(
 			"failed to delete level %q: %w",
 			levelID,
@@ -4673,9 +5007,11 @@ func (lc *LevelsCollection) Delete(levelID string, tenantID string, versions ...
 	}
 
 	if result.DeletedCount == 0 {
+		trace.Failure(ErrConflict, map[string]any{"deletedCount": result.DeletedCount}, "unmatched")
 		return ErrConflict
 	}
 
+	trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 	return nil
 }
 
