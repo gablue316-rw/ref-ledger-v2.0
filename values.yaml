@@ -38,6 +38,8 @@ env:
   MONGODB_REPLICA_SET: "refLedgerRS"
   LOG_FILE_PATH: "/root/logs/ref-ledgerV2-webServer.log"
   APP_ENV: "production"
+  # Comma-separated CIDRs of immediate trusted ingress peers; empty disables forwarded-scheme trust.
+  REF_LEDGER_TRUSTED_PROXY_CIDRS: ""
 
 cloudflare:
   enabled: false

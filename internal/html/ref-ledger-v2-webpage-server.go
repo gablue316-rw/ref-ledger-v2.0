@@ -8056,6 +8056,10 @@ func main() {
 		panic(err)
 	}
 
+	if _, err := parseLogsAdminTrustedProxyCIDRs(os.Getenv(logsAdminTrustedProxyCIDRsEnv)); err != nil {
+		log.Fatal("Trusted proxy CIDR configuration invalid")
+	}
+
 	podName := os.Getenv("POD_NAME")
 	if podName == "" {
 		podName = "local-dev"
