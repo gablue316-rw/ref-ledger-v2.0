@@ -56,13 +56,19 @@ func WriteMobileGame(ctx context.Context, s MobileGameSnapshot, game *model.Game
 	coll := Client.Database(Database).Collection("games")
 	// Match all original fields, including status, to reject concurrent changes/payments.
 	if game == nil {
+		trace := NewWriteTrace(ctx, "mobile.game.delete", coll.Name(), s.Doc.TenantId, "", "", map[string]any{
+			"gameId": s.Doc.GameId, "association": s.Doc.Association,
+		})
 		result, err := coll.DeleteOne(ctx, SnapshotFilter(s.Filter))
 		if err != nil {
+			trace.Failure(err, nil, "failed")
 			return err
 		}
 		if result.DeletedCount != 1 {
+			trace.Failure(ErrMobileConflict, map[string]any{"deletedCount": result.DeletedCount}, "unmatched")
 			return ErrMobileConflict
 		}
+		trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 		MetricsDeleted(s.Doc.TenantId, "games", 1)
 		return nil
 	}
@@ -74,16 +80,25 @@ func WriteMobileGame(ctx context.Context, s MobileGameSnapshot, game *model.Game
 	if err != nil {
 		return err
 	}
+	trace := NewWriteTrace(ctx, "mobile.game.update", coll.Name(), s.Doc.TenantId, "", "", map[string]any{
+		"gameId": doc.GameId, "association": doc.Association, "sport": doc.Sport,
+		"level": doc.Level, "site": doc.Site, "field": doc.Field,
+		"gameCount": doc.NumOfGames, "status": doc.Status, "date": game.Date,
+	})
 	if err = prepareGameOfficials(ctx, coll.Database(), &doc, &s.Doc); err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 	result, err := coll.UpdateOne(ctx, SnapshotFilter(s.Filter), bson.M{"$set": doc, "$unset": bson.M{"referee": "", "u1": "", "u2": "", "eco": ""}})
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 	if result.MatchedCount != 1 {
+		trace.Failure(ErrMobileConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return ErrMobileConflict
 	}
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	MetricsUpdated(s.Doc.TenantId, "games", result.ModifiedCount)
 	return nil
 }
@@ -99,23 +114,34 @@ func CreateMobileGame(ctx context.Context, tenant string, game model.GameDescrip
 		return err
 	}
 	coll := Client.Database(Database).Collection("games")
+	trace := NewWriteTrace(ctx, "mobile.game.insert", coll.Name(), tenant, "", "", map[string]any{
+		"gameId": doc.GameId, "association": doc.Association, "sport": doc.Sport,
+		"level": doc.Level, "site": doc.Site, "field": doc.Field,
+		"gameCount": doc.NumOfGames, "status": doc.Status, "date": game.Date,
+	})
 	if err = prepareGameOfficials(ctx, coll.Database(), &doc, nil); err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 	raw, err := bson.Marshal(doc)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 	var record bson.M
 	if err = bson.Unmarshal(raw, &record); err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 	// A stable ID makes simultaneous mobile creates of the same assignment atomic.
 	key, _ := bson.Marshal(bson.D{{Key: "tenant", Value: tenant}, {Key: "association", Value: game.Association}, {Key: "gameId", Value: game.GameId}})
 	record["_id"] = fmt.Sprintf("mobile-%x", sha256.Sum256(key))
-	_, err = coll.InsertOne(ctx, record)
-	if err == nil {
-		MetricsAdded(tenant, "games", 1)
+	result, err := coll.InsertOne(ctx, record)
+	if err != nil {
+		trace.Failure(err, nil, "failed")
+		return err
 	}
-	return err
+	trace.Success(map[string]any{"insertedCount": int64(1)}, result.InsertedID)
+	MetricsAdded(tenant, "games", 1)
+	return nil
 }

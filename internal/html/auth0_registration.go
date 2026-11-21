@@ -135,6 +135,14 @@ func (registration *auth0Registration) account(ctx context.Context, identity mob
 		MobileIdentity: bson.M{"issuer": identity.Issuer, "subject": identity.Subject},
 	}
 
+	affectedCollections := []string{"users"}
+	if registration.maxAccounts > 0 {
+		affectedCollections = append(affectedCollections, "accountRegistration")
+	}
+	trace := database.NewWriteTrace(ctx, "user.account.register", "users", user.TenantID, "", "", map[string]any{
+		"affectedCollections": affectedCollections,
+	})
+	var insertedUserID any
 	create := func(ctx context.Context) (model.User, error) {
 		linked, err := findAuth0Account(ctx, identity)
 		if !errors.Is(err, mongo.ErrNoDocuments) {
@@ -157,7 +165,11 @@ func (registration *auth0Registration) account(ctx context.Context, identity mob
 				return model.User{}, errAuth0AccountLimit
 			}
 		}
-		_, err = auth0Users().InsertOne(ctx, document)
+		var result *mongo.InsertOneResult
+		result, err = auth0Users().InsertOne(ctx, document)
+		if err == nil {
+			insertedUserID = result.InsertedID
+		}
 		return user, err
 	}
 
@@ -168,11 +180,13 @@ func (registration *auth0Registration) account(ctx context.Context, identity mob
 		// registrations across replicas cannot both take the last slot.
 		session, sessionErr := database.Client.StartSession()
 		if sessionErr != nil {
+			trace.Failure(sessionErr, nil, "failed")
 			return model.User{}, sessionErr
 		}
 		defer session.EndSession(ctx)
 		var result interface{}
 		result, err = session.WithTransaction(ctx, func(tx mongo.SessionContext) (interface{}, error) {
+			insertedUserID = nil
 			lock, err := auth0SignupLocks().UpdateOne(tx, bson.M{"_id": auth0RegistrationLock},
 				bson.M{"$inc": bson.M{"revision": 1}})
 			if err != nil {
@@ -190,9 +204,19 @@ func (registration *auth0Registration) account(ctx context.Context, identity mob
 	if mongo.IsDuplicateKeyError(err) {
 		linked, lookupErr := findAuth0Account(ctx, identity)
 		if errors.Is(lookupErr, mongo.ErrNoDocuments) {
-			return model.User{}, errAuth0EmailInUse
+			user = model.User{}
+			err = errAuth0EmailInUse
+		} else {
+			user = linked
+			err = lookupErr
 		}
-		return linked, lookupErr
+	}
+	if err != nil {
+		trace.Failure(err, nil, "")
+	} else if insertedUserID != nil {
+		trace.Success(nil, insertedUserID)
+	} else {
+		trace.Complete(nil, nil, "no_op")
 	}
 	return user, err
 }
