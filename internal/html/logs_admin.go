@@ -22,6 +22,8 @@ import (
 
 const logsAdminPrefix = "/api/internal/v1/admin/logs"
 
+const logsAdminTrustedProxyCIDRsEnv = "REF_LEDGER_TRUSTED_PROXY_CIDRS"
+
 const (
 	logsAdminCheckAccepted  = "accepted"
 	logsAdminCheckRejected  = "rejected"
@@ -128,15 +130,60 @@ func logLogsAdminAuthenticationFailure(r *http.Request, authorizationStatus, ver
 }
 
 func logsAdminTransportAllowed(r *http.Request) bool {
-	if r.TLS != nil || strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https") {
+	if r.TLS != nil {
 		return true
 	}
-	host := r.Host
-	if parsedHost, _, err := net.SplitHostPort(host); err == nil {
-		host = parsedHost
+	remoteIP := logsAdminRemoteIP(r.RemoteAddr)
+	if remoteIP == nil {
+		return false
 	}
-	ip := net.ParseIP(strings.Trim(host, "[]"))
-	return strings.EqualFold(host, "localhost") || (ip != nil && ip.IsLoopback())
+	if remoteIP.IsLoopback() && strings.EqualFold(database.LogEnvironment(), "development") {
+		return true
+	}
+	if !strings.EqualFold(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto")), "https") {
+		return false
+	}
+	trustedProxyCIDRs, err := parseLogsAdminTrustedProxyCIDRs(os.Getenv(logsAdminTrustedProxyCIDRsEnv))
+	if err != nil {
+		log.Printf("trusted proxy configuration invalid: category=invalid_cidrs")
+		return false
+	}
+	for _, trustedProxyCIDR := range trustedProxyCIDRs {
+		if trustedProxyCIDR.Contains(remoteIP) {
+			return true
+		}
+	}
+	return false
+}
+
+func logsAdminRemoteIP(remoteAddr string) net.IP {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err == nil {
+		remoteAddr = host
+	}
+	if zoneIndex := strings.LastIndexByte(remoteAddr, '%'); zoneIndex >= 0 {
+		remoteAddr = remoteAddr[:zoneIndex]
+	}
+	return net.ParseIP(strings.Trim(remoteAddr, "[]"))
+}
+
+func parseLogsAdminTrustedProxyCIDRs(value string) ([]*net.IPNet, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+	var trustedProxyCIDRs []*net.IPNet
+	for _, value := range strings.Split(value, ",") {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return nil, errors.New("empty trusted proxy CIDR")
+		}
+		_, trustedProxyCIDR, err := net.ParseCIDR(value)
+		if err != nil {
+			return nil, errors.New("invalid trusted proxy CIDR")
+		}
+		trustedProxyCIDRs = append(trustedProxyCIDRs, trustedProxyCIDR)
+	}
+	return trustedProxyCIDRs, nil
 }
 
 func safeLogsActor(actor string) string {

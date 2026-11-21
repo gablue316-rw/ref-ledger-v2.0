@@ -44,6 +44,9 @@ spec:
 
             - name: APP_ENV
               value: {{ .Values.env.APP_ENV | quote }}
+
+            - name: REF_LEDGER_TRUSTED_PROXY_CIDRS
+              value: {{ .Values.env.REF_LEDGER_TRUSTED_PROXY_CIDRS | quote }}
  
             - name: APP_RELEASE
               value: {{ .Values.image.tag | quote }}
