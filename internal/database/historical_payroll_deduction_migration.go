@@ -489,8 +489,14 @@ func ApplyHistoricalPayrollDeductionMigration(
 	}
 
 	for _, change := range plan.changes {
+		trace := NewWriteTrace(ctx, "payment.deduction.migrate", "payments", change.after.TenantId, "", "", map[string]any{
+			"paymentId": change.after.PaymentId, "association": change.after.Association,
+			"taxYear":             strconv.Itoa(change.after.TaxYear),
+			"affectedCollections": []string{"payments", "expenses"},
+		})
 		session, err := db.Client().StartSession()
 		if err != nil {
+			trace.Failure(err, nil, "failed")
 			return fmt.Errorf("start migration transaction for payment %s: %w", change.before.PaymentId, err)
 		}
 		_, transactionErr := session.WithTransaction(ctx, func(tx mongo.SessionContext) (interface{}, error) {
@@ -560,8 +566,12 @@ func ApplyHistoricalPayrollDeductionMigration(
 		})
 		session.EndSession(ctx)
 		if transactionErr != nil {
+			trace.Failure(transactionErr, nil, "")
 			return fmt.Errorf("migrate payment %s: %w", change.before.PaymentId, transactionErr)
 		}
+		trace.EventForCollection("payments", LogLevelInfo, "payment.migration.updated", "Payment deduction updated", nil)
+		trace.EventForCollection("expenses", LogLevelInfo, "payment.migration.expense_synced", "Payroll deduction synchronized", nil)
+		trace.Success(nil, nil)
 		plan.Report.AppliedChanges++
 	}
 	return nil

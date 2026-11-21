@@ -111,11 +111,14 @@ func ForgotPasswordHandler(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 	}
 
-	_, err = resets.InsertOne(ctx, reset)
+	trace := database.NewWriteTrace(ctx, "password_reset.request", resets.Name(), "", "", "", nil)
+	result, err := resets.InsertOne(ctx, reset)
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	trace.Success(nil, result.InsertedID)
 
 	err = sendPasswordResetEmail(req.Email, token)
 	if err != nil {
@@ -197,7 +200,10 @@ func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = users.UpdateOne(ctx,
+	trace := database.NewWriteTrace(ctx, "password_reset.complete", users.Name(), "", "", "", map[string]any{
+		"affectedCollections": []string{"users", "passwordResets"},
+	})
+	userResult, err := users.UpdateOne(ctx,
 		bson.M{
 			"username": reset.Email,
 		},
@@ -209,11 +215,12 @@ func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	_, _ = resets.UpdateOne(ctx,
+	resetResult, resetErr := resets.UpdateOne(ctx,
 		bson.M{
 			"token": req.Token,
 		},
@@ -223,6 +230,24 @@ func ResetPasswordHandler(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	)
+	if resetErr != nil {
+		outcome := "failed"
+		if userResult.MatchedCount > 0 {
+			outcome = "partial"
+		}
+		trace.Failure(resetErr, map[string]any{
+			"matchedCount": userResult.MatchedCount, "partial": userResult.MatchedCount > 0,
+		}, outcome)
+	} else if resetResult.MatchedCount == 0 && userResult.MatchedCount > 0 {
+		trace.Failure(database.ErrConflict, map[string]any{
+			"matchedCount": userResult.MatchedCount, "partial": true,
+		}, "partial")
+	} else if userResult.MatchedCount == 0 {
+		trace.Complete(map[string]any{"matchedCount": userResult.MatchedCount}, nil, "unmatched")
+	} else {
+		trace.EventForCollection("passwordResets", database.LogLevelInfo, "password_reset.token_consumed", "Password reset token consumed", nil)
+		trace.Success(map[string]any{"matchedCount": userResult.MatchedCount, "modifiedCount": userResult.ModifiedCount}, nil)
+	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(bson.M{

@@ -280,15 +280,27 @@ func MobileExpense(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodDelete {
+		var current database.ExpenseDoc
+		if err := bson.Unmarshal(original, &current); err != nil {
+			http.Error(w, "Unable to read expense", 500)
+			return
+		}
+		trace := database.NewWriteTrace(r.Context(), "mobile.expense.delete", coll.Name(), tenant, "", "", map[string]any{
+			"expenseId": current.ExpenseId, "association": current.Association,
+			"date": current.Date, "taxYear": current.TaxYear,
+		})
 		result, err := coll.DeleteOne(r.Context(), database.SnapshotFilter(original))
 		if err != nil {
+			trace.Failure(err, nil, "failed")
 			http.Error(w, "Unable to delete expense", 500)
 			return
 		}
 		if result.DeletedCount != 1 {
+			trace.Failure(errors.New("expense no longer matched the captured version"), map[string]any{"deletedCount": result.DeletedCount}, "unmatched")
 			http.Error(w, "Expense changed; refresh and try again", 409)
 			return
 		}
+		trace.Success(map[string]any{"deletedCount": result.DeletedCount}, nil)
 		database.MetricsDeleted(tenant, "expenses", 1)
 		w.WriteHeader(204)
 		return
@@ -305,10 +317,17 @@ func MobileExpense(w http.ResponseWriter, r *http.Request) {
 	doc.TenantId = tenant
 	if r.Method == http.MethodPost {
 		doc.ExpenseId = "EXP-" + uuid.NewString()
-		if _, err = coll.InsertOne(r.Context(), doc); err != nil {
+		trace := database.NewWriteTrace(r.Context(), "mobile.expense.insert", coll.Name(), tenant, "", "", map[string]any{
+			"expenseId": doc.ExpenseId, "association": doc.Association, "gameId": doc.GameId,
+			"date": doc.Date, "taxYear": doc.TaxYear,
+		})
+		var result *mongo.InsertOneResult
+		if result, err = coll.InsertOne(r.Context(), doc); err != nil {
+			trace.Failure(err, nil, "failed")
 			http.Error(w, "Unable to add expense", 500)
 			return
 		}
+		trace.Success(nil, result.InsertedID)
 		database.MetricsAdded(tenant, "expenses", 1)
 		w.WriteHeader(201)
 		return
@@ -322,15 +341,22 @@ func MobileExpense(w http.ResponseWriter, r *http.Request) {
 	// Explicit fields ensure changing from monetary to mileage (or back) clears
 	// the old value, even though legacy structs use omitempty.
 	update := bson.M{"date": doc.Date, "type": doc.Type, "amount": doc.Amount, "mileage": doc.Mileage, "association": doc.Association, "gameId": doc.GameId, "description": doc.Description, "taxYear": doc.TaxYear}
+	trace := database.NewWriteTrace(r.Context(), "mobile.expense.update", coll.Name(), tenant, "", "", map[string]any{
+		"expenseId": doc.ExpenseId, "association": doc.Association, "gameId": doc.GameId,
+		"date": doc.Date, "taxYear": doc.TaxYear,
+	})
 	result, err := coll.UpdateOne(r.Context(), database.SnapshotFilter(original), bson.M{"$set": update})
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		http.Error(w, "Unable to update expense", 500)
 		return
 	}
 	if result.MatchedCount != 1 {
+		trace.Failure(errors.New("expense no longer matched the captured version"), map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		http.Error(w, "Expense changed; reopen it before trying again", 409)
 		return
 	}
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	database.MetricsUpdated(tenant, "expenses", result.ModifiedCount)
 	w.WriteHeader(204)
 }

@@ -61,16 +61,20 @@ func SendAccountVerification(ctx context.Context, username, tenantID string) err
 	hash := sha256.Sum256([]byte(token))
 	now := time.Now().UTC()
 	users := database.Client.Database(database.GetMongoDbName()).Collection("users")
+	trace := database.NewWriteTrace(ctx, "user.verification.send", users.Name(), tenantID, "", "", nil)
 	result, err := users.UpdateOne(ctx, bson.M{
 		"username": username, "tenantId": tenantID, "emailVerified": false,
 		"$or": bson.A{bson.M{"verificationSentAt": bson.M{"$exists": false}}, bson.M{"verificationSentAt": bson.M{"$lte": now.Add(-time.Minute)}}},
 	}, bson.M{"$set": bson.M{"verificationTokenHash": hex.EncodeToString(hash[:]), "verificationExpiresAt": now.Add(24 * time.Hour), "verificationSentAt": now}})
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		return err
 	}
 	if result.MatchedCount == 0 {
+		trace.Complete(map[string]any{"matchedCount": result.MatchedCount}, nil, "no_op")
 		return nil
 	}
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	var message mailer.Email
 	message.Initialize()
 	message.SetTo([]string{username})
@@ -106,17 +110,22 @@ func ConfirmEmailHandler(w http.ResponseWriter, r *http.Request) {
 	hash := sha256.Sum256([]byte(req.Token))
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	result, err := database.Client.Database(database.GetMongoDbName()).Collection("users").UpdateOne(ctx,
+	users := database.Client.Database(database.GetMongoDbName()).Collection("users")
+	trace := database.NewWriteTrace(ctx, "user.verification.confirm", users.Name(), "", "", "", nil)
+	result, err := users.UpdateOne(ctx,
 		bson.M{"emailVerified": false, "verificationTokenHash": hex.EncodeToString(hash[:]), "verificationExpiresAt": bson.M{"$gt": time.Now().UTC()}},
 		bson.M{"$set": bson.M{"emailVerified": true, "emailVerifiedAt": time.Now().UTC()}, "$unset": bson.M{"verificationTokenHash": "", "verificationExpiresAt": "", "verificationSentAt": ""}})
 	if err != nil {
+		trace.Failure(err, nil, "failed")
 		verificationJSON(w, 500, "Unable to confirm your email. Please try again.")
 		return
 	}
 	if result.MatchedCount != 1 {
+		trace.Complete(map[string]any{"matchedCount": result.MatchedCount}, nil, "unmatched")
 		verificationJSON(w, 400, "This link has expired or has already been used. Sign in if you already confirmed; otherwise request a new email from the login page.")
 		return
 	}
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
 	verificationJSON(w, 200, "Email confirmed. Your account is now active.")
 }
 
