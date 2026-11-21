@@ -1,10 +1,87 @@
 package main
 
 import (
+	"bytes"
+	"log"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+func TestLogsAdminAuthenticationFailureDiagnostic(t *testing.T) {
+	const token = "0123456789abcdef0123456789abcdef"
+	t.Setenv("REF_LEDGER_LOG_API_TOKEN", token)
+	tests := []struct {
+		name           string
+		authorization  string
+		version        string
+		forwardedProto string
+		wantDiagnostic string
+		secretValues   []string
+	}{
+		{
+			name:           "all rejected",
+			authorization:  "Bearer rejected-token-secret",
+			version:        "wrong-version-secret",
+			forwardedProto: "http-forwarded-secret",
+			wantDiagnostic: "authorization=rejected version=incorrect transport=rejected direct_tls=no forwarded_proto=other",
+			secretValues:   []string{"rejected-token-secret", "wrong-version-secret", "http-forwarded-secret"},
+		},
+		{
+			name:           "missing headers",
+			wantDiagnostic: "authorization=missing version=missing transport=rejected direct_tls=no forwarded_proto=missing",
+		},
+		{
+			name:           "accepted authorization still reports other failures",
+			authorization:  "Bearer " + token,
+			version:        "wrong-version-secret",
+			forwardedProto: "http",
+			wantDiagnostic: "authorization=accepted version=incorrect transport=rejected direct_tls=no forwarded_proto=other",
+			secretValues:   []string{token, "wrong-version-secret"},
+		},
+		{
+			name:           "accepted version and transport are reported",
+			version:        "1",
+			forwardedProto: "https",
+			wantDiagnostic: "authorization=missing version=accepted transport=accepted",
+		},
+	}
+
+	oldWriter := log.Writer()
+	defer log.SetOutput(oldWriter)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			log.SetOutput(&output)
+			request := httptest.NewRequest("GET", "http://logs.example.test"+logsAdminPrefix+"/threshold?query-secret=value", nil)
+			request.Host = "logs.example.test"
+			if test.authorization != "" {
+				request.Header.Set("Authorization", test.authorization)
+			}
+			if test.version != "" {
+				request.Header.Set("X-Ref-Ledger-Logs-Version", test.version)
+			}
+			if test.forwardedProto != "" {
+				request.Header.Set("X-Forwarded-Proto", test.forwardedProto)
+			}
+			request.Header.Set("Cookie", "cookie-secret=value")
+
+			response := httptest.NewRecorder()
+			logsAdminAPI(response, request)
+			if response.Code != 401 || strings.TrimSpace(response.Body.String()) != "Administrator service authentication failed." {
+				t.Fatalf("unexpected response: status=%d body=%q", response.Code, response.Body.String())
+			}
+			if !strings.Contains(output.String(), test.wantDiagnostic) {
+				t.Fatalf("diagnostic %q does not contain %q", output.String(), test.wantDiagnostic)
+			}
+			for _, secret := range append(test.secretValues, "query-secret", "cookie-secret") {
+				if strings.Contains(output.String(), secret) {
+					t.Fatalf("diagnostic leaked %q: %s", secret, output.String())
+				}
+			}
+		})
+	}
+}
 
 func TestLogsAdminAuthenticationRequiresConfiguredBearerToken(t *testing.T) {
 	const token = "0123456789abcdef0123456789abcdef"

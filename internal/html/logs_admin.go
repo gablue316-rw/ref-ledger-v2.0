@@ -22,10 +22,21 @@ import (
 
 const logsAdminPrefix = "/api/internal/v1/admin/logs"
 
+const (
+	logsAdminCheckAccepted  = "accepted"
+	logsAdminCheckRejected  = "rejected"
+	logsAdminCheckMissing   = "missing"
+	logsAdminCheckIncorrect = "incorrect"
+)
+
 func logsAdminAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	if !authenticateLogsAdminAPI(r) || r.Header.Get("X-Ref-Ledger-Logs-Version") != "1" || !logsAdminTransportAllowed(r) {
+	authorizationStatus, authorized := logsAdminAuthorization(r)
+	versionStatus := logsAdminVersionStatus(r)
+	transportAllowed := logsAdminTransportAllowed(r)
+	if !authorized || versionStatus != logsAdminCheckAccepted || !transportAllowed {
+		logLogsAdminAuthenticationFailure(r, authorizationStatus, versionStatus, transportAllowed)
 		http.Error(w, "Administrator service authentication failed.", http.StatusUnauthorized)
 		return
 	}
@@ -55,19 +66,65 @@ func logsAdminAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func authenticateLogsAdminAPI(r *http.Request) bool {
+	_, accepted := logsAdminAuthorization(r)
+	return accepted
+}
+
+func logsAdminAuthorization(r *http.Request) (string, bool) {
 	configured := strings.TrimSpace(os.Getenv("REF_LEDGER_LOG_API_TOKEN"))
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	if header == "" {
+		return logsAdminCheckMissing, false
+	}
 	separator := strings.IndexByte(header, ' ')
 	if separator <= 0 || !strings.EqualFold(strings.TrimSpace(header[:separator]), "Bearer") || len(configured) < 32 {
-		return false
+		return logsAdminCheckRejected, false
 	}
 	token := strings.TrimSpace(header[separator+1:])
 	if len(token) != len(configured) {
-		return false
+		return logsAdminCheckRejected, false
 	}
 	expectedHash := sha256.Sum256([]byte(configured))
 	providedHash := sha256.Sum256([]byte(token))
-	return subtle.ConstantTimeCompare(expectedHash[:], providedHash[:]) == 1
+	if subtle.ConstantTimeCompare(expectedHash[:], providedHash[:]) == 1 {
+		return logsAdminCheckAccepted, true
+	}
+	return logsAdminCheckRejected, false
+}
+
+func logsAdminVersionStatus(r *http.Request) string {
+	switch r.Header.Get("X-Ref-Ledger-Logs-Version") {
+	case "":
+		return logsAdminCheckMissing
+	case "1":
+		return logsAdminCheckAccepted
+	default:
+		return logsAdminCheckIncorrect
+	}
+}
+
+func logLogsAdminAuthenticationFailure(r *http.Request, authorizationStatus, versionStatus string, transportAllowed bool) {
+	transportStatus := logsAdminCheckRejected
+	if transportAllowed {
+		transportStatus = logsAdminCheckAccepted
+		log.Printf("administrator service authentication failed: authorization=%s version=%s transport=%s",
+			authorizationStatus, versionStatus, transportStatus)
+		return
+	}
+
+	directTLS := "no"
+	if r.TLS != nil {
+		directTLS = "yes"
+	}
+	forwardedProto := "other"
+	switch r.Header.Get("X-Forwarded-Proto") {
+	case "":
+		forwardedProto = logsAdminCheckMissing
+	case "https":
+		forwardedProto = "https"
+	}
+	log.Printf("administrator service authentication failed: authorization=%s version=%s transport=%s direct_tls=%s forwarded_proto=%s",
+		authorizationStatus, versionStatus, transportStatus, directTLS, forwardedProto)
 }
 
 func logsAdminTransportAllowed(r *http.Request) bool {
