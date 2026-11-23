@@ -13,6 +13,7 @@ import {summarize,dashboardURL,assignmentEarnings} from './data.js';
 import {createReports} from './reports.js';
 import {createPayments} from './payments.js';
 import {createSettings} from './settings.js';
+import {createCatalogManagement} from './catalog-management.js';
 
 const $=id=>document.getElementById(id),
  currency=n=>new Intl.NumberFormat('en-US',{
@@ -26,10 +27,11 @@ let gameFilters=bindGameFilters($('filters'),{sports:[],associations:[],sites:[]
 const reports=createReports($('reports-root'));
 const payments=createPayments($('payments-root'));
 const settings=createSettings($('settings-root'));
+const catalogs=Object.fromEntries([['officials','official'],['associations','association'],['sites','site']].map(([page,type])=>[page,createCatalogManagement(type,$(`${page}-root`),async()=>{const current=generation,catalog=await loadCatalog();if(current===generation)gameFilters.updateCatalog(catalog);})]));
 const closeMenu=()=>{$('menu-options').hidden=true;$('menu-toggle').setAttribute('aria-expanded','false');};
 function showPage(page){
  activePage=page;closeMenu();
- const titles={games:'Games',expenses:'Expenses',reports:'Reports',payments:'Payments',settings:'Settings'};
+ const titles={games:'Games',expenses:'Expenses',reports:'Reports',payments:'Payments',officials:'Officials',associations:'Associations',sites:'Sites',settings:'Settings'};
  $('page-title').textContent=titles[page];
  $('dashboard').hidden=page!=='games';
  for(const p of Object.keys(titles)){
@@ -43,6 +45,7 @@ function showPage(page){
  if(page==='reports')reports.load();
  if(page==='payments')payments.load();
  if(page==='settings')settings.load();
+ if(catalogs[page])catalogs[page].load();
 }
 $('menu-toggle').onclick=()=>{const open=$('menu-options').hidden;$('menu-options').hidden=!open;$('menu-toggle').setAttribute('aria-expanded',String(open));};
 $('nav-games').onclick=()=>showPage('games');
@@ -50,11 +53,13 @@ $('nav-expenses').onclick=()=>showPage('expenses');
 $('nav-reports').onclick=()=>showPage('reports');
 $('nav-payments').onclick=()=>showPage('payments');
 $('nav-settings').onclick=()=>showPage('settings');
+for(const page of Object.keys(catalogs))$(`nav-${page}`).onclick=()=>showPage(page);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu();});
 document.addEventListener('click',e=>{if(!$('navigation').contains(e.target))closeMenu();});
-$('add-game').onclick=()=>editGame(null,async()=>{await load();message('Game added successfully. Adjust the filters if it is not shown.');});
+const refreshGameCatalog=()=>{const current=generation;return catalog=>{if(current===generation)gameFilters.updateCatalog(catalog);};};
+$('add-game').onclick=()=>editGame(null,async()=>{await load();message('Game added successfully. Adjust the filters if it is not shown.');},refreshGameCatalog());
 const gameActions=createGameActions({container:$('games'),
- onEdit:g=>editGame(g,async text=>{await load();message(text);}),
+ onEdit:g=>editGame(g,async text=>{await load();message(text);},refreshGameCatalog()),
  onDelete:g=>bulkGames([g],'DELETE',load),
  onBulk:(games,method)=>bulkGames(games,method,load),
  onStatus:(games,status)=>changeGameStatuses(games,status,load)
@@ -64,11 +69,12 @@ function updateControls() {
  for (const id of ['login','reauth','logout','refresh']) $(id).disabled=busy||authBusy;
  signupButton.disabled=busy||authBusy;
  gameActions.setDisabled(busy||authBusy||!canWrite);
- for(const id of ['menu-toggle','nav-games','nav-expenses','nav-reports','nav-payments','nav-settings','clear-game-filters'])$(id).disabled=busy||authBusy;
+ for(const id of ['menu-toggle','nav-games','nav-expenses','nav-reports','nav-payments','nav-officials','nav-associations','nav-sites','nav-settings','clear-game-filters'])$(id).disabled=busy||authBusy;
  $('add-game').disabled=busy||authBusy||!canWrite;
  reports.setCanWrite(canWrite);
  payments.setCanWrite(canWrite);
  settings.setCanWrite(canWrite);
+ for(const catalog of Object.values(catalogs))catalog.setCanWrite(canWrite);
 }
 
 function clearDashboard() {
@@ -76,6 +82,7 @@ function clearDashboard() {
  $('filters').reset();gameFilters.clearAll();gameFilters.setValues('status',['Pending']);
  expenses.clear();reports.clear();payments.clear();settings.clear();canWrite=false;activePage='games';$('page-title').textContent='Games';$('navigation').hidden=true;$('expenses-page').hidden=true;closeMenu();
  $('reports-page').hidden=true;$('payments-page').hidden=true;$('settings-page').hidden=true;
+ for(const [page,catalog] of Object.entries(catalogs)){catalog.clear();$(`${page}-page`).hidden=true;}
  gameActions.reset();
  $('games').replaceChildren();
  for (const id of ['assignments','gameCount','earnings']) $(id).textContent='—';
