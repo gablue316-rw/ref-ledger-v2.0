@@ -53,7 +53,7 @@ func mobileAccountHandlerWithTimeout(next http.HandlerFunc, timeout time.Duratio
 			http.Error(w, "Service unavailable", 503)
 			return
 		}
-		if r.Method != http.MethodGet && !mobileCanWrite(user.Role) {
+		if !mobileMethodAllowed(user.Role, r.Method) {
 			http.Error(w, "This account has read-only access", 403)
 			return
 		}
@@ -63,6 +63,9 @@ func mobileAccountHandlerWithTimeout(next http.HandlerFunc, timeout time.Duratio
 	}
 }
 func mobileCanWrite(role string) bool { return role == "user" || role == "admin" }
+func mobileMethodAllowed(role, method string) bool {
+	return method == http.MethodGet || mobileCanWrite(role)
+}
 func validateMobileGame(game model.GameDescriptor, old model.GameDescriptor) error {
 	if game.GameId != old.GameId || game.Association != old.Association {
 		return errors.New("game ID and association cannot be changed")
