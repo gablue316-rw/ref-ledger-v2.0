@@ -8446,6 +8446,7 @@ func main() {
 	mux.HandleFunc("/api/mobile/game", mobileAccountHandler(MobileGame))
 	mux.HandleFunc("/api/mobile/catalog", mobileAccountHandler(mobileReadOnly(MobileCatalog)))
 	mux.HandleFunc("/api/mobile/catalog/create/{type}", mobileAccountHandler(MobileCatalogCreate))
+	mux.HandleFunc("/api/mobile/catalog/records/{type}", mobileAccountHandler(MobileCatalogRecords))
 	mux.HandleFunc("/api/mobile/catalog/activate/level", mobileAccountHandler(MobileCatalogActivateLevel))
 	mux.HandleFunc("/api/mobile/access", mobileAccountHandler(mobileReadOnly(MobileAccess)))
 	mux.HandleFunc("/api/mobile/expenses", mobileAccountHandler(MobileExpenses))
