@@ -7,7 +7,7 @@ import {gameURL,inputDate,inputTime,buildGame,responseError,gameFields} from './
 function element(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;return el;}
 async function request(url,method,data){const r=await apiRequest(url,method,data);if(r.status<200||r.status>=300){const error=new Error(responseError(r));error.status=r.status;error.data=r.data;throw error;}return r.data;}
 
-export async function editGame(summary,onSaved){
+export async function editGame(summary,onSaved,onCatalogChanged=()=>{}){
  const creating=!summary;
  if(creating){
   const now=new Date(),date=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -95,6 +95,7 @@ export async function editGame(summary,onSaved){
    catalog=nextCatalog;directory=nextDirectory||[];
    refreshBoundCatalog(catalog,selections);
    renderRoles();
+   onCatalogChanged(catalog);
   }
   function openCatalogForm(type,officialSlot,origin){
    if(working||!snapshot.canWrite)return;

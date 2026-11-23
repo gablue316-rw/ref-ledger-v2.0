@@ -3708,9 +3708,17 @@ func (oc *OfficialCollection) DeleteWithContext(parentCtx context.Context, first
 	}
 
 	// officialId is stored as a string in the games officials array.
+	officialID := official.OfficialId
+	if officialID == 0 {
+		officialID = official.Id
+	}
+	var assignedID interface{} = strconv.FormatInt(officialID, 10)
+	if official.Id != 0 && official.OfficialId != 0 && official.Id != official.OfficialId {
+		assignedID = bson.M{"$in": bson.A{strconv.FormatInt(official.Id, 10), strconv.FormatInt(official.OfficialId, 10)}}
+	}
 	gameFilter := bson.M{
 		"tenantId":             tenantId,
-		"officials.officialId": strconv.FormatInt(official.Id, 10),
+		"officials.officialId": assignedID,
 	}
 
 	gamesCollection := oc.Coll.Database().Collection("games")
