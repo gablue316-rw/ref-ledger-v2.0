@@ -920,6 +920,8 @@ func BuildAtlasURI() (string, bool, error) {
 
 	query := url.Values{}
 	query.Set("appName", appName)
+	query.Set("authSource", "admin")
+	query.Set("tls", "true")
 
 	mongoURL.RawQuery = query.Encode()
 
