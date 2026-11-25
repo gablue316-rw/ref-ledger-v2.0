@@ -1594,7 +1594,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		return ErrConflict
 	}
 
-	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount, "changedValues": changedGameValues(previous, doc)}, nil)
 	MetricsUpdated(tId, "games", result.ModifiedCount)
 
 	fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
@@ -2919,7 +2919,7 @@ func (gc *GameCollection) AddWithContext(parentCtx context.Context, tenantId str
 		return fmt.Errorf("insert failed: %w", err)
 	}
 
-	trace.Success(nil, result.InsertedID)
+	trace.Success(map[string]any{"savedValues": savedGameValues(doc)}, result.InsertedID)
 	MetricsAdded(tenantId, "games", 1)
 
 	gc.LastError = nil

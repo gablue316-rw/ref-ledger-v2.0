@@ -98,7 +98,7 @@ func WriteMobileGame(ctx context.Context, s MobileGameSnapshot, game *model.Game
 		trace.Failure(ErrMobileConflict, map[string]any{"matchedCount": result.MatchedCount}, "unmatched")
 		return ErrMobileConflict
 	}
-	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount, "changedValues": changedGameValues(s.Doc, doc)}, nil)
 	MetricsUpdated(s.Doc.TenantId, "games", result.ModifiedCount)
 	return nil
 }
@@ -141,7 +141,7 @@ func CreateMobileGame(ctx context.Context, tenant string, game model.GameDescrip
 		trace.Failure(err, nil, "failed")
 		return err
 	}
-	trace.Success(map[string]any{"insertedCount": int64(1)}, result.InsertedID)
+	trace.Success(map[string]any{"insertedCount": int64(1), "savedValues": savedGameValues(doc)}, result.InsertedID)
 	MetricsAdded(tenant, "games", 1)
 	return nil
 }

@@ -113,6 +113,7 @@ var allowedLogAttributes = map[string]bool{
 	"affectedCollections": true, "failureCategory": true, "failureReason": true, "driverCode": true,
 	"environment": true, "recordCount": true, "appVersion": true, "release": true, "port": true,
 	"databaseName": true, "threshold": true, "maintenance": true,
+	"savedValues": true, "changedValues": true,
 }
 
 func InitializeStructuredLogging(ctx context.Context) error {
@@ -627,6 +628,10 @@ func cleanLogAttributes(attributes map[string]any) map[string]any {
 			continue
 		}
 		switch typed := value.(type) {
+		case gameLogValues:
+			clean[key] = typed
+		case gameLogChanges:
+			clean[key] = typed
 		case string:
 			text := safeLogText(typed)
 			if text != "[redacted]" {
