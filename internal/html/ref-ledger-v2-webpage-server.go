@@ -8600,6 +8600,7 @@ func main() {
 	}()
 	shutdownContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	go database.RunLogCommandWorker(shutdownContext)
 	select {
 	case err := <-serverErrors:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
