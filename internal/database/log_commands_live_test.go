@@ -67,6 +67,8 @@ func TestLogCommandsLive(t *testing.T) {
 		bson.M{"environment": "development", "tenantId": "tenant-a", "timestamp": cutoff},
 		bson.M{"environment": "development", "tenantId": "tenant-a", "timestamp": cutoff.Add(time.Second)},
 		bson.M{"environment": "development", "tenantId": "tenant-b", "timestamp": cutoff},
+		bson.M{"environment": "development", "timestamp": cutoff},
+		bson.M{"environment": "production", "tenantId": "tenant-a", "timestamp": cutoff},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +101,7 @@ func TestLogCommandsLive(t *testing.T) {
 	if err := db.Collection("refLedgerLogCommands").FindOne(ctx, bson.M{"_id": id}).Decode(&result); err != nil || result.Outcome != "success" || result.Deleted != 1 {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
-	if count, err := db.Collection("refLedgerLogs").CountDocuments(ctx, bson.M{}); err != nil || count != 2 {
+	if count, err := db.Collection("refLedgerLogs").CountDocuments(ctx, bson.M{}); err != nil || count != 4 {
 		t.Fatalf("remaining logs=%d err=%v", count, err)
 	}
 	if count, err := db.Collection("refLedgerLogAudit").CountDocuments(ctx, bson.M{"action": "atlas.clear_logs", "outcome": "success"}); err != nil || count != 1 {
@@ -111,7 +113,7 @@ func TestLogCommandsLive(t *testing.T) {
 	if err := processLogCommand(ctx, id, policy); err != nil {
 		t.Fatal(err)
 	}
-	if count, err := db.Collection("refLedgerLogs").CountDocuments(ctx, bson.M{}); err != nil || count != 3 {
+	if count, err := db.Collection("refLedgerLogs").CountDocuments(ctx, bson.M{}); err != nil || count != 5 {
 		t.Fatalf("retry removed new logs: count=%d err=%v", count, err)
 	}
 	rejected := run(bson.M{"type": "clear_logs", "scope": "tenant", "tenantId": "tenant-b", "confirmation": "CLEAR development", "cutoff": cutoff})
@@ -134,5 +136,74 @@ func TestLogCommandsLive(t *testing.T) {
 	}
 	if actual, err := CaptureThreshold(ctx); err != nil || actual != LogLevelInfo {
 		t.Fatalf("rejected command changed threshold=%d err=%v", actual, err)
+	}
+
+	_, err = db.Collection("refLedgerLogs").InsertMany(ctx, []any{
+		bson.M{"environment": "development", "timestamp": cutoff},
+		bson.M{"environment": "development", "tenantId": "", "timestamp": cutoff},
+		bson.M{"environment": "development", "timestamp": cutoff.Add(time.Second)},
+		bson.M{"environment": "production", "tenantId": "tenant-a", "timestamp": cutoff},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fields := range []bson.M{
+		{"type": "clear_logs", "scope": "environment", "confirmation": "CLEAR development", "cutoff": cutoff},
+		{"type": "clear_logs", "scope": "tenant", "tenantId": "", "confirmation": "CLEAR development", "cutoff": cutoff},
+	} {
+		rejectedID := run(fields)
+		if err := db.Collection("refLedgerLogCommands").FindOne(ctx, bson.M{"_id": rejectedID}).Decode(&result); err != nil || result.Outcome != "rejected" || result.Deleted != 0 {
+			t.Fatalf("rejected clear result=%+v err=%v", result, err)
+		}
+	}
+	policy.allowAllTenants = true
+	ambiguous := run(bson.M{"type": "clear_logs", "scope": "environment", "tenantId": "tenant-a", "confirmation": "CLEAR development", "cutoff": cutoff})
+	if err := db.Collection("refLedgerLogCommands").FindOne(ctx, bson.M{"_id": ambiguous}).Decode(&result); err != nil || result.Outcome != "rejected" || result.Deleted != 0 {
+		t.Fatalf("ambiguous clear result=%+v err=%v", result, err)
+	}
+	auditsBefore, err := db.Collection("refLedgerLogAudit").CountDocuments(ctx, bson.M{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allID := run(bson.M{"type": "clear_logs", "scope": "environment", "tenantId": "", "confirmation": "CLEAR development", "cutoff": cutoff})
+	if err := db.Collection("refLedgerLogCommands").FindOne(ctx, bson.M{"_id": allID}).Decode(&result); err != nil || result.Outcome != "success" || result.Deleted != 5 {
+		t.Fatalf("environment clear result=%+v err=%v", result, err)
+	}
+	for _, check := range []struct {
+		filter bson.M
+		count  int64
+	}{
+		{bson.M{"environment": "development", "timestamp": bson.M{"$lte": cutoff}}, 0},
+		{bson.M{"environment": "development", "timestamp": bson.M{"$gt": cutoff}}, 2},
+		{bson.M{"environment": "production"}, 2},
+	} {
+		if count, err := db.Collection("refLedgerLogs").CountDocuments(ctx, check.filter); err != nil || count != check.count {
+			t.Fatalf("remaining logs filter=%v count=%d err=%v", check.filter, count, err)
+		}
+	}
+	for _, check := range []struct {
+		id, scope string
+	}{
+		{id, "environment:development;tenant:tenant-a"},
+		{allID, "environment:development"},
+	} {
+		if count, err := db.Collection("refLedgerLogAudit").CountDocuments(ctx, bson.M{"requestId": check.id, "scope": check.scope, "outcome": "success"}); err != nil || count != 1 {
+			t.Fatalf("audit for %s count=%d err=%v", check.id, count, err)
+		}
+	}
+	if count, err := db.Collection("refLedgerLogAudit").CountDocuments(ctx, bson.M{}); err != nil || count != auditsBefore+1 {
+		t.Fatalf("audit history count=%d err=%v", count, err)
+	}
+	if _, err := db.Collection("refLedgerLogs").InsertOne(ctx, bson.M{"environment": "development", "timestamp": cutoff}); err != nil {
+		t.Fatal(err)
+	}
+	if err := processLogCommand(ctx, allID, policy); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := db.Collection("refLedgerLogs").CountDocuments(ctx, bson.M{}); err != nil || count != 5 {
+		t.Fatalf("environment retry removed logs: count=%d err=%v", count, err)
+	}
+	if count, err := db.Collection("refLedgerLogAudit").CountDocuments(ctx, bson.M{}); err != nil || count != auditsBefore+1 {
+		t.Fatalf("environment retry changed audit history: count=%d err=%v", count, err)
 	}
 }
