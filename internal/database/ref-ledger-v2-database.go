@@ -1553,15 +1553,19 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		"tenantId":    tId,
 	}
 
-	var previous model.GameDoc
-	if err := coll.FindOne(ctx, filter).Decode(&previous); err != nil {
+	raw, err := coll.FindOne(ctx, filter).Raw()
+	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return ErrConflict
 		}
 		return err
 	}
-	if previous.Version != game.Version {
+	if RecordVersion(raw) != game.Version {
 		return ErrConflict
+	}
+	var previous model.GameDoc
+	if err := bson.Unmarshal(raw, &previous); err != nil {
+		return err
 	}
 	doc.Deductions = previous.Deductions
 	if err := prepareGameOfficials(ctx, coll.Database(), &doc, &previous); err != nil {
@@ -1572,11 +1576,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		"$unset": bson.M{"referee": "", "u1": "", "u2": "", "eco": ""},
 	}
 
-	conditional, conflictErr := ConditionalFilter(ctx, coll, filter, game.Version)
-	if conflictErr != nil {
-		return conflictErr
-	}
-	filter = conditional
+	filter = SnapshotFilter(raw)
 
 	trace := NewWriteTrace(ctx, "game.update", coll.Name(), tId, "", "", map[string]any{
 		"gameId": doc.GameId, "association": doc.Association, "sport": doc.Sport,
@@ -1594,7 +1594,7 @@ func UpdateOneGameDoc(parentCtx context.Context, game model.GameDescriptor, dbas
 		return ErrConflict
 	}
 
-	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount}, nil)
+	trace.Success(map[string]any{"matchedCount": result.MatchedCount, "modifiedCount": result.ModifiedCount, "changedValues": changedGameValues(previous, doc)}, nil)
 	MetricsUpdated(tId, "games", result.ModifiedCount)
 
 	fmt.Println("Updated Match:", result.MatchedCount, "Updated document:", result.ModifiedCount)
@@ -2919,7 +2919,7 @@ func (gc *GameCollection) AddWithContext(parentCtx context.Context, tenantId str
 		return fmt.Errorf("insert failed: %w", err)
 	}
 
-	trace.Success(nil, result.InsertedID)
+	trace.Success(map[string]any{"savedValues": savedGameValues(doc)}, result.InsertedID)
 	MetricsAdded(tenantId, "games", 1)
 
 	gc.LastError = nil
