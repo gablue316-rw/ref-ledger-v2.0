@@ -202,6 +202,10 @@ func SetCaptureThreshold(ctx context.Context, threshold int) error {
 }
 
 func AddLogAudit(ctx context.Context, actor, action, scope, outcome string) error {
+	return addLogAudit(ctx, actor, action, scope, outcome, "")
+}
+
+func addLogAudit(ctx context.Context, actor, action, scope, outcome, requestID string) error {
 	if Client == nil || Database == "" {
 		return errors.New("structured log database is not initialized")
 	}
@@ -212,6 +216,7 @@ func AddLogAudit(ctx context.Context, actor, action, scope, outcome string) erro
 		"action":      safeLogText(action),
 		"scope":       safeLogScope(scope),
 		"outcome":     safeLogText(outcome),
+		"requestId":   safeLogText(requestID),
 	})
 	return err
 }
