@@ -65,6 +65,13 @@ func TestStructuredLoggingLiveWrites(t *testing.T) {
 	}).Decode(&httpLog); err != nil || httpLog.Attributes["route"] != "GET /games/{id}" || httpLog.Attributes["statusCode"] != int32(200) {
 		t.Fatalf("HTTP completion=%+v err=%v", httpLog, err)
 	}
+	failedRequestID := primitive.NewObjectID().Hex()
+	RecordHTTPCompletion(failedRequestID, "POST", "POST /games", tenant, "user", 500, 7, 0, 9, false)
+	if err := db.Collection("refLedgerLogs").FindOne(ctx, bson.M{
+		"event": "http.request.completed", "transactionId": failedRequestID,
+	}).Decode(&httpLog); err != nil || httpLog.Level != LogLevelError || httpLog.Outcome == nil || *httpLog.Outcome != "server_error" {
+		t.Fatalf("failed HTTP completion=%+v err=%v", httpLog, err)
+	}
 	sport := "verify-" + primitive.NewObjectID().Hex()
 	if _, err := db.Collection("roles").InsertOne(ctx, bson.M{
 		"officialRoles": bson.A{bson.M{"sport": sport, "roles": bson.A{}}},

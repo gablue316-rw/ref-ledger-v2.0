@@ -40,6 +40,9 @@ func TestLogCommandsLive(t *testing.T) {
 	}()
 	db := client.Database(Database)
 	policy := logCommandPolicy{environment: "development", actors: map[string]bool{"monitor": true}, tenants: map[string]bool{"tenant-a": true}}
+	if actual, err := CaptureThreshold(ctx); err != nil || actual != LogLevelInfo {
+		t.Fatalf("initial threshold=%d err=%v", actual, err)
+	}
 	run := func(fields bson.M) string {
 		t.Helper()
 		id := uuid.NewString()
@@ -102,7 +105,7 @@ func TestLogCommandsLive(t *testing.T) {
 	if count, err := db.Collection("refLedgerLogAudit").CountDocuments(ctx, bson.M{"action": "atlas.clear_logs", "outcome": "success"}); err != nil || count != 1 {
 		t.Fatalf("clear audits=%d err=%v", count, err)
 	}
-	if _, err := db.Collection("refLedgerLogs").InsertOne(ctx, bson.M{"environment": "development", "tenantId": "tenant-a", "timestamp": cutoff.Add(time.Second)}); err != nil {
+	if _, err := db.Collection("refLedgerLogs").InsertOne(ctx, bson.M{"environment": "development", "tenantId": "tenant-a", "timestamp": cutoff}); err != nil {
 		t.Fatal(err)
 	}
 	if err := processLogCommand(ctx, id, policy); err != nil {
@@ -114,5 +117,22 @@ func TestLogCommandsLive(t *testing.T) {
 	rejected := run(bson.M{"type": "clear_logs", "scope": "tenant", "tenantId": "tenant-b", "confirmation": "CLEAR development", "cutoff": cutoff})
 	if err := db.Collection("refLedgerLogCommands").FindOne(ctx, bson.M{"_id": rejected}).Decode(&result); err != nil || result.Outcome != "rejected" {
 		t.Fatalf("rejected result=%+v err=%v", result, err)
+	}
+	wrongEnvironment := uuid.NewString()
+	if _, err := db.Collection("refLedgerLogCommands").InsertOne(ctx, bson.M{
+		"_id": wrongEnvironment, "requestId": wrongEnvironment, "version": 1,
+		"workerEnvironment": "development", "environment": "production", "actor": "monitor", "state": "pending",
+		"type": "set_capture_threshold", "scope": "environment", "threshold": LogLevelDebug,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := processLogCommand(ctx, wrongEnvironment, policy); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Collection("refLedgerLogCommands").FindOne(ctx, bson.M{"_id": wrongEnvironment}).Decode(&result); err != nil || result.Outcome != "rejected" {
+		t.Fatalf("environment result=%+v err=%v", result, err)
+	}
+	if actual, err := CaptureThreshold(ctx); err != nil || actual != LogLevelInfo {
+		t.Fatalf("rejected command changed threshold=%d err=%v", actual, err)
 	}
 }
