@@ -58,6 +58,9 @@ The Atlas worker is disabled by default. To enable it, set all of:
   REF_LEDGER_LOG_COMMANDS_ENABLED=true
   REF_LEDGER_LOG_COMMAND_ACTORS=monitor-service
   REF_LEDGER_LOG_COMMAND_TENANTS=tenant-a,tenant-b
+To independently authorize environment-wide clears, also set
+  REF_LEDGER_LOG_COMMAND_ALLOW_ALL_TENANTS=true
+This authorization defaults to false; only "true" or "false" are accepted.
 Allowlist entries are exact, comma-separated values. All replicas processing
 the same APP_ENV must use the same policy. The MongoDB deployment must support
 transactions (Atlas replica set); the Ref Ledger database principal needs
@@ -81,10 +84,12 @@ Insert one BSON document in refLedgerLogCommands with:
 For a threshold command, also set type to "set_capture_threshold", scope to
 "environment", and threshold to an integer 1 through 4. For a clear command,
 set type to "clear_logs", scope to "tenant", tenantId to an exact allowlisted
-tenant, confirmation to "CLEAR <APP_ENV>", and cutoff to a BSON UTC date no
-later than processing time. There is no all-tenant clear command.
-The worker deletes only matching environment and tenant log timestamps through
-the fixed cutoff. Audit entries are stored separately and are not cleared.
+tenant, or scope to "environment" and tenantId to an empty string (or omit it)
+with all-tenant authorization enabled. Both scopes require confirmation
+"CLEAR <APP_ENV>" and cutoff as a BSON UTC date no later than processing time.
+Environment scope includes records with no tenant ID; tenant scope deletes only
+the exact tenant. Both are limited to the environment and fixed cutoff. Audit
+entries are stored separately and are not cleared.
 
 The worker atomically commits the effect, audit and command result using a
 majority-committed transaction. It changes state to "completed" and sets

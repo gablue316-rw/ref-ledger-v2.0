@@ -33,9 +33,10 @@ type logCommand struct {
 }
 
 type logCommandPolicy struct {
-	environment string
-	actors      map[string]bool
-	tenants     map[string]bool
+	environment     string
+	actors          map[string]bool
+	tenants         map[string]bool
+	allowAllTenants bool
 }
 
 func commandAllowlist(value string) (map[string]bool, error) {
@@ -70,6 +71,13 @@ func configuredLogCommandPolicy() (logCommandPolicy, bool, error) {
 	if policy.tenants, err = commandAllowlist(os.Getenv("REF_LEDGER_LOG_COMMAND_TENANTS")); err != nil {
 		return policy, false, err
 	}
+	switch os.Getenv("REF_LEDGER_LOG_COMMAND_ALLOW_ALL_TENANTS") {
+	case "", "false":
+	case "true":
+		policy.allowAllTenants = true
+	default:
+		return policy, false, errors.New("invalid all-tenant command authorization")
+	}
 	return policy, true, nil
 }
 
@@ -93,7 +101,16 @@ func validateLogCommand(command logCommand, policy logCommandPolicy, now time.Ti
 			return "invalid_scope_or_threshold"
 		}
 	case "clear_logs":
-		if command.Scope != "tenant" || !policy.tenants[command.TenantID] {
+		switch command.Scope {
+		case "environment":
+			if command.TenantID != "" || !policy.allowAllTenants {
+				return "invalid_scope"
+			}
+		case "tenant":
+			if command.TenantID == "" || !policy.tenants[command.TenantID] {
+				return "invalid_scope"
+			}
+		default:
 			return "invalid_scope"
 		}
 		if command.Confirmation != "CLEAR "+policy.environment || command.Cutoff.IsZero() || command.Cutoff.After(now) {
@@ -195,7 +212,7 @@ func processLogCommand(ctx context.Context, id any, policy logCommandPolicy) err
 			}
 		}
 		scope := "environment:" + policy.environment
-		if rejection == "" && command.Type == "clear_logs" {
+		if rejection == "" && command.Type == "clear_logs" && command.Scope == "tenant" {
 			scope += ";tenant:" + command.TenantID
 		}
 		if err := addLogAudit(sc, command.Actor, "atlas."+command.Type, scope, outcome, command.ID); err != nil {
