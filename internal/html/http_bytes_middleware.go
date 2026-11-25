@@ -12,6 +12,7 @@ import (
 
 	"ref-ledger-v2/internal/database"
 
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -26,32 +27,61 @@ import (
 // HTTP totals use category="http" and collection="http"; collection-operation
 // byte metrics are separate and should not be added to these HTTP totals.
 func HTTPBytesMiddleware(next http.Handler) http.Handler {
+	return httpBytesMiddleware(next, database.RecordHTTPCompletion)
+}
+
+func httpBytesMiddleware(next http.Handler, record func(string, string, string, string, string, int, int64, int64, int64, bool)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 		tenantID := "anonymous"
+		identity := &httpLogIdentity{}
 		// Resolve before logout can delete the session. Login requests without an
 		// existing valid session are attributed to anonymous.
 		if session, err := database.GetSession(r); err == nil && session != nil &&
 			strings.TrimSpace(session.TenantID) != "" && session.TenantID != "na" {
 			tenantID = session.TenantID
+			identity.tenantID, identity.userID = session.TenantID, session.Username
 		}
+		r = r.WithContext(context.WithValue(r.Context(), httpLogIdentityKey{}, identity))
 		var body *httpByteRequestBody
 		if r.Body != nil {
 			body = &httpByteRequestBody{ReadCloser: r.Body}
 			r.Body = body
 		}
 		response := &httpByteResponseWriter{ResponseWriter: w, method: r.Method}
+		requestID := uuid.NewString()
+		completed := false
 		defer func() {
+			elapsed := time.Since(started)
 			var bytesIn int64
 			if body != nil {
 				bytesIn = body.bytesRead
 			}
 			log.Printf("HTTP Method=%s Path=%s BytesIn=%d BytesOut=%d Duration=%s",
-				r.Method, r.URL.Path, bytesIn, response.bytesWritten, time.Since(started))
+				r.Method, r.URL.Path, bytesIn, response.bytesWritten, elapsed)
 			saveHTTPByteMetrics(tenantID, started.UTC().Truncate(time.Minute), bytesIn, response.bytesWritten)
+			status := response.status
+			if status == 0 {
+				status = http.StatusOK
+				if !completed {
+					status = http.StatusInternalServerError
+				}
+			}
+			record(requestID, r.Method, r.Pattern, identity.tenantID, identity.userID,
+				status, bytesIn, response.bytesWritten, elapsed.Milliseconds(), !completed)
 		}()
 		next.ServeHTTP(response, r)
+		completed = true
 	})
+}
+
+type httpLogIdentityKey struct{}
+type httpLogIdentity struct{ tenantID, userID string }
+
+func setHTTPLogIdentity(ctx context.Context, tenantID, userID string) {
+	if identity, ok := ctx.Value(httpLogIdentityKey{}).(*httpLogIdentity); ok {
+		identity.tenantID, identity.userID = tenantID, userID
+	}
 }
 
 type httpByteRequestBody struct {

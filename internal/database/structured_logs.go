@@ -220,32 +220,59 @@ func RecordStructuredLog(level int, event, message string, attributes map[string
 	if level < LogLevelError || level > LogLevelDebug {
 		return
 	}
+	recordStructuredEntry(StructuredLog{
+		Level: level, Event: safeLogText(event), Message: safeLogText(message),
+		Attributes: cleanLogAttributes(attributes),
+	})
+}
+
+func recordStructuredEntry(entry StructuredLog) {
 	if !structuredLogsInitialized.Load() {
-		log.Printf("structured log sink unavailable: event=%s category=not_initialized", safeLogText(event))
+		log.Printf("structured log sink unavailable: event=%s category=not_initialized", entry.Event)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	threshold, err := CaptureThreshold(ctx)
 	if err != nil {
-		log.Printf("structured log threshold unavailable: event=%s category=%s", safeLogText(event), SafeErrorCategory(err))
+		log.Printf("structured log threshold unavailable: event=%s category=%s", entry.Event, SafeErrorCategory(err))
 		return
 	}
-	if !shouldCapture(level, threshold) {
+	if !shouldCapture(entry.Level, threshold) {
 		return
 	}
-	entry := StructuredLog{
-		SchemaVersion: 1,
-		Timestamp:     time.Now().UTC().Truncate(time.Millisecond),
-		Environment:   LogEnvironment(),
-		Level:         level,
-		Event:         safeLogText(event),
-		Message:       safeLogText(message),
-		Attributes:    cleanLogAttributes(attributes),
-	}
+	entry.SchemaVersion = 1
+	entry.Timestamp = time.Now().UTC().Truncate(time.Millisecond)
+	entry.Environment = LogEnvironment()
 	if err := insertStructuredLog(ctx, entry); err != nil {
 		log.Printf("structured log sink write failed: event=%s category=%s", entry.Event, SafeErrorCategory(err))
 	}
+}
+
+var safeHTTPRoute = regexp.MustCompile(`^[[:alnum:] /_{}.*$-]{1,200}$`)
+
+func RecordHTTPCompletion(requestID, method, route, tenantID, userID string, status int, bytesIn, bytesOut, elapsedMS int64, panicked bool) {
+	if !safeHTTPRoute.MatchString(route) {
+		route = "unmatched"
+	}
+	level, outcome := LogLevelInfo, "success"
+	if status >= 500 || panicked {
+		level, outcome = LogLevelError, "server_error"
+	} else if status >= 400 {
+		level, outcome = LogLevelWarning, "client_error"
+	}
+	if panicked {
+		outcome = "panic"
+	}
+	recordStructuredEntry(StructuredLog{
+		Level: level, Event: "http.request.completed", Message: "HTTP request completed",
+		TenantID: optionalLogText(tenantID), UserID: optionalLogText(userID),
+		TransactionID: optionalLogText(requestID), Collection: optionalLogText("http"),
+		Operation: optionalLogText("http.request"), Outcome: optionalLogText(outcome),
+		ElapsedMS: &elapsedMS,
+		Attributes: map[string]any{"method": safeLogText(method), "route": route,
+			"statusCode": status, "bytesIn": bytesIn, "bytesOut": bytesOut},
+	})
 }
 
 func WithStructuredLogContext(ctx context.Context, userID, sessionCorrelation string) context.Context {
