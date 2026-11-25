@@ -53,11 +53,12 @@ func mobileAccountHandlerWithTimeout(next http.HandlerFunc, timeout time.Duratio
 			http.Error(w, "Service unavailable", 503)
 			return
 		}
+		setHTTPLogIdentity(ctx, user.TenantID, user.Username)
 		if !mobileMethodAllowed(user.Role, r.Method) {
 			http.Error(w, "This account has read-only access", 403)
 			return
 		}
-		ctx = database.WithStructuredLogContext(ctx, "", r.Header.Get("Authorization"))
+		ctx = database.WithStructuredLogContext(ctx, user.Username, r.Header.Get("Authorization"))
 		ctx = context.WithValue(ctx, mobileWriteContextKey{}, mobileCanWrite(user.Role))
 		next(w, r.WithContext(context.WithValue(ctx, mobileAccountContextKey{}, user.TenantID)))
 	}

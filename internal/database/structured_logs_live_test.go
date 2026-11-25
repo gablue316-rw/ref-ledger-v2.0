@@ -57,6 +57,21 @@ func TestStructuredLoggingLiveWrites(t *testing.T) {
 	}
 	db := client.Database(Database)
 	tenant := "live-test-" + primitive.NewObjectID().Hex()
+	requestID := primitive.NewObjectID().Hex()
+	RecordHTTPCompletion(requestID, "GET", "GET /games/{id}", tenant, "user", 200, 3, 5, 12, false)
+	var httpLog StructuredLog
+	if err := db.Collection("refLedgerLogs").FindOne(ctx, bson.M{
+		"event": "http.request.completed", "transactionId": requestID,
+	}).Decode(&httpLog); err != nil || httpLog.Attributes["route"] != "GET /games/{id}" || httpLog.Attributes["statusCode"] != int32(200) {
+		t.Fatalf("HTTP completion=%+v err=%v", httpLog, err)
+	}
+	failedRequestID := primitive.NewObjectID().Hex()
+	RecordHTTPCompletion(failedRequestID, "POST", "POST /games", tenant, "user", 500, 7, 0, 9, false)
+	if err := db.Collection("refLedgerLogs").FindOne(ctx, bson.M{
+		"event": "http.request.completed", "transactionId": failedRequestID,
+	}).Decode(&httpLog); err != nil || httpLog.Level != LogLevelError || httpLog.Outcome == nil || *httpLog.Outcome != "server_error" {
+		t.Fatalf("failed HTTP completion=%+v err=%v", httpLog, err)
+	}
 	sport := "verify-" + primitive.NewObjectID().Hex()
 	if _, err := db.Collection("roles").InsertOne(ctx, bson.M{
 		"officialRoles": bson.A{bson.M{"sport": sport, "roles": bson.A{}}},
@@ -78,6 +93,65 @@ func TestStructuredLoggingLiveWrites(t *testing.T) {
 	if err := collection.AddWithContext(ctx, tenant, game); err != nil {
 		t.Fatal(err)
 	}
+	var inserted StructuredLog
+	if err := db.Collection("refLedgerLogs").FindOne(ctx, bson.M{
+		"tenantId": tenant, "operation": "game.insert", "event": "database.write.completed",
+	}).Decode(&inserted); err != nil {
+		t.Fatal(err)
+	}
+	if values, ok := inserted.Attributes["savedValues"].(map[string]any); !ok || values["status"] != "Pending" {
+		t.Fatalf("saved values missing: %#v", inserted.Attributes)
+	}
+	rawGame, err := db.Collection("games").FindOne(ctx, bson.M{"tenantId": tenant, "gameId": int64(1983)}).Raw()
+	if err != nil {
+		t.Fatal(err)
+	}
+	game.Version, game.Status = RecordVersion(rawGame), "Completed"
+	if err := UpdateOneGameDoc(ctx, game, Database, "games", tenant); err != nil {
+		t.Fatal(err)
+	}
+	var updated StructuredLog
+	if err := db.Collection("refLedgerLogs").FindOne(ctx, bson.M{
+		"tenantId": tenant, "operation": "game.update", "event": "database.write.completed",
+	}).Decode(&updated); err != nil {
+		t.Fatal(err)
+	}
+	changes, ok := updated.Attributes["changedValues"].(map[string]any)
+	if !ok {
+		t.Fatalf("changed values missing: %#v", updated.Attributes)
+	}
+	status, ok := changes["status"].(map[string]any)
+	if !ok || status["old"] != "Pending" || status["new"] != "Completed" {
+		t.Fatalf("unexpected status change: %#v", changes)
+	}
+	mobileGame := game
+	mobileGame.GameId, mobileGame.Status = "1988", "Pending"
+	if err := CreateMobileGame(ctx, tenant, mobileGame); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := LoadMobileGame(ctx, tenant, mobileGame.Association, 1988)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mobileGame.Status = "Completed"
+	if err := WriteMobileGame(ctx, snapshot, &mobileGame, snapshot.Version); err != nil {
+		t.Fatal(err)
+	}
+	for _, operation := range []string{"mobile.game.insert", "mobile.game.update"} {
+		var entry StructuredLog
+		if err := db.Collection("refLedgerLogs").FindOne(ctx, bson.M{
+			"tenantId": tenant, "operation": operation, "event": "database.write.completed",
+		}).Decode(&entry); err != nil {
+			t.Fatal(err)
+		}
+		key := "savedValues"
+		if operation == "mobile.game.update" {
+			key = "changedValues"
+		}
+		if _, ok := entry.Attributes[key].(map[string]any); !ok {
+			t.Fatalf("%s missing %s: %#v", operation, key, entry.Attributes)
+		}
+	}
 	if err := collection.AddWithContext(ctx, tenant, game); !mongo.IsDuplicateKeyError(err) {
 		t.Fatalf("duplicate insert: %v", err)
 	}
@@ -91,6 +165,9 @@ func TestStructuredLoggingLiveWrites(t *testing.T) {
 		*failure.DriverCode != 11000 || failure.Attributes["failureReason"] != "duplicate key constraint" ||
 		strings.Contains(failure.Message, tenant) {
 		t.Fatalf("unsafe or incorrect duplicate diagnostic: %+v", failure)
+	}
+	if _, ok := failure.Attributes["savedValues"]; ok {
+		t.Fatal("failed write contains saved values")
 	}
 	count, err := db.Collection("refLedgerLogs").CountDocuments(ctx, bson.M{
 		"transactionId": *failure.TransactionID, "event": "database.write.terminated",

@@ -28,3 +28,74 @@
     "/root/logs/ref-ledgerV2-webServer.log",
     "User"
 )
+
+Structured logging and Monitor commands
+---------------------------------------
+APP_ENV selects the environment for logs and settings (default: development).
+The capture threshold is per environment: Error=1, Warning=2, Info=3 (default),
+Debug=4. HTTP completion records are Info for success, Warning for 4xx, and
+Error for 5xx or a panic, so records above the threshold are not stored. Each
+record contains a generated request ID, registered route pattern (or unmatched),
+status, elapsed milliseconds, and body bytes read/written; headers, cookies,
+bodies and query strings are not stored. Unread request bytes and bytes after
+hijacking are not counted. Existing console and aggregate HTTP metrics remain.
+
+Acknowledged web and mobile individual game inserts include savedValues; game
+updates include changedValues with old/new values from the conditional snapshot
+and acknowledged $set. The allowlist is gameId, date, time, sport, site, field,
+numOfGames, level, home, visitor, gameFee, travelPay, assignorFee, deductions,
+association, status and taxYear. Oversized or unsafe strings are redacted; notes,
+officials, assignors and tenant data are excluded. Failure records do not contain
+savedValues or changedValues. Game imports and writes to other collections keep
+their existing operation logs, without saved-value or field-diff snapshots.
+
+The existing HTTPS logs admin API, transport checks, and diagnostics remain
+available. REF_LEDGER_LOG_API_TOKEN is still required for the admin API and
+session fingerprints; configure it securely as before. Atlas commands do not
+replace HTTPS or use this token.
+
+The Atlas worker is disabled by default. To enable it, set all of:
+  REF_LEDGER_LOG_COMMANDS_ENABLED=true
+  REF_LEDGER_LOG_COMMAND_ACTORS=monitor-service
+  REF_LEDGER_LOG_COMMAND_TENANTS=tenant-a,tenant-b
+To independently authorize environment-wide clears, also set
+  REF_LEDGER_LOG_COMMAND_ALLOW_ALL_TENANTS=true
+This authorization defaults to false; only "true" or "false" are accepted.
+Allowlist entries are exact, comma-separated values. All replicas processing
+the same APP_ENV must use the same policy. The MongoDB deployment must support
+transactions (Atlas replica set); the Ref Ledger database principal needs
+read/update on refLedgerLogCommands, read/write on refLedgerLogSettings and
+refLedgerLogs, and insert on refLedgerLogAudit, including transaction access.
+Grant command producers only insert access to refLedgerLogCommands and read
+access if they need results; never grant update/delete of commands or audit.
+Command authors are trusted administrators for every configured tenant and for
+the environment-wide threshold. The actor is an allowlisted assertion, not an
+independently authenticated identity: do not grant insert access to untrusted
+or tenant-limited callers. Protect the database credentials and connection.
+
+Insert one BSON document in refLedgerLogCommands with:
+  _id: canonical UUID string, equal to requestId
+  requestId: same canonical UUID string
+  version: 1
+  workerEnvironment: the APP_ENV of the intended worker
+  environment: the same APP_ENV
+  actor: an exact configured actor
+  state: "pending"
+For a threshold command, also set type to "set_capture_threshold", scope to
+"environment", and threshold to an integer 1 through 4. For a clear command,
+set type to "clear_logs", scope to "tenant", tenantId to an exact allowlisted
+tenant, or scope to "environment" and tenantId to an empty string (or omit it)
+with all-tenant authorization enabled. Both scopes require confirmation
+"CLEAR <APP_ENV>" and cutoff as a BSON UTC date no later than processing time.
+Environment scope includes records with no tenant ID; tenant scope deletes only
+the exact tenant. Both are limited to the environment and fixed cutoff. Audit
+entries are stored separately and are not cleared.
+
+The worker atomically commits the effect, audit and command result using a
+majority-committed transaction. It changes state to "completed" and sets
+outcome ("success" or "rejected"), reason, deletedCount and completedAt.
+Keep completed command documents as idempotency records: reusing the same _id
+cannot repeat a clear or change its cutoff. Transient transaction failures remain
+pending and are retried; operational failures are logged on the server. An
+environment mismatch is rejected by the intended worker, so workerEnvironment
+must identify that worker. The audit record includes requestId for correlation.
