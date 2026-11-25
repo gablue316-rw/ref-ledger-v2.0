@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"ref-ledger-v2/internal/database"
 )
@@ -123,8 +124,51 @@ func logLogsAdminAuthenticationFailure(r *http.Request, authorizationStatus, ver
 	case "https":
 		forwardedProto = "https"
 	}
+	if authorizationStatus == logsAdminCheckAccepted && versionStatus == logsAdminCheckAccepted {
+		values := r.Header.Values("X-Forwarded-Proto")
+		formatted, truncated := formatLogsAdminForwardedProto(values)
+		log.Printf("administrator service authentication failed: authorization=%s version=%s transport=%s direct_tls=%s forwarded_proto=%s forwarded_proto_count=%d forwarded_proto_values=%s forwarded_proto_truncated=%t",
+			authorizationStatus, versionStatus, transportStatus, directTLS, forwardedProto, len(values), formatted, truncated)
+		return
+	}
 	log.Printf("administrator service authentication failed: authorization=%s version=%s transport=%s direct_tls=%s forwarded_proto=%s",
 		authorizationStatus, versionStatus, transportStatus, directTLS, forwardedProto)
+}
+
+func formatLogsAdminForwardedProto(values []string) (string, bool) {
+	const maxLength = 256
+	var result strings.Builder
+	result.WriteByte('[')
+	truncated := false
+	for i, value := range values {
+		separator := ""
+		if i > 0 {
+			separator = ","
+		}
+		if result.Len()+len(separator)+3 > maxLength {
+			truncated = true
+			break
+		}
+		result.WriteString(separator)
+		result.WriteByte('"')
+		for len(value) > 0 {
+			_, size := utf8.DecodeRuneInString(value)
+			quoted := strconv.Quote(value[:size])
+			escaped := quoted[1 : len(quoted)-1]
+			if result.Len()+len(escaped)+2 > maxLength {
+				truncated = true
+				break
+			}
+			result.WriteString(escaped)
+			value = value[size:]
+		}
+		result.WriteByte('"')
+		if truncated {
+			break
+		}
+	}
+	result.WriteByte(']')
+	return result.String(), truncated
 }
 
 func logsAdminTransportAllowed(r *http.Request) bool {

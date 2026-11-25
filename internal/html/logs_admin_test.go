@@ -74,12 +74,87 @@ func TestLogsAdminAuthenticationFailureDiagnostic(t *testing.T) {
 			if !strings.Contains(output.String(), test.wantDiagnostic) {
 				t.Fatalf("diagnostic %q does not contain %q", output.String(), test.wantDiagnostic)
 			}
+			if strings.Contains(output.String(), "forwarded_proto_values=") {
+				t.Fatalf("unexpected forwarded-proto details: %s", output.String())
+			}
 			for _, secret := range append(test.secretValues, "query-secret", "cookie-secret") {
 				if strings.Contains(output.String(), secret) {
 					t.Fatalf("diagnostic leaked %q: %s", secret, output.String())
 				}
 			}
 		})
+	}
+}
+
+func TestLogsAdminTransportRejectionForwardedProtoDiagnostic(t *testing.T) {
+	const token = "0123456789abcdef0123456789abcdef"
+	t.Setenv("REF_LEDGER_LOG_API_TOKEN", token)
+	tests := []struct {
+		name   string
+		values []string
+		want   string
+	}{
+		{name: "absent", want: `forwarded_proto_count=0 forwarded_proto_values=[] forwarded_proto_truncated=false`},
+		{name: "unexpected", values: []string{"http"}, want: `forwarded_proto_count=1 forwarded_proto_values=["http"] forwarded_proto_truncated=false`},
+		{name: "multiple header lines", values: []string{"http", "https"}, want: `forwarded_proto_count=2 forwarded_proto_values=["http","https"] forwarded_proto_truncated=false`},
+		{name: "comma separated", values: []string{"http, https"}, want: `forwarded_proto_count=1 forwarded_proto_values=["http, https"] forwarded_proto_truncated=false`},
+		{name: "escaped", values: []string{"http\"\n\\value"}, want: `forwarded_proto_count=1 forwarded_proto_values=["http\"\n\\value"] forwarded_proto_truncated=false`},
+		{name: "bounded", values: []string{strings.Repeat("x", 1000)}, want: `forwarded_proto_count=1 forwarded_proto_values=["` + strings.Repeat("x", 252) + `"] forwarded_proto_truncated=true`},
+	}
+
+	oldWriter := log.Writer()
+	defer log.SetOutput(oldWriter)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			log.SetOutput(&output)
+			request := httptest.NewRequest("GET", "http://logs.example.test"+logsAdminPrefix+"/threshold?query-secret=value", strings.NewReader("body-secret"))
+			request.Header.Set("Authorization", "Bearer "+token)
+			request.Header.Set("X-Ref-Ledger-Logs-Version", "1")
+			request.Header.Set("Cookie", "cookie-secret=value")
+			for _, value := range test.values {
+				request.Header.Add("X-Forwarded-Proto", value)
+			}
+			response := httptest.NewRecorder()
+			logsAdminAPI(response, request)
+			if response.Code != 401 || strings.TrimSpace(response.Body.String()) != "Administrator service authentication failed." {
+				t.Fatalf("unexpected response: status=%d body=%q", response.Code, response.Body.String())
+			}
+			if !strings.Contains(output.String(), "authorization=accepted version=accepted transport=rejected direct_tls=no forwarded_proto=") ||
+				!strings.Contains(output.String(), test.want) {
+				t.Fatalf("unexpected diagnostic: %s", output.String())
+			}
+			if test.name == "multiple header lines" {
+				t.Logf("synthetic diagnostic: %s", strings.TrimSpace(output.String()))
+			}
+			for _, secret := range []string{token, "query-secret", "cookie-secret", "body-secret"} {
+				if strings.Contains(output.String(), secret) {
+					t.Fatalf("diagnostic leaked %q: %s", secret, output.String())
+				}
+			}
+		})
+	}
+}
+
+func TestFormatLogsAdminForwardedProtoBounded(t *testing.T) {
+	tests := []struct {
+		name   string
+		values []string
+	}{
+		{name: "long escaped value", values: []string{strings.Repeat("\n", 1000)}},
+		{name: "many empty lines", values: make([]string, 1000)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			formatted, truncated := formatLogsAdminForwardedProto(test.values)
+			if !truncated || len(formatted) > 256 || !strings.HasPrefix(formatted, "[") || !strings.HasSuffix(formatted, "]") || strings.Contains(formatted, "\n") {
+				t.Fatalf("unbounded or unescaped diagnostic: length=%d truncated=%t value=%q", len(formatted), truncated, formatted)
+			}
+		})
+	}
+	formatted, truncated := formatLogsAdminForwardedProto([]string{strings.Repeat("x", 252)})
+	if truncated || len(formatted) != 256 {
+		t.Fatalf("exactly fitting value was truncated: length=%d truncated=%t", len(formatted), truncated)
 	}
 }
 
