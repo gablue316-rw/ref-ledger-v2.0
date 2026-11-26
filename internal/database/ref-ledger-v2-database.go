@@ -841,6 +841,14 @@ func CreateSessionIndices() {
 
 }
 
+// WebSessionFilter matches untyped web sessions and excludes typed mobile records.
+func WebSessionFilter(sessionID string) bson.M {
+	return bson.M{
+		"sessionId": sessionID,
+		"type":      bson.M{"$exists": false},
+	}
+}
+
 func GetSession(r *http.Request) (*model.Session, error) {
 
 	cookie, err := r.Cookie("rl_session")
@@ -855,7 +863,7 @@ func GetSession(r *http.Request) (*model.Session, error) {
 		Collection("sessions").
 		FindOne(
 			r.Context(),
-			bson.M{"sessionId": cookie.Value},
+			WebSessionFilter(cookie.Value),
 		).
 		Decode(&session)
 
@@ -4305,9 +4313,7 @@ func (sc *SessionsCollection) Init(client *mongo.Client) error {
 
 func (sc *SessionsCollection) GetTenantID(sessionID string) (string, error) {
 
-	filter := bson.M{
-		"sessionId": sessionID,
-	}
+	filter := WebSessionFilter(sessionID)
 
 	var session SessionDoc
 
