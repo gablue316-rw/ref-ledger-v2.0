@@ -53,6 +53,10 @@ func mobileAccountHandlerWithTimeout(next http.HandlerFunc, timeout time.Duratio
 			http.Error(w, "Service unavailable", 503)
 			return
 		}
+		if err := requireMobileSession(ctx, r, identity, user); err != nil {
+			writeMobileSessionError(w, err)
+			return
+		}
 		setHTTPLogIdentity(ctx, user.TenantID, user.Username)
 		if !mobileMethodAllowed(user.Role, r.Method) {
 			http.Error(w, "This account has read-only access", 403)
