@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -11,8 +12,11 @@ import (
 	"errors"
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/mobileauth"
+	"ref-ledger-v2/internal/model"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type mobileAccountContextKey struct{}
@@ -50,7 +54,7 @@ func MobileDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Apply the same linked-account eligibility rules as web sign-in.
-	user, err := findAuth0Account(ctx, identity)
+	user, err := findMobileAccount(ctx, identity)
 	if errors.Is(err, mongo.ErrNoDocuments) || errors.Is(err, errAuth0AccountDenied) {
 		http.Error(w, "Account access denied", http.StatusForbidden)
 		return
@@ -60,6 +64,34 @@ func MobileDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	GetGames(w, r.WithContext(context.WithValue(ctx, mobileAccountContextKey{}, user.TenantID)))
+}
+
+func findMobileAccount(ctx context.Context, identity mobileauth.Identity) (model.User, error) {
+	user, err := findAuth0Account(ctx, identity)
+	if err != nil {
+		return model.User{}, err
+	}
+	recordMobileActivity(ctx, user)
+	return user, nil
+}
+
+func recordMobileActivity(ctx context.Context, user model.User) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	sessions := database.Client.Database(database.GetMongoDbName()).Collection("sessions")
+	// This marker is not a web session: it has no sessionId or cookie.
+	filter := bson.M{"_id": bson.D{{Key: "type", Value: "mobileActivity"}, {Key: "tenantId", Value: user.TenantID}, {Key: "username", Value: user.Username}}}
+	update := bson.M{
+		"$set": bson.M{"tenantId": user.TenantID, "username": user.Username},
+		"$max": bson.M{"expiresAt": time.Now().Add(sessionDuration)},
+	}
+	_, err := sessions.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	if mongo.IsDuplicateKeyError(err) {
+		_, err = sessions.UpdateOne(ctx, filter, update)
+	}
+	if err != nil {
+		log.Printf("Unable to record mobile activity: %v", err)
+	}
 }
 
 func authenticateMobile(w http.ResponseWriter, r *http.Request) (mobileauth.Identity, string, bool) {
