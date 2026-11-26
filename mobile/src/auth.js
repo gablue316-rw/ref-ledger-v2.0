@@ -25,6 +25,8 @@ async function startSession(){
  const create=async()=>CapacitorHttp.post({url,headers:{Authorization:`Bearer ${await token()}`,Accept:'application/json'},connectTimeout:10000,readTimeout:25000});
  let response=await create();
  if(response.status===403){const setup=await registerAccount();if(setup.status===204||setup.status===200)response=await create();}
+ // The rollout backend returns 404 while managed sessions are disabled.
+ if(response.status===404)return;
  if(response.status!==200||!response.data?.sessionToken)throw new Error('Unable to start a Ref Ledger session.');
  await vault.set({key:sessionKey,value:response.data.sessionToken});
 }

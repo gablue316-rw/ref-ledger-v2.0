@@ -7333,11 +7333,9 @@ func authenticatedSession(r *http.Request) (model.Session, bool) {
 
 	var session model.Session
 
-	err = collection.
-		FindOne(r.Context(), bson.M{
-			"sessionId": sessionID,
-			"expiresAt": bson.M{"$gt": time.Now()},
-		}).
+	filter := database.WebSessionFilter(sessionID)
+	filter["expiresAt"] = bson.M{"$gt": time.Now()}
+	err = collection.FindOne(r.Context(), filter).
 		Decode(&session)
 
 	return session, err == nil
@@ -7375,7 +7373,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 		sessions := database.Client.Database(database.GetMongoDbName()).Collection("sessions")
 		tenantID, _ := getTenantId(r)
 		trace := database.NewWriteTrace(r.Context(), "session.logout", sessions.Name(), tenantID, "", cookie.Value, nil)
-		result, deleteErr := sessions.DeleteOne(r.Context(), bson.M{"sessionId": cookie.Value})
+		result, deleteErr := sessions.DeleteOne(r.Context(), database.WebSessionFilter(cookie.Value))
 		if deleteErr != nil {
 			trace.Failure(deleteErr, nil, "failed")
 		} else if result.DeletedCount == 0 {

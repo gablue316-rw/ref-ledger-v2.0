@@ -271,3 +271,61 @@ func TestMobileSessions(t *testing.T) {
 		}
 	})
 }
+
+func TestWebSessionLookupsExcludeTypedRecords(t *testing.T) {
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("web cookie lookups", func(mt *mtest.T) {
+		oldClient, oldDB := database.Client, database.Database
+		database.Client, database.Database = mt.Client, mt.DB.Name()
+		defer func() { database.Client, database.Database = oldClient, oldDB }()
+
+		const sessionID = "web-session"
+		namespace := mt.DB.Name() + ".sessions"
+		doc := bson.D{{Key: "sessionId", Value: sessionID}, {Key: "tenantId", Value: "account"}, {Key: "expiresAt", Value: time.Now().Add(time.Minute)}}
+		for range 3 {
+			mt.AddMockResponses(mtest.CreateCursorResponse(0, namespace, mtest.FirstBatch, doc))
+		}
+		req := httptest.NewRequest(http.MethodGet, "/api/example", nil)
+		req.AddCookie(&http.Cookie{Name: "rl_session", Value: sessionID})
+		if _, ok := authenticatedSession(req); !ok {
+			mt.Fatal("existing web session was rejected")
+		}
+		if _, err := database.GetSession(req); err != nil {
+			mt.Fatal(err)
+		}
+		collection := database.SessionsCollection{Coll: mt.DB.Collection("sessions")}
+		if _, err := collection.GetTenantID(sessionID); err != nil {
+			mt.Fatal(err)
+		}
+		for _, event := range mt.GetAllStartedEvents() {
+			filter := event.Command.Lookup("filter").Document()
+			if filter.Lookup("sessionId").StringValue() != sessionID || filter.Lookup("type").Document().Lookup("$exists").Boolean() {
+				mt.Fatalf("unexpected web session filter: %s", filter)
+			}
+		}
+	})
+}
+
+func TestLegacyMobileRollout(t *testing.T) {
+	t.Setenv("REF_LEDGER_MOBILE_SESSION_MODE", "legacy")
+	w := httptest.NewRecorder()
+	MobileSession(w, httptest.NewRequest(http.MethodPost, "/api/mobile/session", nil))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("session endpoint status = %d, want 404", w.Code)
+	}
+
+	mt := mtest.New(t, mtest.NewOptions().ClientType(mtest.Mock))
+	mt.Run("existing client retains access", func(mt *mtest.T) {
+		oldClient, oldDB := database.Client, database.Database
+		database.Client, database.Database = mt.Client, mt.DB.Name()
+		defer func() { database.Client, database.Database = oldClient, oldDB }()
+		mt.AddMockResponses(mtest.CreateSuccessResponse())
+		req := httptest.NewRequest(http.MethodGet, "/api/mobile/games", nil)
+		if err := requireMobileSession(req.Context(), req, mobileauth.Identity{}, model.User{TenantID: "account", Username: "user"}); err != nil {
+			mt.Fatal(err)
+		}
+		if event := mt.GetStartedEvent(); event == nil || event.CommandName != "update" {
+			mt.Fatalf("expected legacy activity update, got %v", event)
+		}
+	})
+}
