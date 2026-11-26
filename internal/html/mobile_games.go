@@ -44,7 +44,7 @@ func mobileAccountHandlerWithTimeout(next http.HandlerFunc, timeout time.Duratio
 			http.Error(w, "Service unavailable", 503)
 			return
 		}
-		user, err := findAuth0Account(ctx, identity)
+		user, err := findMobileAccount(ctx, identity)
 		if errors.Is(err, mongo.ErrNoDocuments) || errors.Is(err, errAuth0AccountDenied) {
 			http.Error(w, "Account access denied", 403)
 			return

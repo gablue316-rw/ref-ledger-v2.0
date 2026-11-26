@@ -5951,8 +5951,9 @@ func ValidateLogin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+const sessionDuration = 15 * time.Minute
+
 func createWebSession(w http.ResponseWriter, r *http.Request, user model.User, secure bool) error {
-	sessionDuration := 15 * time.Minute
 	sessionID := uuid.New().String()
 
 	session := model.Session{
