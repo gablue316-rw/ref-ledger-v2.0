@@ -25,9 +25,8 @@ import (
 )
 
 const (
-	mobileSessionHeader   = "X-Ref-Ledger-Mobile-Session"
-	mobileSessionType     = "mobile"
-	mobileSessionDuration = 24 * time.Hour
+	mobileSessionHeader = "X-Ref-Ledger-Mobile-Session"
+	mobileSessionType   = "mobile"
 )
 
 var errMobileSessionRequired = errors.New("active mobile session required")
@@ -59,7 +58,7 @@ func createMobileSession(ctx context.Context, identity mobileauth.Identity, user
 	res := mobileSessionResponse{
 		SessionID:    uuid.New().String(),
 		SessionToken: base64.RawURLEncoding.EncodeToString(secret),
-		ExpiresAt:    now.Add(mobileSessionDuration),
+		ExpiresAt:    now.Add(sessionDuration),
 	}
 	_, err := mobileSessions().InsertOne(ctx, bson.M{
 		"sessionId": res.SessionID, "type": mobileSessionType, "platform": "android",
@@ -92,7 +91,7 @@ func recordMobileActivity(ctx context.Context, user model.User) {
 	// This marker is not a web session: it has no sessionId or cookie.
 	filter := bson.M{"_id": bson.D{{Key: "type", Value: "mobileActivity"}, {Key: "tenantId", Value: user.TenantID}, {Key: "username", Value: user.Username}}}
 	update := bson.M{
-		"$set": bson.M{"tenantId": user.TenantID, "username": user.Username},
+		"$set": bson.M{"tenantId": user.TenantID, "username": user.Username, "platform": "android"},
 		"$max": bson.M{"expiresAt": time.Now().Add(sessionDuration)},
 	}
 	_, err := sessions.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
@@ -119,8 +118,8 @@ func requireMobileSession(ctx context.Context, r *http.Request, identity mobilea
 		"type": mobileSessionType, "mobileTokenHash": hashMobileSessionToken(token),
 		"issuer": identity.Issuer, "subject": identity.Subject,
 		"tenantId": user.TenantID, "username": user.Username,
-		"expiresAt": bson.M{"$gt": now},
-	}, bson.M{"$set": bson.M{"lastActivityAt": now, "expiresAt": now.Add(mobileSessionDuration), "role": user.Role}},
+		"expiresAt": bson.M{"$gt": now}, "createdAt": bson.M{"$gt": now.Add(-sessionDuration)},
+	}, bson.M{"$set": bson.M{"lastActivityAt": now, "role": user.Role}},
 		options.FindOneAndUpdate().SetProjection(bson.M{"_id": 1})).Err()
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return errMobileSessionRequired
@@ -132,7 +131,9 @@ func writeMobileSessionError(w http.ResponseWriter, err error) {
 	if errors.Is(err, errMobileSessionRequired) {
 		w.Header().Set("WWW-Authenticate", "Bearer")
 		w.Header().Set("X-Ref-Ledger-Session", "invalid")
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"code": "mobile_session_invalid", "error": "Your session ended. Please sign in again."})
 		return
 	}
 	http.Error(w, "Service unavailable", http.StatusServiceUnavailable)

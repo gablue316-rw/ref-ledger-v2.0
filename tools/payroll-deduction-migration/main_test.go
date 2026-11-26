@@ -1,6 +1,7 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestRunRequiresExactDatabaseConfirmationForApply(t *testing.T) {
 }
 
 func TestSameFilePath(t *testing.T) {
-	if !sameFilePath("report.json", ".\\report.json") {
+	if !sameFilePath("report.json", "."+string(filepath.Separator)+"report.json") {
 		t.Fatal("equivalent report paths were not recognized")
 	}
 	if sameFilePath("types.csv", "report.json") {

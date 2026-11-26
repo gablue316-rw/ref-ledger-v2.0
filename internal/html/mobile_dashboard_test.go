@@ -11,6 +11,7 @@ import (
 	"ref-ledger-v2/internal/database"
 	"ref-ledger-v2/internal/mobileauth"
 	"ref-ledger-v2/internal/model"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -206,7 +207,7 @@ func TestWebSessionStillUsesCookieAndExpiry(t *testing.T) {
 		doc := mt.GetStartedEvent().Command.Lookup("documents").Array().Index(0).Value().Document()
 		expiry := doc.Lookup("expiresAt").Time()
 		if len(cookies) != 1 || cookies[0].Name != "rl_session" || doc.Lookup("sessionId").StringValue() != cookies[0].Value ||
-			doc.Lookup("tenantId").StringValue() != "web-account" || expiry.Before(before.Add(-time.Millisecond)) || expiry.After(after.Add(time.Millisecond)) {
+			doc.Lookup("client").StringValue() != "web" || doc.Lookup("tenantId").StringValue() != "web-account" || expiry.Before(before.Add(-time.Millisecond)) || expiry.After(after.Add(time.Millisecond)) {
 			mt.Fatalf("unexpected web session: %s cookies=%v", doc, cookies)
 		}
 	})
@@ -231,7 +232,7 @@ func TestMobileSessions(t *testing.T) {
 		doc := mt.GetAllStartedEvents()[0].Command.Lookup("documents").Array().Index(0).Value().Document()
 		if doc.Lookup("sessionId").StringValue() != res.SessionID || doc.Lookup("tenantId").StringValue() != "account-a" ||
 			doc.Lookup("username").StringValue() != user.Username || doc.Lookup("mobileTokenHash").StringValue() != hashMobileSessionToken(res.SessionToken) ||
-			doc.Lookup("platform").StringValue() != "android" || !doc.Lookup("expiresAt").Time().After(time.Now()) {
+			doc.Lookup("platform").StringValue() != "android" || doc.Lookup("expiresAt").Time().Sub(doc.Lookup("createdAt").Time()) != 15*time.Minute {
 			mt.Fatalf("unexpected session: %s", doc)
 		}
 		if _, err := doc.LookupErr("sessionToken"); err == nil {
@@ -246,7 +247,16 @@ func TestMobileSessions(t *testing.T) {
 		if err := requireMobileSession(context.Background(), req, identity, user); err != nil {
 			mt.Fatal(err)
 		}
-		q := mt.GetStartedEvent().Command.Lookup("query").Document()
+		command := mt.GetStartedEvent().Command
+		q := command.Lookup("query").Document()
+		createdAfter := q.Lookup("createdAt", "$gt").Time()
+		expiresAfter := q.Lookup("expiresAt", "$gt").Time()
+		if expiresAfter.Sub(createdAfter) != 15*time.Minute {
+			mt.Fatalf("previously issued sessions must also expire after 15 minutes: %s", q)
+		}
+		if _, err := command.LookupErr("update", "$set", "expiresAt"); err == nil {
+			mt.Fatal("session activity must not extend expiration")
+		}
 		if q.Lookup("tenantId").StringValue() != "account-a" || q.Lookup("subject").StringValue() != "subject" || q.Lookup("type").StringValue() != "mobile" {
 			mt.Fatalf("unscoped query: %s", q)
 		}
@@ -261,7 +271,7 @@ func TestMobileSessions(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		writeMobileSessionError(w, errMobileSessionRequired)
-		if w.Code != http.StatusUnauthorized || w.Header().Get("X-Ref-Ledger-Session") != "invalid" {
+		if w.Code != http.StatusUnauthorized || w.Header().Get("X-Ref-Ledger-Session") != "invalid" || !strings.Contains(w.Body.String(), "mobile_session_invalid") {
 			mt.Fatalf("status=%d", w.Code)
 		}
 		noHeader := httptest.NewRequest(http.MethodGet, "/api/mobile/game", nil)
