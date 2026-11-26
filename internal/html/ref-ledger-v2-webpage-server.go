@@ -8444,6 +8444,7 @@ func main() {
 	mux.HandleFunc("/api/game-update", authRequired(readOnlyForbidden(UpdateGame)))
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/mobile/dashboard", MobileDashboard)
+	mux.HandleFunc("/api/mobile/session", MobileSession)
 	mux.HandleFunc("/api/mobile/game", mobileAccountHandler(MobileGame))
 	mux.HandleFunc("/api/mobile/catalog", mobileAccountHandler(mobileReadOnly(MobileCatalog)))
 	mux.HandleFunc("/api/mobile/catalog/create/{type}", mobileAccountHandler(MobileCatalogCreate))
