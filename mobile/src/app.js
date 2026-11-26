@@ -195,6 +195,7 @@ async function load(){
   }
 
   if(r.status===401){
+   if(r.sessionRevoked){clearDashboard();throw new Error('This session was ended. Sign in again.');}
    throw new Error('Your session expired. Sign out and sign in again.');
   }
 
