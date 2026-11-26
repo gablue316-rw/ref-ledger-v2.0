@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"log"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,8 @@ import (
 func TestLogsAdminAuthenticationFailureDiagnostic(t *testing.T) {
 	const token = "0123456789abcdef0123456789abcdef"
 	t.Setenv("REF_LEDGER_LOG_API_TOKEN", token)
+	t.Setenv("APP_ENV", "production")
+	t.Setenv(logsAdminTrustedProxyCIDRsEnv, "192.0.2.0/24")
 	tests := []struct {
 		name           string
 		authorization  string
@@ -55,6 +58,7 @@ func TestLogsAdminAuthenticationFailureDiagnostic(t *testing.T) {
 			log.SetOutput(&output)
 			request := httptest.NewRequest("GET", "http://logs.example.test"+logsAdminPrefix+"/threshold?query-secret=value", nil)
 			request.Host = "logs.example.test"
+			request.RemoteAddr = "192.0.2.10:443"
 			if test.authorization != "" {
 				request.Header.Set("Authorization", test.authorization)
 			}
@@ -178,23 +182,54 @@ func TestLogsAdminAuthenticationRequiresConfiguredBearerToken(t *testing.T) {
 }
 
 func TestLogsAdminTransportAndActorValidation(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv(logsAdminTrustedProxyCIDRsEnv, "")
 	t.Setenv("REF_LEDGER_LOG_API_TOKEN", strings.Repeat("k", 32))
 	request := httptest.NewRequest("GET", "http://localhost"+logsAdminPrefix, nil)
+	request.RemoteAddr = "127.0.0.1:1234"
 	if !logsAdminTransportAllowed(request) {
 		t.Fatal("loopback development transport was rejected")
 	}
-	request.Host = "logs.example.test"
+	t.Setenv("APP_ENV", "production")
+	request.RemoteAddr = "127.0.0.1:1234"
+	request.Host = "localhost"
 	if logsAdminTransportAllowed(request) {
-		t.Fatal("plain HTTP non-loopback transport was accepted")
+		t.Fatal("plain HTTP loopback transport was accepted in production")
 	}
+	request.RemoteAddr = "203.0.113.10:1234"
 	request.Header.Set("X-Forwarded-Proto", "https")
+	if logsAdminTransportAllowed(request) {
+		t.Fatal("client-supplied forwarded scheme was accepted from an untrusted peer")
+	}
+	request.TLS = &tls.ConnectionState{}
 	if !logsAdminTransportAllowed(request) {
-		t.Fatal("TLS reverse-proxy transport was rejected")
+		t.Fatal("direct TLS transport was rejected")
 	}
 	actor := safeLogsActor("operator@example.test")
 	if actor == "operator@example.test" || !strings.HasPrefix(actor, "admin:") ||
 		safeLogsActor("bad\r\nactor") != "monitor-admin" {
 		t.Fatal("administrator actor validation did not redact unsafe values")
+	}
+}
+
+func TestLogsAdminTransportTrustsForwardedSchemeOnlyFromConfiguredProxy(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv(logsAdminTrustedProxyCIDRsEnv, "192.0.2.0/24")
+	request := httptest.NewRequest("GET", "http://logs.example.test"+logsAdminPrefix, nil)
+	request.RemoteAddr = "192.0.2.10:443"
+	request.Header.Set("X-Forwarded-Proto", "https")
+	if !logsAdminTransportAllowed(request) {
+		t.Fatal("forwarded HTTPS from the configured proxy was rejected")
+	}
+
+	request.RemoteAddr = "198.51.100.10:443"
+	if logsAdminTransportAllowed(request) {
+		t.Fatal("forwarded HTTPS from an untrusted peer was accepted")
+	}
+
+	t.Setenv(logsAdminTrustedProxyCIDRsEnv, "not-a-cidr")
+	if logsAdminTransportAllowed(request) {
+		t.Fatal("forwarded HTTPS was accepted with invalid proxy configuration")
 	}
 }
 
