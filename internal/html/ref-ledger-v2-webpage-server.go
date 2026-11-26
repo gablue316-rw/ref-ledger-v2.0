@@ -5957,6 +5957,7 @@ func createWebSession(w http.ResponseWriter, r *http.Request, user model.User, s
 	sessionID := uuid.New().String()
 
 	session := model.Session{
+		Client:    "web",
 		SessionID: sessionID,
 		Username:  user.Username,
 		TenantID:  user.TenantID,

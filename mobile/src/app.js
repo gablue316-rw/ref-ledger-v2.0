@@ -7,7 +7,7 @@ import {createGameActions} from './game-actions.js';
 import {bulkGames} from './game-bulk.js';
 import {editGame} from './game-editor.js';
 import { Browser } from '@capacitor/browser';
-import {login, logout, apiGet, registerAccount} from './auth.js';
+import {login, logout, apiGet, registerAccount, sessionEndedEvent} from './auth.js';
 import {config} from './config.js';
 import {summarize,dashboardURL,assignmentEarnings} from './data.js';
 import {createReports} from './reports.js';
@@ -195,7 +195,6 @@ async function load(){
   }
 
   if(r.status===401){
-   if(r.sessionRevoked){clearDashboard();throw new Error('This session was ended. Sign in again.');}
    throw new Error('Your session expired. Sign out and sign in again.');
   }
 
@@ -304,6 +303,16 @@ $('logout').onclick=async()=>{
   updateControls();
  }
 };
+
+globalThis.addEventListener(sessionEndedEvent,()=>{
+ clearDashboard();
+ for(const dialog of document.querySelectorAll('dialog[open]')){
+  dialog.close();
+  if(dialog.parentElement===document.body)dialog.remove();
+ }
+ message('Your session ended. Please sign in again.');
+ updateControls();
+});
 
 // Restore only inside a native build. Browser mode never reads or stores tokens.
 import {Capacitor} from '@capacitor/core';

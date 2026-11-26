@@ -6,19 +6,40 @@ import {normalizeTokens,authorizationParameters} from './data.js';
 const key=`ref-ledger-refresh:${encodeURIComponent(c.issuer)}:${encodeURIComponent(c.clientId)}:${encodeURIComponent(c.audience)}`;
 const sessionKey=`ref-ledger-session:${encodeURIComponent(c.issuer)}:${encodeURIComponent(c.clientId)}:${encodeURIComponent(c.audience)}`;
 const sessionHeader='X-Ref-Ledger-Mobile-Session';
-let access='',expires=0,refreshing;
+let access='',expires=0,refreshing,clearingSession;
+let sessionGeneration=0;
+export const sessionEndedEvent='ref-ledger:session-ended';
 async function sessionSecret(){try{return (await vault.get({key:sessionKey})).value;}catch{return '';}}
-export async function clearLocalSession(){expireAccess();await vault.remove({key}).catch(()=>{});await vault.remove({key:sessionKey}).catch(()=>{});}
+export function clearLocalSession(){
+ if(clearingSession)return clearingSession;
+ ++sessionGeneration;
+ clearingSession=(async()=>{
+  await refreshing?.catch(()=>{});
+  expireAccess();
+  await vault.remove({key}).catch(()=>{});
+  await vault.remove({key:sessionKey}).catch(()=>{});
+ })().finally(()=>{clearingSession=undefined;});
+ return clearingSession;
+}
 function sessionRevoked(response){
  if(response.status!==401)return false;
  const h=response.headers||{};
- return Object.keys(h).some(k=>k.toLowerCase()==='x-ref-ledger-session'&&h[k]==='invalid');
+ return response.data?.code==='mobile_session_invalid'||
+  Object.keys(h).some(k=>k.toLowerCase()==='x-ref-ledger-session'&&h[k]==='invalid');
 }
 async function guarded(request){
+ if(clearingSession)return {status:401};
+ const current=sessionGeneration;
  let response=await request();
- if(response.status===401&&!sessionRevoked(response)){expireAccess();response=await request();}
- if(sessionRevoked(response)){await clearLocalSession();response.sessionRevoked=true;}
- return response;
+ if(current===sessionGeneration&&response.status===401&&!sessionRevoked(response)){
+  expireAccess();
+  response=await request();
+ }
+ if(current===sessionGeneration&&sessionRevoked(response)){
+  await clearLocalSession();
+  globalThis.dispatchEvent(new Event(sessionEndedEvent));
+ }
+ return current===sessionGeneration?response:{status:401};
 }
 async function startSession(){
  const url=new URL('/api/mobile/session',c.apiBase).toString();

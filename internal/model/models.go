@@ -17,6 +17,7 @@ type User struct {
 }
 
 type Session struct {
+	Client    string    `bson:"client,omitempty" json:"-"`
 	SessionID string    `bson:"sessionId" json:"sessionId"`
 	Username  string    `bson:"username" json:"username"`
 	TenantID  string    `bson:"tenantId" json:"tenantId"`
