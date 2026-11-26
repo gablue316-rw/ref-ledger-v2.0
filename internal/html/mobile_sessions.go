@@ -10,6 +10,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -79,9 +80,36 @@ func createMobileSession(ctx context.Context, identity mobileauth.Identity, user
 	return res, nil
 }
 
-// requireMobileSession accepts a request only when its session secret belongs to
-// an unexpired, unrevoked session bound to the authenticated identity and account.
+// Legacy mode lets clients upgrade before per-device session enforcement starts.
+func legacyMobileSessionsEnabled() bool {
+	return os.Getenv("REF_LEDGER_MOBILE_SESSION_MODE") == "legacy"
+}
+
+func recordMobileActivity(ctx context.Context, user model.User) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	sessions := database.Client.Database(database.GetMongoDbName()).Collection("sessions")
+	// This marker is not a web session: it has no sessionId or cookie.
+	filter := bson.M{"_id": bson.D{{Key: "type", Value: "mobileActivity"}, {Key: "tenantId", Value: user.TenantID}, {Key: "username", Value: user.Username}}}
+	update := bson.M{
+		"$set": bson.M{"tenantId": user.TenantID, "username": user.Username},
+		"$max": bson.M{"expiresAt": time.Now().Add(sessionDuration)},
+	}
+	_, err := sessions.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	if mongo.IsDuplicateKeyError(err) {
+		_, err = sessions.UpdateOne(ctx, filter, update)
+	}
+	if err != nil {
+		log.Printf("Unable to record mobile activity: %v", err)
+	}
+}
+
+// In managed mode, require a session bound to the authenticated identity and account.
 func requireMobileSession(ctx context.Context, r *http.Request, identity mobileauth.Identity, user model.User) error {
+	if legacyMobileSessionsEnabled() {
+		recordMobileActivity(ctx, user)
+		return nil
+	}
 	token := strings.TrimSpace(r.Header.Get(mobileSessionHeader))
 	if token == "" {
 		return errMobileSessionRequired
@@ -113,6 +141,10 @@ func writeMobileSessionError(w http.ResponseWriter, err error) {
 // MobileSession creates (POST) or ends (DELETE) the caller's mobile session.
 func MobileSession(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
+	if legacyMobileSessionsEnabled() {
+		http.NotFound(w, r)
+		return
+	}
 	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
 		w.Header().Set("Allow", "POST, DELETE")
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
