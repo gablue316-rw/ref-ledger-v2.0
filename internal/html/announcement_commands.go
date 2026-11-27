@@ -91,14 +91,11 @@ func validateAnnouncementCommand(c announcementCommand, p announcementCommandPol
 		return "expired_or_invalid_lifetime"
 	}
 	switch c.Type {
-	case "list", "accounts", "sessions", "detail", "publish", "edit", "clear":
+	case "list", "history", "accounts", "sessions", "detail", "publish", "edit", "clear", "delete":
 	default:
 		return "invalid_type"
 	}
-	if (c.Type == "detail" || c.Type == "edit" || c.Type == "clear") && c.AnnouncementID == "" {
-		return "invalid_announcement_id"
-	}
-	if c.Type == "detail" || c.Type == "edit" || c.Type == "clear" {
+	if c.Type == "detail" || c.Type == "edit" || c.Type == "clear" || c.Type == "delete" {
 		id, err := uuid.Parse(c.AnnouncementID)
 		if err != nil || id.String() != c.AnnouncementID {
 			return "invalid_announcement_id"
@@ -140,7 +137,7 @@ func validateAnnouncementCommand(c announcementCommand, p announcementCommandPol
 		return "invalid_request"
 	}
 	if c.After != "" {
-		if c.Type == "list" {
+		if c.Type == "list" || c.Type == "history" {
 			id, err := uuid.Parse(c.After)
 			if err != nil || id.String() != c.After {
 				return "invalid_cursor"
@@ -166,9 +163,9 @@ func validAnnouncementCommandFields(raw bson.Raw, typ string) bool {
 		allowed["username"], allowed["after"] = true, true
 	case "sessions":
 		allowed["tenantId"], allowed["userId"], allowed["after"] = true, true, true
-	case "list":
+	case "list", "history":
 		allowed["after"] = true
-	case "detail", "clear":
+	case "detail", "clear", "delete":
 		allowed["announcementId"] = true
 	case "publish":
 		allowed["request"] = true
@@ -533,9 +530,12 @@ func executeAnnouncementCommand(ctx context.Context, db *mongo.Database, c annou
 			next = docs[len(docs)-1].ID.Hex()
 		}
 		return bson.M{"sessions": items, "nextCursor": next}, false, nil
-	case "list":
+	case "list", "history":
 		now := time.Now().UTC()
 		filter := bson.M{"cleared": false, "$or": bson.A{bson.M{"endsAt": bson.M{"$exists": false}}, bson.M{"endsAt": nil}, bson.M{"endsAt": bson.M{"$gt": now}}}}
+		if c.Type == "history" {
+			filter = inactiveAnnouncementFilter(now)
+		}
 		if c.After != "" {
 			filter["_id"] = bson.M{"$gt": c.After}
 		}
@@ -576,6 +576,17 @@ func executeAnnouncementCommand(ctx context.Context, db *mongo.Database, c annou
 			return nil, false, err
 		}
 		return a, true, nil
+	case "delete":
+		filter := inactiveAnnouncementFilter(s.clock())
+		filter["_id"] = c.AnnouncementID
+		result, err := db.Collection("announcements").DeleteOne(ctx, filter)
+		if err != nil {
+			return nil, false, err
+		}
+		if result.DeletedCount == 0 {
+			return nil, false, errAnnouncementNotFound
+		}
+		return bson.M{"_id": c.AnnouncementID}, true, nil
 	case "edit", "clear":
 		a, err := s.store.get(ctx, c.AnnouncementID)
 		if err != nil {
@@ -611,4 +622,8 @@ func executeAnnouncementCommand(ctx context.Context, db *mongo.Database, c annou
 	default:
 		return nil, false, fmt.Errorf("unsupported command")
 	}
+}
+
+func inactiveAnnouncementFilter(now time.Time) bson.M {
+	return bson.M{"$or": bson.A{bson.M{"cleared": true}, bson.M{"endsAt": bson.M{"$lte": now}}}}
 }
