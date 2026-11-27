@@ -24,6 +24,7 @@ async function initializeNavbar() {
         initializeSidebar();
         highlightCurrentPage();
         initializeLogout();
+        initializeAnnouncements(container);
 
         await Promise.all([
             loadCurrentUser(),
@@ -285,4 +286,93 @@ function initializeSidebar() {
     nav.addEventListener("click", event => { if (event.target.closest("a") && media.matches) setOpen(false); });
     media.addEventListener("change", () => setOpen(false));
     setOpen(false);
+}
+
+
+// ---- Announcement banner ----
+// Plain text only (textContent). Live updates arrive over Server-Sent Events;
+// the server sends the full current state on every (re)connect.
+function initializeAnnouncements(container) {
+    if (document.getElementById("announcement-banner") || !window.EventSource) {
+        return;
+    }
+
+    const style = document.createElement("style");
+    style.textContent = `
+        #announcement-banner{display:flex;align-items:center;gap:12px;padding:8px 16px;background:#ffd23f;color:#1a1200;
+            font:600 14px/1.4 "Segoe UI",Arial,sans-serif;border-bottom:2px solid #b38600}
+        #announcement-banner[hidden]{display:none}
+        #announcement-banner .announcement-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        #announcement-banner button{flex:none;background:#1a1200;color:#fff;border:0;border-radius:4px;padding:4px 10px;font:inherit;cursor:pointer}
+        #announcement-dialog{max-width:min(640px,92vw);border:2px solid #b38600;border-radius:8px;padding:20px;color:#1a1200}
+        #announcement-dialog .announcement-full{max-height:60vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 16px}
+        #announcement-dialog button{background:#132d3d;color:#fff;border:0;border-radius:4px;padding:8px 16px;font:inherit;cursor:pointer}`;
+    document.head.appendChild(style);
+
+    const banner = document.createElement("div");
+    banner.id = "announcement-banner";
+    banner.setAttribute("role", "status");
+    banner.hidden = true;
+    const text = document.createElement("span");
+    text.className = "announcement-text";
+    const more = document.createElement("button");
+    more.type = "button";
+    more.textContent = "Read more";
+    more.hidden = true;
+    banner.append(text, more);
+    container.insertAdjacentElement("afterend", banner);
+
+    const dialog = document.createElement("dialog");
+    dialog.id = "announcement-dialog";
+    dialog.setAttribute("aria-labelledby", "announcement-dialog-title");
+    dialog.innerHTML = '<h2 id="announcement-dialog-title" style="margin-top:0;font-size:18px">Announcement</h2>' +
+        '<p class="announcement-full" tabindex="0"></p><button type="button">Close</button>';
+    document.body.appendChild(dialog);
+    const full = dialog.querySelector(".announcement-full");
+    dialog.querySelector("button").addEventListener("click", () => dialog.close());
+
+    const updateOverflow = () => {
+        more.hidden = true;
+        if (!banner.hidden) {
+            more.hidden = !(text.scrollWidth > text.clientWidth || text.textContent.includes("\n"));
+        }
+    };
+    more.addEventListener("click", () => {
+        full.textContent = text.textContent;
+        if (!dialog.open) {
+            dialog.showModal();
+        }
+    });
+    window.addEventListener("resize", updateOverflow);
+
+    const show = (announcement) => {
+        if (!announcement || !announcement.message) {
+            if (dialog.open) {
+                dialog.close();
+            }
+            banner.hidden = true;
+            text.textContent = "";
+            more.hidden = true;
+            return;
+        }
+        text.textContent = announcement.message;
+        banner.hidden = false;
+        updateOverflow();
+        if (dialog.open) {
+            full.textContent = announcement.message;
+        }
+    };
+
+    const source = new EventSource("/api/announcements/events");
+    source.addEventListener("announcement", (event) => {
+        try {
+            show(JSON.parse(event.data).announcement);
+        } catch (error) {
+            console.error("Unable to read announcement:", error);
+        }
+    });
+    source.addEventListener("session_ended", () => {
+        source.close();
+        show(null);
+    });
 }
