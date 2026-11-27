@@ -61,7 +61,7 @@ func createMobileSession(ctx context.Context, identity mobileauth.Identity, user
 		ExpiresAt:    now.Add(sessionDuration),
 	}
 	_, err := mobileSessions().InsertOne(ctx, bson.M{
-		"sessionId": res.SessionID, "type": mobileSessionType, "platform": "android",
+		"sessionId": res.SessionID, "targetId": uuid.New().String(), "type": mobileSessionType, "platform": "android",
 		"username": user.Username, "tenantId": user.TenantID, "role": user.Role,
 		"issuer": identity.Issuer, "subject": identity.Subject,
 		"mobileTokenHash": hashMobileSessionToken(res.SessionToken),
