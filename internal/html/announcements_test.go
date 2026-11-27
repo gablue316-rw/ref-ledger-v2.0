@@ -622,35 +622,57 @@ func (m memoryAnnouncementDismissals) dismiss(_ context.Context, r announcementR
 
 func TestAnnouncementDismissalBySchedule(t *testing.T) {
 	for _, timed := range []bool{false, true} {
-		service, _ := newAnnouncementTestService()
-		service.dismissals = memoryAnnouncementDismissals{}
-		request := announcementRequest{Audience: "system", Message: "Maintenance"}
-		if timed {
-			request.EndsAt = annNow.Add(time.Hour).Format(time.RFC3339)
-			request.Timezone = "UTC"
-		}
-		a, err := service.publish(context.Background(), request, "monitor")
-		if err != nil {
-			t.Fatal(err)
-		}
-		req := httptest.NewRequest(http.MethodPost, "/api/announcements/dismiss", strings.NewReader(fmt.Sprintf(`{"id":%q}`, a.ID)))
-		req.Header.Set("Content-Type", "application/json")
-		w := httptest.NewRecorder()
-		service.dismissHandler(func(context.Context) (announcementRecipient, error) { return annLaptop, nil })(w, req)
-		if w.Code != http.StatusNoContent {
-			t.Fatalf("dismiss returned %d: %s", w.Code, w.Body.String())
-		}
-		bob := announcementRecipient{TenantID: annBob.TenantID, UserID: annBob.UserID}
-		newBobSession := bob
-		newBobSession.SignedInAt = annNow.Add(time.Minute)
-		for _, check := range []struct {
-			recipient announcementRecipient
-			visible   bool
-		}{{annLaptop, false}, {annPhone, timed}, {bob, true}, {newBobSession, timed}} {
-			v, err := service.current(context.Background(), check.recipient)
-			if err != nil || (v != nil) != check.visible {
-				t.Fatalf("timed=%t recipient=%+v visible=%t got %v, %v", timed, check.recipient, check.visible, v, err)
-			}
+		for _, sessions := range [][2]announcementRecipient{{annLaptop, annPhone}, {annPhone, annLaptop}} {
+			t.Run(fmt.Sprintf("timed=%t/%s-clears", timed, sessions[0].TargetID), func(t *testing.T) {
+				ctx := context.Background()
+				service, _ := newAnnouncementTestService()
+				service.dismissals = memoryAnnouncementDismissals{}
+				request := announcementRequest{Audience: "user", TenantID: annAlice.TenantID, UserID: annAlice.UserID, Message: "Maintenance"}
+				if timed {
+					request.EndsAt = annNow.Add(time.Hour).Format(time.RFC3339)
+					request.Timezone = "UTC"
+				}
+				announcement, err := service.publish(ctx, request, "monitor")
+				if err != nil {
+					t.Fatal(err)
+				}
+				dismiss := func(recipient announcementRecipient) int {
+					req := httptest.NewRequest(http.MethodPost, "/api/announcements/dismiss", strings.NewReader(fmt.Sprintf(`{"id":%q}`, announcement.ID)))
+					req.Header.Set("Content-Type", "application/json")
+					response := httptest.NewRecorder()
+					service.dismissHandler(func(context.Context) (announcementRecipient, error) { return recipient, nil })(response, req)
+					return response.Code
+				}
+				verify := func(recipient announcementRecipient, visible bool) {
+					t.Helper()
+					for range 2 {
+						view, err := service.current(ctx, recipient)
+						if err != nil || (view != nil) != visible {
+							t.Fatalf("recipient=%+v visible=%t got %v, %v", recipient, visible, view, err)
+						}
+					}
+				}
+				unmanaged := sessions[0]
+				unmanaged.TargetID = ""
+				if status := dismiss(unmanaged); status != http.StatusConflict {
+					t.Fatalf("dismiss without session returned %d", status)
+				}
+				verify(sessions[0], true)
+				verify(sessions[1], true)
+				if status := dismiss(sessions[0]); status != http.StatusNoContent {
+					t.Fatalf("dismiss returned %d", status)
+				}
+				verify(sessions[0], false)
+				verify(sessions[1], true)
+				replacement := sessions[0]
+				replacement.TargetID = "replacement-session"
+				replacement.SignedInAt = annNow.Add(time.Minute)
+				verify(replacement, timed)
+				if _, err := service.clear(ctx, announcement.ID); err != nil {
+					t.Fatal(err)
+				}
+				verify(sessions[1], false)
+			})
 		}
 	}
 }

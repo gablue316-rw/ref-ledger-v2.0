@@ -192,7 +192,7 @@ func (s *announcementService) current(ctx context.Context, r announcementRecipie
 	}
 	now := s.clock()
 	var dismissed map[string]bool
-	if s.dismissals != nil {
+	if s.dismissals != nil && r.TargetID != "" {
 		keys := make([]string, 0, len(all))
 		for _, a := range all {
 			if announcementEligible(a, r, now) {
