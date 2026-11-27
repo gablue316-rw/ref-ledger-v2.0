@@ -38,6 +38,8 @@ env:
   MONGODB_REPLICA_SET: "refLedgerRS"
   LOG_FILE_PATH: "/root/logs/ref-ledgerV2-webServer.log"
   APP_ENV: "production"
+  REF_LEDGER_ANNOUNCEMENT_COMMANDS_ENABLED: "false"
+  REF_LEDGER_ANNOUNCEMENT_COMMAND_ACTORS: ""
 
 cloudflare:
   enabled: false

@@ -4,13 +4,21 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"ref-ledger-v2/internal/database"
+
+	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type memAnnouncementStore struct {
@@ -158,6 +166,96 @@ func TestAnnouncementAdminRequiresAuthorization(t *testing.T) {
 	svc.adminHandler(func(*http.Request) bool { return false }, func(*http.Request) string { return "" })(rec, req)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestAnnouncementAdminDiagnostics(t *testing.T) {
+	const token = "0123456789abcdef0123456789abcdef"
+	t.Setenv("REF_LEDGER_LOG_API_TOKEN", token)
+	oldClient, oldWriter := database.Client, log.Writer()
+	defer func() { database.Client = oldClient; log.SetOutput(oldWriter) }()
+	disconnected, err := mongo.NewClient(options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, authorization, host string
+		proto                     []string
+		tls, client               bool
+		path                      string
+		status                    int
+		diagnostic                string
+	}{
+		{name: "missing bearer before readiness", host: "example.test", status: 401, diagnostic: "authorization=missing transport=rejected"},
+		{name: "wrong bearer", authorization: "******", host: "example.test", proto: []string{"http-secret"}, status: 401, diagnostic: "authorization=rejected transport=rejected"},
+		{name: "proxy rejection", authorization: "Bearer " + token, host: "example.test", proto: []string{"http", "https"}, status: 401, diagnostic: `authorization=accepted transport=rejected direct_tls=no forwarded_proto_count=2 forwarded_proto_values=["http","https"]`},
+		{name: "comma separated proxy rejection", authorization: "Bearer " + token, host: "example.test", proto: []string{"http, https"}, status: 401, diagnostic: `forwarded_proto_values=["http,https"]`},
+		{name: "untrusted proxy contents", authorization: "Bearer " + token, host: "example.test", proto: []string{"credential-secret\n" + token}, status: 401, diagnostic: `forwarded_proto_values=["[redacted]"]`},
+		{name: "https readiness", authorization: "Bearer " + token, host: "example.test", proto: []string{" HTTPS "}, status: 503, diagnostic: "database=not_initialized"},
+		{name: "direct tls readiness", authorization: "Bearer " + token, host: "example.test", tls: true, status: 503, diagnostic: "database=not_initialized"},
+		{name: "loopback readiness", authorization: "Bearer " + token, host: "localhost:8080", status: 503, diagnostic: "database=not_initialized"},
+		{name: "ready reaches handler without version", authorization: "Bearer " + token, host: "example.test", proto: []string{"https"}, client: true, path: "/not/available", status: 404},
+		{name: "database operation failure", authorization: "Bearer " + token, host: "example.test", proto: []string{"https"}, client: true, status: 500, diagnostic: "database=operation_failed"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			database.Client = nil
+			if tt.client {
+				database.Client = disconnected
+			}
+			var output bytes.Buffer
+			log.SetOutput(&output)
+			req := httptest.NewRequest(http.MethodGet, "http://example.test"+announcementAdminPrefix+tt.path+"?username=query-secret", strings.NewReader("body-secret"))
+			req.Host = tt.host
+			req.Header.Set("Authorization", tt.authorization)
+			req.Header.Set("Cookie", "rl_session=cookie-secret")
+			req.Header.Set("X-Request-ID", "untrusted-correlation-secret")
+			req.Header.Set("X-Ref-Ledger-Admin-Actor", "actor-secret")
+			for _, value := range tt.proto {
+				req.Header.Add("X-Forwarded-Proto", value)
+			}
+			if tt.tls {
+				req.TLS = &tls.ConnectionState{}
+			}
+			rec := httptest.NewRecorder()
+			announcementAdminHandler(rec, req)
+			if rec.Code != tt.status {
+				t.Fatalf("status = %d, want %d; body=%q", rec.Code, tt.status, rec.Body.String())
+			}
+			id := rec.Header().Get("X-Request-ID")
+			if _, err := uuid.Parse(id); err != nil {
+				t.Fatalf("invalid generated request ID %q", id)
+			}
+			if rec.Header().Get("Cache-Control") != "no-store" || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
+				t.Fatal("missing security response headers")
+			}
+			if tt.diagnostic != "" && (!strings.Contains(output.String(), tt.diagnostic) || !strings.Contains(output.String(), "request_id="+id)) {
+				t.Fatalf("unexpected diagnostic: %s", output.String())
+			}
+			for _, secret := range []string{token, "invalid-secret", "http-secret", "credential-secret", "query-secret", "body-secret", "cookie-secret", "untrusted-correlation-secret", "actor-secret"} {
+				if strings.Contains(output.String(), secret) {
+					t.Fatalf("diagnostic leaked %q: %s", secret, output.String())
+				}
+			}
+		})
+	}
+}
+
+func TestSafeAnnouncementForwardedProto(t *testing.T) {
+	for _, input := range [][]string{
+		{strings.Repeat("x", 10000)},
+		{"http, credential-secret"},
+		{"http\nhttps"},
+		{"httpſ"},
+	} {
+		formatted, _ := safeAnnouncementForwardedProto(input)
+		if formatted != `["[redacted]"]` {
+			t.Fatalf("unsafe value was not redacted: %q", formatted)
+		}
+	}
+	formatted, truncated := safeAnnouncementForwardedProto(make([]string, 1000))
+	if !truncated || len(formatted) > 256 {
+		t.Fatalf("unbounded diagnostic: %q truncated=%t", formatted, truncated)
 	}
 }
 
