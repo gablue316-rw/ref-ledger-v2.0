@@ -5,7 +5,7 @@ This document describes the Ref Ledger server API used by Ref Ledger Monitor
 eligibility using server time and the authenticated recipient identity.
 
 For the Atlas transport, see the
-[commit-pinned v1 Monitor contract](https://github.com/gablue316-rw/ref-ledger-v2.0/blob/e3ff61c27fff49ee2cb6169b1c82216e3fa3cfb8/docs/announcement-atlas-v1.md).
+[commit-pinned v1 Monitor contract](https://github.com/gablue316-rw/ref-ledger-v2.0/blob/190b97a6037a205fed42faf207ee750769f3485f/docs/announcement-atlas-v1.md).
 
 ## Authentication and transport
 
