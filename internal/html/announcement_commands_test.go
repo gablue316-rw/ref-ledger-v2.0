@@ -150,6 +150,46 @@ func TestAnnouncementCommandsLive(t *testing.T) {
 		}
 		return result(id)
 	}
+	{
+		activeID, scheduledID, expiredID, unselectedID := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+		expiredAt := now.Add(-time.Minute)
+		rows := db.Collection("announcements")
+		for _, item := range []announcement{
+			{ID: activeID, StartsAt: now.Add(-time.Hour), Version: 1},
+			{ID: scheduledID, StartsAt: now.Add(time.Hour), Version: 1},
+			{ID: expiredID, StartsAt: now.Add(-time.Hour), EndsAt: &expiredAt, Version: 1},
+			{ID: unselectedID, StartsAt: now.Add(-time.Hour), Version: 1},
+		} {
+			if _, err := rows.InsertOne(ctx, item); err != nil {
+				t.Fatal(err)
+			}
+		}
+		search := run(insert("search", bson.M{"status": "active"}))
+		if search["outcome"] != "success" || len(search["result"].(bson.M)["announcements"].(bson.A)) != 2 {
+			t.Fatalf("active search: %v", search)
+		}
+		bulk := run(insert("bulk-clear", bson.M{"announcementIds": bson.A{activeID, scheduledID, expiredID}}))
+		if bulk["outcome"] != "success" {
+			t.Fatalf("bulk clear: %v", bulk)
+		}
+		for i, outcome := range []string{"cleared", "cleared", "skipped"} {
+			if got := bulk["result"].(bson.M)["results"].(bson.A)[i].(bson.M)["outcome"]; got != outcome {
+				t.Fatalf("row %d outcome=%v want %s", i, got, outcome)
+			}
+		}
+		for _, id := range []string{activeID, scheduledID, expiredID} {
+			if deleted := run(insert("delete", bson.M{"announcementId": id})); deleted["outcome"] != "success" {
+				t.Fatalf("delete inactive: %v", deleted)
+			}
+		}
+		if count, err := rows.CountDocuments(ctx, bson.M{}); err != nil || count != 1 {
+			t.Fatalf("deleted records remained or unselected row was lost: %d %v", count, err)
+		}
+		if _, err := rows.DeleteOne(ctx, bson.M{"_id": unselectedID}); err != nil {
+			t.Fatal(err)
+		}
+
+	}
 	accounts := run(insert("accounts", bson.M{"username": "same"}))
 	if len(accounts["result"].(bson.M)["accounts"].(bson.A)) != 2 {
 		t.Fatal(accounts)

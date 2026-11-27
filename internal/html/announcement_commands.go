@@ -24,6 +24,8 @@ import (
 const announcementCommandCollection = "refLedgerAnnouncementCommands"
 
 type announcementCommand struct {
+	Status            string              `bson:"status"`
+	AnnouncementIDs   []string            `bson:"announcementIds"`
 	ID                string              `bson:"_id"`
 	RequestID         string              `bson:"requestId"`
 	Version           int                 `bson:"version"`
@@ -39,6 +41,11 @@ type announcementCommand struct {
 	Username          string              `bson:"username"`
 	After             string              `bson:"after"`
 	Request           announcementRequest `bson:"request"`
+}
+
+type announcementSearchRow struct {
+	Announcement announcement `bson:",inline"`
+	Status       string       `bson:"status"`
 }
 
 type announcementCommandPolicy struct {
@@ -91,7 +98,7 @@ func validateAnnouncementCommand(c announcementCommand, p announcementCommandPol
 		return "expired_or_invalid_lifetime"
 	}
 	switch c.Type {
-	case "list", "history", "accounts", "sessions", "detail", "publish", "edit", "clear", "delete":
+	case "list", "history", "search", "accounts", "sessions", "detail", "publish", "edit", "clear", "bulk-clear", "delete":
 	default:
 		return "invalid_type"
 	}
@@ -99,6 +106,26 @@ func validateAnnouncementCommand(c announcementCommand, p announcementCommandPol
 		id, err := uuid.Parse(c.AnnouncementID)
 		if err != nil || id.String() != c.AnnouncementID {
 			return "invalid_announcement_id"
+		}
+	}
+	if c.Type == "search" {
+		switch c.Status {
+		case "all", "active", "scheduled", "cleared", "expired":
+		default:
+			return "invalid_status"
+		}
+	}
+	if c.Type == "bulk-clear" {
+		if len(c.AnnouncementIDs) == 0 || len(c.AnnouncementIDs) > 100 {
+			return "invalid_announcement_id"
+		}
+		seen := make(map[string]bool, len(c.AnnouncementIDs))
+		for _, id := range c.AnnouncementIDs {
+			parsed, err := uuid.Parse(id)
+			if err != nil || parsed.String() != id || seen[id] {
+				return "invalid_announcement_id"
+			}
+			seen[id] = true
 		}
 	}
 	if c.Type == "sessions" && (c.TenantID == "" || c.UserID == "") {
@@ -137,7 +164,7 @@ func validateAnnouncementCommand(c announcementCommand, p announcementCommandPol
 		return "invalid_request"
 	}
 	if c.After != "" {
-		if c.Type == "list" || c.Type == "history" {
+		if c.Type == "list" || c.Type == "history" || c.Type == "search" {
 			id, err := uuid.Parse(c.After)
 			if err != nil || id.String() != c.After {
 				return "invalid_cursor"
@@ -165,6 +192,10 @@ func validAnnouncementCommandFields(raw bson.Raw, typ string) bool {
 		allowed["tenantId"], allowed["userId"], allowed["after"] = true, true, true
 	case "list", "history":
 		allowed["after"] = true
+	case "search":
+		allowed["after"], allowed["status"] = true, true
+	case "bulk-clear":
+		allowed["announcementIds"] = true
 	case "detail", "clear", "delete":
 		allowed["announcementId"] = true
 	case "publish":
@@ -530,11 +561,13 @@ func executeAnnouncementCommand(ctx context.Context, db *mongo.Database, c annou
 			next = docs[len(docs)-1].ID.Hex()
 		}
 		return bson.M{"sessions": items, "nextCursor": next}, false, nil
-	case "list", "history":
-		now := time.Now().UTC()
+	case "list", "history", "search":
+		now := s.clock()
 		filter := bson.M{"cleared": false, "$or": bson.A{bson.M{"endsAt": bson.M{"$exists": false}}, bson.M{"endsAt": nil}, bson.M{"endsAt": bson.M{"$gt": now}}}}
 		if c.Type == "history" {
 			filter = inactiveAnnouncementFilter(now)
+		} else if c.Type == "search" {
+			filter = announcementSearchFilter(c.Status, now)
 		}
 		if c.After != "" {
 			filter["_id"] = bson.M{"$gt": c.After}
@@ -558,6 +591,13 @@ func executeAnnouncementCommand(ctx context.Context, db *mongo.Database, c annou
 		if truncated {
 			next = items[len(items)-1].ID
 		}
+		if c.Type == "search" {
+			rows := make([]announcementSearchRow, 0, len(items))
+			for _, item := range items {
+				rows = append(rows, announcementSearchRow{Announcement: item, Status: announcementStatus(item, now)})
+			}
+			return bson.M{"announcements": rows, "nextCursor": next}, false, nil
+		}
 		return bson.M{"announcements": items, "nextCursor": next}, false, nil
 	case "detail":
 		a, err := s.store.get(ctx, c.AnnouncementID)
@@ -576,6 +616,28 @@ func executeAnnouncementCommand(ctx context.Context, db *mongo.Database, c annou
 			return nil, false, err
 		}
 		return a, true, nil
+	case "bulk-clear":
+		now := s.clock()
+		results := make([]bson.M, 0, len(c.AnnouncementIDs))
+		changed := false
+		for _, id := range c.AnnouncementIDs {
+			filter := announcementSearchFilter("open", now)
+			filter["_id"] = id
+			result, err := db.Collection("announcements").UpdateOne(ctx, filter, bson.M{
+				"$set": bson.M{"cleared": true, "clearedAt": now, "updatedAt": now},
+				"$inc": bson.M{"version": 1},
+			})
+			if err != nil {
+				return nil, false, err
+			}
+			outcome := "skipped"
+			if result.ModifiedCount == 1 {
+				outcome = "cleared"
+				changed = true
+			}
+			results = append(results, bson.M{"id": id, "outcome": outcome})
+		}
+		return bson.M{"results": results}, changed, nil
 	case "delete":
 		filter := inactiveAnnouncementFilter(s.clock())
 		filter["_id"] = c.AnnouncementID
@@ -626,4 +688,36 @@ func executeAnnouncementCommand(ctx context.Context, db *mongo.Database, c annou
 
 func inactiveAnnouncementFilter(now time.Time) bson.M {
 	return bson.M{"$or": bson.A{bson.M{"cleared": true}, bson.M{"endsAt": bson.M{"$lte": now}}}}
+}
+
+func announcementStatus(a announcement, now time.Time) string {
+	switch {
+	case a.Cleared:
+		return "cleared"
+	case a.EndsAt != nil && !now.Before(*a.EndsAt):
+		return "expired"
+	case now.Before(a.StartsAt):
+		return "scheduled"
+	default:
+		return "active"
+	}
+}
+
+func announcementSearchFilter(status string, now time.Time) bson.M {
+	switch status {
+	case "all":
+		return bson.M{}
+	case "cleared":
+		return bson.M{"cleared": true}
+	case "expired":
+		return bson.M{"cleared": false, "endsAt": bson.M{"$lte": now}}
+	}
+	filter := bson.M{"cleared": false, "$or": bson.A{bson.M{"endsAt": nil}, bson.M{"endsAt": bson.M{"$gt": now}}}}
+	switch status {
+	case "scheduled":
+		filter["startsAt"] = bson.M{"$gt": now}
+	case "active":
+		filter["startsAt"] = bson.M{"$lte": now}
+	}
+	return filter
 }
