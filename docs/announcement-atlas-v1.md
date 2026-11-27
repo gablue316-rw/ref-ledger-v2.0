@@ -104,6 +104,10 @@ metadata on a processing command whose date-valued lease has expired. A
 processing command whose lease expiry is missing or not a BSON date cannot
 safely be determined expired and requires operator investigation; the worker
 does not touch it or let it block the pending batch.
+Non-scalar states matching `pending` are rejected without executing them.
+If such a state also contains `processing`, it is only rejected when a
+date-valued lease is expired; otherwise it is skipped to protect a possible
+active claim and requires investigation if it does not become eligible.
 Each poll gives a command at most three seconds, including the driver's
 transaction retries. Pending expired commands are rejected, not executed.
 Effects and the completed result are committed in one snapshot/majority Mongo

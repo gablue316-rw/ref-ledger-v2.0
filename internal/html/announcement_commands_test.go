@@ -315,6 +315,13 @@ func TestAnnouncementCommandsLive(t *testing.T) {
 			"environment": "batch-test", "actor": "monitor", "state": "pending", "type": "list",
 			"createdAt": now, "expiresAt": now.Add(time.Minute), "attempts": badAttempts})
 	}
+	for i := 0; i < 26; i++ {
+		id := fmt.Sprintf("00000000-0000-4000-8002-%012x", i)
+		batch = append(batch, bson.M{"_id": id, "requestId": id, "version": 1, "workerEnvironment": "batch-test",
+			"environment": "batch-test", "actor": "monitor", "state": bson.A{"pending"}, "type": "publish",
+			"request": bson.M{"message": "must not publish", "audience": "system"}, "createdAt": now,
+			"expiresAt": now.Add(time.Minute), "attempts": "invalid", "leaseId": "malicious", "leaseUntil": now.Add(time.Hour)})
+	}
 	goodID := "ffffffff-ffff-4fff-8fff-ffffffffffff"
 	batch = append(batch, bson.M{"_id": goodID, "requestId": goodID, "version": 1, "workerEnvironment": "batch-test",
 		"environment": "batch-test", "actor": "monitor", "state": "pending", "type": "list",
@@ -333,10 +340,16 @@ func TestAnnouncementCommandsLive(t *testing.T) {
 	unknownLeaseID := "00000000-0000-4000-8001-000000000005"
 	batch = append(batch, bson.M{"_id": unknownLeaseID, "workerEnvironment": "batch-test", "state": "processing",
 		"leaseId": "unknown", "leaseUntil": bson.A{now.Add(-time.Minute)}, "attempts": 1})
+	activeArrayID := "00000000-0000-4000-8001-000000000006"
+	batch = append(batch, bson.M{"_id": activeArrayID, "workerEnvironment": "batch-test", "state": bson.A{"pending", "processing"},
+		"leaseId": "other-worker", "leaseUntil": now.Add(time.Hour), "attempts": 1})
+	expiredArrayID := "00000000-0000-4000-8001-000000000007"
+	batch = append(batch, bson.M{"_id": expiredArrayID, "workerEnvironment": "batch-test", "state": bson.A{"pending", "processing"},
+		"leaseId": "old-worker", "leaseUntil": now.Add(-time.Minute), "attempts": 1})
 	if _, err := commands.InsertMany(ctx, batch); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 3; i++ {
 		if err := processPendingAnnouncementCommands(ctx, batchPolicy); err != nil {
 			t.Fatal(err)
 		}
@@ -347,13 +360,24 @@ func TestAnnouncementCommandsLive(t *testing.T) {
 			t.Fatal(doc)
 		}
 	}
+	for i := 0; i < 26; i++ {
+		id := fmt.Sprintf("00000000-0000-4000-8002-%012x", i)
+		doc := result(id)
+		if doc["state"] != "completed" || doc["outcome"] != "rejected" || doc["reason"] != "malformed" {
+			t.Fatal(doc)
+		}
+		count, err := db.Collection("announcements").CountDocuments(ctx, bson.M{"_id": id})
+		if err != nil || count != 0 {
+			t.Fatalf("malformed state caused publish: count=%d err=%v", count, err)
+		}
+	}
 	if doc := result(goodID); doc["outcome"] != "success" {
 		t.Fatal(doc)
 	}
 	if doc := result(expiredID); doc["outcome"] != "rejected" || doc["reason"] != "malformed" {
 		t.Fatal(doc)
 	}
-	for _, id := range []string{pendingLeaseID, expiredMissingLeaseID} {
+	for _, id := range []string{pendingLeaseID, expiredMissingLeaseID, expiredArrayID} {
 		if doc := result(id); doc["outcome"] != "rejected" || doc["reason"] != "malformed" {
 			t.Fatal(doc)
 		}
@@ -362,6 +386,9 @@ func TestAnnouncementCommandsLive(t *testing.T) {
 		t.Fatal(doc)
 	}
 	if doc := result(unknownLeaseID); doc["state"] != "processing" || doc["leaseId"] != "unknown" {
+		t.Fatal(doc)
+	}
+	if doc := result(activeArrayID); doc["leaseId"] != "other-worker" || len(doc["state"].(bson.A)) != 2 {
 		t.Fatal(doc)
 	}
 }

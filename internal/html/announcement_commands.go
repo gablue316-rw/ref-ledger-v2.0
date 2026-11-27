@@ -236,13 +236,38 @@ func runAnnouncementCommandWorker(ctx context.Context) {
 	}
 }
 
+func announcementScalarState(state string) bson.M {
+	return bson.M{"state": state, "$expr": bson.M{"$eq": bson.A{bson.M{"$type": "$state"}, "string"}}}
+}
+
+func announcementExpiredLease(now time.Time) bson.M {
+	return bson.M{"leaseUntil": bson.M{"$lte": now}, "$expr": bson.M{"$eq": bson.A{bson.M{"$type": "$leaseUntil"}, "date"}}}
+}
+
+func announcementClaimable(now time.Time) bson.M {
+	return bson.M{"$or": bson.A{
+		announcementScalarState("pending"),
+		bson.M{"$and": bson.A{announcementScalarState("processing"), announcementExpiredLease(now)}},
+	}}
+}
+
+// An array containing "processing" might belong to a worker whose state was
+// corrupted externally. Do not disturb it unless its lease is known to expire.
+func announcementMalformedPendingState(now time.Time) bson.M {
+	return bson.M{"$and": bson.A{
+		bson.M{"state": "pending"},
+		bson.M{"$expr": bson.M{"$ne": bson.A{bson.M{"$type": "$state"}, "string"}}},
+		bson.M{"$or": bson.A{bson.M{"state": bson.M{"$nin": bson.A{"processing"}}}, announcementExpiredLease(now)}},
+	}}
+}
+
 func processPendingAnnouncementCommands(parent context.Context, policy announcementCommandPolicy) error {
 	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
 	defer cancel()
 	collection := database.Client.Database(database.GetMongoDbName()).Collection(announcementCommandCollection)
+	now := time.Now().UTC()
 	cur, err := collection.Find(ctx, bson.M{"workerEnvironment": policy.environment, "$or": bson.A{
-		bson.M{"state": "pending"}, bson.M{"state": "processing", "leaseUntil": bson.M{"$lte": time.Now().UTC()},
-			"$expr": bson.M{"$eq": bson.A{bson.M{"$type": "$leaseUntil"}, "date"}}},
+		announcementClaimable(now), announcementMalformedPendingState(now),
 	}},
 		options.Find().SetProjection(bson.M{"_id": 1}).SetSort(bson.D{{Key: "_id", Value: 1}}).SetLimit(25))
 	if err != nil {
@@ -275,10 +300,14 @@ func processAnnouncementCommand(ctx context.Context, id any, policy announcement
 	commands := db.Collection(announcementCommandCollection, options.Collection().SetWriteConcern(writeconcern.Majority()))
 	lease := uuid.NewString()
 	now := time.Now().UTC()
-	eligible := bson.M{"_id": id, "workerEnvironment": policy.environment, "$or": bson.A{
-		bson.M{"state": "pending"}, bson.M{"state": "processing", "leaseUntil": bson.M{"$lte": now},
-			"$expr": bson.M{"$eq": bson.A{bson.M{"$type": "$leaseUntil"}, "date"}}},
-	}}
+	identity := bson.M{"_id": id, "workerEnvironment": policy.environment}
+	badState := bson.M{"$and": bson.A{identity, announcementMalformedPendingState(now)}}
+	if _, err := commands.UpdateOne(ctx, badState, bson.M{"$set": bson.M{
+		"state": "completed", "outcome": "rejected", "reason": "malformed", "result": nil, "completedAt": now,
+	}, "$unset": bson.M{"leaseId": "", "leaseUntil": ""}}); err != nil {
+		return err
+	}
+	eligible := bson.M{"$and": bson.A{identity, announcementClaimable(now)}}
 	// Aggregation $type checks the field itself (query $type also matches array
 	// elements). Only pending or definitively expired leases may be rejected.
 	attemptType := bson.M{"$type": "$attempts"}
@@ -314,7 +343,8 @@ func processAnnouncementCommand(ctx context.Context, id any, policy announcement
 	_, err = session.WithTransaction(ctx, func(sc mongo.SessionContext) (any, error) {
 		// WithTransaction may invoke this callback again after an abort.
 		changed = false
-		filter := bson.M{"_id": id, "workerEnvironment": policy.environment, "state": "processing", "leaseId": lease}
+		filter := bson.M{"_id": id, "workerEnvironment": policy.environment, "state": "processing", "leaseId": lease,
+			"$expr": bson.M{"$eq": bson.A{bson.M{"$type": "$state"}, "string"}}}
 		raw, err := commands.FindOne(sc, filter).Raw()
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, nil
@@ -357,7 +387,8 @@ func processAnnouncementCommand(ctx context.Context, id any, policy announcement
 		// If commit succeeded despite a lost response this predicate cannot match.
 		releaseCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		_, _ = commands.UpdateOne(releaseCtx, bson.M{"_id": id, "state": "processing", "leaseId": lease}, bson.M{"$set": bson.M{"state": "pending"}, "$unset": bson.M{"leaseId": "", "leaseUntil": ""}})
+		_, _ = commands.UpdateOne(releaseCtx, bson.M{"_id": id, "state": "processing", "leaseId": lease,
+			"$expr": bson.M{"$eq": bson.A{bson.M{"$type": "$state"}, "string"}}}, bson.M{"$set": bson.M{"state": "pending"}, "$unset": bson.M{"leaseId": "", "leaseUntil": ""}})
 	}
 	if err == nil && changed {
 		announcements().hub.notify()
