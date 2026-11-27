@@ -53,12 +53,14 @@ are worker-owned; producers must omit them.
 |---|---|---|
 | `list` | optional `after` | `announcements`, `nextCursor`; pending and active, not cleared or expired |
 | `history` | optional `after` | `announcements`, `nextCursor`; cleared and expired only |
+| `search` | `status` (all, active, scheduled, cleared, expired), optional `after` | Paginated `announcements` with server-evaluated status and `nextCursor` |
 | `detail` | `announcementId` UUID | announcement, including cleared/expired |
 | `accounts` | optional exact `username`, optional `after` | `accounts` of `{tenantId,userId,username}`, `nextCursor` |
 | `sessions` | `tenantId`, `userId`, optional `after` | `sessions`, `nextCursor` |
 | `publish` | `request` | created announcement |
 | `edit` | `announcementId`, `request` | updated announcement |
 | `clear` | `announcementId` | cleared announcement (already cleared is a no-op) |
+| `bulk-clear` | `announcementIds` (1–100 distinct canonical UUIDs) | Clears selected active or scheduled announcements in one command. Returns `results` with each `id` and its `outcome` (cleared or skipped). |
 | `delete` | `announcementId` | Permanently deletes a cleared or expired record from `announcements`; returns its ID. Clear an active or scheduled record first. |
 
 `nextCursor` is empty at the end; otherwise issue a **new command with a new
