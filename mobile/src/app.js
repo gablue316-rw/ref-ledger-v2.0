@@ -78,7 +78,11 @@ function updateControls() {
  for(const catalog of Object.values(catalogs))catalog.setCanWrite(canWrite);
 }
 
-const announcements=createAnnouncementBanner({banner:$('announcement-banner'),text:$('announcement-text'),more:$('announcement-more'),dialog:$('announcement-dialog'),body:$('announcement-body'),close:$('announcement-close'),
+const announcements=createAnnouncementBanner({banner:$('announcement-banner'),text:$('announcement-text'),more:$('announcement-more'),dialog:$('announcement-dialog'),body:$('announcement-body'),close:$('announcement-close'),clear:$('announcement-clear'),status:$('announcement-status'),
+ dismiss:async id=>{
+  const response=await apiRequest(new URL('/api/mobile/announcements/dismiss',config.apiBase).toString(),'POST',{id});
+  if(response.status!==204)throw new Error('Dismissal failed');
+ },
  watch:apply=>startAnnouncementLoop({apply,request:known=>apiRequest(announcementURL(config.apiBase,known),'GET',undefined,{},35000)})});
 
 function clearDashboard() {

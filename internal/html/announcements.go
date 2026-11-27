@@ -53,6 +53,7 @@ type announcement struct {
 	SessionTargetID string     `bson:"sessionTargetId,omitempty" json:"sessionTargetId,omitempty"`
 	StartsAt        time.Time  `bson:"startsAt" json:"startsAt"`
 	EndsAt          *time.Time `bson:"endsAt,omitempty" json:"endsAt,omitempty"`
+	Scheduled       *bool      `bson:"scheduled,omitempty" json:"scheduled,omitempty"`
 	Timezone        string     `bson:"timezone,omitempty" json:"timezone,omitempty"`
 	Cleared         bool       `bson:"cleared" json:"cleared"`
 	ClearedAt       *time.Time `bson:"clearedAt,omitempty" json:"clearedAt,omitempty"`
@@ -72,10 +73,11 @@ type announcementView struct {
 }
 
 type announcementRecipient struct {
-	TenantID string
-	UserID   string
-	Username string
-	TargetID string // session targeting ID; empty when the client has no managed session
+	TenantID   string
+	UserID     string
+	Username   string
+	SignedInAt time.Time
+	TargetID   string // session targeting ID; empty when the client has no managed session
 }
 
 type announcementUser struct{ TenantID, UserID, Username string }
@@ -132,10 +134,11 @@ func (h *announcementHub) notify() {
 }
 
 type announcementService struct {
-	store announcementStore
-	dir   announcementDirectory
-	hub   announcementHub
-	now   func() time.Time
+	store      announcementStore
+	dir        announcementDirectory
+	hub        announcementHub
+	now        func() time.Time
+	dismissals announcementDismissalStore
 }
 
 func (s *announcementService) clock() time.Time {
@@ -155,6 +158,9 @@ func announcementActive(a announcement, now time.Time) bool {
 // announcementEligible enforces the audience on the server for reads and live delivery.
 func announcementEligible(a announcement, r announcementRecipient, now time.Time) bool {
 	if !announcementActive(a, now) {
+		return false
+	}
+	if !a.timed() && r.SignedInAt.After(a.CreatedAt) {
 		return false
 	}
 	switch a.Audience {
@@ -185,10 +191,23 @@ func (s *announcementService) current(ctx context.Context, r announcementRecipie
 		return nil, err
 	}
 	now := s.clock()
+	var dismissed map[string]bool
+	if s.dismissals != nil {
+		keys := make([]string, 0, len(all))
+		for _, a := range all {
+			if announcementEligible(a, r, now) {
+				keys = append(keys, dismissalKey(a, r))
+			}
+		}
+		dismissed, err = s.dismissals.dismissed(ctx, r, keys)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var best *announcement
 	for i := range all {
 		a := all[i]
-		if !announcementEligible(a, r, now) {
+		if dismissed[dismissalKey(a, r)] || !announcementEligible(a, r, now) {
 			continue
 		}
 		if best == nil || announcementRank(a) > announcementRank(*best) ||
@@ -285,6 +304,8 @@ func (s *announcementService) build(ctx context.Context, req announcementRequest
 			return a, badAnnouncement("unknown timezone %q", tz)
 		}
 	}
+	scheduled := strings.TrimSpace(req.StartsAt) != "" || strings.TrimSpace(req.EndsAt) != ""
+	a.Scheduled = &scheduled
 	a.Timezone = tz
 	a.StartsAt = now
 	if strings.TrimSpace(req.StartsAt) != "" {

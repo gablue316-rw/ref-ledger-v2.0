@@ -231,7 +231,7 @@ var (
 
 func announcements() *announcementService {
 	announcementsOnce.Do(func() {
-		announcementsSvc = &announcementService{store: mongoAnnouncementStore{}, dir: mongoAnnouncementDirectory{}}
+		announcementsSvc = &announcementService{store: mongoAnnouncementStore{}, dir: mongoAnnouncementDirectory{}, dismissals: mongoAnnouncementDismissals{}}
 	})
 	return announcementsSvc
 }
@@ -348,7 +348,7 @@ func webAnnouncementRecipient(r *http.Request) resolveRecipient {
 		if err != nil {
 			return announcementRecipient{}, errAnnouncementSessionEnd
 		}
-		return announcementRecipient{TenantID: session.TenantID, UserID: userID, Username: session.Username, TargetID: target}, nil
+		return announcementRecipient{TenantID: session.TenantID, UserID: userID, Username: session.Username, TargetID: target, SignedInAt: session.ExpiresAt.Add(-sessionDuration)}, nil
 	}
 }
 
@@ -387,10 +387,16 @@ func mobileAnnouncementRecipient(r *http.Request) resolveRecipient {
 		}
 		rec := announcementRecipient{TenantID: user.TenantID, UserID: userID, Username: user.Username}
 		if token := strings.TrimSpace(r.Header.Get(mobileSessionHeader)); token != "" {
-			rec.TargetID, err = ensureSessionTargetID(ctx, bson.M{
+			filter := bson.M{
 				"type": mobileSessionType, "mobileTokenHash": hashMobileSessionToken(token),
 				"issuer": identity.Issuer, "subject": identity.Subject, "tenantId": user.TenantID,
-			})
+			}
+			var session announcementSessionDoc
+			if err := mobileSessions().FindOne(ctx, filter).Decode(&session); err != nil {
+				return announcementRecipient{}, err
+			}
+			rec.SignedInAt = session.CreatedAt
+			rec.TargetID, err = ensureSessionTargetID(ctx, filter)
 			if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 				return announcementRecipient{}, err
 			}
