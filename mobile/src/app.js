@@ -7,7 +7,8 @@ import {createGameActions} from './game-actions.js';
 import {bulkGames} from './game-bulk.js';
 import {editGame} from './game-editor.js';
 import { Browser } from '@capacitor/browser';
-import {login, logout, apiGet, registerAccount, sessionEndedEvent} from './auth.js';
+import {login, logout, apiGet, apiRequest, registerAccount, sessionEndedEvent} from './auth.js';
+import {createAnnouncementBanner,startAnnouncementLoop,announcementURL} from './announcements.js';
 import {config} from './config.js';
 import {summarize,dashboardURL,assignmentEarnings} from './data.js';
 import {createReports} from './reports.js';
@@ -77,7 +78,11 @@ function updateControls() {
  for(const catalog of Object.values(catalogs))catalog.setCanWrite(canWrite);
 }
 
+const announcements=createAnnouncementBanner({banner:$('announcement-banner'),text:$('announcement-text'),more:$('announcement-more'),dialog:$('announcement-dialog'),body:$('announcement-body'),close:$('announcement-close'),
+ watch:apply=>startAnnouncementLoop({apply,request:known=>apiRequest(announcementURL(config.apiBase,known),'GET',undefined,{},35000)})});
+
 function clearDashboard() {
+ announcements.stop();
  ++generation;
  $('filters').reset();gameFilters.clearAll();gameFilters.setValues('status',['Pending']);
  expenses.clear();reports.clear();payments.clear();settings.clear();canWrite=false;activePage='games';$('page-title').textContent='Games';$('navigation').hidden=true;$('expenses-page').hidden=true;closeMenu();
@@ -135,6 +140,7 @@ function render(games){
  $('dashboard').hidden=activePage!=='games';
  $('navigation').hidden=false;
  $('logout').hidden=false;
+ announcements.start();
  message(games.length?'':'No games match these filters.');
 }
 

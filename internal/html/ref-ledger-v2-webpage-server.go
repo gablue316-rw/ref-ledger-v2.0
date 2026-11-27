@@ -5959,6 +5959,7 @@ func createWebSession(w http.ResponseWriter, r *http.Request, user model.User, s
 	session := model.Session{
 		Client:    "web",
 		SessionID: sessionID,
+		TargetID:  uuid.New().String(),
 		Username:  user.Username,
 		TenantID:  user.TenantID,
 		ExpiresAt: time.Now().Add(sessionDuration),
@@ -8444,6 +8445,11 @@ func main() {
 	mux.HandleFunc("/api/dashboard", GetGames)
 	mux.HandleFunc("/api/mobile/dashboard", MobileDashboard)
 	mux.HandleFunc("/api/mobile/session", MobileSession)
+	mux.HandleFunc("/api/announcements/current", webAnnouncementCurrent)
+	mux.HandleFunc("/api/announcements/events", webAnnouncementEvents)
+	mux.HandleFunc("/api/mobile/announcements/current", mobileAnnouncementCurrent)
+	mux.HandleFunc(announcementAdminPrefix, announcementAdminHandler)
+	mux.HandleFunc(announcementAdminPrefix+"/", announcementAdminHandler)
 	mux.HandleFunc("/api/mobile/game", mobileAccountHandler(MobileGame))
 	mux.HandleFunc("/api/mobile/catalog", mobileAccountHandler(mobileReadOnly(MobileCatalog)))
 	mux.HandleFunc("/api/mobile/catalog/create/{type}", mobileAccountHandler(MobileCatalogCreate))

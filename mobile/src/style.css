@@ -17,3 +17,10 @@ header{gap:12px;flex-wrap:wrap}.account-actions{display:flex;gap:8px;flex-wrap:w
 header .app-version{display:block;font-size:.8rem;letter-spacing:normal;color:#a9d9df;margin:5px 0}
 
 .catalog-action{display:block;width:100%;margin:0;padding:7px 10px;min-height:38px;font-size:.88rem}.catalog-editor{width:min(94vw,480px);max-height:88dvh;border:0;border-radius:16px;padding:20px;color:#172d3e;background:#f3f6f8;overflow:auto}.catalog-editor::backdrop{background:#102b40b3}.catalog-editor form{display:grid;grid-template-columns:1fr;gap:12px;margin:0;padding:0}.catalog-editor h2{margin:0}.catalog-editor label{display:grid;gap:6px}.catalog-editor .catalog-help{margin:0;color:#526777}.catalog-editor .catalog-error{min-height:1.4em;margin:0;color:#ac3030}.catalog-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.catalog-actions button{flex:1}
+
+#announcement-banner{display:flex;align-items:center;gap:10px;padding:8px 14px;background:#ffd23f;color:#1a1200;font-weight:600;border-bottom:2px solid #b38600}
+#announcement-banner[hidden]{display:none}
+#announcement-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#announcement-banner button{flex:none;margin:0;padding:4px 10px;font-size:.85rem}
+#announcement-dialog{max-width:92vw;border:2px solid #b38600;border-radius:8px;color:#1a1200}
+#announcement-body{max-height:60vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}

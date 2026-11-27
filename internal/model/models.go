@@ -17,8 +17,10 @@ type User struct {
 }
 
 type Session struct {
-	Client    string    `bson:"client,omitempty" json:"-"`
-	SessionID string    `bson:"sessionId" json:"sessionId"`
+	Client    string `bson:"client,omitempty" json:"-"`
+	SessionID string `bson:"sessionId" json:"sessionId"`
+	// TargetID is a random, non-secret ID used only to target announcements.
+	TargetID  string    `bson:"targetId,omitempty" json:"-"`
 	Username  string    `bson:"username" json:"username"`
 	TenantID  string    `bson:"tenantId" json:"tenantId"`
 	Role      string    `bson:"role" json:"role"`
