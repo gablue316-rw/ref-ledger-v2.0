@@ -99,6 +99,7 @@ type announcementStore interface {
 
 type announcementDirectory interface {
 	resolveUser(ctx context.Context, username string) (announcementUser, error)
+	userByID(ctx context.Context, tenantID, userID string) (announcementUser, error)
 	sessionByTarget(ctx context.Context, targetID string) (announcementSession, error)
 	sessionsForUser(ctx context.Context, tenantID, username string) ([]announcementSession, error)
 }
@@ -311,12 +312,16 @@ func (s *announcementService) build(ctx context.Context, req announcementRequest
 	switch a.Audience {
 	case announcementAudienceSystem:
 	case announcementAudienceUser:
-		if strings.TrimSpace(req.Username) == "" {
-			return a, badAnnouncement("username is required for the user audience")
+		tenantID, userID := strings.TrimSpace(req.TenantID), strings.TrimSpace(req.UserID)
+		if tenantID == "" || userID == "" {
+			return a, badAnnouncement("tenantId and userId are required for the user audience")
 		}
-		u, err := s.dir.resolveUser(ctx, req.Username)
+		u, err := s.dir.userByID(ctx, tenantID, userID)
 		if err != nil {
 			return a, err
+		}
+		if strings.TrimSpace(req.Username) != "" && !strings.EqualFold(strings.TrimSpace(req.Username), u.Username) {
+			return a, errAnnouncementUserUnknown
 		}
 		a.TenantID, a.UserID, a.Username = u.TenantID, u.UserID, u.Username
 	case announcementAudienceSession:

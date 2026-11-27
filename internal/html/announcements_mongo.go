@@ -74,6 +74,26 @@ func (mongoAnnouncementDirectory) userID(ctx context.Context, tenantID, username
 	return doc.ID.Hex(), err
 }
 
+func (mongoAnnouncementDirectory) userByID(ctx context.Context, tenantID, userID string) (announcementUser, error) {
+	id, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return announcementUser{}, errAnnouncementUserUnknown
+	}
+	var doc struct {
+		ID       primitive.ObjectID `bson:"_id"`
+		TenantID string             `bson:"tenantId"`
+		Username string             `bson:"username"`
+	}
+	err = auth0Users().FindOne(ctx, bson.M{"_id": id, "tenantId": tenantID}).Decode(&doc)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return announcementUser{}, errAnnouncementUserUnknown
+	}
+	if err != nil {
+		return announcementUser{}, err
+	}
+	return announcementUser{TenantID: doc.TenantID, UserID: doc.ID.Hex(), Username: doc.Username}, nil
+}
+
 func (d mongoAnnouncementDirectory) resolveUser(ctx context.Context, username string) (announcementUser, error) {
 	username = strings.TrimSpace(username)
 	for _, candidate := range []string{username, strings.ToLower(username)} {

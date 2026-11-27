@@ -52,7 +52,15 @@ func (m *memAnnouncementStore) save(_ context.Context, a announcement) error {
 
 type memDirectory struct {
 	users    map[string]announcementUser
+	userIDs  map[string]announcementUser
 	sessions map[string]announcementSession
+}
+
+func (d *memDirectory) userByID(_ context.Context, tenantID, userID string) (announcementUser, error) {
+	if u, ok := d.userIDs[tenantID+"\x00"+userID]; ok {
+		return u, nil
+	}
+	return announcementUser{}, errAnnouncementUserUnknown
 }
 
 func (d *memDirectory) resolveUser(_ context.Context, username string) (announcementUser, error) {
@@ -98,6 +106,11 @@ func newAnnouncementTestService() (*announcementService, *time.Time) {
 		store: &memAnnouncementStore{docs: map[string]announcement{}},
 		dir: &memDirectory{
 			users: map[string]announcementUser{annAlice.Username: annAlice, annBob.Username: annBob, annCarol.Username: annCarol},
+			userIDs: map[string]announcementUser{
+				"t1\x00u-alice": annAlice,
+				"t1\x00u-bob":   annBob,
+				"t2\x00u-carol": annCarol,
+			},
 			sessions: map[string]announcementSession{
 				"target-laptop": {TargetID: "target-laptop", TenantID: "t1", UserID: "u-alice", Username: annAlice.Username, Platform: "web", ExpiresAt: annNow.Add(time.Hour)},
 				"target-phone":  {TargetID: "target-phone", TenantID: "t1", UserID: "u-alice", Username: annAlice.Username, Platform: "android", ExpiresAt: annNow.Add(time.Hour)},
@@ -190,7 +203,7 @@ func TestAnnouncementValidation(t *testing.T) {
 			t.Errorf("%s: status = %d", name, code)
 		}
 	}
-	if code, _ := monitorCall(t, svc, "POST", "", map[string]any{"message": "x", "audience": "user", "username": "nobody@example.test"}); code != http.StatusNotFound {
+	if code, _ := monitorCall(t, svc, "POST", "", map[string]any{"message": "x", "audience": "user", "tenantId": "t1", "userId": "unknown", "username": "nobody@example.test"}); code != http.StatusNotFound {
 		t.Errorf("unknown user status = %d", code)
 	}
 }
@@ -236,7 +249,7 @@ func TestSessionPublishRejectsInvalidTargets(t *testing.T) {
 
 func TestUserAudienceReachesEverySessionIncludingNewSignIns(t *testing.T) {
 	svc, _ := newAnnouncementTestService()
-	if code, out := monitorCall(t, svc, "POST", "", map[string]any{"message": "for alice", "audience": "user", "username": "ALICE@example.test"}); code != http.StatusCreated {
+	if code, out := monitorCall(t, svc, "POST", "", map[string]any{"message": "for alice", "audience": "user", "tenantId": "t1", "userId": "u-alice", "username": "ALICE@example.test"}); code != http.StatusCreated {
 		t.Fatalf("publish = %d %v", code, out)
 	}
 	newSignIn := announcementRecipient{TenantID: "t1", UserID: "u-alice", TargetID: "brand-new"}
@@ -256,6 +269,59 @@ func TestUserAudienceReachesEverySessionIncludingNewSignIns(t *testing.T) {
 	}
 }
 
+func TestUserAudienceIsScopedByTenantAndStableUserID(t *testing.T) {
+	svc, _ := newAnnouncementTestService()
+	otherAccountUser := announcementUser{TenantID: "t2", UserID: "u-alice-t2", Username: annAlice.Username}
+	dir := svc.dir.(*memDirectory)
+	dir.userIDs["t2\x00u-alice-t2"] = otherAccountUser
+	dir.sessions["target-other-tenant"] = announcementSession{
+		TargetID: "target-other-tenant", TenantID: "t2", UserID: otherAccountUser.UserID,
+		Username: otherAccountUser.Username, ExpiresAt: annNow.Add(time.Hour),
+	}
+
+	selected := map[string]any{
+		"message": "selected account only", "audience": "user", "tenantId": "t1",
+		"userId": "u-alice", "username": annAlice.Username,
+	}
+	code, out := monitorCall(t, svc, http.MethodPost, "", selected)
+	if code != http.StatusCreated {
+		t.Fatalf("publish = %d: %v", code, out)
+	}
+	for _, recipient := range []announcementRecipient{annLaptop, annPhone} {
+		if got := visible(t, svc, recipient); got != "selected account only" {
+			t.Errorf("selected account session got %q", got)
+		}
+	}
+	if got := visible(t, svc, announcementRecipient{TenantID: "t2", UserID: otherAccountUser.UserID, Username: otherAccountUser.Username, TargetID: "target-other-tenant"}); got != "" {
+		t.Errorf("same username in another account received %q", got)
+	}
+
+	for name, body := range map[string]map[string]any{
+		"tenant mismatch": {"message": "bad", "audience": "user", "tenantId": "t2", "userId": "u-alice"},
+		"user mismatch":   {"message": "bad", "audience": "user", "tenantId": "t1", "userId": "u-alice-t2"},
+		"name mismatch":   {"message": "bad", "audience": "user", "tenantId": "t1", "userId": "u-alice", "username": annBob.Username},
+		"missing IDs":     {"message": "bad", "audience": "user", "username": annAlice.Username},
+	} {
+		if status, _ := monitorCall(t, svc, http.MethodPost, "", body); status == http.StatusCreated {
+			t.Errorf("%s publish must be rejected", name)
+		}
+	}
+
+	updateTarget := map[string]any{"message": "system baseline", "audience": "system"}
+	_, out = monitorCall(t, svc, http.MethodPost, "", updateTarget)
+	id := out["id"].(string)
+	for name, body := range map[string]map[string]any{
+		"tenant mismatch": {"message": "bad update", "audience": "user", "tenantId": "t2", "userId": "u-alice"},
+		"user mismatch":   {"message": "bad update", "audience": "user", "tenantId": "t1", "userId": "u-alice-t2"},
+		"name mismatch":   {"message": "bad update", "audience": "user", "tenantId": "t1", "userId": "u-alice", "username": annBob.Username},
+		"missing IDs":     {"message": "bad update", "audience": "user", "username": annAlice.Username},
+	} {
+		if status, _ := monitorCall(t, svc, http.MethodPut, "/"+id, body); status == http.StatusOK {
+			t.Errorf("%s update must be rejected", name)
+		}
+	}
+}
+
 func TestSystemAudienceUpdateRetargetAndClear(t *testing.T) {
 	svc, _ := newAnnouncementTestService()
 	_, out := monitorCall(t, svc, "POST", "", map[string]any{"message": "hello", "audience": "system"})
@@ -266,7 +332,7 @@ func TestSystemAudienceUpdateRetargetAndClear(t *testing.T) {
 	if code, _ := monitorCall(t, svc, "PUT", "/"+id, map[string]any{"message": "hello", "audience": "system", "version": 99}); code != http.StatusConflict {
 		t.Fatalf("stale version = %d", code)
 	}
-	code, out := monitorCall(t, svc, "PUT", "/"+id, map[string]any{"message": "updated", "audience": "user", "username": annBob.Username})
+	code, out := monitorCall(t, svc, "PUT", "/"+id, map[string]any{"message": "updated", "audience": "user", "tenantId": "t1", "userId": "u-bob", "username": annBob.Username})
 	if code != http.StatusOK || out["version"].(float64) != 2 {
 		t.Fatalf("update = %d %v", code, out)
 	}
@@ -346,7 +412,7 @@ func TestLongPollReturnsOnPublishAndClear(t *testing.T) {
 	done := make(chan announcementPayload, 1)
 	go func() { done <- get("?known=") }()
 	time.Sleep(50 * time.Millisecond)
-	_, out := monitorCall(t, svc, "POST", "", map[string]any{"message": "live", "audience": "user", "username": annAlice.Username})
+	_, out := monitorCall(t, svc, "POST", "", map[string]any{"message": "live", "audience": "user", "tenantId": "t1", "userId": "u-alice", "username": annAlice.Username})
 	var p announcementPayload
 	select {
 	case p = <-done:
