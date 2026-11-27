@@ -15,6 +15,16 @@ Requests with a short or missing configured token are rejected.
 Content-Type: application/json
 ```
 
+Responses include a server-generated `X-Request-ID` for correlating a request
+with Ref Ledger diagnostics. Authentication failures log the correlation ID,
+bearer and transport classifications, and direct-TLS status. When an
+authenticated request is rejected for transport, diagnostics describe the
+number and safe values of `X-Forwarded-Proto` headers; unrecognized values
+are redacted. A
+missing database client returns `503` after authentication, and database
+operation failures are logged separately. Never include bearer tokens, cookies,
+session credentials, or request bodies when sharing diagnostic information.
+
 `REF_LEDGER_LOG_API_TOKEN` must be configured on Ref Ledger and contain at
 least 32 characters. Requests are accepted over HTTPS or loopback transport.
 The announcement API does not require the logs API version header. An optional
@@ -164,8 +174,8 @@ Audience-specific fields are also present when applicable: `tenantId`,
 
 ## Errors
 
-Errors are JSON objects of the form `{"error":"..."}` (authentication and
-unknown-route responses may be plain HTTP error text).
+Errors are JSON objects of the form `{"error":"..."}` (authentication,
+database-readiness, and unknown-route responses may be plain HTTP error text).
 
 | Status | Meaning |
 | --- | --- |
@@ -175,6 +185,7 @@ unknown-route responses may be plain HTTP error text).
 | `409 Conflict` | The supplied update `version` is stale, or concurrent modification prevented saving. Reload before retrying. |
 | `422 Unprocessable Entity` | Session target is invalid, expired, revoked, or its tenant/user/username does not match. |
 | `500 Internal Server Error` | Unexpected server-side failure. |
+| `503 Service Unavailable` | The database client is not initialized. |
 
 ## Customer delivery contract
 
