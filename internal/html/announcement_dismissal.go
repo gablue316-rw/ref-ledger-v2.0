@@ -21,10 +21,7 @@ func (a announcement) timed() bool {
 }
 
 func dismissalKey(a announcement, recipient announcementRecipient) string {
-	if a.timed() {
-		return a.ID + ":" + recipient.TargetID
-	}
-	return a.ID
+	return a.ID + ":" + recipient.TargetID
 }
 
 type announcementDismissalStore interface {
@@ -112,7 +109,7 @@ func (s *announcementService) dismissHandler(resolve resolveRecipient) http.Hand
 			writeAnnouncementResult(w, 0, nil, errAnnouncementNotFound)
 			return
 		}
-		if a.timed() && recipient.TargetID == "" {
+		if recipient.TargetID == "" {
 			http.Error(w, "A managed sign-in session is required", http.StatusConflict)
 			return
 		}
