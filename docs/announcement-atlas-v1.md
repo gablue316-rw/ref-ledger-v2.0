@@ -22,6 +22,12 @@ collections plus find/update on commands. Restrict command read access because
 results contain account identifiers and announcement messages. Do not expose
 the command collection to customer clients.
 
+The Helm deployment passes both worker variables from the `env` values in
+the repository's `values.yaml`; they default to `"false"` and `""`.
+For an approved rollout, set `env.REF_LEDGER_ANNOUNCEMENT_COMMANDS_ENABLED`
+to `"true"` and `env.REF_LEDGER_ANNOUNCEMENT_COMMAND_ACTORS` to the authorized
+comma-separated actor IDs, with `env.APP_ENV` set to the intended environment.
+
 Monitor must authenticate and authorize its operators, protect credentials,
 restrict message content, and never put passwords, tokens, cookies, session
 secrets or unrelated fields in commands. Unknown fields are rejected, but
@@ -93,6 +99,11 @@ means now; omitted end means no scheduled expiration.
 The worker polls every five seconds, up to 25 commands per batch. A claim
 increments `attempts` and uses a 30-second lease. On crash an expired lease
 can be reclaimed; three failed claims terminate as `failed/retry_exhausted`.
+Malformed pending worker metadata is rejected as `malformed`, as is malformed
+metadata on a processing command whose date-valued lease has expired. A
+processing command whose lease expiry is missing or not a BSON date cannot
+safely be determined expired and requires operator investigation; the worker
+does not touch it or let it block the pending batch.
 Each poll gives a command at most three seconds, including the driver's
 transaction retries. Pending expired commands are rejected, not executed.
 Effects and the completed result are committed in one snapshot/majority Mongo

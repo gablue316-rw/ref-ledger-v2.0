@@ -127,10 +127,13 @@ func (d mongoAnnouncementDirectory) resolveUser(ctx context.Context, username st
 // Web sessions have no "type"; Android sessions are "mobile". The targeting ID is
 // random and separate from the web cookie value and mobile session secret.
 func announcementSessionFilter() bson.M {
-	return bson.M{"$or": bson.A{
-		bson.M{"type": bson.M{"$exists": false}},
-		bson.M{"type": mobileSessionType, "createdAt": bson.M{"$gt": time.Now().Add(-sessionDuration)}},
-	}}
+	return bson.M{
+		"_id.type": bson.M{"$ne": "mobileActivity"},
+		"$or": bson.A{
+			bson.M{"type": bson.M{"$exists": false}},
+			bson.M{"type": mobileSessionType, "createdAt": bson.M{"$gt": time.Now().Add(-sessionDuration)}},
+		},
+	}
 }
 
 func ensureSessionTargetID(ctx context.Context, filter bson.M) (string, error) {

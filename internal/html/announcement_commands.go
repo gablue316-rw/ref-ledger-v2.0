@@ -241,7 +241,8 @@ func processPendingAnnouncementCommands(parent context.Context, policy announcem
 	defer cancel()
 	collection := database.Client.Database(database.GetMongoDbName()).Collection(announcementCommandCollection)
 	cur, err := collection.Find(ctx, bson.M{"workerEnvironment": policy.environment, "$or": bson.A{
-		bson.M{"state": "pending"}, bson.M{"state": "processing", "leaseUntil": bson.M{"$lte": time.Now().UTC()}},
+		bson.M{"state": "pending"}, bson.M{"state": "processing", "leaseUntil": bson.M{"$lte": time.Now().UTC()},
+			"$expr": bson.M{"$eq": bson.A{bson.M{"$type": "$leaseUntil"}, "date"}}},
 	}},
 		options.Find().SetProjection(bson.M{"_id": 1}).SetSort(bson.D{{Key: "_id", Value: 1}}).SetLimit(25))
 	if err != nil {
@@ -275,8 +276,30 @@ func processAnnouncementCommand(ctx context.Context, id any, policy announcement
 	lease := uuid.NewString()
 	now := time.Now().UTC()
 	eligible := bson.M{"_id": id, "workerEnvironment": policy.environment, "$or": bson.A{
-		bson.M{"state": "pending"}, bson.M{"state": "processing", "leaseUntil": bson.M{"$lte": now}},
+		bson.M{"state": "pending"}, bson.M{"state": "processing", "leaseUntil": bson.M{"$lte": now},
+			"$expr": bson.M{"$eq": bson.A{bson.M{"$type": "$leaseUntil"}, "date"}}},
 	}}
+	// Aggregation $type checks the field itself (query $type also matches array
+	// elements). Only pending or definitively expired leases may be rejected.
+	attemptType := bson.M{"$type": "$attempts"}
+	malformed := bson.M{"$and": bson.A{eligible, bson.M{"$expr": bson.M{"$or": bson.A{
+		bson.M{"$not": bson.A{bson.M{"$in": bson.A{attemptType, bson.A{"missing", "int", "long"}}}}},
+		bson.M{"$cond": bson.A{bson.M{"$in": bson.A{attemptType, bson.A{"int", "long"}}}, bson.M{"$lt": bson.A{"$attempts", 0}}, false}},
+		bson.M{"$and": bson.A{bson.M{"$eq": bson.A{"$state", "pending"}}, bson.M{"$or": bson.A{
+			bson.M{"$ne": bson.A{bson.M{"$type": "$leaseId"}, "missing"}},
+			bson.M{"$ne": bson.A{bson.M{"$type": "$leaseUntil"}, "missing"}},
+		}}}},
+		bson.M{"$and": bson.A{bson.M{"$eq": bson.A{"$state", "processing"}}, bson.M{"$or": bson.A{
+			bson.M{"$ne": bson.A{bson.M{"$type": "$leaseId"}, "string"}},
+			bson.M{"$eq": bson.A{"$leaseId", ""}},
+			bson.M{"$eq": bson.A{attemptType, "missing"}},
+		}}}},
+	}}}}}
+	if _, err := commands.UpdateOne(ctx, malformed, bson.M{"$set": bson.M{
+		"state": "completed", "outcome": "rejected", "reason": "malformed", "result": nil, "completedAt": now,
+	}, "$unset": bson.M{"leaseId": "", "leaseUntil": ""}}); err != nil {
+		return err
+	}
 	// Exhausted leases are terminal even when the previous worker died.
 	exhausted := bson.M{"$and": bson.A{eligible, bson.M{"attempts": bson.M{"$gte": 3}}}}
 	if _, err := commands.UpdateOne(ctx, exhausted, bson.M{"$set": bson.M{"state": "completed", "outcome": "failed", "reason": "retry_exhausted", "completedAt": now}, "$unset": bson.M{"leaseId": "", "leaseUntil": ""}}); err != nil {

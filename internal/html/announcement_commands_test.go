@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -106,9 +107,11 @@ func TestAnnouncementCommandsLive(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	web, mobile, old, revoked := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	web, mobile, old, revoked, marker := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
 	_, err = db.Collection("sessions").InsertMany(ctx, []any{
 		bson.M{"tenantId": "b", "username": "same", "targetId": web, "expiresAt": now.Add(time.Hour), "sessionId": "web-secret"},
+		bson.M{"tenantId": "b", "username": "same", "expiresAt": now.Add(time.Hour), "sessionId": "legacy-web-secret"},
+		bson.M{"_id": bson.D{{Key: "type", Value: "mobileActivity"}, {Key: "tenantId", Value: "b"}, {Key: "username", Value: "same"}}, "tenantId": "b", "username": "same", "targetId": marker, "expiresAt": now.Add(time.Hour)},
 		bson.M{"tenantId": "b", "username": "same", "type": "mobile", "targetId": mobile, "createdAt": now, "expiresAt": now.Add(time.Hour), "mobileTokenHash": "mobile-secret"},
 		bson.M{"tenantId": "b", "username": "same", "type": "mobile", "targetId": old, "createdAt": now.Add(-time.Hour), "expiresAt": now.Add(time.Hour)},
 		bson.M{"tenantId": "b", "username": "same", "targetId": revoked, "expiresAt": now.Add(time.Hour)},
@@ -152,16 +155,20 @@ func TestAnnouncementCommandsLive(t *testing.T) {
 		t.Fatal(accounts)
 	}
 	sessions := run(insert("sessions", bson.M{"tenantId": "b", "userId": uidB.Hex()}))
-	if sessions["outcome"] != "success" || len(sessions["result"].(bson.M)["sessions"].(bson.A)) != 2 {
+	if sessions["outcome"] != "success" || len(sessions["result"].(bson.M)["sessions"].(bson.A)) != 3 {
 		t.Fatal(sessions)
 	}
+	directorySessions, err := (mongoAnnouncementDirectory{}).sessionsForUser(ctx, "b", "same")
+	if err != nil || len(directorySessions) != 3 {
+		t.Fatalf("legacy session discovery: %v %v", directorySessions, err)
+	}
 	encoded, _ := bson.MarshalExtJSON(sessions["result"], false, false)
-	for _, secret := range []string{"web-secret", "mobile-secret", "user-secret"} {
+	for _, secret := range []string{"web-secret", "legacy-web-secret", "mobile-secret", "user-secret"} {
 		if containsBytes(encoded, secret) {
 			t.Fatalf("result leaked secret")
 		}
 	}
-	for _, target := range []string{old, revoked, uuid.NewString()} {
+	for _, target := range []string{old, revoked, marker, uuid.NewString()} {
 		doc := run(insert("publish", bson.M{"request": bson.M{"message": "hello", "audience": "session", "tenantId": "b", "userId": uidB.Hex(), "sessionTargetId": target}}))
 		if doc["reason"] != "invalid_session" {
 			t.Fatal(doc)
@@ -297,6 +304,65 @@ func TestAnnouncementCommandsLive(t *testing.T) {
 	second := run(insert("accounts", bson.M{"username": "page", "after": cursor}))["result"].(bson.M)
 	if len(first["accounts"].(bson.A)) != 100 || len(second["accounts"].(bson.A)) != 5 || second["nextCursor"] != "" {
 		t.Fatalf("pagination failed: %v %v", first, second)
+	}
+	// Malformed worker metadata must not pin the first 25 queue entries.
+	batchPolicy := announcementCommandPolicy{environment: "batch-test", actors: map[string]bool{"monitor": true}}
+	var batch []any
+	for i := 0; i < 26; i++ {
+		id := fmt.Sprintf("00000000-0000-4000-8000-%012x", i)
+		badAttempts := []any{"invalid", nil, bson.A{1}, -1, 0.5}[i%5]
+		batch = append(batch, bson.M{"_id": id, "requestId": id, "version": 1, "workerEnvironment": "batch-test",
+			"environment": "batch-test", "actor": "monitor", "state": "pending", "type": "list",
+			"createdAt": now, "expiresAt": now.Add(time.Minute), "attempts": badAttempts})
+	}
+	goodID := "ffffffff-ffff-4fff-8fff-ffffffffffff"
+	batch = append(batch, bson.M{"_id": goodID, "requestId": goodID, "version": 1, "workerEnvironment": "batch-test",
+		"environment": "batch-test", "actor": "monitor", "state": "pending", "type": "list",
+		"createdAt": now, "expiresAt": now.Add(time.Minute)})
+	activeID := "00000000-0000-4000-8001-000000000001"
+	batch = append(batch, bson.M{"_id": activeID, "workerEnvironment": "batch-test", "state": "processing",
+		"leaseId": "other-worker", "leaseUntil": now.Add(time.Hour), "attempts": "invalid"})
+	expiredID := "00000000-0000-4000-8001-000000000002"
+	batch = append(batch, bson.M{"_id": expiredID, "workerEnvironment": "batch-test", "state": "processing",
+		"leaseId": "old-worker", "leaseUntil": now.Add(-time.Minute), "attempts": "invalid"})
+	pendingLeaseID := "00000000-0000-4000-8001-000000000003"
+	batch = append(batch, bson.M{"_id": pendingLeaseID, "workerEnvironment": "batch-test", "state": "pending", "leaseId": "invalid"})
+	expiredMissingLeaseID := "00000000-0000-4000-8001-000000000004"
+	batch = append(batch, bson.M{"_id": expiredMissingLeaseID, "workerEnvironment": "batch-test", "state": "processing",
+		"leaseUntil": now.Add(-time.Minute), "attempts": 1})
+	unknownLeaseID := "00000000-0000-4000-8001-000000000005"
+	batch = append(batch, bson.M{"_id": unknownLeaseID, "workerEnvironment": "batch-test", "state": "processing",
+		"leaseId": "unknown", "leaseUntil": bson.A{now.Add(-time.Minute)}, "attempts": 1})
+	if _, err := commands.InsertMany(ctx, batch); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 2; i++ {
+		if err := processPendingAnnouncementCommands(ctx, batchPolicy); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 26; i++ {
+		doc := result(fmt.Sprintf("00000000-0000-4000-8000-%012x", i))
+		if doc["state"] != "completed" || doc["outcome"] != "rejected" || doc["reason"] != "malformed" {
+			t.Fatal(doc)
+		}
+	}
+	if doc := result(goodID); doc["outcome"] != "success" {
+		t.Fatal(doc)
+	}
+	if doc := result(expiredID); doc["outcome"] != "rejected" || doc["reason"] != "malformed" {
+		t.Fatal(doc)
+	}
+	for _, id := range []string{pendingLeaseID, expiredMissingLeaseID} {
+		if doc := result(id); doc["outcome"] != "rejected" || doc["reason"] != "malformed" {
+			t.Fatal(doc)
+		}
+	}
+	if doc := result(activeID); doc["state"] != "processing" || doc["leaseId"] != "other-worker" {
+		t.Fatal(doc)
+	}
+	if doc := result(unknownLeaseID); doc["state"] != "processing" || doc["leaseId"] != "unknown" {
+		t.Fatal(doc)
 	}
 }
 
