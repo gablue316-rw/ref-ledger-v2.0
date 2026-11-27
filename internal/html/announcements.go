@@ -210,16 +210,16 @@ func announcementKey(v *announcementView) string {
 }
 
 type announcementRequest struct {
-	Message         string `json:"message"`
-	Audience        string `json:"audience"`
-	Username        string `json:"username"`
-	TenantID        string `json:"tenantId"`
-	UserID          string `json:"userId"`
-	SessionTargetID string `json:"sessionTargetId"`
-	StartsAt        string `json:"startsAt"`
-	EndsAt          string `json:"endsAt"`
-	Timezone        string `json:"timezone"`
-	Version         int64  `json:"version"`
+	Message         string `json:"message" bson:"message"`
+	Audience        string `json:"audience" bson:"audience"`
+	Username        string `json:"username" bson:"username"`
+	TenantID        string `json:"tenantId" bson:"tenantId"`
+	UserID          string `json:"userId" bson:"userId"`
+	SessionTargetID string `json:"sessionTargetId" bson:"sessionTargetId"`
+	StartsAt        string `json:"startsAt" bson:"startsAt"`
+	EndsAt          string `json:"endsAt" bson:"endsAt"`
+	Timezone        string `json:"timezone" bson:"timezone"`
+	Version         int64  `json:"version" bson:"version"`
 }
 
 type announcementInputError struct{ msg string }
