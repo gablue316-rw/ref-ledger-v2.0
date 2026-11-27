@@ -35,9 +35,11 @@ export function startAnnouncementLoop({request,apply,wait=ms=>new Promise(r=>set
  return {stop(){running=false;apply(null);}};
 }
 
-export function createAnnouncementBanner({banner,text,more,dialog,body,close,watch,doc=document}){
- let loop;
+export function createAnnouncementBanner({banner,text,more,dialog,body,close,clear,status,dismiss,watch,doc=document}){
+ let loop,current;
  const render=a=>{
+  current=a;
+  if(status)status.textContent="";
   if(!a||!a.message){
    if(dialog.open)dialog.close();
    banner.hidden=true;text.textContent='';more.hidden=true;body.textContent='';
@@ -49,6 +51,19 @@ export function createAnnouncementBanner({banner,text,more,dialog,body,close,wat
  };
  more.onclick=()=>{body.textContent=text.textContent;if(!dialog.open)dialog.showModal();};
  close.onclick=()=>dialog.close();
+ if(clear)clear.onclick=async()=>{
+  const id=current?.id;
+  if(!id)return;
+  clear.disabled=true;
+  try{
+   await dismiss(id);
+   if(current?.id===id)render(null);
+  }catch{
+   if(current?.id===id)status.textContent='Unable to clear the announcement. Try again.';
+  }finally{
+   clear.disabled=false;
+  }
+ };
  const stop=()=>{loop?.stop();loop=undefined;};
  const start=()=>{if(loop||doc.visibilityState==='hidden')return;loop=watch(render);};
  // Foreground only: reconcile from scratch on resume.

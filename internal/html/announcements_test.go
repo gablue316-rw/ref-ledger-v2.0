@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -602,4 +603,54 @@ func TestEventStreamDeliversScheduledStartClearAndSessionEnd(t *testing.T) {
 	revoked = true
 	mu.Unlock()
 	next("session_ended")
+}
+
+type memoryAnnouncementDismissals map[string]bool
+
+func (m memoryAnnouncementDismissals) dismissed(_ context.Context, r announcementRecipient, keys []string) (map[string]bool, error) {
+	out := make(map[string]bool, len(keys))
+	for _, key := range keys {
+		out[key] = m[r.TenantID+":"+r.UserID+":"+key]
+	}
+	return out, nil
+}
+
+func (m memoryAnnouncementDismissals) dismiss(_ context.Context, r announcementRecipient, key string) error {
+	m[r.TenantID+":"+r.UserID+":"+key] = true
+	return nil
+}
+
+func TestAnnouncementDismissalBySchedule(t *testing.T) {
+	for _, timed := range []bool{false, true} {
+		service, _ := newAnnouncementTestService()
+		service.dismissals = memoryAnnouncementDismissals{}
+		request := announcementRequest{Audience: "system", Message: "Maintenance"}
+		if timed {
+			request.EndsAt = annNow.Add(time.Hour).Format(time.RFC3339)
+			request.Timezone = "UTC"
+		}
+		a, err := service.publish(context.Background(), request, "monitor")
+		if err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/api/announcements/dismiss", strings.NewReader(fmt.Sprintf(`{"id":%q}`, a.ID)))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		service.dismissHandler(func(context.Context) (announcementRecipient, error) { return annLaptop, nil })(w, req)
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("dismiss returned %d: %s", w.Code, w.Body.String())
+		}
+		bob := announcementRecipient{TenantID: annBob.TenantID, UserID: annBob.UserID}
+		newBobSession := bob
+		newBobSession.SignedInAt = annNow.Add(time.Minute)
+		for _, check := range []struct {
+			recipient announcementRecipient
+			visible   bool
+		}{{annLaptop, false}, {annPhone, timed}, {bob, true}, {newBobSession, timed}} {
+			v, err := service.current(context.Background(), check.recipient)
+			if err != nil || (v != nil) != check.visible {
+				t.Fatalf("timed=%t recipient=%+v visible=%t got %v, %v", timed, check.recipient, check.visible, v, err)
+			}
+		}
+	}
 }

@@ -8447,6 +8447,8 @@ func main() {
 	mux.HandleFunc("/api/mobile/session", MobileSession)
 	mux.HandleFunc("/api/announcements/current", webAnnouncementCurrent)
 	mux.HandleFunc("/api/announcements/events", webAnnouncementEvents)
+	mux.HandleFunc("/api/announcements/dismiss", webAnnouncementDismiss)
+	mux.HandleFunc("/api/mobile/announcements/dismiss", mobileAnnouncementDismiss)
 	mux.HandleFunc("/api/mobile/announcements/current", mobileAnnouncementCurrent)
 	mux.HandleFunc(announcementAdminPrefix, announcementAdminHandler)
 	mux.HandleFunc(announcementAdminPrefix+"/", announcementAdminHandler)
