@@ -319,7 +319,12 @@ function initializeAnnouncements(container) {
     more.type = "button";
     more.textContent = "Read more";
     more.hidden = true;
-    banner.append(text, more);
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.textContent = "Clear";
+    const status = document.createElement("span");
+    status.setAttribute("role", "alert");
+    banner.append(text, more, clear, status);
     container.insertAdjacentElement("afterend", banner);
 
     const dialog = document.createElement("dialog");
@@ -345,7 +350,10 @@ function initializeAnnouncements(container) {
     });
     window.addEventListener("resize", updateOverflow);
 
+    let current;
     const show = (announcement) => {
+        current = announcement;
+        status.textContent = "";
         if (!announcement || !announcement.message) {
             if (dialog.open) {
                 dialog.close();
@@ -362,6 +370,25 @@ function initializeAnnouncements(container) {
             full.textContent = announcement.message;
         }
     };
+
+    clear.addEventListener("click", async () => {
+        const id = current?.id;
+        if (!id) return;
+        clear.disabled = true;
+        try {
+            const response = await fetch("/api/announcements/dismiss", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({id}),
+            });
+            if (!response.ok) throw new Error("Dismissal failed");
+            if (current?.id === id) show(null);
+        } catch {
+            if (current?.id === id) status.textContent = "Unable to clear the announcement. Try again.";
+        } finally {
+            clear.disabled = false;
+        }
+    });
 
     const source = new EventSource("/api/announcements/events");
     source.addEventListener("announcement", (event) => {
